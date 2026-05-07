@@ -1,0 +1,34 @@
+{
+  "project_info": {
+    "name": "PhoneFarm_Solumate",
+    "type": "android_control_system"
+  },
+  "frontend_identifiers": {
+    "components": {
+      "app": "App",
+      "device_viewer": "DeviceViewer",
+      "right_bar": "RightBar",
+      "tile": "Tile"
+    },
+    "css_classes": {
+      "right_config_panel": "rightConfigPanel",
+      "right_config_panel_collapsed": "collapsed",
+      "sidebar_pinned": "sidebar-pinned",
+      "sidebar_auto_hide": "sidebar-auto-hide",
+      "btn_pin": "btn-pin"
+    },
+    "state_variables": {
+      "sidebar_collapsed": "sidebarCollapsed",
+      "is_sidebar_pinned": "isSidebarPinned",
+      "is_sidebar_hovered": "isSidebarHovered"
+    }
+  },
+  "key_codes": {
+    "back": 4,
+    "home": 3,
+    "menu": 82,
+    "power": 26,
+    "volume_up": 24,
+    "volume_down": 25
+  }
+}
