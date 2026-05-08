@@ -260,19 +260,13 @@ body.sidebarCollapsed {
   background: linear-gradient(135deg, #8fc5ff, #5a8cff);
 }
 
-#grid {
+#grid, .devices-grid, .tiles-container {
   display: grid;
-  gap: var(--grid-gap, 8px);
-  padding: 8px;
+  gap: 2px !important;
+  padding: 2px;
   box-sizing: border-box;
-  /* width can be controlled from App via CSS variable */
-  grid-template-columns: var(--grid-template-columns,
-      repeat(auto-fit, minmax(var(--tile-width, 320px), var(--tile-width, 320px))));
+  grid-template-columns: repeat(auto-fit, minmax(var(--tile-width, 120px), 1fr));
   grid-auto-rows: max-content;
-  /* Key behavior:
-     - In fixed columns mode, the grid can be wider than the viewport and will scroll inside #gridScroll.
-     - In auto mode, min-width:100% keeps it filling the viewport.
-  */
   width: var(--grid-width, 100%);
   min-width: 100%;
 }
@@ -1676,7 +1670,9 @@ video {
   max-height: 100%;
   object-fit: fill !important;
   /* Quan trọng: Ép giãn để lấp kín 100% vùng đen */
-  margin: auto;
+  margin: 0;
+  padding: 0;
+  display: block;
 }
 
 .tile {
