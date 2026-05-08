@@ -395,13 +395,13 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
         id="viewerPanel"
         style={{ flex: 1, ['--viewer-aspect' as any]: viewerAspect }}
       >
-        {/* 
-        <div className="viewerHeader">
-          ...
-        </div>
-        */}
+        <div className="drag-handle-invisible"></div>
 
-        <div className={`viewerBody${tab === 'view' ? ' viewMode' : ''}`} ref={bodyRef}>
+        <div 
+          className={`viewerBody${tab === 'view' ? ' viewMode' : ''}`} 
+          ref={bodyRef}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           {tab === 'view' ? (
             <div className="viewerMain">
               <div className="viewerCanvasWrap" style={{ transform: 'none' }}>
