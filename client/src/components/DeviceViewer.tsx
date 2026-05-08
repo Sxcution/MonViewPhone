@@ -390,184 +390,183 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
   }, [apps, appsFilter]);
 
   return (
-    <>
-    <div
-      id="viewerPanel"
-      style={{ flex: 1, ['--viewer-aspect' as any]: viewerAspect }}
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      {/* 
-      <div className="viewerHeader">
-        ...
-      </div>
-      */}
+    <div className="device-viewer-container">
+      <div
+        id="viewerPanel"
+        style={{ flex: 1, ['--viewer-aspect' as any]: viewerAspect }}
+      >
+        {/* 
+        <div className="viewerHeader">
+          ...
+        </div>
+        */}
 
-      <div className={`viewerBody${tab === 'view' ? ' viewMode' : ''}`} ref={bodyRef}>
-        {tab === 'view' ? (
-          <div className="viewerMain">
-            <div className="viewerCanvasWrap" style={{ transform: 'none' }}>
-              <canvas ref={canvasRef} className="viewerCanvas" style={{ touchAction: 'none' }} tabIndex={0} />
-            </div>
-          </div>
-        ) : null}
-
-        {tab === 'files' ? (
-          <div className="viewerPanelInner">
-            <div className="viewerFsTop">
-              <button className="viewerFsBtn" onClick={() => refreshDir(parent)} disabled={!parent || fileLoading}>
-                <ArrowLeft size={16} strokeWidth={1.8} />
-                <span style={{ marginLeft: 6 }}>Up</span>
-              </button>
-              <button className="viewerFsBtn" onClick={() => refreshDir(cwd)} disabled={fileLoading}>
-                <RefreshCw size={16} strokeWidth={1.8} />
-                <span style={{ marginLeft: 6 }}>Refresh</span>
-              </button>
-              <button
-                className="viewerFsBtn"
-                onClick={() => uploadInputRef.current?.click()}
-                disabled={fileLoading}
-              >
-                ⬆ Upload
-              </button>
-              <input
-                ref={uploadInputRef}
-                type="file"
-                style={{ display: 'none' }}
-                onChange={(e) => onUploadPick(e.target.files?.[0] || null)}
-              />
-            </div>
-
-            <div className="viewerFsPath">
-              <input
-                className="viewerFsPathInput"
-                value={cwd}
-                onChange={(e) => setCwd(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') refreshDir(e.currentTarget.value);
-                }}
-              />
-              <button className="viewerFsBtn" onClick={() => refreshDir(cwd)} disabled={fileLoading}>
-                Go
-              </button>
-            </div>
-
-            {fileError ? <div className="viewerError">{fileError}</div> : null}
-
-            <div className="viewerFsMain">
-              <div className="viewerFsList">
-                {fileLoading ? <div className="viewerHint">Loading…</div> : null}
-                {!fileLoading && !entries.length ? <div className="viewerHint">No entries</div> : null}
-                {entries.map((e) => (
-                  <button
-                    key={e.fullPath}
-                    className="viewerFsRow"
-                    onClick={() => {
-                      if (e.isDirBool) {
-                        setPreview({ kind: 'none' });
-                        refreshDir(joinPath(cwd, e.name + '/'));
-                      } else {
-                        openFile(e.fullPath, e.name);
-                      }
-                    }}
-                  >
-                    <span className="viewerFsName">
-                      {e.isDirBool ? (
-                        <Folder size={16} strokeWidth={1.8} style={{ marginRight: 8, flexShrink: 0 }} />
-                      ) : (
-                        <FileText size={16} strokeWidth={1.8} style={{ marginRight: 8, flexShrink: 0 }} />
-                      )}
-                      {e.name}
-                    </span>
-                    {!e.isDirBool ? <span className="viewerFsMeta">{e.size}b</span> : null}
-                  </button>
-                ))}
-              </div>
-
-              <div className="viewerFsPreview">
-                {preview.kind === 'none' ? <div className="viewerHint">Select a file to preview</div> : null}
-                {preview.kind === 'text' ? (
-                  <pre className="viewerFsText">{preview.text}</pre>
-                ) : null}
-                {preview.kind === 'image' ? (
-                  <>
-                    <div className="viewerFsPreviewTop">
-                      <button className="viewerFsBtn" onClick={downloadCurrentPreview}>
-                        <Download size={16} strokeWidth={1.8} style={{ marginRight: 6 }} />
-                        Download
-                      </button>
-                      <div className="viewerFsSmall">{preview.path}</div>
-                    </div>
-                    <img className="viewerFsImg" src={preview.url} alt={preview.path} />
-                  </>
-                ) : null}
-                {preview.kind === 'blob' ? (
-                  <>
-                    <div className="viewerFsPreviewTop">
-                      <button className="viewerFsBtn" onClick={downloadCurrentPreview}>
-                        <Download size={16} strokeWidth={1.8} style={{ marginRight: 6 }} />
-                        Download
-                      </button>
-                      <a className="viewerFsBtn" href={preview.url} target="_blank" rel="noreferrer">
-                        Open
-                      </a>
-                    </div>
-                    <div className="viewerHint">Binary file preview (download/open)</div>
-                    <div className="viewerFsSmall">{preview.path}</div>
-                  </>
-                ) : null}
+        <div className={`viewerBody${tab === 'view' ? ' viewMode' : ''}`} ref={bodyRef}>
+          {tab === 'view' ? (
+            <div className="viewerMain">
+              <div className="viewerCanvasWrap" style={{ transform: 'none' }}>
+                <canvas ref={canvasRef} className="viewerCanvas" style={{ touchAction: 'none' }} tabIndex={0} />
               </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {tab === 'apps' ? (
-          <div className="viewerPanelInner">
-            <div className="viewerFsTop">
-              <button className="viewerFsBtn" onClick={() => refreshApps()} disabled={appsLoading}>
-                <RefreshCw size={16} strokeWidth={1.8} />
-                <span style={{ marginLeft: 6 }}>Refresh</span>
-              </button>
-              <input
-                className="viewerFsPathInput"
-                placeholder="Filter apps…"
-                value={appsFilter}
-                onChange={(e) => setAppsFilter(e.target.value)}
-              />
-            </div>
+          {tab === 'files' ? (
+            <div className="viewerPanelInner">
+              <div className="viewerFsTop">
+                <button className="viewerFsBtn" onClick={() => refreshDir(parent)} disabled={!parent || fileLoading}>
+                  <ArrowLeft size={16} strokeWidth={1.8} />
+                  <span style={{ marginLeft: 6 }}>Up</span>
+                </button>
+                <button className="viewerFsBtn" onClick={() => refreshDir(cwd)} disabled={fileLoading}>
+                  <RefreshCw size={16} strokeWidth={1.8} />
+                  <span style={{ marginLeft: 6 }}>Refresh</span>
+                </button>
+                <button
+                  className="viewerFsBtn"
+                  onClick={() => uploadInputRef.current?.click()}
+                  disabled={fileLoading}
+                >
+                  ⬆ Upload
+                </button>
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  style={{ display: 'none' }}
+                  onChange={(e) => onUploadPick(e.target.files?.[0] || null)}
+                />
+              </div>
 
-            <div className="viewerHint" style={{ marginBottom: 8 }}>
-              Apps list is <b>best-effort</b> (based on readable app directories). Some devices block /data/app without root.
-            </div>
+              <div className="viewerFsPath">
+                <input
+                  className="viewerFsPathInput"
+                  value={cwd}
+                  onChange={(e) => setCwd(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') refreshDir(e.currentTarget.value);
+                  }}
+                />
+                <button className="viewerFsBtn" onClick={() => refreshDir(cwd)} disabled={fileLoading}>
+                  Go
+                </button>
+              </div>
 
-            {appsError ? <div className="viewerError">{appsError}</div> : null}
-            {appsLoading ? <div className="viewerHint">Loading…</div> : null}
+              {fileError ? <div className="viewerError">{fileError}</div> : null}
 
-            <div className="viewerAppsList">
-              {filteredApps.map((a) => (
-                <div key={a.path} className="viewerAppsRow">
-                  <div className="viewerAppsName">{a.name}</div>
-                  <div className="viewerAppsPath">{a.path}</div>
+              <div className="viewerFsMain">
+                <div className="viewerFsList">
+                  {fileLoading ? <div className="viewerHint">Loading…</div> : null}
+                  {!fileLoading && !entries.length ? <div className="viewerHint">No entries</div> : null}
+                  {entries.map((e) => (
+                    <button
+                      key={e.fullPath}
+                      className="viewerFsRow"
+                      onClick={() => {
+                        if (e.isDirBool) {
+                          setPreview({ kind: 'none' });
+                          refreshDir(joinPath(cwd, e.name + '/'));
+                        } else {
+                          openFile(e.fullPath, e.name);
+                        }
+                      }}
+                    >
+                      <span className="viewerFsName">
+                        {e.isDirBool ? (
+                          <Folder size={16} strokeWidth={1.8} style={{ marginRight: 8, flexShrink: 0 }} />
+                        ) : (
+                          <FileText size={16} strokeWidth={1.8} style={{ marginRight: 8, flexShrink: 0 }} />
+                        )}
+                        {e.name}
+                      </span>
+                      {!e.isDirBool ? <span className="viewerFsMeta">{e.size}b</span> : null}
+                    </button>
+                  ))}
                 </div>
-              ))}
-              {!appsLoading && !filteredApps.length ? <div className="viewerHint">No apps found</div> : null}
-            </div>
-          </div>
-        ) : null}
 
-        {tab === 'shell' ? (
-          <div className="viewerPanelInner viewerShellWrap" ref={shellWrapRef}>
-            <ShellPage wsServer={wsServer} udid={udid} />
-          </div>
-        ) : null}
+                <div className="viewerFsPreview">
+                  {preview.kind === 'none' ? <div className="viewerHint">Select a file to preview</div> : null}
+                  {preview.kind === 'text' ? (
+                    <pre className="viewerFsText">{preview.text}</pre>
+                  ) : null}
+                  {preview.kind === 'image' ? (
+                    <>
+                      <div className="viewerFsPreviewTop">
+                        <button className="viewerFsBtn" onClick={downloadCurrentPreview}>
+                          <Download size={16} strokeWidth={1.8} style={{ marginRight: 6 }} />
+                          Download
+                        </button>
+                        <div className="viewerFsSmall">{preview.path}</div>
+                      </div>
+                      <img className="viewerFsImg" src={preview.url} alt={preview.path} />
+                    </>
+                  ) : null}
+                  {preview.kind === 'blob' ? (
+                    <>
+                      <div className="viewerFsPreviewTop">
+                        <button className="viewerFsBtn" onClick={downloadCurrentPreview}>
+                          <Download size={16} strokeWidth={1.8} style={{ marginRight: 6 }} />
+                          Download
+                        </button>
+                        <a className="viewerFsBtn" href={preview.url} target="_blank" rel="noreferrer">
+                          Open
+                        </a>
+                      </div>
+                      <div className="viewerHint">Binary file preview (download/open)</div>
+                      <div className="viewerFsSmall">{preview.path}</div>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {tab === 'apps' ? (
+            <div className="viewerPanelInner">
+              <div className="viewerFsTop">
+                <button className="viewerFsBtn" onClick={() => refreshApps()} disabled={appsLoading}>
+                  <RefreshCw size={16} strokeWidth={1.8} />
+                  <span style={{ marginLeft: 6 }}>Refresh</span>
+                </button>
+                <input
+                  className="viewerFsPathInput"
+                  placeholder="Filter apps…"
+                  value={appsFilter}
+                  onChange={(e) => setAppsFilter(e.target.value)}
+                />
+              </div>
+
+              <div className="viewerHint" style={{ marginBottom: 8 }}>
+                Apps list is <b>best-effort</b> (based on readable app directories). Some devices block /data/app without root.
+              </div>
+
+              {appsError ? <div className="viewerError">{appsError}</div> : null}
+              {appsLoading ? <div className="viewerHint">Loading…</div> : null}
+
+              <div className="viewerAppsList">
+                {filteredApps.map((a) => (
+                  <div key={a.path} className="viewerAppsRow">
+                    <div className="viewerAppsName">{a.name}</div>
+                    <div className="viewerAppsPath">{a.path}</div>
+                  </div>
+                ))}
+                {!appsLoading && !filteredApps.length ? <div className="viewerHint">No apps found</div> : null}
+              </div>
+            </div>
+          ) : null}
+
+          {tab === 'shell' ? (
+            <div className="viewerPanelInner viewerShellWrap" ref={shellWrapRef}>
+              <ShellPage wsServer={wsServer} udid={udid} />
+            </div>
+          ) : null}
+        </div>
       </div>
+      <ViewerSidePanel
+        udid={udid}
+        currentOrder={currentOrder}
+        onChangeOrder={onChangeOrder}
+        onCloseViewer={onClose}
+      />
     </div>
-    <ViewerSidePanel
-      udid={udid}
-      currentOrder={currentOrder}
-      onChangeOrder={onChangeOrder}
-      onCloseViewer={onClose}
-    />
-    </>
   );
 }
 

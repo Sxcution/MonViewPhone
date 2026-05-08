@@ -1781,7 +1781,7 @@ export function App () {
             onMouseDown={e => e.stopPropagation()}
             onPointerDown={onViewerPointerDown}
           >
-            <div className='viewerOverlayPanel device-viewer-container'>
+            <div className='viewerOverlayPanel'>
               <DeviceViewer
                 udid={viewerUdid}
                 wsServer={wsServer}
