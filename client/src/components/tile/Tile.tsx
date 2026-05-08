@@ -229,7 +229,7 @@ function TileComponent({
             className={tileClass}
             data-udid={udid}
         >
-            {showTileInfo ? (
+            {showTileInfo && !isViewing ? (
                 <TileHeader
                     udid={udid}
                     order={order}

@@ -299,7 +299,20 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
 
   return (
     <>
-      <div className="vsp-panel">
+      <div className="vsp-panel right-bar-container">
+        <div className="vsp-header" style={{ justifyContent: 'space-between' }}>
+          <div className="device-serial-title" style={{
+              color: '#fff', 
+              fontWeight: 'bold',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+          }}>
+              📱 {udid}
+          </div>
+          <button className="vsp-header-close" onClick={onCloseViewer} title={t('Close')}><X size={14} /></button>
+        </div>
         {/* Toast notifications */}
         {toasts.length > 0 && (
           <div className="vsp-toast-container">
@@ -308,9 +321,6 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
             ))}
           </div>
         )}
-        <div className="vsp-header">
-          <button className="vsp-header-close" onClick={onCloseViewer} title={t('Close')}><X size={14} /></button>
-        </div>
         <div className="vsp-body">
           {/* 1. Đổi số hiệu - inline */}
           <div className="vsp-section">

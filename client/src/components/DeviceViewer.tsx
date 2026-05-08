@@ -393,39 +393,14 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
     <>
     <div
       id="viewerPanel"
-      style={{ width: '100%', ['--viewer-aspect' as any]: viewerAspect }}
+      style={{ flex: 1, ['--viewer-aspect' as any]: viewerAspect }}
       onMouseDown={(e) => e.stopPropagation()}
     >
+      {/* 
       <div className="viewerHeader">
-        <div className="viewerTitle">
-          <div className="viewerTitleLine" title={`${deviceName} ${udid}`}>
-            <span className="viewerDeviceName">{deviceName}</span>
-            <button className="viewerSerialBtn" type="button" onClick={copySerial} title="Copy serial">
-              {udid}
-            </button>
-            {status !== 'ready' ? <span className="viewerStatus">loading...</span> : null}
-            {serialCopied ? <span className="viewerCopied">Copied</span> : null}
-          </div>
-        </div>
-
-        <div className="viewerHeaderRight">
-          <div className="viewerTabs">
-            <button className={`viewerTab ${tab === 'view' ? 'on' : ''}`} onClick={() => setTab('view')}>
-              View
-            </button>
-            <button className={`viewerTab ${tab === 'files' ? 'on' : ''}`} onClick={() => setTab('files')}>
-              Files
-            </button>
-            <button className={`viewerTab ${tab === 'apps' ? 'on' : ''}`} onClick={() => setTab('apps')}>
-              Apps
-            </button>
-            <button className={`viewerTab ${tab === 'shell' ? 'on' : ''}`} onClick={() => setTab('shell')}>
-              Shell
-            </button>
-          </div>
-
-        </div>
+        ...
       </div>
+      */}
 
       <div className={`viewerBody${tab === 'view' ? ' viewMode' : ''}`} ref={bodyRef}>
         {tab === 'view' ? (
