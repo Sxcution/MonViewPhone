@@ -260,7 +260,9 @@ body.sidebarCollapsed {
   background: linear-gradient(135deg, #8fc5ff, #5a8cff);
 }
 
-#grid, .devices-grid, .tiles-container {
+#grid,
+.devices-grid,
+.tiles-container {
   display: grid;
   gap: 2px !important;
   padding: 2px;
@@ -4468,36 +4470,42 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 
 /* Giao diện khung phóng to */
 .device-viewer-container {
-    display: flex;
-    flex-direction: row;
-    gap: 15px; /* Khoảng cách tách biệt màn hình và bảng điều khiển */
-    background: transparent !important; /* Không để nền ở thẻ cha */
-    border: none !important;
-    box-shadow: none !important;
-    overflow: visible !important;
-    cursor: grab;
+  display: flex;
+  flex-direction: row;
+  gap: 3px;
+  /* Khoảng cách tách biệt màn hình và bảng điều khiển (giảm từ 8px xuống 3px) */
+  background: transparent !important;
+  /* Không để nền ở thẻ cha */
+  border: none !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  cursor: grab;
 }
 
 .device-viewer-container:active {
-    cursor: grabbing;
+  cursor: grabbing;
 }
 
 /* Khối 1: Màn hình điện thoại */
 #viewerPanel {
-    border: 4px solid #007bff !important; /* Viền xanh đậm và dày */
-    border-radius: 16px !important; /* Bo góc tròn */
-    overflow: hidden;
-    background-color: #1e1e1e;
-    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
-    pointer-events: auto;
+  border: 6px solid #007bff !important;
+  /* Viền xanh dày hơn (tăng từ 4px) */
+  border-radius: 16px !important;
+  /* Bo góc tròn */
+  overflow: hidden;
+  background-color: #1e1e1e;
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
 }
 
 /* Khối 2: Bảng điều khiển */
 .right-bar-container {
-    border: 4px solid #007bff !important;
-    border-radius: 16px !important;
-    background-color: #1e1e1e;
-    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
-    pointer-events: auto;
-    border-left: 4px solid #007bff !important; /* Override the previous border-left */
+  border: 2px solid #007bff !important;
+  /* Viền xanh mỏng hơn (giảm từ 4px) */
+  border-radius: 16px !important;
+  background-color: #1e1e1e;
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+  border-left: 2px solid #007bff !important;
+  /* Override the previous border-left */
 }
