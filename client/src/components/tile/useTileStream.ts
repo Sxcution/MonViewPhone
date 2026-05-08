@@ -113,8 +113,8 @@ export function useTileStream(args: Args) {
                 dw = dh * ar;
             }
 
-            canvas.style.width = '100%';
-            canvas.style.height = '100%';
+            canvas.style.width = `${Math.round(dw)}px`;
+            canvas.style.height = `${Math.round(dh)}px`;
         }
 
         const ro = new ResizeObserver(fitCanvasToBody);
