@@ -208,7 +208,6 @@ function TileComponent({
             className="tileVideoFrame"
             ref={frameRef}
             aria-hidden={isViewing}
-            style={{ ['--stream-aspect' as any]: String(videoAspect || 9 / 19.5) }}
         >
             <canvas ref={canvasRef} style={{ touchAction: 'none' }} tabIndex={0} />
         </div>
