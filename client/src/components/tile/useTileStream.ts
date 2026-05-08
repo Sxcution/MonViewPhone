@@ -109,8 +109,9 @@ export function useTileStream(args: Args) {
             const dw = Math.ceil(canvas.width * scale);
             const dh = Math.ceil(canvas.height * scale);
 
-            canvas.style.width = `${dw}px`;
-            canvas.style.height = `${dh}px`;
+            // Đã nhường quyền điều khiển size cho CSS (object-fit: contain)
+            // canvas.style.width = `${dw}px`;
+            // canvas.style.height = `${dh}px`;
         }
 
         const ro = new ResizeObserver(fitCanvasToBody);

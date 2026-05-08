@@ -209,7 +209,18 @@ function TileComponent({
             ref={frameRef}
             aria-hidden={isViewing}
         >
-            <canvas ref={canvasRef} style={{ touchAction: 'none' }} tabIndex={0} />
+            <canvas
+                ref={canvasRef}
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    display: 'block',
+                    position: 'relative',
+                    touchAction: 'none',
+                }}
+                tabIndex={0}
+            />
         </div>
     );
 

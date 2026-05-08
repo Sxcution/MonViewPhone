@@ -818,19 +818,7 @@ body.sidebarCollapsed {
   margin-top: 2px;
 }
 
-.tile {
-  --tile-aspect: 9/16;
-  background: #111827;
-  border: 2px solid #374151;
-  border-radius: 4px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  height: auto;
-  min-height: 0;
-  position: relative;
-  transition: all 0.15s ease-in-out;
-}
+
 .tile:hover {
   border-color: rgba(96, 165, 250, 0.6);
 }
@@ -1583,18 +1571,44 @@ body.sidebarCollapsed {
   align-self: center;
 }
 
+
+:root {
+  --phone-shell-aspect: 9 / 19.5; /* hoặc 9 / 20 nếu muốn ngắn hơn chút */
+}
+
+/* Ép canvas/video luôn hiển thị toàn bộ nội dung */
+canvas, video {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain !important;
+    margin: auto;
+}
+
+.tile {
+  background: #111827;
+  border: 2px solid #374151;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-height: 0;
+  position: relative;
+  aspect-ratio: 9 / 19.5; /* Ép tỷ lệ hiển thị chuẩn hiện đại */
+  justify-content: center;
+  align-items: center;
+}
+
 .tileBody {
   display: block;
   width: 100%;
-  aspect-ratio: var(--phone-shell-aspect, 9 / 19.5);
+  height: 100%;
   background: #000;
   overflow: hidden;
   min-height: 0;
   position: relative;
-}
-
-:root {
-  --phone-shell-aspect: 9 / 19.5; /* hoặc 9 / 20 nếu muốn ngắn hơn chút */
 }
 
 .tileVideoFrame {
@@ -1603,20 +1617,11 @@ body.sidebarCollapsed {
   position: relative;
   overflow: hidden;
   background: #000;
-  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.tileVideoFrame canvas {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: block;
-  width: auto !important;
-  height: auto !important;
-  max-width: none !important;
-  max-height: none !important;
-}
 .tileSyncBadge {
   position: absolute;
   top: 10px;
