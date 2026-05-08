@@ -1582,7 +1582,7 @@ canvas, video {
     height: 100% !important;
     max-width: 100%;
     max-height: 100%;
-    object-fit: contain !important;
+    object-fit: fill !important; /* Quan trọng: Ép giãn để lấp kín 100% vùng đen */
     margin: auto;
 }
 
@@ -1596,7 +1596,7 @@ canvas, video {
   height: auto;
   min-height: 0;
   position: relative;
-  aspect-ratio: 9 / 19.5; /* Ép tỷ lệ hiển thị chuẩn hiện đại */
+  aspect-ratio: 9 / 20; /* Tối ưu cho các máy màn dài, hạn chế méo hình */
   justify-content: center;
   align-items: center;
 }

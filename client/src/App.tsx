@@ -333,7 +333,7 @@ export function App () {
   // useEffect(() => {
   //   console.log(viewerOverrideConfig)
   // }, [viewerOverrideConfig])
-  const PHONE_SHELL_RATIO = 19.5 / 9;
+  const PHONE_SHELL_RATIO = 20 / 9;
   const DEFAULT_DIMS: TileDims = { width: 350, height: Math.round(350 * PHONE_SHELL_RATIO) }
 
   // Persisted tile size
