@@ -1,16 +1,3 @@
-## Đóng góp / Donation
-
-Nếu bạn thấy dự án hữu ích và muốn ủng hộ tác giả duy trì/hoàn thiện dự án, bạn có thể donation theo thông tin dưới đây:
-
-- **MoMo:** `0799640848`
-- **VietinBank:** `0799640848` — **Đoàn Thanh Lực**
-
-Xin cảm ơn bạn đã ủng hộ! 🙏
-
----
-
-# Solumate Steam Project
-
 Dự án gồm 2 phần:
 - **server**: backend API
 - **client**: frontend
