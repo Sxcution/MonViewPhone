@@ -333,7 +333,8 @@ export function App () {
   // useEffect(() => {
   //   console.log(viewerOverrideConfig)
   // }, [viewerOverrideConfig])
-  const DEFAULT_DIMS: TileDims = { width: 350, height: 700 }
+  const PHONE_SHELL_RATIO = 19.5 / 9;
+  const DEFAULT_DIMS: TileDims = { width: 350, height: Math.round(350 * PHONE_SHELL_RATIO) }
 
   // Persisted tile size
   const [tileDims, setTileDims] = useState<TileDims>(() => {
@@ -342,18 +343,14 @@ export function App () {
       if (!saved) return DEFAULT_DIMS
       const p = JSON.parse(saved)
       const w = clamp(Number(p?.width), 100, 4000)
-      const h = clamp(Number(p?.height), 100, 4000)
+      const h = Math.round(w * PHONE_SHELL_RATIO)
       return { width: w, height: h }
     } catch {
       return DEFAULT_DIMS
     }
   })
 
-  const tileAspectRef = useRef<number>(
-    tileDims.width > 0
-      ? tileDims.height / tileDims.width
-      : DEFAULT_DIMS.height / DEFAULT_DIMS.width
-  )
+  const tileAspectRef = useRef<number>(PHONE_SHELL_RATIO)
 
   const dimsRef = useRef<TileDims>(tileDims)
   useEffect(() => {
@@ -386,7 +383,7 @@ export function App () {
 
   const updateWidth = (w: number) => {
     const width = clamp(w, 100, 4000)
-    const height = clamp(Math.round(width * tileAspectRef.current), 100, 4000)
+    const height = Math.round(width * PHONE_SHELL_RATIO)
     const next = { width, height }
     dimsRef.current = next
     applyDimsToGrid(next)

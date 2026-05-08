@@ -97,9 +97,34 @@ export function useTileStream(args: Args) {
         const ctx2d = canvas.getContext("2d", { alpha: false }) as CanvasRenderingContext2D | null;
 
         function fitCanvasToBody() {
-            if (!canvas) return;
-            canvas.style.width = '100%';
-            canvas.style.height = '100%';
+            if (!body || !canvas) return;
+
+            const rect = body.getBoundingClientRect();
+            const bw = rect.width;
+            const bh = rect.height;
+
+            if (!bw || !bh || !canvas.width || !canvas.height) return;
+
+            const videoAr = canvas.width / canvas.height;
+            const frameAr = bw / bh;
+
+            let dw = bw;
+            let dh = bh;
+
+            // COVER thay vì CONTAIN
+            if (videoAr > frameAr) {
+                // video rộng hơn khung -> fit theo height, crop 2 bên
+                dh = bh;
+                dw = dh * videoAr;
+            } else {
+                // video cao hơn khung -> fit theo width, crop trên dưới
+                dw = bw;
+                dh = dw / videoAr;
+            }
+
+            // overscan nhẹ để tránh viền đen do rounding/subpixel
+            canvas.style.width = `${Math.ceil(dw) + 2}px`;
+            canvas.style.height = `${Math.ceil(dh) + 2}px`;
         }
 
         const ro = new ResizeObserver(fitCanvasToBody);

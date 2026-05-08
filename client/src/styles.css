@@ -1592,10 +1592,13 @@ body.sidebarCollapsed {
   position: relative;
 }
 
+:root {
+  --phone-shell-aspect: 9 / 19.5; /* hoặc 9 / 20 nếu muốn ngắn hơn chút */
+}
+
 .tileVideoFrame {
   width: 100%;
-  aspect-ratio: var(--stream-aspect, 9 / 16);
-  height: auto;
+  aspect-ratio: var(--phone-shell-aspect);
   position: relative;
   overflow: hidden;
   background: #000;
@@ -1604,10 +1607,14 @@ body.sidebarCollapsed {
 
 .tileVideoFrame canvas {
   position: absolute;
-  inset: 0;
-  width: 100% !important;
-  height: 100% !important;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
 }
 .tileSyncBadge {
   position: absolute;
