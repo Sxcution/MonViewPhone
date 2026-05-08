@@ -213,6 +213,7 @@ function TileComponent({
         <div
             className={tileClass}
             data-udid={udid}
+            style={{ ['--stream-aspect' as any]: String(videoAspect || 9 / 16) }}
         >
             {showTileInfo ? (
                 <TileHeader

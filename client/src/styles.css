@@ -826,8 +826,8 @@ body.sidebarCollapsed {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: 100%;           /* ← fill grid cell */
-  min-height: 240px;
+  height: auto;
+  min-height: 0;
   position: relative;
   transition: all 0.15s ease-in-out;
 }
@@ -1584,40 +1584,30 @@ body.sidebarCollapsed {
 }
 
 .tileBody {
-  position: relative;
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: stretch;
+  display: block;
+  width: 100%;
   background: #000;
   overflow: hidden;
   min-height: 0;
-  min-width: 0;
-  width: 100%;
+  position: relative;
 }
 
 .tileVideoFrame {
   width: 100%;
-  height: 100%;           /* ← fill toàn bộ chiều cao tileBody */
-  flex: 1 1 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  aspect-ratio: var(--stream-aspect, 9 / 16);
+  height: auto;
+  position: relative;
+  overflow: hidden;
   background: #000;
   border-radius: 6px;
-  overflow: hidden;
-  position: relative;
 }
 
 .tileVideoFrame canvas {
-  display: block;
-  /* KHÔNG dùng width/height 100% ở đây */
-  /* Sẽ được set bằng JS */
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
 }
 .tileSyncBadge {
   position: absolute;

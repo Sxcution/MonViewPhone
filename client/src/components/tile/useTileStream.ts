@@ -97,25 +97,9 @@ export function useTileStream(args: Args) {
         const ctx2d = canvas.getContext("2d", { alpha: false }) as CanvasRenderingContext2D | null;
 
         function fitCanvasToBody() {
-            if (!body || !canvas) {
-                return;
-            }
-            const rect = body.getBoundingClientRect();
-            const bw = rect.width;
-            const bh = rect.height;
-            if (!bw || !bh || !canvas.width || !canvas.height) return;
-
-            const ar = canvas.width / canvas.height;
-            let dw = bw;
-            let dh = dw / ar;
-
-            if (dh > bh) {
-                dh = bh;
-                dw = dh * ar;
-            }
-
-            canvas.style.width = `${Math.round(dw)}px`;
-            canvas.style.height = `${Math.round(dh)}px`;
+            if (!canvas) return;
+            canvas.style.width = '100%';
+            canvas.style.height = '100%';
         }
 
         const ro = new ResizeObserver(fitCanvasToBody);
