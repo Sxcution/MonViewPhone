@@ -240,7 +240,7 @@ body.sidebarCollapsed {
     --grid-template-columns,
     repeat(auto-fit, minmax(var(--tile-width, 320px), var(--tile-width, 320px)))
   );
-  grid-auto-rows: auto;
+  grid-auto-rows: max-content;
   /* Key behavior:
      - In fixed columns mode, the grid can be wider than the viewport and will scroll inside #gridScroll.
      - In auto mode, min-width:100% keeps it filling the viewport.
@@ -826,7 +826,7 @@ body.sidebarCollapsed {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: auto;
+  height: 100%;           /* ← fill grid cell */
   min-height: 240px;
   position: relative;
   transition: all 0.15s ease-in-out;
@@ -1588,8 +1588,8 @@ body.sidebarCollapsed {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   background: #000;
   overflow: hidden;
   min-height: 0;
@@ -1599,7 +1599,8 @@ body.sidebarCollapsed {
 
 .tileVideoFrame {
   width: 100%;
-  aspect-ratio: var(--tile-aspect, 9/16);
+  height: 100%;           /* ← fill toàn bộ chiều cao tileBody */
+  flex: 1 1 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1611,7 +1612,7 @@ body.sidebarCollapsed {
 .tileVideoFrame canvas {
   width: 100%;
   height: 100%;
-  object-fit: fill;
+  object-fit: contain;    /* ← giữ đúng tỉ lệ, không letterbox cứng */
 }
 .tileSyncBadge {
   position: absolute;
