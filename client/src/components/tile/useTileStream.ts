@@ -105,26 +105,12 @@ export function useTileStream(args: Args) {
 
             if (!bw || !bh || !canvas.width || !canvas.height) return;
 
-            const videoAr = canvas.width / canvas.height;
-            const frameAr = bw / bh;
+            const scale = Math.min(bw / canvas.width, bh / canvas.height);
+            const dw = Math.ceil(canvas.width * scale);
+            const dh = Math.ceil(canvas.height * scale);
 
-            let dw = bw;
-            let dh = bh;
-
-            // COVER thay vì CONTAIN
-            if (videoAr > frameAr) {
-                // video rộng hơn khung -> fit theo height, crop 2 bên
-                dh = bh;
-                dw = dh * videoAr;
-            } else {
-                // video cao hơn khung -> fit theo width, crop trên dưới
-                dw = bw;
-                dh = dw / videoAr;
-            }
-
-            // overscan nhẹ để tránh viền đen do rounding/subpixel
-            canvas.style.width = `${Math.ceil(dw) + 2}px`;
-            canvas.style.height = `${Math.ceil(dh) + 2}px`;
+            canvas.style.width = `${dw}px`;
+            canvas.style.height = `${dh}px`;
         }
 
         const ro = new ResizeObserver(fitCanvasToBody);

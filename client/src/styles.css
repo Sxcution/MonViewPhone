@@ -1598,7 +1598,7 @@ body.sidebarCollapsed {
 
 .tileVideoFrame {
   width: 100%;
-  aspect-ratio: var(--phone-shell-aspect);
+  aspect-ratio: var(--stream-aspect, 9 / 19.5);
   position: relative;
   overflow: hidden;
   background: #000;
