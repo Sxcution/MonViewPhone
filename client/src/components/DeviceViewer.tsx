@@ -390,17 +390,36 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
   }, [apps, appsFilter]);
 
   return (
-    <div className="device-viewer-container">
+    <div className="device-viewer-container" style={{ display: 'flex', gap: '20px', height: '100%', alignItems: 'stretch' }}>
+      
+      {/* 📱 KHỐI 1: CARD THIẾT BỊ (VIỀN DÀY ĐỂ KÉO THẢ) */}
       <div
         id="viewerPanel"
-        style={{ flex: 1, ['--viewer-aspect' as any]: viewerAspect }}
+        className="drag-handle-invisible" // <- App.tsx sẽ dựa vào class này để cho phép kéo thả
+        style={{ 
+          flex: 1, 
+          ['--viewer-aspect' as any]: viewerAspect,
+          border: '14px solid #007bff', /* Viền dày giống Xiaowei để dễ cầm nắm */
+          borderRadius: '16px',
+          backgroundColor: '#007bff',
+          cursor: 'grab', /* Con trỏ hình bàn tay khi rê vào viền */
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+        }}
       >
-        <div className="drag-handle-invisible"></div>
-
+        {/* VÙNG THÂN MÀN HÌNH: Chặn kéo thả để không bị lỗi khi click / vuốt điện thoại */}
         <div 
           className={`viewerBody${tab === 'view' ? ' viewMode' : ''}`} 
           ref={bodyRef}
-          onMouseDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()} 
+          style={{ 
+            cursor: 'default', 
+            flex: 1, 
+            backgroundColor: '#111', 
+            borderRadius: '6px', /* Bo góc nhẹ phần trong */
+            overflow: 'hidden' 
+          }}
         >
           {tab === 'view' ? (
             <div className="viewerMain">
@@ -560,12 +579,42 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
           ) : null}
         </div>
       </div>
-      <ViewerSidePanel
-        udid={udid}
-        currentOrder={currentOrder}
-        onChangeOrder={onChangeOrder}
-        onCloseViewer={onClose}
-      />
+
+      {/* 🎛️ KHỐI 2: BẢNG ĐIỀU KHIỂN (CỐ ĐỊNH KÍCH THƯỚC KHÔNG CHE CHỮ) */}
+      <div 
+        className="drag-handle-invisible" // Bảng ĐK cũng có viền kéo thả được
+        style={{
+          flexShrink: 0,
+          minWidth: '350px', /* Fix dứt điểm lỗi bị che chữ */
+          border: '4px solid #007bff',
+          borderRadius: '16px',
+          backgroundColor: '#007bff',
+          cursor: 'grab',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+        }}
+      >
+        <div 
+          onMouseDown={(e) => e.stopPropagation()} // Chỉ chặn khi click vào Nút, list chữ bên trong
+          style={{ 
+            cursor: 'default', 
+            flex: 1, 
+            backgroundColor: '#1e1e1e', 
+            borderRadius: '10px',
+            overflowY: 'auto', // Cho phép cuộn nếu danh sách tính năng quá dài
+            overflowX: 'hidden'
+          }}
+        >
+          <ViewerSidePanel
+            udid={udid}
+            currentOrder={currentOrder}
+            onChangeOrder={onChangeOrder}
+            onCloseViewer={onClose}
+          />
+        </div>
+      </div>
+      
     </div>
   );
 }
