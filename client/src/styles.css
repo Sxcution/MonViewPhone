@@ -260,7 +260,9 @@ body.sidebarCollapsed {
   background: linear-gradient(135deg, #8fc5ff, #5a8cff);
 }
 
-#grid, .devices-grid, .tiles-container {
+#grid,
+.devices-grid,
+.tiles-container {
   display: grid;
   gap: 2px !important;
   padding: 2px;
@@ -3704,7 +3706,9 @@ body.alignRight .headerBar {
 }
 
 .vsp-select {
-  flex: 1;
+  flex: 0 1 auto;
+  min-width: 120px;
+  max-width: 170px;
   height: 32px;
   border-radius: 8px;
   border: 1px solid #333;
@@ -4468,16 +4472,20 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 
 /* Giao diện khung phóng to */
 .device-viewer-container {
-    border: 2px solid #3b3b3b; /* Viền xám đen hiện đại */
-    border-radius: 8px; /* Bo góc mềm mại */
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); /* Đổ bóng tạo chiều sâu */
-    overflow: hidden;
-    display: flex;
-    flex-direction: row; /* Ép màn hình và thanh bên phải nằm ngang */
+  border: 2px solid #3b3b3b;
+  /* Viền xám đen hiện đại */
+  border-radius: 8px;
+  /* Bo góc mềm mại */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  /* Đổ bóng tạo chiều sâu */
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  /* Ép màn hình và thanh bên phải nằm ngang */
 }
 
 /* Đảm bảo thanh bên phải cũng bo viền ăn khớp */
 .right-bar-container {
-    border-left: 1px solid #3b3b3b;
-    background-color: #1e1e1e;
+  border-left: 1px solid #3b3b3b;
+  background-color: #1e1e1e;
 }

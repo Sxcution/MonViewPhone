@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '@/context/I18nContext';
-import { Eye, GripVertical, RefreshCw } from 'lucide-react';
+import { Eye, RefreshCw } from 'lucide-react';
+import { listUserProfiles } from '@/lib/serverApi';
 
 type Props = {
     udid: string;
+    wsServer: string;
     order?: number;
     status: string;
     syncRole: 'main' | 'follower' | null;
@@ -22,6 +24,7 @@ type Props = {
  */
 export function TileHeader({
     udid,
+    wsServer,
     order,
     status,
     syncRole,
@@ -36,6 +39,22 @@ export function TileHeader({
 }: Props) {
     const { t } = useI18n();
     const [orderValue, setOrderValue] = useState('');
+
+    const [profiles, setProfiles] = useState<{ id: number; name: string }[]>([]);
+    const [selectedUser, setSelectedUser] = useState<number>(0);
+
+    useEffect(() => {
+        let active = true;
+        listUserProfiles(wsServer, udid)
+            .then((res) => {
+                if (active && res && res.length > 0) {
+                    setProfiles(res);
+                    setSelectedUser(res[0].id);
+                }
+            })
+            .catch((err) => console.error('Failed to load profiles', err));
+        return () => { active = false; };
+    }, [wsServer, udid]);
 
     useEffect(() => {
         setOrderValue(typeof order === 'number' ? String(order).padStart(2, '0') : '');
@@ -65,30 +84,61 @@ export function TileHeader({
             <div className="tileHeader" onClick={onHeaderClick} title={udid}>
                 <div className="left">
                     <div className="udidRow">
-                      {typeof order === 'number' ? (
-                          <input
-                              className="tileNumber"
-                              type="text"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              value={orderValue}
-                              title="Nhap so thu tu"
-                              onChange={(e) => setOrderValue(e.target.value.replace(/[^0-9]/g, ''))}
-                              onBlur={commitOrder}
-                              onClick={(e) => e.stopPropagation()}
-                              onPointerDown={(e) => e.stopPropagation()}
-                              onKeyDown={(e) => {
-                                  e.stopPropagation();
-                                  if (e.key === 'Enter') {
-                                      e.currentTarget.blur();
-                                  }
-                                  if (e.key === 'Escape') {
-                                      setOrderValue(String(order).padStart(2, '0'));
-                                      e.currentTarget.blur();
-                                  }
-                              }}
-                          />
-                      ) : null}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                        {typeof order === 'number' ? (
+                            <input
+                                className="tileNumber"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={orderValue}
+                                title="Nhap so thu tu"
+                                onChange={(e) => setOrderValue(e.target.value.replace(/[^0-9]/g, ''))}
+                                onBlur={commitOrder}
+                                onClick={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => {
+                                    e.stopPropagation();
+                                    if (e.key === 'Enter') {
+                                        e.currentTarget.blur();
+                                    }
+                                    if (e.key === 'Escape') {
+                                        setOrderValue(String(order).padStart(2, '0'));
+                                        e.currentTarget.blur();
+                                    }
+                                }}
+                            />
+                        ) : null}
+
+                        {profiles.length > 0 && (
+                            <select
+                                className="userProfileSelect"
+                                value={selectedUser}
+                                onChange={(e) => setSelectedUser(Number(e.target.value))}
+                                onClick={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                title="Chon User Profile"
+                                style={{
+                                    fontSize: '10px',
+                                    padding: '1px 2px',
+                                    borderRadius: '3px',
+                                    background: 'rgba(0,0,0,0.3)',
+                                    color: '#fff',
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    width: '100%',
+                                    textAlign: 'center',
+                                    outline: 'none',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {profiles.map((p) => (
+                                    <option key={p.id} value={p.id} style={{ color: '#000' }}>
+                                        User {p.id}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                      </div>
                       {connectionLabel ? <div className={`tileConnChip${connClass}`}>{connectionLabel}</div> : null}
                       {syncRole ? (
                           <div className={`tileSyncChip ${syncRole}`}>{syncRole === 'main' ? t('ChÃ­nh') : t('Phá»¥')}</div>

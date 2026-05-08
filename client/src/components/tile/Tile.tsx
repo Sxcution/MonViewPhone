@@ -232,6 +232,7 @@ function TileComponent({
             {showTileInfo ? (
                 <TileHeader
                     udid={udid}
+                    wsServer={wsServer}
                     order={order}
                     status={status}
                     syncRole={syncRole}
