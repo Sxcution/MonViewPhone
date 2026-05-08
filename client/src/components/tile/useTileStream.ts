@@ -100,8 +100,9 @@ export function useTileStream(args: Args) {
             if (!body || !canvas) {
                 return;
             }
-            const bw = body.clientWidth;
-            const bh = body.clientHeight;
+            const rect = body.getBoundingClientRect();
+            const bw = rect.width;
+            const bh = rect.height;
             if (!bw || !bh || !canvas.width || !canvas.height) return;
 
             const ar = canvas.width / canvas.height;
