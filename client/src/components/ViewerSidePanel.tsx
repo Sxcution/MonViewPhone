@@ -301,7 +301,14 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
     <>
       <div className="vsp-panel right-bar-container">
         <div className="vsp-header" style={{ justifyContent: 'space-between' }}>
-          <div className="vsp-header-title">
+          <div className="device-serial-title" style={{
+              color: '#fff', 
+              fontWeight: 'bold',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+          }}>
               📱 {udid}
           </div>
           <button className="vsp-header-close" onClick={onCloseViewer} title={t('Close')}><X size={14} /></button>
