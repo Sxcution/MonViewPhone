@@ -211,6 +211,7 @@ function TileComponent({
         >
             <canvas
                 ref={canvasRef}
+                onContextMenu={(e) => e.preventDefault()}
                 style={{
                     width: '100%',
                     height: '100%',

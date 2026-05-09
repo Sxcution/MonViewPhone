@@ -77,9 +77,9 @@ export function attachTouchControls(
     }
   }
 
-  function sendBackKey() {
-    const down = encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_BACK);
-    const up = encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_BACK);
+  function sendKeyEvent(keycode: number) {
+    const down = encodeKeycodeMessage(KeyEventAction.DOWN, keycode);
+    const up = encodeKeycodeMessage(KeyEventAction.UP, keycode);
     sendToTargets(() => down);
     sendToTargets(() => up);
   }
@@ -111,7 +111,7 @@ export function attachTouchControls(
 
     if (e.button === 2) {
       e.stopPropagation();
-      sendBackKey();
+      sendKeyEvent(AndroidKeycode.KEYCODE_BACK);
       return;
     }
     if (((e.buttons ?? 0) & 2) === 2) return;
