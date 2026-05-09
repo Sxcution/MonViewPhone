@@ -73,6 +73,7 @@ type ActiveContextValue = {
   toggleSyncTarget: (udid: string) => void;
   setSyncTargetsList: (next: string[]) => void;
   stopSync: () => void;
+  altSoloUdid: string | null;
 };
 
 const Ctx = createContext<ActiveContextValue | null>(null);
@@ -107,6 +108,33 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       return [];
     }
   });
+
+  const [altSoloUdid, setAltSoloUdid] = useState<string | null>(null);
+  const activeUdidRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    activeUdidRef.current = activeUdid;
+  }, [activeUdid]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        // Khi đè Alt, ghi nhớ device đang active để solo
+        setAltSoloUdid((prev) => prev ?? activeUdidRef.current);
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        setAltSoloUdid(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -192,7 +220,12 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
   const resolveTargets = useCallback(
     (sourceUdid: string | null): InputTarget[] => {
       if (!sourceUdid) return [];
-      
+
+      // ÉP ĐÈ ALT: luôn solo device nguồn, bỏ qua sync group
+      if (altSoloUdid) {
+        return getTargetsByUdids([sourceUdid]);
+      }
+
       // SMART SYNC: If the source device is currently in the selected group (syncTargets),
       // broadcast the action to ALL devices in that group automatically!
       if (syncTargets.includes(sourceUdid)) {
@@ -213,7 +246,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       }
       return getTargetsByUdids([sourceUdid]);
     },
-    [getTargetsByUdids, syncAll, syncMain, syncTargets],
+    [getTargetsByUdids, syncAll, syncMain, syncTargets, altSoloUdid],
   );
 
   const getInputTargetsForSource = useCallback(
@@ -322,6 +355,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       },
       setSyncTargetsList,
       stopSync,
+      altSoloUdid,
     }),
     [
       activeUdid,
@@ -341,6 +375,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       syncTargets,
       setSyncTargetsList,
       stopSync,
+      altSoloUdid,
     ],
   );
 

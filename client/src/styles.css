@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --rb-width: 54px;
   --config-width: 320px;
   --sidebar-total: var(--config-width);
@@ -4489,6 +4489,201 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 .right-bar-container {
   border-left: 1px solid #3b3b3b;
   background-color: #1e1e1e;
+transition: background 0.12s ease;
+}
+
+.vsp-adb-submenu-item:hover {
+  background: rgba(77, 161, 255, 0.12);
+  color: #b8e7ff;
+}
+
+.vsp-adb-submenu-item.vsp-cmd-warn {
+  color: #ff9c9c;
+}
+
+.vsp-adb-submenu-item.vsp-cmd-warn:hover {
+  background: rgba(255, 100, 100, 0.1);
+}
+
+/* Right-click context menu */
+.vsp-ctx-menu {
+  position: fixed;
+  z-index: 50000;
+  min-width: 200px;
+  background: rgba(22, 22, 22, 0.98);
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vsp-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #ddd;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.vsp-ctx-item:hover {
+  background: rgba(77, 161, 255, 0.12);
+  color: #b8e7ff;
+}
+
+.vsp-ctx-divider {
+  height: 1px;
+  background: #333;
+  margin: 2px 8px;
+}
+
+.vsp-ctx-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #888;
+}
+
+.vsp-ctx-colors {
+  display: flex;
+  gap: 6px;
+  padding: 4px 12px 6px;
+  flex-wrap: wrap;
+}
+
+.vsp-ctx-color-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+
+.vsp-ctx-color-dot:hover {
+  transform: scale(1.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Sidebar Auto-Hide Wrapper */
+.sidebar-wrapper {
+  position: fixed;
+  top: 0;
+  height: 100dvh;
+  z-index: 1000;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+}
+
+body:not(.alignRight) .sidebar-wrapper {
+  left: 0;
+}
+
+body.alignRight .sidebar-wrapper {
+  right: 0;
+}
+
+/* Make children static within wrapper to flow naturally */
+.sidebar-wrapper #rightbar,
+.sidebar-wrapper .rightConfigPanel {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  box-shadow: none !important;
+}
+
+/* Hide RightBar because we are using rightConfigPanel full time with auto-hide */
+.sidebar-wrapper #rightbar {
+  display: none !important;
+}
+
+body.alignRight .sidebar-wrapper {
+  box-shadow: -16px 0 50px rgba(0, 0, 0, 0.55);
+}
+
+body:not(.alignRight) .sidebar-wrapper {
+  box-shadow: 16px 0 50px rgba(0, 0, 0, 0.55);
+}
+
+.sidebar-wrapper.auto-hide {
+  /* Push out of view, leave 20px */
+  transform: translateX(calc(100% - 20px));
+}
+
+body:not(.alignRight) .sidebar-wrapper.auto-hide {
+  transform: translateX(calc(-100% + 20px));
+}
+
+/* Ensure hover has higher specificity */
+body.alignRight .sidebar-wrapper.auto-hide:hover,
+body:not(.alignRight) .sidebar-wrapper.auto-hide:hover {
+  transform: translateX(0);
+}
+
+body.alignRight .sidebar-wrapper.pinned,
+body:not(.alignRight) .sidebar-wrapper.pinned {
+  transform: translateX(0);
+}
+
+/* Pin button styles */
+.btn-pin {
+  position: absolute;
+  top: 14px;
+  left: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid #2f2f2f;
+  background: #141414;
+  color: #e6e6e6;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.btn-pin:active {
+  transform: translateY(1px);
+}
+
+.btn-setting {
+  left: 58px;
+}
+
+.rightConfigPanel {
+  padding-top: 60px !important;
+  /* Make room for pin button */
+}
+
+/* Giao diện khung phóng to */
+.device-viewer-container {
+  border: 2px solid #3b3b3b;
+  /* Viền xám đen hiện đại */
+  border-radius: 8px;
+  /* Bo góc mềm mại */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  /* Đổ bóng tạo chiều sâu */
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  /* Ép màn hình và thanh bên phải nằm ngang */
+}
+
+/* Đảm bảo thanh bên phải cũng bo viền ăn khớp */
+.right-bar-container {
+  border-left: 1px solid #3b3b3b;
+  background-color: #1e1e1e;
 }
 /* ===== Full Viewer Layout (ki?u Xiaowei) ===== */
 #fullViewerLayout {
@@ -4500,7 +4695,26 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   background: #0e0e0e;
 }
 
-/* C?t tr�i: di?n tho?i */
+.viewerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  pointer-events: none;        /* ← backdrop KHÔNG chặn click */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewerOverlayPanelWrap {
+  pointer-events: all;         /* ← chỉ panel mới nhận click */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(var(--viewer-dx, 0px), var(--viewer-dy, 0px));
+  transform-origin: center center;
+}
+
+/* C?t tri: di?n tho?i */
 .fvl-phone {
   flex: 1 1 auto;
   display: flex;

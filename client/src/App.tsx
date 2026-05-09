@@ -678,6 +678,11 @@ export function App () {
 
   const sendBackToDevice = useCallback(
     (udid: string) => {
+      const targets =
+        connectSelection.size > 0 && connectSelection.has(udid)
+          ? getTargetsByUdids(Array.from(connectSelection))
+          : getTargetsByUdids([udid])
+
       const down = encodeKeycodeMessage(
         KeyEventAction.DOWN,
         AndroidKeycode.KEYCODE_BACK
@@ -686,16 +691,14 @@ export function App () {
         KeyEventAction.UP,
         AndroidKeycode.KEYCODE_BACK
       )
-      for (const target of getTargetsByUdids([udid])) {
+      for (const t of targets) {
         try {
-          target.ws.send(down)
-          target.ws.send(up)
-        } catch {
-          // ignore
-        }
+          t.ws.send(down)
+          t.ws.send(up)
+        } catch {}
       }
     },
-    [getTargetsByUdids]
+    [connectSelection, getTargetsByUdids]
   )
 
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
@@ -840,17 +843,14 @@ export function App () {
   // Ctrl + A chon tat ca thiet bi để chọn tất cả thiết bị
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Dùng e.code thay vì e.key để ổn định trên mọi ngôn ngữ bàn phím
+      // Ctrl+A chọn tất cả
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA') {
-        const activeNodeName = document.activeElement?.nodeName.toLowerCase()
-        const isInputFocus =
-          activeNodeName === 'input' ||
-          activeNodeName === 'textarea' ||
-          activeNodeName === 'select' ||
+        const active = document.activeElement?.nodeName.toLowerCase()
+        if (
+          ['input', 'textarea', 'select'].includes(active || '') ||
           (document.activeElement as HTMLElement)?.isContentEditable
-
-        if (isInputFocus) return
-
+        )
+          return
         e.preventDefault()
         setConnectSelection(new Set(mergedOrder))
       }
@@ -1898,9 +1898,10 @@ export function App () {
       {viewerUdid ? (
         <div
           className='viewerOverlay'
-          onMouseDown={() => {
-            setViewerUdid(null)
-            setViewerOverrideConfig(null)
+          onMouseDown={(e) => {
+            // KHÔNG tắt viewer khi click ngoài — chỉ tắt khi bấm nút X trong DeviceViewer
+            // Cho phép click xuyên qua để tương tác grid phía sau
+            e.stopPropagation()
           }}
         >
           <div
