@@ -17,7 +17,7 @@ This file documents the structure of the `stream-phonefarm-solumate-main` projec
 - `client/src/components/ViewerSidePanel.tsx`: Right-side panel specifically for the `DeviceViewer`.
 
 #### Tile Components (Phone Cards)
-- `client/src/components/tile/Tile.tsx`: Main component representing a single phone card.
+- `client/src/components/tile/Tile.tsx`: Main component representing a single phone card. Includes onPointerEnter hover focus for Alt-Solo control.
 - `client/src/components/tile/TileHeader.tsx`: Header of the phone card (UDID, status, user profile selection).
 - `client/src/components/tile/TileMenu.tsx`: Context menu for the phone card.
 - `client/src/components/tile/TileNav.tsx`: Bottom navigation buttons on the phone card.
@@ -37,7 +37,7 @@ This file documents the structure of the `stream-phonefarm-solumate-main` projec
 - `client/src/lib/control.ts`: Functions for encoding Scrcpy control messages.
 - `client/src/lib/keyEvent.ts`: Android keycode mappings.
 - `client/src/lib/serverApi.ts`: API client for the Node.js backend.
-- `client/src/lib/touchControls.ts`: Logic for capturing mouse/touch events and sending to device.
+- `client/src/lib/touchControls.ts`: Logic for capturing mouse/touch events and sending to device. Now supports isolated control when holding Alt.
 - `client/src/lib/video.ts`: Video stream processing utilities.
 
 ### Workers

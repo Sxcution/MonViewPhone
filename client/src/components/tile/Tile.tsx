@@ -185,6 +185,13 @@ function TileComponent({
         selectOnly(udid);
     }, [selectOnly, udid]);
 
+    const onPointerEnter = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        if (e.altKey) {
+            selectOnly(udid);
+            canvasRef.current?.focus?.();
+        }
+    }, [selectOnly, udid]);
+
     const tileClass = `tile${isActive ? ' active' : ''}${selected ? ' selected' : ''}${isSyncMain ? ' sync-main' : ''
         }${isSyncFollower ? ' sync-follower' : ''}${isViewing ? ' viewing' : ''}`;
 
@@ -266,7 +273,7 @@ function TileComponent({
                 />
             ) : null}
 
-            <div className="tileBody" ref={bodyRef}>
+            <div className="tileBody" ref={bodyRef} onPointerEnter={onPointerEnter}>
                 {!isViewing && loading ? (
                     <div className="loading">
                         <div className="spinner"></div>

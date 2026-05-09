@@ -172,7 +172,8 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       }
 
       const metaState =
-        (e.getModifierState('Alt') ? AndroidKeycode.META_ALT_ON : 0) |
+        // LƯU Ý: Xóa/comment dòng getModifierState('Alt') để tránh kẹt shortcut Android khi đè Alt điều khiển đơn
+        // (e.getModifierState('Alt') ? AndroidKeycode.META_ALT_ON : 0) |
         (e.getModifierState('Shift') ? AndroidKeycode.META_SHIFT_ON : 0) |
         (e.getModifierState('Control') ? AndroidKeycode.META_CTRL_ON : 0) |
         (e.getModifierState('Meta') ? AndroidKeycode.META_META_ON : 0) |
@@ -215,7 +216,8 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       repeatCounterRef.current.delete(keyCode);
 
       const metaState =
-        (e.getModifierState('Alt') ? AndroidKeycode.META_ALT_ON : 0) |
+        // LƯU Ý: Xóa/comment dòng getModifierState('Alt') để tránh kẹt shortcut Android khi đè Alt điều khiển đơn
+        // (e.getModifierState('Alt') ? AndroidKeycode.META_ALT_ON : 0) |
         (e.getModifierState('Shift') ? AndroidKeycode.META_SHIFT_ON : 0) |
         (e.getModifierState('Control') ? AndroidKeycode.META_CTRL_ON : 0) |
         (e.getModifierState('Meta') ? AndroidKeycode.META_META_ON : 0) |

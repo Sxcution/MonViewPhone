@@ -54,7 +54,8 @@
       "on_grid_pointer_move": "onGridPointerMove",
       "on_grid_pointer_up": "onGridPointerUp",
       "get_is_alt_held": "getIsAltHeld",
-      "set_alt_solo_udid": "setAltSoloUdid"
+      "set_alt_solo_udid": "setAltSoloUdid",
+      "on_pointer_enter_tile": "onPointerEnter"
     },
     "refs": {
       "rubber_band_ref": "rubberBandRef",

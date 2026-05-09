@@ -10,6 +10,7 @@ type ActivePointerState = {
   lastXY: { x01: number; y01: number };
   lastButtons: number;
   dirty: boolean;
+  isolated: boolean;
 };
 
 function makePointerIdAllocator() {
@@ -66,9 +67,10 @@ export function attachTouchControls(
     return targets.some((t) => t.ws && t.ws.readyState === WebSocket.OPEN);
   }
 
-  function sendToTargets(makeMsg: (t: InputTarget) => Uint8Array) {
+  function sendToTargets(makeMsg: (t: InputTarget) => Uint8Array, isolated: boolean = false) {
     const targets = getTargets();
     for (const t of targets) {
+      if (isolated && t.canvas !== canvas) continue; // Chỉ gửi cho canvas hiện tại
       if (!t.ws || t.ws.readyState !== WebSocket.OPEN) continue;
       try {
         t.ws.send(makeMsg(t));
@@ -78,14 +80,14 @@ export function attachTouchControls(
     }
   }
 
-  function sendBackKey() {
+  function sendBackKey(isolated: boolean = false) {
     const down = encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_BACK);
     const up = encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_BACK);
-    sendToTargets(() => down);
+    sendToTargets(() => down, isolated);
 
     // Thêm độ trễ để Android kịp ghi nhận sự kiện nhấn phím
     setTimeout(() => {
-      sendToTargets(() => up);
+      sendToTargets(() => up, isolated);
     }, 30);
   }
 
@@ -101,7 +103,7 @@ export function attachTouchControls(
         sendToTargets((t) => {
           const { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
           return encodeTouchMessage(MotionAction.MOVE, st.pid, x, y, w, h, 1, st.lastButtons);
-        });
+        }, st.isolated);
       }
     });
   }
@@ -114,7 +116,9 @@ export function attachTouchControls(
     e.preventDefault();
     onActivate?.();
 
+    const isolated = e.altKey;
     if (e.button === 2) {
+      sendBackKey(isolated);
       return;
     }
     if (((e.buttons ?? 0) & 2) === 2) return;
@@ -131,12 +135,13 @@ export function attachTouchControls(
       lastXY: { x01, y01 },
       lastButtons: buttons,
       dirty: false,
+      isolated,
     });
 
     sendToTargets((t) => {
       const { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
       return encodeTouchMessage(MotionAction.DOWN, pid, x, y, w, h, 1, buttons);
-    });
+    }, isolated);
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -172,13 +177,13 @@ export function attachTouchControls(
       sendToTargets((t) => {
         const { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
         return encodeTouchMessage(MotionAction.MOVE, st.pid, x, y, w, h, 1, st.lastButtons);
-      });
+      }, st.isolated);
     }
 
     sendToTargets((t) => {
       const { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
       return encodeTouchMessage(MotionAction.UP, st.pid, x, y, w, h, 0, 0);
-    });
+    }, st.isolated);
 
     active.delete(e.pointerId);
     ptr.free(e.pointerId);
@@ -197,7 +202,7 @@ export function attachTouchControls(
     sendToTargets((t) => {
       const { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
       return encodeScrollMessage(x, y, w, h, hScroll, vScroll);
-    });
+    }, e.altKey);
   }
 
   const onContextMenu = (e: Event) => {
