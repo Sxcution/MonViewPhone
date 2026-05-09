@@ -223,6 +223,12 @@ function TileComponent({
                 onContextMenu={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+
+                    // Ctrl + Click phải = phóng to device (mở DeviceViewer)
+                    if (e.ctrlKey && onViewDevice) {
+                        selectOnly(udid);
+                        onViewDevice(udid);
+                    }
                 }}
             />
         </div>

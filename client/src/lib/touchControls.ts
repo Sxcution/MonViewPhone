@@ -201,6 +201,8 @@ export function attachTouchControls(
 
   const onContextMenu = (e: Event) => {
     e.preventDefault();
+    // Nếu đang đè Ctrl, nhường cho logic phóng to (Tile.tsx)
+    if ((e as MouseEvent).ctrlKey) return;
     sendBackKey();
   };
 
