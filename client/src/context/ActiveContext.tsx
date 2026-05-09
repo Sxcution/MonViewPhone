@@ -273,7 +273,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
 
         return getTargetsByUdids([sourceUdid]);
       },
-      [getTargetsByUdids, syncAll, syncMain, syncTargets],
+      [getTargetsByUdids, syncAll, syncMain, syncTargets, altSoloUdid],
     );
 
   const getInputTargetsForSource = useCallback(
