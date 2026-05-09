@@ -215,6 +215,25 @@ export function App () {
     setSyncTargetsList(Array.from(connectSelection))
   }, [connectSelection, setSyncTargetsList])
   const [connectModalOpen, setConnectModalOpen] = useState(false)
+
+  // ===== SAVED GROUPS =====
+  const [savedGroups, setSavedGroups] = useState<Array<{ name: string; udids: string[] }>>(() => {
+    try {
+      const raw = localStorage.getItem('savedGroups')
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch { return [] }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('savedGroups', JSON.stringify(savedGroups))
+    } catch {}
+  }, [savedGroups])
+
+  const [groupModalOpen, setGroupModalOpen] = useState(false)
+  const [groupModalName, setGroupModalName] = useState('')
   const [connectPorts, setConnectPorts] = useState<Record<string, number>>({})
   const [connectBusy, setConnectBusy] = useState(false)
   const targetConnect = deviceFilter === 'wifi' ? 'usb' : 'wifi'
@@ -1835,13 +1854,53 @@ export function App () {
                   {connectBtnLabel}
                 </button>
               ) : null}
-              <button className='rcpAdd ghost'>{t('Add tag')}</button>
+              <button
+                className='rcpAdd ghost'
+                disabled={!connectSelection.size}
+                title={connectSelection.size ? `Lưu nhóm ${connectSelection.size} device` : 'Chọn device trước'}
+                onClick={() => {
+                  if (!connectSelection.size) return
+                  setGroupModalName('')
+                  setGroupModalOpen(true)
+                }}
+              >
+                {t('Thêm Nhóm')}
+                {connectSelection.size > 0 ? ` (${connectSelection.size})` : ''}
+              </button>
             </div>
             {connectNotification ? (
               <div className={`rcpConnectNotification ${connectNotification.type}`}>
                 {connectNotification.text}
               </div>
             ) : null}
+            {/* Danh sách nhóm đã lưu */}
+            {savedGroups.length > 0 && (
+              <div className='rcpSavedGroups'>
+                {savedGroups.map((group, idx) => (
+                  <div key={idx} className='rcpSavedGroupRow'>
+                    <button
+                      className='rcpSavedGroupBtn'
+                      title={`Load nhóm: ${group.udids.length} device`}
+                      onClick={() => {
+                        setConnectSelection(new Set(group.udids))
+                      }}
+                    >
+                      <span className='rcpSavedGroupName'>{group.name}</span>
+                      <span className='rcpSavedGroupCount'>{group.udids.length}</span>
+                    </button>
+                    <button
+                      className='rcpSavedGroupDel'
+                      title='Xoá nhóm'
+                      onClick={() => {
+                        setSavedGroups(prev => prev.filter((_, i) => i !== idx))
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className='rcpGridWrap' style={{ marginTop: '12px' }}>
               <div className='rcpGrid rcpGridCompact'>
                 {orderedRegistered.map((id) => (
@@ -2182,6 +2241,64 @@ export function App () {
           </div>
         </div>
       ) : null}
+
+      {/* Modal Thêm Nhóm */}
+      {groupModalOpen && (
+        <div
+          className='confirmOverlay'
+          onMouseDown={() => setGroupModalOpen(false)}
+        >
+          <div
+            className='confirmPanel'
+            style={{ maxWidth: 360 }}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <div className='confirmTitle'>Thêm Nhóm</div>
+            <div className='confirmText' style={{ marginBottom: 12 }}>
+              Đặt tên cho nhóm <strong>{connectSelection.size}</strong> device đang chọn
+            </div>
+
+            <input
+              className='confirmInput'
+              type='text'
+              placeholder='Tên nhóm (VD: Nhóm LINE, Nhóm 1-10...)'
+              value={groupModalName}
+              autoFocus
+              onChange={e => setGroupModalName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && groupModalName.trim()) {
+                  setSavedGroups(prev => [
+                    ...prev,
+                    { name: groupModalName.trim(), udids: Array.from(connectSelection) }
+                  ])
+                  setGroupModalOpen(false)
+                }
+                if (e.key === 'Escape') setGroupModalOpen(false)
+              }}
+            />
+
+            <div className='confirmBtns' style={{ marginTop: 16 }}>
+              <button className='modalBtn' onClick={() => setGroupModalOpen(false)}>
+                Huỷ
+              </button>
+              <button
+                className='modalBtnPrimary'
+                disabled={!groupModalName.trim()}
+                onClick={() => {
+                  if (!groupModalName.trim()) return
+                  setSavedGroups(prev => [
+                    ...prev,
+                    { name: groupModalName.trim(), udids: Array.from(connectSelection) }
+                  ])
+                  setGroupModalOpen(false)
+                }}
+              >
+                Lưu Nhóm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {contextMenuTarget ? (
         <div 
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999999 }}

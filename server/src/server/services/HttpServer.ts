@@ -1036,6 +1036,15 @@ export class HttpServer extends TypedEmitter<HttpServerEvents> implements Servic
                 return res.status(400).json({ success: false, message });
             }
         });
+
+        // ===== SERVER RESTART API =====
+        this.mainApp.post('/api/server/restart', async (_req, res) => {
+            res.json({ ok: true, message: 'Server restarting...' });
+            // Delay nhỏ để response kịp gửi về client trước khi process thoát
+            setTimeout(() => {
+                process.exit(0); // PM2 / nodemon / Start_PhoneFarm.bat sẽ tự restart
+            }, 300);
+        });
         const config = Config.getInstance();
         config.servers.forEach((serverItem) => {
             const { secure, port, redirectToSecure } = serverItem;
