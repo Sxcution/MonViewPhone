@@ -87,6 +87,17 @@ export function useTileStream(args: Args) {
         getInputTargetsRef.current = getInputTargetsForSource;
     }, [getInputTargetsForSource]);
 
+    // Keep ref cho getIsAltHeld và setAltSoloUdid để tránh stale closure
+    const getIsAltHeldRef = useRef(getIsAltHeld);
+    useEffect(() => {
+        getIsAltHeldRef.current = getIsAltHeld;
+    }, [getIsAltHeld]);
+
+    const setAltSoloUdidRef = useRef(setAltSoloUdid);
+    useEffect(() => {
+        setAltSoloUdidRef.current = setAltSoloUdid;
+    }, [setAltSoloUdid]);
+
     useEffect(() => {
         destroyedRef.current = false;
         closingRef.current = false;
@@ -193,11 +204,20 @@ export function useTileStream(args: Args) {
         const onActivate = () => selectOnly(udid);
 
         const handlePointerEnter = () => {
-          if (getIsAltHeld?.()) {
-            setAltSoloUdid?.(udid);
-          }
+            if (getIsAltHeldRef.current?.()) {
+                setAltSoloUdidRef.current?.(udid);
+            }
         };
+        const handlePointerLeave = () => {
+            // Khi chuột rời tile, nếu tile này đang là solo thì clear
+            // Để resolveTargets biết không còn solo nữa khi chuột ra ngoài
+            if (!getIsAltHeldRef.current?.()) {
+                setAltSoloUdidRef.current?.(null);
+            }
+        };
+
         body.addEventListener('pointerenter', handlePointerEnter);
+        body.addEventListener('pointerleave', handlePointerLeave);
 
         detachControlsRef.current = attachTouchControls(
             canvas,
@@ -688,6 +708,7 @@ export function useTileStream(args: Args) {
             window.removeEventListener('beforeunload', closeWs);
             window.removeEventListener('pagehide', closeWs);
             body.removeEventListener('pointerenter', handlePointerEnter);
+            body.removeEventListener('pointerleave', handlePointerLeave);
             if (watchdogTimer != null) {
                 clearInterval(watchdogTimer);
                 watchdogTimer = null;

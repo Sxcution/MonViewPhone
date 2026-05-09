@@ -142,11 +142,18 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
         setAltSoloUdidState(null);
       }
     };
+    const onBlur = () => {
+      isAltHeldRef.current = false;
+      altSoloUdidRef.current = null;
+      setAltSoloUdidState(null);
+    };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
     };
   }, []);
 
