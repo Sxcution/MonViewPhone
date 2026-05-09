@@ -1490,7 +1490,7 @@ export function App() {
         </div>
       </div>
 
-      <div className={`sidebar-wrapper ${isSidebarPinned ? 'pinned' : contextMenuOpen ? 'auto-hide force-show' : 'auto-hide'}`}>
+      <div className={`sidebar-wrapper ${isSidebarPinned ? 'pinned' : (contextMenuOpen || !!groupContextMenu) ? 'auto-hide force-show' : 'auto-hide'}`}>
         <RightBar
           hidden={false}
           showExpand={false}
