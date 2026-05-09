@@ -21,7 +21,9 @@
       "header_device_num_input": "headerDeviceNumInput",
       "header_device_control": "headerDeviceControl",
       "tile_selected": "selected",
-      "tile_active": "active"
+      "tile_active": "active",
+      "selected_count_badge": "selectedCountBadge",
+      "cursor_device_tooltip": "cursorDeviceTooltip"
     },
     "state_variables": {
       "sidebar_collapsed": "sidebarCollapsed",
@@ -31,7 +33,8 @@
       "rubber_band": "rubberBand",
       "connect_selection": "connectSelection",
       "profiles": "profiles",
-      "selected_user": "selectedUser"
+      "selected_user": "selectedUser",
+      "mouse_pos": "mousePos"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

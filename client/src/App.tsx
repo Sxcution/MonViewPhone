@@ -197,6 +197,7 @@ export function App() {
   const [connectSelection, setConnectSelection] = useState<Set<string>>(
     () => new Set(syncTargets)
   )
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   // Rubber band selection state
   const [rubberBand, setRubberBand] = useState<{
@@ -228,6 +229,16 @@ export function App() {
       setActiveGroupIdx(null)
     }
   }, [connectSelection])
+
+  // Track vị trí chuột cho tooltip
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
   const [connectModalOpen, setConnectModalOpen] = useState(false)
 
   // ===== SAVED GROUPS =====
@@ -2609,6 +2620,27 @@ export function App() {
           </div>
         </div>
       ) : null}
+
+      {/* === Badge tổng số device đang chọn (góc dưới trái) === */}
+      {connectSelection.size > 0 && (
+        <div className="selectedCountBadge">
+          <span className="selectedCountBadgeIcon">📱</span>
+          <span className="selectedCountBadgeNum">{connectSelection.size}</span>
+        </div>
+      )}
+
+      {/* === Tooltip số device theo con trỏ chuột === */}
+      {connectSelection.size > 0 && (
+        <div
+          className="cursorDeviceTooltip"
+          style={{
+            left: mousePos.x + 14,
+            top: mousePos.y + 14,
+          }}
+        >
+          {connectSelection.size}
+        </div>
+      )}
     </>
   )
 }

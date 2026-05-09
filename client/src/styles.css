@@ -5076,3 +5076,61 @@ input[type="number"] {
   from { transform: scale(0.5); opacity: 0; }
   to   { transform: scale(1);   opacity: 1; }
 }
+
+/* === Badge tổng device đang chọn - góc dưới trái === */
+.selectedCountBadge {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #1a2a1a;
+  border: 2px solid #3ddc84;
+  border-radius: 8px;
+  padding: 4px 12px 4px 8px;
+  box-shadow: 0 2px 12px rgba(61, 220, 132, 0.25);
+  pointer-events: none;
+  user-select: none;
+  animation: badgePop 0.15s ease;
+}
+
+.selectedCountBadgeIcon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.selectedCountBadgeNum {
+  font-size: 16px;
+  font-weight: 700;
+  color: #3ddc84;
+  font-family: monospace;
+  letter-spacing: 0.5px;
+}
+
+@keyframes badgePop {
+  from { transform: scale(0.85); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+/* === Tooltip số device theo con trỏ chuột === */
+.cursorDeviceTooltip {
+  position: fixed;
+  z-index: 99999;
+  pointer-events: none;
+  user-select: none;
+  background: #3ddc84;
+  color: #0a1a0a;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: monospace;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(61, 220, 132, 0.5);
+  transition: none; /* Không delay để follow chuột nhanh */
+}
