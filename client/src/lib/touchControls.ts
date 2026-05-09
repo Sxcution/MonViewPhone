@@ -81,7 +81,11 @@ export function attachTouchControls(
     const down = encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_BACK);
     const up = encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_BACK);
     sendToTargets(() => down);
-    sendToTargets(() => up);
+
+    // Thêm độ trễ để Android kịp ghi nhận sự kiện nhấn phím
+    setTimeout(() => {
+      sendToTargets(() => up);
+    }, 30);
   }
 
   function scheduleMoveFlush() {
@@ -110,7 +114,6 @@ export function attachTouchControls(
     onActivate?.();
 
     if (e.button === 2) {
-      sendBackKey();
       return;
     }
     if (((e.buttons ?? 0) & 2) === 2) return;
@@ -196,14 +199,17 @@ export function attachTouchControls(
     });
   }
 
-  const preventContextMenu = (e: Event) => e.preventDefault();
+  const onContextMenu = (e: Event) => {
+    e.preventDefault();
+    sendBackKey();
+  };
 
   canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
   canvas.addEventListener('pointermove', onPointerMove, { passive: false });
   canvas.addEventListener('pointerup', onPointerUpOrCancel, { passive: false });
   canvas.addEventListener('pointercancel', onPointerUpOrCancel, { passive: false });
   canvas.addEventListener('wheel', onWheel, { passive: false });
-  canvas.addEventListener('contextmenu', preventContextMenu);
+  canvas.addEventListener('contextmenu', onContextMenu);
 
   return () => {
     canvas.removeEventListener('pointerdown', onPointerDown);
@@ -211,6 +217,6 @@ export function attachTouchControls(
     canvas.removeEventListener('pointerup', onPointerUpOrCancel);
     canvas.removeEventListener('pointercancel', onPointerUpOrCancel);
     canvas.removeEventListener('wheel', onWheel);
-    canvas.removeEventListener('contextmenu', preventContextMenu);
+    canvas.removeEventListener('contextmenu', onContextMenu);
   };
 }
