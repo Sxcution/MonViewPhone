@@ -56,6 +56,7 @@ export function attachTouchControls(
   getTargets: TargetsGetter,
   onActivate?: () => void,
   onSetAltSolo?: (udid: string | null) => void,
+  udid?: string,
 ): () => void {
   const ptr = makePointerIdAllocator();
   const active = new Map<number, ActivePointerState>();
@@ -114,12 +115,11 @@ export function attachTouchControls(
     e.preventDefault();
     onActivate?.();
 
-    // Nếu đè Alt, kích hoạt chế độ Solo cho thiết bị này
-    if (e.altKey && onSetAltSolo) {
-      // Chúng ta cần udid của device này. 
-      // Vì attachTouchControls được gọi cho từng canvas, 
-      // chúng ta nên truyền udid vào đây hoặc dùng callback.
-      // Giả sử udid được truyền vào qua closure từ Tile.tsx.
+    // Giữ Alt = solo mode cho tile này
+    if (e.altKey && onSetAltSolo && udid) {
+      onSetAltSolo(udid);
+    } else {
+      onSetAltSolo?.(null); // release solo khi không giữ Alt
     }
 
     if (e.button === 2) {
@@ -168,6 +168,10 @@ export function attachTouchControls(
   }
 
   function onPointerUpOrCancel(e: PointerEvent) {
+    // Release alt solo khi nhả chuột
+    if (!e.altKey) {
+      onSetAltSolo?.(null);
+    }
     const st = active.get(e.pointerId);
     if (!st) return;
     e.preventDefault();

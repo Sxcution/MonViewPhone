@@ -170,7 +170,13 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
     if (tab !== 'view') return;
 
     const onActivate = () => selectOnly(udid);
-    detachRef.current = attachTouchControls(c, () => getInputTargetsForSource(udid), onActivate, () => setAltSoloUdid(udid));
+    detachRef.current = attachTouchControls(
+      c,
+      () => getInputTargetsForSource(udid),
+      onActivate,
+      (u) => setAltSoloUdid(u),
+      udid
+    );
 
     return () => {
       detachRef.current?.();

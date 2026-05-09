@@ -194,7 +194,8 @@ export function useTileStream(args: Args) {
             canvas,
             () => getInputTargetsRef.current(udid),
             onActivate,
-            () => setAltSoloUdid?.(udid)
+            (u) => setAltSoloUdid?.(u),
+            udid
         );
 
         function makeDecoder() {
