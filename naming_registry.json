@@ -24,8 +24,9 @@
       "tile_active": "active",
       "selected_count_badge": "selectedCountBadge",
       "cursor_device_tooltip": "cursorDeviceTooltip",
-      "rcp_saved_group_item": "rcpSavedGroupItem",
-      "rcp_group_rename_input": "rcpGroupRenameInput",
+      "group_focused": "focused",
+      "group_focus_dot": "rcpGroupFocusDot",
+      "group_rename_input": "rcpGroupRenameInput",
       "ctx_menu_item": "ctxMenuItem"
     },
     "state_variables": {
@@ -40,7 +41,9 @@
       "mouse_pos": "mousePos",
       "focus_group_idx": "focusGroupIdx",
       "rename_group_idx": "renameGroupIdx",
+      "rename_group_value": "renameGroupValue",
       "drag_group_idx": "dragGroupIdx",
+      "drag_group_over_idx": "dragGroupOverIdx",
       "group_context_menu": "groupContextMenu"
     },
     "handlers": {

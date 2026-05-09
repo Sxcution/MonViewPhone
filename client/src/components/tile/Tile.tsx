@@ -211,7 +211,6 @@ function TileComponent({
         >
             <canvas
                 ref={canvasRef}
-                onContextMenu={(e) => e.preventDefault()}
                 style={{
                     width: '100%',
                     height: '100%',
@@ -229,10 +228,6 @@ function TileComponent({
         <div
             className={tileClass}
             data-udid={udid}
-            onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-            }}
         >
             {showTileInfo ? (
                 <TileHeader

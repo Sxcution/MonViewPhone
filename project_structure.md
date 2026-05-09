@@ -5,7 +5,7 @@ This file documents the structure of the `stream-phonefarm-solumate-main` projec
 ## Client (React/Vite)
 
 ### Core Files
-- `client/src/App.tsx`: Main application component; handles the device grid, drag & drop, and centralized HeaderBar integration. **Modified to render all devices pass connection filter in DOM (using CSS visibility) to maintain stable WebSocket streams.**
+- `client/src/App.tsx`: Main application component, handles the device grid, drag & drop, and centralized HeaderBar integration. Now includes advanced device group management (focus mode, reordering, and renaming).
 - `client/src/main.tsx`: React entry point.
 - `client/src/styles.css`: Global CSS with high-density UI optimizations and theme tokens.
 
@@ -51,9 +51,7 @@ This file documents the structure of the `stream-phonefarm-solumate-main` projec
 - `server-go/`: New highly-concurrent backend service written in Go (in active development).
   - `server-go/main.go`: Entry point, includes ADB warm-up logic and HTTP/WebSocket server initialization.
   - `server-go/adb/tracker.go`: ADB device tracker utilizing goroutines.
-  - `server-go/adb/utils.go`: ADB command execution utilities.
   - `server-go/websocket/handler.go`: WebSocket communication handler.
-  - `server-go/websocket/proxy.go`: WebSocket proxy logic with automatic ADB forward cleanup.
 
 ## APK Build
 - `APK Build/MonKeyboard/`: Android project for the lightweight invisible keyboard (IME).

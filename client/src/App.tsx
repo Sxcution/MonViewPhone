@@ -572,10 +572,18 @@ export function App() {
     return []
   }, [deviceParam, discoveredDevices])
   const filteredGridDevices = useMemo(() => {
-    return gridDevices
-  }, [gridDevices])
+    let list = gridDevices
+    if (deviceFilter !== 'all') {
+      list = list.filter(id => getDeviceConnectionType(id) === deviceFilter)
+    }
+    if (focusGroupIdx !== null && savedGroups[focusGroupIdx]) {
+      const groupSet = new Set(savedGroups[focusGroupIdx].udids)
+      list = list.filter(id => groupSet.has(id))
+    }
+    return list
+  }, [deviceFilter, gridDevices, getDeviceConnectionType, focusGroupIdx, savedGroups])
   const { mergedOrder, moveTile, getTileNumber, setTileNumber } =
-    useTileOrder(filteredGridDevices)
+    useTileOrder(gridDevices)
   const filteredRegistered = useMemo(() => {
     return registeredUdids.filter(id => {
       if (deviceFilter !== 'all') {
@@ -603,6 +611,13 @@ export function App() {
     })
     return arr
   }, [filteredRegistered, orderMap])
+  const currentFocusGroupSet = useMemo(() => {
+    if (focusGroupIdx !== null && savedGroups[focusGroupIdx]) {
+      return new Set(savedGroups[focusGroupIdx].udids);
+    }
+    return null;
+  }, [focusGroupIdx, savedGroups]);
+
   const selectedVisible = useMemo(
     () => orderedRegistered.filter(id => connectSelection.has(id)),
     [orderedRegistered, connectSelection]
@@ -1309,130 +1324,124 @@ export function App() {
             }
           >
             {mergedOrder.map((udid, idx) => {
-              const isVisible = (() => {
-                // 1. Kiểm tra filter kết nối (USB/Wi-Fi)
-                if (deviceFilter !== 'all') {
-                  if (getDeviceConnectionType(udid) !== deviceFilter) return false
-                }
-                // 2. Kiểm tra filter nhóm
-                if (focusGroupIdx === null || !savedGroups[focusGroupIdx]) return true
-                return savedGroups[focusGroupIdx].udids.includes(udid)
-              })()
+              // <!-- isVisible : Kiểm tra thiết bị có khớp với bộ lọc hiện tại không -->
+              const isVisible = (deviceFilter === 'all' || getDeviceConnectionType(udid) === deviceFilter) &&
+                (!currentFocusGroupSet || currentFocusGroupSet.has(udid));
 
               return (
-              <div
-                key={udid}
-                data-udid={udid}
-                className={`tileDraggableWrapper${isSingleDevice ? ' single' : ''
-                  }${dragging ? ' dragging' : ''}${viewerUdid === udid ? ' hiddenByViewer' : ''
-                  }${dropTarget === udid ? ' dropTarget' : ''}`}
-                onPointerDownCapture={e => {
-                  if (e.button !== 2) return
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-                onMouseDownCapture={e => {
-                  if (e.button !== 2) return
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-                onPointerDown={onTilePointerDown}
-                onClick={(e) => {
-                  const target = e.target as HTMLElement;
-                  // Nhường thao tác UI cho các nút riêng
-                  if (target.closest('button') || target.tagName.toLowerCase() === 'input') return;
-
-                  // CHỈ CÓ TÁC DỤNG nếu đang đè phím Ctrl/Meta
-                  if (!e.ctrlKey && !e.metaKey) return;
-
-                  // Chọn/Bỏ chọn đa nhiệm (viền xanh)
-                  setConnectSelection(prev => {
-                    const next = new Set(prev);
-                    if (next.has(udid)) next.delete(udid);
-                    else next.add(udid);
-                    return next;
-                  });
-                  // Bật chế độ active duy nhất (viền trắng) để làm tâm điểm
-                  selectOnly(udid);
-                }}
-                onContextMenu={e => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  if (e.ctrlKey || e.metaKey) {
-                    selectOnly(udid)
-                    setViewerUdid(udid)
-                    return
-                  }
-                  // Mở context menu nhóm cho tile này
-                  setContextMenuTarget({ x: e.clientX, y: e.clientY, udid, sourceGrid: 'main', groupIdx: activeGroupIdx ?? undefined })
-                  setContextMenuInput(String(orderMap.get(udid) ?? 0))
-                  setContextMenuOpen(true)
-                }}
-                onDragOver={e => {
-                  if (draggingTile) e.preventDefault()
-                  if (draggingTile && dropTarget !== udid) {
-                    setDropTarget(udid)
-                  }
-                  if (draggingTile && draggingTile !== udid) {
-                    const toIndex = mergedOrder.indexOf(udid)
-                    const fromIndex = mergedOrder.indexOf(draggingTile)
-                    if (
-                      toIndex >= 0 &&
-                      fromIndex >= 0 &&
-                      toIndex !== fromIndex
-                    ) {
-                      moveTile(draggingTile, toIndex)
-                    }
-                  }
-                }}
-                onDrop={e => {
-                  e.preventDefault()
-                  if (draggingTile) {
-                    const toIndex = mergedOrder.indexOf(udid)
-                    if (toIndex >= 0) moveTile(draggingTile, toIndex)
-                    setDraggingTile(null)
-                  }
-                  setDropTarget(null)
-                }}
-                onDragLeave={() => {
-                  setDropTarget(prev => (prev === udid ? null : prev))
-                }}
-                style={{
-                  display: isVisible ? 'block' : 'none',
-                  ...(isSingleDevice
-                    ? {
-                      ['--drag-x' as any]: `${dragOffset.x}px`,
-                      ['--drag-y' as any]: `${dragOffset.y}px`
-                    }
-                    : {})
-                }}
-              >
-                <Tile
-                  udid={udid}
-                  order={getTileNumber(udid, idx + 1)}
-                  deviceParam={udid}
-                  wsServer={wsServer}
-                  isViewing={viewerUdid === udid}
-                  selected={connectSelection.has(udid)}
-                  showTileInfo={showTileInfo}
-                  streamConfig={
-                    viewerUdid === udid && viewerOverrideConfig
-                      ? viewerOverrideConfig
-                      : streamConfig
-                  }
-                  onRegisterReload={registerReload}
-                  onUnregisterReload={unregisterReload}
-                  onViewDevice={id => {
-                    setViewerUdid(id)
+                <div
+                  key={udid}
+                  data-udid={udid}
+                  className={`tileDraggableWrapper${isSingleDevice ? ' single' : ''
+                    }${dragging ? ' dragging' : ''}${viewerUdid === udid ? ' hiddenByViewer' : ''
+                    }${dropTarget === udid ? ' dropTarget' : ''}`}
+                  onPointerDownCapture={e => {
+                    if (e.button !== 2) return
+                    e.preventDefault()
+                    e.stopPropagation()
                   }}
-                  onMove={moveTile}
-                  onChangeOrderNumber={setTileNumber}
-                  onDragStart={id => setDraggingTile(id)}
-                  onDragEnd={() => setDraggingTile(null)}
-                />
-              </div>
-            )
-          })}
+                  onMouseDownCapture={e => {
+                    if (e.button !== 2) return
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onPointerDown={onTilePointerDown}
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    // Nhường thao tác UI cho các nút riêng
+                    if (target.closest('button') || target.tagName.toLowerCase() === 'input') return;
+
+                    // CHỈ CÓ TÁC DỤNG nếu đang đè phím Ctrl/Meta
+                    if (!e.ctrlKey && !e.metaKey) return;
+
+                    // Chọn/Bỏ chọn đa nhiệm (viền xanh)
+                    setConnectSelection(prev => {
+                      const next = new Set(prev);
+                      if (next.has(udid)) next.delete(udid);
+                      else next.add(udid);
+                      return next;
+                    });
+                    // Bật chế độ active duy nhất (viền trắng) để làm tâm điểm
+                    selectOnly(udid);
+                  }}
+                  onContextMenu={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (e.ctrlKey || e.metaKey) {
+                      selectOnly(udid)
+                      setViewerUdid(udid)
+                      return
+                    }
+                    // Mở context menu nhóm cho tile này
+                    setContextMenuTarget({ x: e.clientX, y: e.clientY, udid, sourceGrid: 'main', groupIdx: activeGroupIdx ?? undefined })
+                    setContextMenuInput(String(orderMap.get(udid) ?? 0))
+                    setContextMenuOpen(true)
+                  }}
+                  onDragOver={e => {
+                    if (draggingTile) e.preventDefault()
+                    if (draggingTile && dropTarget !== udid) {
+                      setDropTarget(udid)
+                    }
+                    if (draggingTile && draggingTile !== udid) {
+                      const toIndex = mergedOrder.indexOf(udid)
+                      const fromIndex = mergedOrder.indexOf(draggingTile)
+                      if (
+                        toIndex >= 0 &&
+                        fromIndex >= 0 &&
+                        toIndex !== fromIndex
+                      ) {
+                        moveTile(draggingTile, toIndex)
+                      }
+                    }
+                  }}
+                  onDrop={e => {
+                    e.preventDefault()
+                    if (draggingTile) {
+                      const toIndex = mergedOrder.indexOf(udid)
+                      if (toIndex >= 0) moveTile(draggingTile, toIndex)
+                      setDraggingTile(null)
+                    }
+                    setDropTarget(null)
+                  }}
+                  onDragLeave={() => {
+                    setDropTarget(prev => (prev === udid ? null : prev))
+                  }}
+                  style={{
+                    display: isVisible ? 'block' : 'none',
+                    ...(isSingleDevice
+                      ? {
+                        ['--drag-x' as any]: `${dragOffset.x}px`,
+                        ['--drag-y' as any]: `${dragOffset.y}px`
+                      }
+                      : {})
+                  }}
+                >
+                  <Tile
+                    udid={udid}
+                    order={getTileNumber(udid, idx + 1)}
+                    deviceParam={udid}
+                    wsServer={wsServer}
+                    isViewing={viewerUdid === udid}
+                    selected={connectSelection.has(udid)}
+                    showTileInfo={showTileInfo}
+                    streamConfig={
+                      viewerUdid === udid && viewerOverrideConfig
+                        ? viewerOverrideConfig
+                        : streamConfig
+                    }
+                    onRegisterReload={registerReload}
+                    onUnregisterReload={unregisterReload}
+                    onViewDevice={id => {
+                      setViewerUdid(id)
+                    }}
+                    onMove={moveTile}
+                    onChangeOrderNumber={setTileNumber}
+                    onDragStart={id => setDraggingTile(id)}
+                    onDragEnd={() => setDraggingTile(null)}
+                  />
+                </div>
+              );
+            })}
           </div>
           {rubberBand && (() => {
             const x = Math.min(rubberBand.startX, rubberBand.currentX)

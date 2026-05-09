@@ -77,9 +77,9 @@ export function attachTouchControls(
     }
   }
 
-  function sendKeyEvent(keycode: number) {
-    const down = encodeKeycodeMessage(KeyEventAction.DOWN, keycode);
-    const up = encodeKeycodeMessage(KeyEventAction.UP, keycode);
+  function sendBackKey() {
+    const down = encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_BACK);
+    const up = encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_BACK);
     sendToTargets(() => down);
     sendToTargets(() => up);
   }
@@ -110,8 +110,7 @@ export function attachTouchControls(
     onActivate?.();
 
     if (e.button === 2) {
-      e.stopPropagation();
-      sendKeyEvent(AndroidKeycode.KEYCODE_BACK);
+      sendBackKey();
       return;
     }
     if (((e.buttons ?? 0) & 2) === 2) return;
@@ -197,10 +196,7 @@ export function attachTouchControls(
     });
   }
 
-  const preventContextMenu = (e: Event) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
+  const preventContextMenu = (e: Event) => e.preventDefault();
 
   canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
   canvas.addEventListener('pointermove', onPointerMove, { passive: false });
