@@ -4988,3 +4988,8 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 .rcpGroupDeviceItem:hover {
   border-color: rgba(233, 69, 96, 0.5) !important;
 }
+
+/* Context menu submenu hover bridge */
+.ctxAddToGroupWrap:hover .ctxSubMenu {
+  display: flex !important;
+}
