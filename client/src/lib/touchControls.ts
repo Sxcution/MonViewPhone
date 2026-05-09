@@ -55,7 +55,6 @@ export function attachTouchControls(
   canvas: HTMLCanvasElement,
   getTargets: TargetsGetter,
   onActivate?: () => void,
-  onSetAltSolo?: (udid: string | null) => void,
   udid?: string,
 ): () => void {
   const ptr = makePointerIdAllocator();

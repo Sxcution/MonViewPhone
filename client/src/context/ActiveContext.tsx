@@ -73,9 +73,10 @@ type ActiveContextValue = {
   toggleSyncTarget: (udid: string) => void;
   setSyncTargetsList: (next: string[]) => void;
   stopSync: () => void;
+  isAltHeld: boolean;
   altSoloUdid: string | null;
   setAltSoloUdid: (udid: string | null) => void;
-  isAltHeld: boolean;
+  getIsAltHeld: () => boolean;
 };
 
 const Ctx = createContext<ActiveContextValue | null>(null);
@@ -116,32 +117,29 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
     syncTargetsRef.current = syncTargets;
   }, [syncTargets]);
 
-  const [altSoloUdid, setAltSoloUdidState] = useState<string | null>(null);
-  const [isAltHeld, setIsAltHeld] = useState(false);
-  const altSoloUdidRef = useRef<string | null>(null);
   const activeUdidRef = useRef<string | null>(null);
 
   useEffect(() => {
     activeUdidRef.current = activeUdid;
   }, [activeUdid]);
 
-  // Wrap setter để cập nhật cả ref lẫn state đồng bộ
-  const setAltSoloUdid = useCallback((udid: string | null) => {
-    altSoloUdidRef.current = udid; // Cập nhật ref ngay lập tức (đồng bộ)
-    setAltSoloUdidState(udid); // Cập nhật state để re-render UI
-  }, []);
+  // Alt-solo: udid đang được điều khiển đơn lẻ khi giữ Alt
+  const isAltHeldRef = useRef(false);
+  const altSoloUdidRef = useRef<string | null>(null);
+  const [altSoloUdid, setAltSoloUdidState] = useState<string | null>(null);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Alt') {
         e.preventDefault();
-        setIsAltHeld(true);
+        isAltHeldRef.current = true;
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Alt') {
-        setIsAltHeld(false);
-        setAltSoloUdid(null); // Thả Alt → clear solo, về broadcast
+        isAltHeldRef.current = false;
+        altSoloUdidRef.current = null;
+        setAltSoloUdidState(null);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -150,7 +148,14 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [setAltSoloUdid]);
+  }, []);
+
+  const setAltSoloUdid = useCallback((udid: string | null) => {
+    altSoloUdidRef.current = udid;
+    setAltSoloUdidState(udid);
+  }, []);
+
+  const getIsAltHeld = useCallback(() => isAltHeldRef.current, []);
 
   useEffect(() => {
     try {
@@ -237,28 +242,23 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       (sourceUdid: string | null): InputTarget[] => {
         if (!sourceUdid) return [];
 
-        const currentSyncTargets = syncTargetsRef.current;
-
-        // Đọc từ REF để có giá trị mới nhất ngay lập tức (không bị stale do React async)
         const currentAltSolo = altSoloUdidRef.current;
 
-        // ÉP ĐÈ ALT: luôn solo device nguồn, bỏ qua sync group
+        // Khi đang giữ Alt: chỉ gửi đến tile mà chuột đang hover (altSoloUdid)
         if (currentAltSolo !== null) {
-          // Chỉ solo nếu thao tác đến TỪ ĐÚNG tile đang giữ Alt
           if (sourceUdid === currentAltSolo) {
             return getTargetsByUdids([sourceUdid]);
           }
-          // Nếu thao tác từ tile khác khi đang alt-solo tile này -> block hoàn toàn để tránh loạn
           return [];
         }
 
-        // ✅ FIX: Smart Sync — Kiểm tra nếu thiết bị nguồn nằm trong nhóm Sync (bao gồm cả Main)
+        // Chế độ sync bình thường
+        const currentSyncTargets = syncTargetsRef.current;
         const isInSyncGroup =
           currentSyncTargets.includes(sourceUdid) ||
           (syncMain !== null && sourceUdid === syncMain);
 
         if (isInSyncGroup) {
-          // Broadcast tới cả thiết bị Chính và tất cả thiết bị Phụ trong nhóm
           const ids = uniq([
             ...(syncMain ? [syncMain] : []),
             ...currentSyncTargets,
@@ -266,7 +266,6 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
           return getTargetsByUdids(ids);
         }
 
-        // Legacy fallback: Nếu chế độ Đồng bộ tất cả đang bật
         if (syncAll) {
           const ids = uniq([sourceUdid, ...currentSyncTargets.filter(Boolean)]);
           return getTargetsByUdids(ids);
@@ -383,9 +382,10 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       },
       setSyncTargetsList,
       stopSync,
+      isAltHeld: altSoloUdid !== null, // true khi đang solo
       altSoloUdid,
       setAltSoloUdid,
-      isAltHeld,
+      getIsAltHeld,
     }),
     [
       activeUdid,
@@ -407,7 +407,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       stopSync,
       altSoloUdid,
       setAltSoloUdid,
-      isAltHeld,
+      getIsAltHeld,
     ],
   );
 

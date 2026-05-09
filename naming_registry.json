@@ -44,13 +44,17 @@
       "rename_group_value": "renameGroupValue",
       "drag_group_idx": "dragGroupIdx",
       "drag_group_over_idx": "dragGroupOverIdx",
-      "group_context_menu": "groupContextMenu"
+      "group_context_menu": "groupContextMenu",
+      "alt_solo_udid": "altSoloUdid",
+      "is_alt_held": "isAltHeld"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
       "on_grid_pointer_down": "onGridPointerDown",
       "on_grid_pointer_move": "onGridPointerMove",
-      "on_grid_pointer_up": "onGridPointerUp"
+      "on_grid_pointer_up": "onGridPointerUp",
+      "get_is_alt_held": "getIsAltHeld",
+      "set_alt_solo_udid": "setAltSoloUdid"
     },
     "refs": {
       "rubber_band_ref": "rubberBandRef",

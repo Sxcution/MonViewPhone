@@ -29,7 +29,7 @@ type Args = {
     selectOnly: (udid: string) => void;
     getInputTargetsForSource: (udid: string) => InputTarget[];
     setAltSoloUdid?: (udid: string | null) => void;
-    isAltHeld: boolean;
+    getIsAltHeld?: () => boolean;
 
   // UI state setters
   setStatus: (s: string) => void;
@@ -69,7 +69,7 @@ export function useTileStream(args: Args) {
         selectOnly,
         getInputTargetsForSource,
         setAltSoloUdid,
-        isAltHeld,
+        getIsAltHeld,
         setStatus,
         setLoading,
         reloadRef,
@@ -86,11 +86,6 @@ export function useTileStream(args: Args) {
     useEffect(() => {
         getInputTargetsRef.current = getInputTargetsForSource;
     }, [getInputTargetsForSource]);
-
-    const isAltHeldRef = useRef(isAltHeld);
-    useEffect(() => {
-        isAltHeldRef.current = isAltHeld;
-    }, [isAltHeld]);
 
     useEffect(() => {
         destroyedRef.current = false;
@@ -198,9 +193,9 @@ export function useTileStream(args: Args) {
         const onActivate = () => selectOnly(udid);
 
         const handlePointerEnter = () => {
-            if (isAltHeldRef.current) {
-                setAltSoloUdid?.(udid);
-            }
+          if (getIsAltHeld?.()) {
+            setAltSoloUdid?.(udid);
+          }
         };
         body.addEventListener('pointerenter', handlePointerEnter);
 
@@ -208,7 +203,6 @@ export function useTileStream(args: Args) {
             canvas,
             () => getInputTargetsRef.current(udid),
             onActivate,
-            (u) => setAltSoloUdid?.(u),
             udid
         );
 

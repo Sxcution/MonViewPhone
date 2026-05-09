@@ -46,7 +46,7 @@ function TileComponent({
         setSyncMain,
         toggleSyncTarget,
         setAltSoloUdid,
-        isAltHeld,
+        getIsAltHeld,   // <-- thay isAltHeld bằng getIsAltHeld
     } = useActive();
     const { androidDeviceMap } = useServer();
 
@@ -149,7 +149,7 @@ function TileComponent({
         selectOnly,
         getInputTargetsForSource,
         setAltSoloUdid,
-        isAltHeld,
+        getIsAltHeld,
         setStatus,
         setLoading,
         reloadRef,
