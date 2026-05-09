@@ -576,12 +576,8 @@ export function App() {
     if (deviceFilter !== 'all') {
       list = list.filter(id => getDeviceConnectionType(id) === deviceFilter)
     }
-    if (focusGroupIdx !== null && savedGroups[focusGroupIdx]) {
-      const groupSet = new Set(savedGroups[focusGroupIdx].udids)
-      list = list.filter(id => groupSet.has(id))
-    }
     return list
-  }, [deviceFilter, gridDevices, getDeviceConnectionType, focusGroupIdx, savedGroups])
+  }, [deviceFilter, gridDevices, getDeviceConnectionType])
   const { mergedOrder, moveTile, getTileNumber, setTileNumber } =
     useTileOrder(filteredGridDevices)
   const filteredRegistered = useMemo(() => {
@@ -1316,7 +1312,13 @@ export function App() {
               } as React.CSSProperties
             }
           >
-            {mergedOrder.map((udid, idx) => (
+            {mergedOrder.map((udid, idx) => {
+              const isVisible = (() => {
+                if (focusGroupIdx === null || !savedGroups[focusGroupIdx]) return true
+                return savedGroups[focusGroupIdx].udids.includes(udid)
+              })()
+
+              return (
               <div
                 key={udid}
                 data-udid={udid}
@@ -1394,14 +1396,15 @@ export function App() {
                 onDragLeave={() => {
                   setDropTarget(prev => (prev === udid ? null : prev))
                 }}
-                style={
-                  isSingleDevice
+                style={{
+                  display: isVisible ? 'block' : 'none',
+                  ...(isSingleDevice
                     ? {
                       ['--drag-x' as any]: `${dragOffset.x}px`,
                       ['--drag-y' as any]: `${dragOffset.y}px`
                     }
-                    : undefined
-                }
+                    : {})
+                }}
               >
                 <Tile
                   udid={udid}
@@ -1426,8 +1429,8 @@ export function App() {
                   onDragStart={id => setDraggingTile(id)}
                   onDragEnd={() => setDraggingTile(null)}
                 />
-              </div>
-            ))}
+              )
+            })}
           </div>
           {rubberBand && (() => {
             const x = Math.min(rubberBand.startX, rubberBand.currentX)

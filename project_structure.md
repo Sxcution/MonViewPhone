@@ -5,7 +5,7 @@ This file documents the structure of the `stream-phonefarm-solumate-main` projec
 ## Client (React/Vite)
 
 ### Core Files
-- `client/src/App.tsx`: Main application component, handles the device grid, drag & drop, and centralized HeaderBar integration.
+- `client/src/App.tsx`: Main application component; handles the device grid, drag & drop, and centralized HeaderBar integration. **Modified to render all devices pass connection filter in DOM (using CSS visibility) to maintain stable WebSocket streams.**
 - `client/src/main.tsx`: React entry point.
 - `client/src/styles.css`: Global CSS with high-density UI optimizations and theme tokens.
 
