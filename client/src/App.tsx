@@ -1123,17 +1123,47 @@ export function App () {
       back: {
         label: 'Quay lại',
         icon: <ArrowLeft size={15} strokeWidth={1.8} />,
-        run: () => sendKeyTap(AndroidKeycode.KEYCODE_BACK)
+        run: () => {
+          const targets = quickCommandTargets()
+          const keyTargets = getTargetsByUdids(targets)
+          if (keyTargets.length) {
+            const down = encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_BACK)
+            const up = encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_BACK)
+            for (const t of keyTargets) { try { t.ws.send(down); t.ws.send(up) } catch {} }
+          } else {
+            sendKeyTap(AndroidKeycode.KEYCODE_BACK)
+          }
+        }
       },
       home: {
         label: 'Home',
         icon: <Home size={15} strokeWidth={1.8} />,
-        run: () => sendKeyTap(AndroidKeycode.KEYCODE_HOME)
+        run: () => {
+          const targets = quickCommandTargets()
+          const keyTargets = getTargetsByUdids(targets)
+          if (keyTargets.length) {
+            const down = encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_HOME)
+            const up = encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_HOME)
+            for (const t of keyTargets) { try { t.ws.send(down); t.ws.send(up) } catch {} }
+          } else {
+            sendKeyTap(AndroidKeycode.KEYCODE_HOME)
+          }
+        }
       },
       recent: {
         label: 'Đa nhiệm',
         icon: <Menu size={15} strokeWidth={1.8} />,
-        run: () => sendKeyTap(AndroidKeycode.KEYCODE_APP_SWITCH)
+        run: () => {
+          const targets = quickCommandTargets()
+          const keyTargets = getTargetsByUdids(targets)
+          if (keyTargets.length) {
+            const down = encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_APP_SWITCH)
+            const up = encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_APP_SWITCH)
+            for (const t of keyTargets) { try { t.ws.send(down); t.ws.send(up) } catch {} }
+          } else {
+            sendKeyTap(AndroidKeycode.KEYCODE_APP_SWITCH)
+          }
+        }
       },
       screenshot: {
         label: 'Chụp màn hình',
@@ -1141,7 +1171,7 @@ export function App () {
         run: () => screenshotActiveCanvas()
       }
     }),
-    [runQuickAdbCommands, screenshotActiveCanvas, sendKeyTap]
+    [runQuickAdbCommands, screenshotActiveCanvas, sendKeyTap, quickCommandTargets, getTargetsByUdids]
   )
 
   return (
