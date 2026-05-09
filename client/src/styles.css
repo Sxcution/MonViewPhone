@@ -5025,70 +5025,54 @@ input[type="number"] {
 /* ===== SELECTION COUNT BADGE ===== */
 .selectionCountBadge {
   position: fixed;
-  bottom: 20px;
-  left: 20px;
+  bottom: 14px;
+  left: 14px;
   z-index: 9999;
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: linear-gradient(135deg, #1a7a30 0%, #0f5c22 100%);
+  gap: 5px;
+  background: #1a6a2a;
   border: 2px solid #2ecc5a;
   color: #fff;
-  border-radius: 16px;
-  padding: 10px 20px 10px 16px;
+  border-radius: 8px;
+  padding: 4px 10px 4px 8px;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 4px 24px rgba(46,204,90,0.35), 0 2px 8px rgba(0,0,0,0.5);
-  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
-  animation: badgePopIn 0.2s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.45);
+  transition: background 0.15s, transform 0.1s;
+  animation: badgePopIn 0.15s cubic-bezier(0.34,1.56,0.64,1);
 }
 
 .selectionCountBadge:hover {
-  background: linear-gradient(135deg, #c0392b 0%, #922b21 100%);
+  background: #c0392b;
   border-color: #e74c3c;
-  box-shadow: 0 4px 24px rgba(231,76,60,0.4), 0 2px 8px rgba(0,0,0,0.5);
-  transform: scale(1.04);
+  transform: scale(1.05);
+}
+
+.selectionCountBadge:hover::after {
+  content: ' ✕';
+  font-size: 12px;
+  opacity: 0.8;
 }
 
 .selectionCountIcon {
-  font-size: 22px;
+  font-size: 14px;
   line-height: 1;
-  display: flex;
-  align-items: center;
+  opacity: 0.85;
 }
 
 .selectionCountNum {
-  font-size: 36px;
-  font-weight: 900;
   font-family: 'Courier New', monospace;
-  line-height: 1;
-  letter-spacing: -1px;
-  min-width: 36px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  min-width: 18px;
   text-align: center;
 }
 
-.selectionCountLabel {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  line-height: 1;
-}
-
-.selectionCountLabelTop {
-  font-size: 10px;
-  font-weight: 500;
-  opacity: 0.7;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-}
-
-.selectionCountLabelBot {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.9;
-}
-
 @keyframes badgePopIn {
-  from { transform: scale(0.4) translateY(20px); opacity: 0; }
-  to   { transform: scale(1)   translateY(0);    opacity: 1; }
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
 }
