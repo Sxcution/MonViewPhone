@@ -28,6 +28,7 @@ type Args = {
     // Active/sync callbacks from ActiveContext
     selectOnly: (udid: string) => void;
     getInputTargetsForSource: (udid: string) => InputTarget[];
+    setAltSoloUdid?: (udid: string | null) => void;
 
   // UI state setters
   setStatus: (s: string) => void;
@@ -66,6 +67,7 @@ export function useTileStream(args: Args) {
         streamCfgRef,
         selectOnly,
         getInputTargetsForSource,
+        setAltSoloUdid,
         setStatus,
         setLoading,
         reloadRef,
@@ -188,7 +190,12 @@ export function useTileStream(args: Args) {
 
         const onActivate = () => selectOnly(udid);
 
-        detachControlsRef.current = attachTouchControls(canvas, () => getInputTargetsRef.current(udid), onActivate);
+        detachControlsRef.current = attachTouchControls(
+            canvas,
+            () => getInputTargetsRef.current(udid),
+            onActivate,
+            () => setAltSoloUdid?.(udid)
+        );
 
         function makeDecoder() {
             firstFrame = false;

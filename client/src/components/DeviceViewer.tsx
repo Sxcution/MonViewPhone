@@ -93,7 +93,7 @@ type PreviewState =
  */
 const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChangeOrder }: Props) => {
   const { androidDeviceMap, listDir, pullFile, pushFile } = useServer();
-  const { getCanvasForUdid, getInputTargetsForSource, selectOnly } = useActive();
+  const { getCanvasForUdid, getInputTargetsForSource, selectOnly, setAltSoloUdid } = useActive();
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const detachRef = useRef<(() => void) | null>(null);
@@ -170,13 +170,13 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
     if (tab !== 'view') return;
 
     const onActivate = () => selectOnly(udid);
-    detachRef.current = attachTouchControls(c, () => getInputTargetsForSource(udid), onActivate);
+    detachRef.current = attachTouchControls(c, () => getInputTargetsForSource(udid), onActivate, () => setAltSoloUdid(udid));
 
     return () => {
       detachRef.current?.();
       detachRef.current = null;
     };
-  }, [udid, tab, getInputTargetsForSource, selectOnly]);
+  }, [udid, tab, getInputTargetsForSource, selectOnly, setAltSoloUdid]);
 
   // ===== Mirror tile canvas into viewer canvas (RAF), only in view tab.
   useEffect(() => {

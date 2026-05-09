@@ -122,21 +122,13 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
   }, [activeUdid]);
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') {
-        // Khi đè Alt, ghi nhớ device đang active để solo
-        setAltSoloUdid((prev) => prev ?? activeUdidRef.current);
-      }
-    };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Alt') {
         setAltSoloUdid(null);
       }
     };
-    window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
   }, []);
@@ -230,7 +222,12 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
 
         // ÉP ĐÈ ALT: luôn solo device nguồn, bỏ qua sync group
         if (altSoloUdid) {
-          return getTargetsByUdids([sourceUdid]);
+          // Chỉ solo nếu thao tác đến TỪ ĐÚNG tile đang giữ Alt
+          if (sourceUdid === altSoloUdid) {
+            return getTargetsByUdids([sourceUdid]);
+          }
+          // Nếu thao tác từ tile khác khi đang alt-solo tile này -> block hoàn toàn để tránh loạn
+          return [];
         }
 
         // ✅ FIX: Smart Sync — Kiểm tra nếu thiết bị nguồn nằm trong nhóm Sync (bao gồm cả Main)
@@ -365,6 +362,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       setSyncTargetsList,
       stopSync,
       altSoloUdid,
+      setAltSoloUdid,
     }),
     [
       activeUdid,
