@@ -221,6 +221,13 @@ export function App() {
   useEffect(() => {
     setSyncTargetsList(Array.from(connectSelection))
   }, [connectSelection, setSyncTargetsList])
+
+  // Reset activeGroupIdx khi không còn device nào được chọn
+  useEffect(() => {
+    if (connectSelection.size === 0) {
+      setActiveGroupIdx(null)
+    }
+  }, [connectSelection])
   const [connectModalOpen, setConnectModalOpen] = useState(false)
 
   // ===== SAVED GROUPS =====
@@ -1897,8 +1904,14 @@ export function App() {
                             className={`rcpSavedGroupBtn${activeGroupIdx === idx ? ' active' : ''}`}
                             title={`Load nhóm: ${group.udids.length} device`}
                             onClick={() => {
-                              setConnectSelection(new Set(group.udids))
-                              setActiveGroupIdx(idx)
+                              // Toggle: nếu đang active nhóm này thì bỏ chọn, ngược lại load nhóm
+                              if (activeGroupIdx === idx) {
+                                setActiveGroupIdx(null)
+                                setConnectSelection(new Set())
+                              } else {
+                                setConnectSelection(new Set(group.udids))
+                                setActiveGroupIdx(idx)
+                              }
                             }}
                           >
                             <span className='rcpSavedGroupName'>{group.name}</span>
@@ -2553,16 +2566,39 @@ export function App() {
                         onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
                         onClick={() => {
                           if (alreadyIn) return
-                          setSavedGroups(prev => prev.map((g, i) =>
-                            i === gIdx ? { ...g, udids: [...g.udids, contextMenuTarget.udid] } : g
-                          ))
+
+                          // Lấy tất cả device đang được chọn (connectSelection)
+                          // Nếu device click chuột phải không nằm trong selection → chỉ thêm 1 device đó
+                          // Nếu device click chuột phải nằm trong selection → thêm tất cả device đang chọn
+                          const clickedUdid = contextMenuTarget!.udid
+                          const selectedUdids = connectSelection.size > 0 && connectSelection.has(clickedUdid)
+                            ? Array.from(connectSelection)
+                            : [clickedUdid]
+
+                          setSavedGroups(prev => prev.map((g, i) => {
+                            if (i !== gIdx) return g
+                            // Gộp, loại trùng
+                            const existingSet = new Set(g.udids)
+                            const toAdd = selectedUdids.filter(u => !existingSet.has(u))
+                            return { ...g, udids: [...g.udids, ...toAdd] }
+                          }))
+
                           setContextMenuTarget(null)
                           setContextMenuOpen(false)
                         }}
                       >
                         <span>{grp.name}</span>
                         <span style={{ fontSize: 11, color: '#555' }}>
-                          {alreadyIn ? '✓ Đã có' : `+${grp.udids.length}`}
+                          {(() => {
+                            const clickedUdid = contextMenuTarget!.udid
+                            const selectedUdids = connectSelection.size > 0 && connectSelection.has(clickedUdid)
+                              ? Array.from(connectSelection)
+                              : [clickedUdid]
+                            const existingSet = new Set(grp.udids)
+                            const countToAdd = selectedUdids.filter(u => !existingSet.has(u)).length
+                            if (alreadyIn && countToAdd === 0) return '✓ Đã có'
+                            return countToAdd > 1 ? `+${countToAdd} device` : alreadyIn ? '✓ Đã có' : `+1`
+                          })()}
                         </span>
                       </button>
                     )
