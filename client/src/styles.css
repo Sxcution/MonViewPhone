@@ -1,4 +1,4 @@
-:root {
+ï»¿:root {
   --rb-width: 54px;
   --config-width: 320px;
   --sidebar-total: var(--config-width);
@@ -55,9 +55,9 @@ body.sidebarCollapsed {
   z-index: 1200;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 16px;
-  /* min-height: 64px; */
+  gap: 6px;
+  padding: 2px 12px;
+  height: 28px;
   flex-wrap: wrap;
   background: radial-gradient(circle at 18% 20%, rgba(42, 55, 82, 0.18), rgba(14, 14, 14, 0.94));
   border-bottom: 1px solid #1f2635;
@@ -70,7 +70,7 @@ body.sidebarCollapsed {
 .headerRight {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   flex: 1;
   /* min-width: 0; */
 }
@@ -81,7 +81,7 @@ body.sidebarCollapsed {
 
 .headerCenter {
   justify-content: center;
-  gap: 14px;
+  gap: 8px;
   flex: 1.4;
 }
 
@@ -99,12 +99,12 @@ body.sidebarCollapsed {
 .headerBrand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 .headerLogoWrap {
-  width: 44px;
-  height: 44px;
+  width: 24px;
+  height: 24px;
   border-radius: 12px;
   background: linear-gradient(135deg, rgba(77, 161, 255, 0.18), rgba(61, 208, 167, 0.12));
   border: 1px solid rgba(77, 161, 255, 0.35);
@@ -114,15 +114,15 @@ body.sidebarCollapsed {
 }
 
 .headerLogo {
-  width: 44px;
-  height: 44px;
+  width: 24px;
+  height: 24px;
   object-fit: contain;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35));
 }
 
 .headerGradientTitle {
   margin: 0;
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 800;
   background: linear-gradient(135deg, #f1d167, #f7e7ae, #f1d167);
   -webkit-background-clip: text;
@@ -182,7 +182,7 @@ body.sidebarCollapsed {
   min-width: 140px;
   border: 1px solid rgba(42, 42, 42, 0.9);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 4px 8px;
   background: rgba(0, 0, 0, 0.3);
   display: flex;
   /* flex-direction: column; */
@@ -322,8 +322,8 @@ body.sidebarCollapsed {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 4px 8px;
   border-bottom: 1px solid #2a2a2a;
   background: rgba(27, 27, 27, 0.92);
   cursor: move;
@@ -332,7 +332,7 @@ body.sidebarCollapsed {
 .viewerHeaderRight {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   margin-left: auto;
 }
 
@@ -422,7 +422,7 @@ body.sidebarCollapsed {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .connectList {
@@ -651,7 +651,7 @@ body.sidebarCollapsed {
   color: #e8f2ff;
   display: grid;
   place-items: center;
-  font-size: 20px;
+  font-size: 14px;
   cursor: pointer;
   transition: transform 0.08s ease, border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.35);
@@ -681,8 +681,8 @@ body.sidebarCollapsed {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 4px 8px;
   box-sizing: border-box;
   background: #111;
 }
@@ -730,7 +730,7 @@ body.sidebarCollapsed {
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 10px;
+  gap: 6px;
 }
 
 .viewerFsList {
@@ -748,7 +748,7 @@ body.sidebarCollapsed {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
   background: transparent;
   border: 0;
   border-bottom: 1px solid #1c1c1c;
@@ -927,7 +927,7 @@ body.sidebarCollapsed {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
   padding: 18px;
   text-align: center;
   color: #dff7ec;
@@ -956,7 +956,7 @@ body.sidebarCollapsed {
 }
 
 .tileViewingFooter {
-  padding: 10px 12px;
+  padding: 4px 8px;
   background: linear-gradient(120deg, rgba(104, 224, 171, 0.18), rgba(28, 28, 28, 0.92));
   border-top: 1px solid rgba(104, 224, 171, 0.36);
   text-align: center;
@@ -1014,7 +1014,7 @@ body.sidebarCollapsed {
   padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   max-height: 60vh;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1032,7 +1032,7 @@ body.sidebarCollapsed {
 .modalActions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 6px;
   margin-top: 8px;
 }
 
@@ -1052,7 +1052,7 @@ body.sidebarCollapsed {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
 }
 
 .modalSyncTitle {
@@ -1080,7 +1080,7 @@ body.sidebarCollapsed {
 .modalDeviceRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   padding: 8px 10px;
   border-radius: 10px;
   cursor: pointer;
@@ -1186,7 +1186,7 @@ body.sidebarCollapsed {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
   padding: 14px;
   border-bottom: 1px solid #2a2a2a;
 }
@@ -1211,7 +1211,7 @@ body.sidebarCollapsed {
   padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
   max-height: min(74vh, 680px);
   overflow: auto;
 }
@@ -1252,7 +1252,7 @@ body.sidebarCollapsed {
 .syncModalRow {
   display: grid;
   grid-template-columns: 26px 1fr;
-  gap: 10px;
+  gap: 6px;
   align-items: flex-start;
   padding: 10px;
   border-radius: 12px;
@@ -1302,7 +1302,7 @@ body.sidebarCollapsed {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
   padding: 4px 2px 2px;
   flex-wrap: wrap;
 }
@@ -1469,7 +1469,7 @@ body.sidebarCollapsed {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
   padding: 18px;
   text-align: center;
   color: #dff7ec;
@@ -1985,7 +1985,7 @@ canvas {
   bottom: 0;
   height: 54px;
   display: flex;
-  gap: 10px;
+  gap: 6px;
   align-items: center;
   justify-content: center;
   background: rgba(27, 27, 27, 0.92);
@@ -2043,12 +2043,12 @@ canvas {
   background: rgba(15, 15, 15, 0.96);
   border-right: 1px solid #2a2a2a;
   box-shadow: 16px 0 50px rgba(0, 0, 0, 0.55);
-  padding: 14px 12px 16px;
+  padding: 8px 10px;
   box-sizing: border-box;
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 8px;
   z-index: 20005;
   transition: width 0.2s ease, padding 0.2s ease;
 }
@@ -2065,7 +2065,7 @@ canvas {
 .rightConfigPanel .rcpContent {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
 .rightConfigPanel.collapsed .rcpContent {
@@ -2120,7 +2120,7 @@ canvas {
 .rcpHeader {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   padding: 8px 10px;
   border: 1px solid #2a2a2a;
   border-radius: 12px;
@@ -2532,7 +2532,7 @@ canvas {
 
 .rcpConnectNotification {
   font-size: 12px;
-  padding: 10px 12px;
+  padding: 4px 8px;
   border-radius: 12px;
   margin-bottom: 8px;
   border: 1px solid transparent;
@@ -2557,7 +2557,7 @@ canvas {
   bottom: 24px;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   padding: 10px 16px;
   border-radius: 999px;
   background: rgba(5, 9, 18, 0.8);
@@ -2681,7 +2681,7 @@ canvas {
   font-size: 12px;
   color: #e9f1ff;
   position: relative;
-  padding: 10px 12px;
+  padding: 4px 8px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(15, 20, 32, 0.8);
@@ -2948,7 +2948,7 @@ canvas {
   padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   z-index: 11000;
 }
 
@@ -3066,7 +3066,7 @@ canvas {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
   padding: 12px 12px;
   border-bottom: 1px solid #2a2a2a;
   background: rgba(27, 27, 27, 0.92);
@@ -3134,7 +3134,7 @@ canvas {
   padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .cp-searchRow {
@@ -3352,7 +3352,7 @@ canvas {
 
 .cp-queueRow {
   display: flex;
-  gap: 10px;
+  gap: 6px;
   align-items: flex-start;
   padding: 10px;
   border-radius: 12px;
@@ -4500,7 +4500,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   background: #0e0e0e;
 }
 
-/* C?t trái: di?n tho?i */
+/* C?t trï¿½i: di?n tho?i */
 .fvl-phone {
   flex: 1 1 auto;
   display: flex;
@@ -4512,7 +4512,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 }
 
 .fvl-canvas {
-  /* Gi? dúng aspect ratio, chi?u cao max 100vh */
+  /* Gi? dï¿½ng aspect ratio, chi?u cao max 100vh */
   max-height: 100vh;
   max-width: 100%;
   width: auto;
@@ -4547,7 +4547,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 4px 8px;
   border-bottom: 1px solid #2a2a2a;
   position: sticky;
   top: 0;
@@ -4571,3 +4571,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   background: #2a2a2a;
   color: #fff;
 }
+
+/* === Compact UI Optimizations === */
+.headerDeviceNumInput:focus { border-color: #5fa7ff !important; outline: none; }
+.headerDeviceControl { display: flex; align-items: center; background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }

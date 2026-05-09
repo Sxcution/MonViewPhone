@@ -17,7 +17,9 @@
       "sidebar_auto_hide": "sidebar-auto-hide",
       "btn_pin": "btn-pin",
       "tile_draggable_wrapper": "tileDraggableWrapper",
-      "user_profile_select": "userProfileSelect"
+      "user_profile_select": "userProfileSelect",
+      "header_device_num_input": "headerDeviceNumInput",
+      "header_device_control": "headerDeviceControl"
     },
     "state_variables": {
       "sidebar_collapsed": "sidebarCollapsed",

@@ -406,20 +406,6 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
       <div className="viewerHeader">
         <div className="viewerTitle">
           <div className="viewerTitleLine">
-            <span className="viewerDeviceName" style={{ fontSize: '12px', color: 'var(--color-text-muted, #aaa)' }}>Số Máy</span>
-            <input
-              className="vsp-input vsp-input-inline"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder={currentOrder !== undefined ? String(currentOrder + 1) : '?'}
-              value={newOrderViewer}
-              onChange={e => setNewOrderViewer(e.target.value.replace(/[^0-9]/g, ''))}
-              onPointerDown={e => e.stopPropagation()}
-              onKeyDown={e => e.key === 'Enter' && handleChangeOrderViewer()}
-              style={{ width: 52, textAlign: 'center' }}
-            />
-            <button className="vsp-btn vsp-btn-primary" onClick={handleChangeOrderViewer} style={{ padding: '2px 8px', fontSize: '12px' }}>Đổi</button>
             {status !== 'ready' ? <span className="viewerStatus">loading...</span> : null}
           </div>
         </div>

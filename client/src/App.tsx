@@ -1176,6 +1176,7 @@ export function App () {
 
   return (
     <>
+      <HeaderBar wsServer={wsServer} />
       <input
         ref={apkInputRef}
         type='file'

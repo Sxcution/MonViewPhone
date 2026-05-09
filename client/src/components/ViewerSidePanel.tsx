@@ -322,11 +322,11 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
           </div>
         )}
         <div className="vsp-body">
-          {/* 1. Đổi số hiệu - inline */}
+          {/* 1. Số Máy - inline */}
           <div className="vsp-section">
             <div className="vsp-section-title-inline">
               <Hash size={15} />
-              <span>{t('Đổi số hiệu')}</span>
+              <span>{t('Số Máy')}</span>
               <input className="vsp-input vsp-input-inline" type="text" inputMode="numeric" pattern="[0-9]*"
                 placeholder={currentOrder !== undefined ? String(currentOrder + 1) : '?'}
                 value={newOrder} onChange={e => setNewOrder(e.target.value.replace(/[^0-9]/g, ''))}

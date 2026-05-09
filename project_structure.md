@@ -5,13 +5,13 @@ This file documents the structure of the `stream-phonefarm-solumate-main` projec
 ## Client (React/Vite)
 
 ### Core Files
-- `client/src/App.tsx`: Main application component, handles the device grid, drag & drop, and right control panel.
+- `client/src/App.tsx`: Main application component, handles the device grid, drag & drop, and centralized HeaderBar integration.
 - `client/src/main.tsx`: React entry point.
-- `client/src/styles.css`: Global CSS and theme tokens.
+- `client/src/styles.css`: Global CSS with high-density UI optimizations and theme tokens.
 
 ### Components
-- `client/src/components/DeviceViewer.tsx`: Displays a single device in the expanded viewer mode with File/App/Shell tabs.
-- `client/src/components/HeaderBar.tsx`: Top navigation bar.
+- `client/src/components/DeviceViewer.tsx`: Displays a single device in the expanded viewer mode; UI is optimized to hide redundant controls now present in HeaderBar.
+- `client/src/components/HeaderBar.tsx`: Top navigation bar; now hosts centralized device numbering and reordering controls.
 - `client/src/components/RightBar.tsx`: Thin right sidebar containing quick action icons (Power, Volume, Home, etc.).
 - `client/src/components/SyncPanel.tsx`: Panel for device synchronization settings.
 - `client/src/components/ViewerSidePanel.tsx`: Right-side panel specifically for the `DeviceViewer`.
