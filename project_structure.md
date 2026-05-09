@@ -17,7 +17,7 @@ This file documents the structure of the `stream-phonefarm-solumate-main` projec
 - `client/src/components/ViewerSidePanel.tsx`: Right-side panel specifically for the `DeviceViewer`.
 
 #### Tile Components (Phone Cards)
-- `client/src/components/tile/Tile.tsx`: Main component representing a single phone card. Includes onPointerEnter hover focus for Alt-Solo control.
+- `client/src/components/tile/Tile.tsx`: Main component representing a single phone card. Includes onPointerEnter/Leave hover focus logic and Alt keyup restoration for solo control.
 - `client/src/components/tile/TileHeader.tsx`: Header of the phone card (UDID, status, user profile selection).
 - `client/src/components/tile/TileMenu.tsx`: Context menu for the phone card.
 - `client/src/components/tile/TileNav.tsx`: Bottom navigation buttons on the phone card.

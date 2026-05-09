@@ -158,6 +158,23 @@ function TileComponent({
             setVideoAspect(w / h);
         },
     });
+
+    // Lắng nghe sự kiện nhả phím Alt (KeyUp) để khôi phục focus về máy Main
+    useEffect(() => {
+        // Chỉ máy Main mới cần lắng nghe để tự đoạt lại focus, tránh gọi hàm trùng lặp ở các máy Follower
+        if (!isSyncMain) return;
+
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Alt') {
+                selectOnly(udid); // udid ở đây chính là máy Main
+                canvasRef.current?.focus?.();
+            }
+        };
+
+        window.addEventListener('keyup', handleKeyUp);
+        return () => window.removeEventListener('keyup', handleKeyUp);
+    }, [isSyncMain, selectOnly, udid]);
+
     const screenshotThisCanvas = useCallback(() => {
         const c = canvasRef.current;
         if (!c) return;
@@ -191,6 +208,14 @@ function TileComponent({
             canvasRef.current?.focus?.();
         }
     }, [selectOnly, udid]);
+
+    const onPointerLeave = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        // Khi chuột rời khỏi máy này, nếu đang bật đồng bộ thì lập tức trả focus về máy Main
+        // Việc này ngăn ngừa kẹt trạng thái focus ở máy Follower khi rê chuột ra ngoài grid
+        if (syncAll && syncMain) {
+            selectOnly(syncMain);
+        }
+    }, [syncAll, syncMain, selectOnly]);
 
     const tileClass = `tile${isActive ? ' active' : ''}${selected ? ' selected' : ''}${isSyncMain ? ' sync-main' : ''
         }${isSyncFollower ? ' sync-follower' : ''}${isViewing ? ' viewing' : ''}`;
@@ -273,7 +298,7 @@ function TileComponent({
                 />
             ) : null}
 
-            <div className="tileBody" ref={bodyRef} onPointerEnter={onPointerEnter}>
+            <div className="tileBody" ref={bodyRef} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
                 {!isViewing && loading ? (
                     <div className="loading">
                         <div className="spinner"></div>
