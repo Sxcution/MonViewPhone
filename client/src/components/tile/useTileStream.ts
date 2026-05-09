@@ -83,6 +83,11 @@ export function useTileStream(args: Args) {
         getInputTargetsRef.current = getInputTargetsForSource;
     }, [getInputTargetsForSource]);
 
+    const selectOnlyRef = useRef(selectOnly);
+    useEffect(() => {
+        selectOnlyRef.current = selectOnly;
+    }, [selectOnly]);
+
     useEffect(() => {
         destroyedRef.current = false;
         closingRef.current = false;
@@ -186,7 +191,7 @@ export function useTileStream(args: Args) {
         let pendingFrame: { width: number; height: number; data: ArrayBuffer } | null = null;
         let frameId = 1;
 
-        const onActivate = () => selectOnly(udid);
+        const onActivate = () => selectOnlyRef.current(udid);
 
         detachControlsRef.current = attachTouchControls(canvas, () => getInputTargetsRef.current(udid), onActivate);
 
@@ -678,5 +683,6 @@ export function useTileStream(args: Args) {
             closeWs();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [udid, deviceParam, wsServer, selectOnly]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [udid, deviceParam, wsServer]);
 }

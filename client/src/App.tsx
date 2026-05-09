@@ -572,12 +572,8 @@ export function App() {
     return []
   }, [deviceParam, discoveredDevices])
   const filteredGridDevices = useMemo(() => {
-    let list = gridDevices
-    if (deviceFilter !== 'all') {
-      list = list.filter(id => getDeviceConnectionType(id) === deviceFilter)
-    }
-    return list
-  }, [deviceFilter, gridDevices, getDeviceConnectionType])
+    return gridDevices
+  }, [gridDevices])
   const { mergedOrder, moveTile, getTileNumber, setTileNumber } =
     useTileOrder(filteredGridDevices)
   const filteredRegistered = useMemo(() => {
@@ -1314,6 +1310,11 @@ export function App() {
           >
             {mergedOrder.map((udid, idx) => {
               const isVisible = (() => {
+                // 1. Kiểm tra filter kết nối (USB/Wi-Fi)
+                if (deviceFilter !== 'all') {
+                  if (getDeviceConnectionType(udid) !== deviceFilter) return false
+                }
+                // 2. Kiểm tra filter nhóm
                 if (focusGroupIdx === null || !savedGroups[focusGroupIdx]) return true
                 return savedGroups[focusGroupIdx].udids.includes(udid)
               })()
@@ -1429,8 +1430,9 @@ export function App() {
                   onDragStart={id => setDraggingTile(id)}
                   onDragEnd={() => setDraggingTile(null)}
                 />
-              )
-            })}
+              </div>
+            )
+          })}
           </div>
           {rubberBand && (() => {
             const x = Math.min(rubberBand.startX, rubberBand.currentX)
