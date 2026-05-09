@@ -18,7 +18,7 @@ This file documents the structure of the `stream-phonefarm-solumate-main` projec
 
 #### Tile Components (Phone Cards)
 - `client/src/components/tile/Tile.tsx`: Main component representing a single phone card.
-- `client/src/components/tile/TileHeader.tsx`: Header of the phone card (UDID, status).
+- `client/src/components/tile/TileHeader.tsx`: Header of the phone card (UDID, status, user profile selection).
 - `client/src/components/tile/TileMenu.tsx`: Context menu for the phone card.
 - `client/src/components/tile/TileNav.tsx`: Bottom navigation buttons on the phone card.
 - `client/src/components/tile/types.ts`: TypeScript definitions for tile components.

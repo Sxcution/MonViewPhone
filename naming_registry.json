@@ -16,7 +16,8 @@
       "sidebar_pinned": "sidebar-pinned",
       "sidebar_auto_hide": "sidebar-auto-hide",
       "btn_pin": "btn-pin",
-      "tile_draggable_wrapper": "tileDraggableWrapper"
+      "tile_draggable_wrapper": "tileDraggableWrapper",
+      "user_profile_select": "userProfileSelect"
     },
     "state_variables": {
       "sidebar_collapsed": "sidebarCollapsed",
@@ -24,7 +25,9 @@
       "sidebar_hovered": "isSidebarHovered",
       "new_order_viewer": "newOrderViewer",
       "rubber_band": "rubberBand",
-      "connect_selection": "connectSelection"
+      "connect_selection": "connectSelection",
+      "profiles": "profiles",
+      "selected_user": "selectedUser"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
