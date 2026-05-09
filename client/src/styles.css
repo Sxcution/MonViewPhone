@@ -4921,3 +4921,70 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 .spin {
   animation: spin 1s linear infinite;
 }
+
+/* ===== GROUP ITEM LAYOUT ===== */
+.rcpSavedGroupItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.rcpSavedGroupRow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Nút load nhóm — khi active (đang được load) highlight */
+.rcpSavedGroupBtn.active {
+  border-color: #4a6aff;
+  color: #a0b4ff;
+  background: #1a1f3a;
+}
+
+/* Nút dropdown ▾ */
+.rcpSavedGroupExpand {
+  width: 22px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid #2a2a3a;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #666;
+  font-size: 11px;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.rcpSavedGroupExpand:hover {
+  border-color: #4a6aff;
+  color: #4a6aff;
+}
+
+.rcpSavedGroupExpand.open {
+  color: #4a6aff;
+  border-color: #4a6aff;
+  background: rgba(74, 106, 255, 0.1);
+  transform: rotate(180deg);
+}
+
+/* Grid device bên trong dropdown */
+.rcpSavedGroupDevices {
+  padding: 4px 0 6px 4px;
+  border-left: 2px solid #1e2040;
+  margin-left: 4px;
+  margin-bottom: 2px;
+}
+
+/* Device item trong dropdown nhóm — hover khác để phân biệt */
+.rcpGroupDeviceItem {
+  cursor: context-menu !important;
+  user-select: none;
+}
+
+.rcpGroupDeviceItem:hover {
+  border-color: rgba(233, 69, 96, 0.5) !important;
+}

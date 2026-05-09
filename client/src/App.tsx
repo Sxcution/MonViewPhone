@@ -149,7 +149,7 @@ export function App () {
   const lastViewedRef = useRef<string | null>(null)
   const [draggingTile, setDraggingTile] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
-  const [contextMenuTarget, setContextMenuTarget] = useState<{ x: number, y: number, udid: string } | null>(null)
+  const [contextMenuTarget, setContextMenuTarget] = useState<{ x: number, y: number, udid: string, groupIdx?: number } | null>(null)
   const [pageContextMenu, setPageContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [contextMenuInput, setContextMenuInput] = useState('')
   const [globalAdbOpen, setGlobalAdbOpen] = useState(false)
@@ -234,6 +234,15 @@ export function App () {
 
   const [groupModalOpen, setGroupModalOpen] = useState(false)
   const [groupModalName, setGroupModalName] = useState('')
+
+  // Track nhóm đang được load (để biết xoá device khỏi nhóm nào)
+  const [activeGroupIdx, setActiveGroupIdx] = useState<number | null>(null)
+
+  // State dropdown expand từng nhóm
+  const [expandedGroupIdx, setExpandedGroupIdx] = useState<number | null>(null)
+
+  // Modal xác nhận xoá nhóm
+  const [deleteGroupConfirm, setDeleteGroupConfirm] = useState<number | null>(null)
   const [connectPorts, setConnectPorts] = useState<Record<string, number>>({})
   const [connectBusy, setConnectBusy] = useState(false)
   const targetConnect = deviceFilter === 'wifi' ? 'usb' : 'wifi'
@@ -1873,30 +1882,66 @@ export function App () {
                 {connectNotification.text}
               </div>
             ) : null}
-            {/* Danh sách nhóm đã lưu */}
             {savedGroups.length > 0 && (
               <div className='rcpSavedGroups'>
                 {savedGroups.map((group, idx) => (
-                  <div key={idx} className='rcpSavedGroupRow'>
-                    <button
-                      className='rcpSavedGroupBtn'
-                      title={`Load nhóm: ${group.udids.length} device`}
-                      onClick={() => {
-                        setConnectSelection(new Set(group.udids))
-                      }}
-                    >
-                      <span className='rcpSavedGroupName'>{group.name}</span>
-                      <span className='rcpSavedGroupCount'>{group.udids.length}</span>
-                    </button>
-                    <button
-                      className='rcpSavedGroupDel'
-                      title='Xoá nhóm'
-                      onClick={() => {
-                        setSavedGroups(prev => prev.filter((_, i) => i !== idx))
-                      }}
-                    >
-                      ✕
-                    </button>
+                  <div key={idx} className='rcpSavedGroupItem'>
+                    {/* Row chính */}
+                    <div className='rcpSavedGroupRow'>
+                      {/* Nút load nhóm */}
+                      <button
+                        className={`rcpSavedGroupBtn${activeGroupIdx === idx ? ' active' : ''}`}
+                        title={`Load nhóm: ${group.udids.length} device`}
+                        onClick={() => {
+                          setConnectSelection(new Set(group.udids))
+                          setActiveGroupIdx(idx)
+                        }}
+                      >
+                        <span className='rcpSavedGroupName'>{group.name}</span>
+                        <span className='rcpSavedGroupCount'>{group.udids.length}</span>
+                      </button>
+
+                      {/* Nút dropdown xem device */}
+                      <button
+                        className={`rcpSavedGroupExpand${expandedGroupIdx === idx ? ' open' : ''}`}
+                        title='Xem device trong nhóm'
+                        onClick={() => setExpandedGroupIdx(prev => prev === idx ? null : idx)}
+                      >
+                        ▾
+                      </button>
+
+                      {/* Nút xoá nhóm — mở confirm thay vì xoá thẳng */}
+                      <button
+                        className='rcpSavedGroupDel'
+                        title='Xoá nhóm'
+                        onClick={() => setDeleteGroupConfirm(idx)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Dropdown: grid device trong nhóm */}
+                    {expandedGroupIdx === idx && (
+                      <div className='rcpSavedGroupDevices'>
+                        <div className='rcpGrid rcpGridCompact' style={{ marginTop: 4 }}>
+                          {group.udids.map(uid => (
+                            <div
+                              key={uid}
+                              className={`rcpGridItem${connectSelection.has(uid) ? ' on' : ''} rcpGroupDeviceItem`}
+                              title={uid}
+                              onContextMenu={e => {
+                                e.preventDefault()
+                                // Truyền groupIdx để biết xoá khỏi nhóm nào
+                                setContextMenuTarget({ x: e.clientX, y: e.clientY, udid: uid, groupIdx: idx })
+                                setContextMenuInput(String(orderMap.get(uid) ?? 0))
+                              }}
+                            >
+                              <span>{String(orderMap.get(uid) ?? 0).padStart(2, '0')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2299,6 +2344,48 @@ export function App () {
           </div>
         </div>
       )}
+
+      {/* Modal xác nhận xoá nhóm */}
+      {deleteGroupConfirm !== null && (
+        <div
+          className='confirmOverlay'
+          onMouseDown={() => setDeleteGroupConfirm(null)}
+        >
+          <div
+            className='confirmPanel'
+            style={{ maxWidth: 340 }}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <div className='confirmTitle'>Xoá nhóm?</div>
+            <div className='confirmText'>
+              Bạn có chắc muốn xoá nhóm{' '}
+              <strong>"{savedGroups[deleteGroupConfirm]?.name}"</strong>?<br/>
+              <span style={{ color: '#888', fontSize: 12 }}>
+                Hành động này không thể hoàn tác.
+              </span>
+            </div>
+            <div className='confirmBtns' style={{ marginTop: 16 }}>
+              <button className='modalBtn' onClick={() => setDeleteGroupConfirm(null)}>
+                Huỷ
+              </button>
+              <button
+                className='modalBtnPrimary'
+                style={{ background: '#e94560', borderColor: '#e94560' }}
+                onClick={() => {
+                  const idx = deleteGroupConfirm
+                  setSavedGroups(prev => prev.filter((_, i) => i !== idx))
+                  // Reset activeGroupIdx nếu đang load nhóm bị xoá
+                  if (activeGroupIdx === idx) setActiveGroupIdx(null)
+                  if (expandedGroupIdx === idx) setExpandedGroupIdx(null)
+                  setDeleteGroupConfirm(null)
+                }}
+              >
+                Xoá nhóm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {contextMenuTarget ? (
         <div 
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999999 }}
@@ -2351,6 +2438,44 @@ export function App () {
                 {t('Lưu')}
               </button>
             </div>
+            {/* Chỉ hiện khi click từ dropdown nhóm */}
+            {contextMenuTarget?.groupIdx !== undefined && (
+              <>
+                <div style={{ height: 1, background: '#333', margin: '4px 0' }} />
+                <button
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#ff6060',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    padding: '4px 0',
+                    textAlign: 'left',
+                    width: '100%'
+                  }}
+                  onClick={() => {
+                    const { udid, groupIdx } = contextMenuTarget!
+                    if (groupIdx === undefined) return
+                    setSavedGroups(prev => prev.map((g, i) =>
+                      i === groupIdx
+                        ? { ...g, udids: g.udids.filter(u => u !== udid) }
+                        : g
+                    ))
+                    // Nếu nhóm đang active, cũng bỏ chọn device đó
+                    if (activeGroupIdx === groupIdx) {
+                      setConnectSelection(prev => {
+                        const next = new Set(prev)
+                        next.delete(udid)
+                        return next
+                      })
+                    }
+                    setContextMenuTarget(null)
+                  }}
+                >
+                  🗑 Xoá khỏi nhóm
+                </button>
+              </>
+            )}
           </div>
         </div>
       ) : null}
