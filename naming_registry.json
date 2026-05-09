@@ -29,6 +29,15 @@
       "group_rename_input": "rcpGroupRenameInput",
       "ctx_menu_item": "ctxMenuItem"
     },
+    "css_variables": {
+      "bg_base": "--bg-base",
+      "bg_panel": "--bg-panel",
+      "bg_hover": "--bg-hover",
+      "text_main": "--text-main",
+      "text_muted": "--text-muted",
+      "border_color": "--border-color",
+      "accent_color": "--accent-color"
+    },
     "state_variables": {
       "sidebar_collapsed": "sidebarCollapsed",
       "is_sidebar_pinned": "isSidebarPinned",

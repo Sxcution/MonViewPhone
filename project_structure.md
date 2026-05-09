@@ -2,6 +2,9 @@
 
 This file documents the structure of the `stream-phonefarm-solumate-main` project.
 
+## Documentation
+- `client/docs/UI_STYLE_GUIDE.md`: Design system rules and CSS variable definitions for the project.
+
 ## Client (React/Vite)
 
 ### Core Files
