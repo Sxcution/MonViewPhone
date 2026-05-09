@@ -26,8 +26,7 @@
       "cursor_device_tooltip": "cursorDeviceTooltip",
       "rcp_saved_group_item": "rcpSavedGroupItem",
       "rcp_group_rename_input": "rcpGroupRenameInput",
-      "ctx_menu_item": "ctxMenuItem",
-      "hidden_by_group": "hiddenByGroup"
+      "ctx_menu_item": "ctxMenuItem"
     },
     "state_variables": {
       "sidebar_collapsed": "sidebarCollapsed",
@@ -42,9 +41,7 @@
       "focus_group_idx": "focusGroupIdx",
       "rename_group_idx": "renameGroupIdx",
       "drag_group_idx": "dragGroupIdx",
-      "group_context_menu": "groupContextMenu",
-      "focus_group_hidden_set": "focusGroupHiddenSet",
-      "focus_group_hidden_set_ref": "focusGroupHiddenSetRef"
+      "group_context_menu": "groupContextMenu"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
@@ -55,8 +52,7 @@
     "refs": {
       "rubber_band_ref": "rubberBandRef",
       "grid_scroll_ref": "gridScrollRef",
-      "rubber_band_just_finished_ref": "rubberBandJustFinishedRef",
-      "group_click_timer_ref": "groupClickTimerRef"
+      "rubber_band_just_finished_ref": "rubberBandJustFinishedRef"
     }
   },
   "key_codes": {

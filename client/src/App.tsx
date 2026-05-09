@@ -271,8 +271,6 @@ export function App() {
 
   // State lọc hiển thị theo nhóm (double click nhóm)
   const [focusGroupIdx, setFocusGroupIdx] = useState<number | null>(null)
-  // Timer để phân biệt single click vs double click trên nhóm
-  const groupClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // State đổi tên nhóm
   const [renameGroupIdx, setRenameGroupIdx] = useState<number | null>(null)
@@ -574,36 +572,36 @@ export function App() {
     return []
   }, [deviceParam, discoveredDevices])
   const filteredGridDevices = useMemo(() => {
-    if (deviceFilter === 'all') return gridDevices
-    return gridDevices.filter(
-      id => getDeviceConnectionType(id) === deviceFilter
-    )
-  }, [deviceFilter, gridDevices, getDeviceConnectionType])
+    let list = gridDevices
+    if (deviceFilter !== 'all') {
+      list = list.filter(id => getDeviceConnectionType(id) === deviceFilter)
+    }
+    if (focusGroupIdx !== null && savedGroups[focusGroupIdx]) {
+      const groupSet = new Set(savedGroups[focusGroupIdx].udids)
+      list = list.filter(id => groupSet.has(id))
+    }
+    return list
+  }, [deviceFilter, gridDevices, getDeviceConnectionType, focusGroupIdx, savedGroups])
   const { mergedOrder, moveTile, getTileNumber, setTileNumber } =
     useTileOrder(filteredGridDevices)
   const filteredRegistered = useMemo(() => {
     return registeredUdids.filter(id => {
-      if (deviceFilter === 'all') return true
-      const type = getDeviceConnectionType(id)
-      return type === deviceFilter
+      if (deviceFilter !== 'all') {
+        const type = getDeviceConnectionType(id)
+        if (type !== deviceFilter) return false
+      }
+      if (focusGroupIdx !== null && savedGroups[focusGroupIdx]) {
+        const groupSet = new Set(savedGroups[focusGroupIdx].udids)
+        if (!groupSet.has(id)) return false
+      }
+      return true
     })
-  }, [registeredUdids, deviceFilter, getDeviceConnectionType])
+  }, [registeredUdids, deviceFilter, getDeviceConnectionType, focusGroupIdx, savedGroups])
   const orderMap = useMemo(() => {
     const m = new Map<string, number>()
     mergedOrder.forEach((id, idx) => m.set(id, getTileNumber(id, idx + 1)))
     return m
   }, [mergedOrder, getTileNumber])
-
-  const focusGroupHiddenSet = useMemo(() => {
-    if (focusGroupIdx === null || !savedGroups[focusGroupIdx]) return null
-    const groupSet = new Set(savedGroups[focusGroupIdx].udids)
-    const hidden = new Set(mergedOrder.filter(id => !groupSet.has(id)))
-    console.log('[focusGroup] idx=', focusGroupIdx, 'groupUdids=', [...groupSet], 'mergedOrder=', mergedOrder, 'hidden=', [...hidden])
-    return hidden
-  }, [focusGroupIdx, savedGroups, mergedOrder])
-
-  const focusGroupHiddenSetRef = useRef<Set<string> | null>(null)
-  focusGroupHiddenSetRef.current = focusGroupHiddenSet
   const orderedRegistered = useMemo(() => {
     const arr = [...filteredRegistered]
     arr.sort((a, b) => {
@@ -1318,20 +1316,13 @@ export function App() {
               } as React.CSSProperties
             }
           >
-            {mergedOrder.map((udid, idx) => {
-              const isHidden = focusGroupHiddenSetRef.current?.has(udid) ?? false
-              // Tạm thời log để debug
-              if (focusGroupHiddenSetRef.current && isHidden) console.log('[HIDE]', udid)
-              if (focusGroupHiddenSetRef.current && !isHidden) console.log('[SHOW]', udid)
-
-              return (
-                <div
-                  key={udid}
-                  data-udid={udid}
-                  className={`tileDraggableWrapper${isSingleDevice ? ' single' : ''
-                    }${dragging ? ' dragging' : ''}${viewerUdid === udid ? ' hiddenByViewer' : ''
-                    }${dropTarget === udid ? ' dropTarget' : ''
-                    }${isHidden ? ' hiddenByGroup' : ''}`}
+            {mergedOrder.map((udid, idx) => (
+              <div
+                key={udid}
+                data-udid={udid}
+                className={`tileDraggableWrapper${isSingleDevice ? ' single' : ''
+                  }${dragging ? ' dragging' : ''}${viewerUdid === udid ? ' hiddenByViewer' : ''
+                  }${dropTarget === udid ? ' dropTarget' : ''}`}
                 onPointerDownCapture={e => {
                   if (e.button !== 2) return
                   e.preventDefault()
@@ -1403,15 +1394,14 @@ export function App() {
                 onDragLeave={() => {
                   setDropTarget(prev => (prev === udid ? null : prev))
                 }}
-                style={{
-                  ...(isSingleDevice
+                style={
+                  isSingleDevice
                     ? {
                       ['--drag-x' as any]: `${dragOffset.x}px`,
                       ['--drag-y' as any]: `${dragOffset.y}px`
                     }
-                    : {}),
-                  ...(isHidden ? { display: 'none' } : {})
-                }}
+                    : undefined
+                }
               >
                 <Tile
                   udid={udid}
@@ -1977,36 +1967,19 @@ export function App() {
                           {/* Nút load/focus nhóm — double click để focus, single click để select */}
                           <button
                             className={`rcpSavedGroupBtn${activeGroupIdx === idx ? ' active' : ''}${focusGroupIdx === idx ? ' focused' : ''}`}
-                            title={`Click: chọn nhóm | Double click: chỉ hiện nhóm này`}
+                            title={`Click: chọn nhóm | Double click: chỉ hiện nhóm này | Drag: đổi thứ tự`}
                             onClick={() => {
-                              // Nếu đang pending double click thì cancel để double click xử lý
-                              if (groupClickTimerRef.current) {
-                                clearTimeout(groupClickTimerRef.current)
-                                groupClickTimerRef.current = null
-                                // Đây là click thứ 2 trong double click → không làm gì, để onDoubleClick xử lý
-                                return
+                              if (activeGroupIdx === idx) {
+                                setActiveGroupIdx(null)
+                                setConnectSelection(new Set())
+                              } else {
+                                setConnectSelection(new Set(group.udids))
+                                setActiveGroupIdx(idx)
                               }
-                              // Delay single click để chờ xem có double click không
-                              groupClickTimerRef.current = setTimeout(() => {
-                                groupClickTimerRef.current = null
-                                // Single click: toggle select nhóm
-                                if (activeGroupIdx === idx) {
-                                  setActiveGroupIdx(null)
-                                  setConnectSelection(new Set())
-                                } else {
-                                  setConnectSelection(new Set(group.udids))
-                                  setActiveGroupIdx(idx)
-                                }
-                              }, 220)
                             }}
                             onDoubleClick={() => {
-                              // Cancel timer single click nếu còn
-                              if (groupClickTimerRef.current) {
-                                clearTimeout(groupClickTimerRef.current)
-                                groupClickTimerRef.current = null
-                              }
-                              // Double click: toggle focus nhóm (ẩn/hiện device)
                               if (focusGroupIdx === idx) {
+                                // Double click lại → bỏ focus, hiện hết
                                 setFocusGroupIdx(null)
                               } else {
                                 setFocusGroupIdx(idx)

@@ -5206,6 +5206,8 @@ input[type="number"] {
 }
 
 
+
+
 /* Strengthened hiddenByGroup */
 .tileDraggableWrapper.hiddenByGroup,
 .tileDraggableWrapper.hiddenByGroup.single,
@@ -5220,4 +5222,3 @@ input[type="number"] {
   margin: 0 !important;
   overflow: hidden !important;
 }
-
