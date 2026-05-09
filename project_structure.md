@@ -52,3 +52,9 @@ This file documents the structure of the `stream-phonefarm-solumate-main` projec
   - `server-go/main.go`: Entry point, includes ADB warm-up logic and HTTP/WebSocket server initialization.
   - `server-go/adb/tracker.go`: ADB device tracker utilizing goroutines.
   - `server-go/websocket/handler.go`: WebSocket communication handler.
+
+## APK Build
+- `APK Build/MonKeyboard/`: Android project for the lightweight invisible keyboard (IME).
+  - `MonKeyboard/app/src/main/java/com/monkeyboard/ime/MonKeyboardService.java`: Core IME logic.
+  - `MonKeyboard/app/src/main/java/com/monkeyboard/ime/MainActivity.java`: Setup guide UI.
+

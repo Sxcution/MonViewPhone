@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">MonKeyboard</string>
+    <string name="ime_name">MonKeyboard</string>
+    <string name="subtype_label">MonKeyboard (EN)</string>
+    <string name="btn_enable">Step 1 · Enable in Settings</string>
+    <string name="btn_select">Step 2 · Set as Default</string>
+    <string name="status_active">⌨ MonKeyboard · Active</string>
+    <string name="guide_title">MonKeyboard</string>
+    <string name="guide_desc">A lightweight invisible keyboard.\nEnable it in Settings, then set as default.</string>
+</resources>

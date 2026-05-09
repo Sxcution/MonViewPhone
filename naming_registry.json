@@ -19,7 +19,9 @@
       "tile_draggable_wrapper": "tileDraggableWrapper",
       "user_profile_select": "userProfileSelect",
       "header_device_num_input": "headerDeviceNumInput",
-      "header_device_control": "headerDeviceControl"
+      "header_device_control": "headerDeviceControl",
+      "tile_selected": "selected",
+      "tile_active": "active"
     },
     "state_variables": {
       "sidebar_collapsed": "sidebarCollapsed",

@@ -865,8 +865,10 @@ body.sidebarCollapsed {
 }
 
 .tile.selected {
-  border: 3px solid #3b82f6;
-  box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4), 0 4px 6px -4px rgba(59, 130, 246, 0.4);
+  border-color: rgba(59, 130, 246, 0.9);   /* giữ border width = 2px, chỉ đổi màu */
+  outline: 6px solid rgba(59, 130, 246, 0.8);
+  outline-offset: -1px;
+  box-shadow: 0 0 0 0px transparent;
 }
 
 .tile.sync-main {
@@ -1691,6 +1693,7 @@ video {
   /* Tối ưu cho các máy màn dài, hạn chế méo hình */
   justify-content: center;
   align-items: center;
+  box-sizing: border-box;
 }
 
 .tileBody {
@@ -1912,8 +1915,8 @@ video {
 
 /* highlight tile đang active */
 .tile.active {
-  outline: 2px solid rgba(255, 255, 255, 0.35);
-  outline-offset: 0px;
+  border-color: rgba(255, 255, 255, 0.5);  /* chỉ đổi màu border, không tăng width */
+  outline: none;
 }
 
 .tile.sync-main.active {
@@ -1926,15 +1929,17 @@ video {
 
 /* Multi-selected (sync group) */
 .tile.selected {
-  outline: 2px solid rgba(47, 111, 235, 0.55);
-  outline-offset: 0px;
-  border-color: rgba(47, 111, 235, 0.9);
-  box-shadow: 0 0 0 1px rgba(47, 111, 235, 0.35) inset;
+  border-color: rgba(47, 111, 235, 0.9);   /* giữ 2px, không tăng */
+  outline: 6px solid rgba(47, 111, 235, 0.7);
+  outline-offset: -1px;
+  box-shadow: none;
 }
 
 /* If both selected + active, make it a bit stronger */
 .tile.selected.active {
-  outline: 2px solid rgba(47, 111, 235, 0.9);
+  border-color: rgba(47, 111, 235, 1);
+  outline: 6px solid rgba(47, 111, 235, 0.6);
+  outline-offset: -1px;
 }
 
 canvas {

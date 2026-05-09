@@ -1,0 +1,27 @@
+{
+  "project_info": {
+    "name": "MonKeyboard",
+    "package": "com.monkeyboard.ime",
+    "type": "android_ime"
+  },
+  "ui_identifiers": {
+    "main_activity": {
+      "btn_enable": "btn_enable",
+      "btn_select": "btn_select"
+    },
+    "keyboard_view": {
+      "keyboard_root": "keyboard_root",
+      "tv_status": "tv_status"
+    }
+  },
+  "strings": {
+    "app_name": "MonKeyboard",
+    "ime_name": "MonKeyboard",
+    "subtype_label": "MonKeyboard (EN)",
+    "btn_enable": "Step 1 · Enable in Settings",
+    "btn_select": "Step 2 · Set as Default",
+    "status_active": "⌨ MonKeyboard · Active",
+    "guide_title": "MonKeyboard",
+    "guide_desc": "A lightweight invisible keyboard.\nEnable it in Settings, then set as default."
+  }
+}
