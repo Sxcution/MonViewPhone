@@ -199,6 +199,7 @@ export function App () {
     startX: number; startY: number; active: boolean
   }>({ startX: 0, startY: 0, active: false })
   const gridScrollRef = useRef<HTMLDivElement | null>(null)
+  const rubberBandJustFinishedRef = useRef(false)
 
   const [appSettingsVisible, setAppSettingsVisible] = useState(false)
 
@@ -777,8 +778,19 @@ export function App () {
     setConnectSelection(newSelected)
   }, [mergedOrder])
 
-  const onGridPointerUp = useCallback(() => {
+  const onGridPointerUp = useCallback((e?: React.PointerEvent<HTMLDivElement>) => {
+    if (!rubberBandRef.current.active) return
     rubberBandRef.current.active = false
+
+    // Nếu đã kéo đủ xa (>5px), đánh dấu để onClick không reset selection
+    const dx = Math.abs(rubberBandRef.current.startX - (e?.clientX ?? rubberBandRef.current.startX))
+    const dy = Math.abs(rubberBandRef.current.startY - (e?.clientY ?? rubberBandRef.current.startY))
+    if (dx > 5 || dy > 5) {
+      rubberBandJustFinishedRef.current = true
+      // Reset sau 100ms (đủ để onClick bỏ qua)
+      setTimeout(() => { rubberBandJustFinishedRef.current = false }, 100)
+    }
+
     setRubberBand(null)
   }, [])
 
@@ -1158,6 +1170,9 @@ export function App () {
           onPointerUp={onGridPointerUp}
           onPointerCancel={onGridPointerUp}
           onClick={(e) => {
+            // Nếu vừa kéo rubber band xong, bỏ qua onClick để không reset selection
+            if (rubberBandJustFinishedRef.current) return;
+
             const target = e.target as HTMLElement;
             // Bỏ chọn tất cả nếu bấm vào nền (không trúng điện thoại hay panel nào)
             if (!target.closest('.tileDraggableWrapper') && !target.closest('.rightConfigPanel') && !target.closest('.headerBar')) {

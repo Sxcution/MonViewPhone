@@ -34,7 +34,8 @@
     },
     "refs": {
       "rubber_band_ref": "rubberBandRef",
-      "grid_scroll_ref": "gridScrollRef"
+      "grid_scroll_ref": "gridScrollRef",
+      "rubber_band_just_finished_ref": "rubberBandJustFinishedRef"
     }
   },
   "key_codes": {
