@@ -31,15 +31,15 @@ type Args = {
     setAltSoloUdid?: (udid: string | null) => void;
     getIsAltHeld?: () => boolean;
 
-  // UI state setters
-  setStatus: (s: string) => void;
-  setLoading: (b: boolean) => void;
+    // UI state setters
+    setStatus: (s: string) => void;
+    setLoading: (b: boolean) => void;
 
-  // Exposed reload ref (used by header/menu + parent App for reload-all)
-  reloadRef: MutableRefObject<(() => void) | null>;
+    // Exposed reload ref (used by header/menu + parent App for reload-all)
+    reloadRef: MutableRefObject<(() => void) | null>;
 
-  // Notify caller about current video dimensions (per-tile aspect ratio)
-  onVideoDims?: (w: number, h: number) => void;
+    // Notify caller about current video dimensions (per-tile aspect ratio)
+    onVideoDims?: (w: number, h: number) => void;
 };
 
 /**

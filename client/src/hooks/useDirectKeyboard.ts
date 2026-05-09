@@ -75,10 +75,10 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
   useEffect(() => {
     if (!enabled || !activeUdid) return;
     const sink = getOrCreateHiddenPasteTarget();
-    
+
     // Focus sink ban đầu
     sink.focus({ preventScroll: true });
-    
+
     // Re-focus khi click ra ngoài (trừ khi click vào input/textarea thật)
     const refocus = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -93,8 +93,8 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       // Delay 1 frame để DOM events hoàn tất rồi mới focus lại
       requestAnimationFrame(() => {
         if (document.activeElement?.tagName === 'INPUT' ||
-            document.activeElement?.tagName === 'TEXTAREA' ||
-            document.activeElement?.tagName === 'SELECT') {
+          document.activeElement?.tagName === 'TEXTAREA' ||
+          document.activeElement?.tagName === 'SELECT') {
           return;
         }
         sink.focus({ preventScroll: true });

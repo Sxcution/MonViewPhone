@@ -245,43 +245,43 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
     return out;
   }, []);
 
-    const resolveTargets = useCallback(
-      (sourceUdid: string | null): InputTarget[] => {
-        if (!sourceUdid) return [];
+  const resolveTargets = useCallback(
+    (sourceUdid: string | null): InputTarget[] => {
+      if (!sourceUdid) return [];
 
-        const currentAltSolo = altSoloUdidRef.current;
+      const currentAltSolo = altSoloUdidRef.current;
 
-        // Khi đang giữ Alt: chỉ gửi đến tile mà chuột đang hover (altSoloUdid)
-        if (currentAltSolo !== null) {
-          if (sourceUdid === currentAltSolo) {
-            return getTargetsByUdids([sourceUdid]);
-          }
-          return [];
+      // Khi đang giữ Alt: chỉ gửi đến tile mà chuột đang hover (altSoloUdid)
+      if (currentAltSolo !== null) {
+        if (sourceUdid === currentAltSolo) {
+          return getTargetsByUdids([sourceUdid]);
         }
+        return [];
+      }
 
-        // Chế độ sync bình thường
-        const currentSyncTargets = syncTargetsRef.current;
-        const isInSyncGroup =
-          currentSyncTargets.includes(sourceUdid) ||
-          (syncMain !== null && sourceUdid === syncMain);
+      // Chế độ sync bình thường
+      const currentSyncTargets = syncTargetsRef.current;
+      const isInSyncGroup =
+        currentSyncTargets.includes(sourceUdid) ||
+        (syncMain !== null && sourceUdid === syncMain);
 
-        if (isInSyncGroup) {
-          const ids = uniq([
-            ...(syncMain ? [syncMain] : []),
-            ...currentSyncTargets,
-          ]);
-          return getTargetsByUdids(ids);
-        }
+      if (isInSyncGroup) {
+        const ids = uniq([
+          ...(syncMain ? [syncMain] : []),
+          ...currentSyncTargets,
+        ]);
+        return getTargetsByUdids(ids);
+      }
 
-        if (syncAll) {
-          const ids = uniq([sourceUdid, ...currentSyncTargets.filter(Boolean)]);
-          return getTargetsByUdids(ids);
-        }
+      if (syncAll) {
+        const ids = uniq([sourceUdid, ...currentSyncTargets.filter(Boolean)]);
+        return getTargetsByUdids(ids);
+      }
 
-        return getTargetsByUdids([sourceUdid]);
-      },
-      [getTargetsByUdids, syncAll, syncMain, syncTargets, altSoloUdid],
-    );
+      return getTargetsByUdids([sourceUdid]);
+    },
+    [getTargetsByUdids, syncAll, syncMain, syncTargets, altSoloUdid],
+  );
 
   const getInputTargetsForSource = useCallback(
     (sourceUdid: string): InputTarget[] => {

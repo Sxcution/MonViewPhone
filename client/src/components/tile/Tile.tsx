@@ -185,9 +185,8 @@ function TileComponent({
         selectOnly(udid);
     }, [selectOnly, udid]);
 
-    const tileClass = `tile${isActive ? ' active' : ''}${selected ? ' selected' : ''}${
-        isSyncMain ? ' sync-main' : ''
-    }${isSyncFollower ? ' sync-follower' : ''}${isViewing ? ' viewing' : ''}`;
+    const tileClass = `tile${isActive ? ' active' : ''}${selected ? ' selected' : ''}${isSyncMain ? ' sync-main' : ''
+        }${isSyncFollower ? ' sync-follower' : ''}${isViewing ? ' viewing' : ''}`;
 
     const viewingLabel = t('Đang điều khiển');
     const viewingHint = t('Thiết bị đang mở trong viewer — tránh điều khiển trùng lặp');
