@@ -26,7 +26,8 @@
       "cursor_device_tooltip": "cursorDeviceTooltip",
       "rcp_saved_group_item": "rcpSavedGroupItem",
       "rcp_group_rename_input": "rcpGroupRenameInput",
-      "ctx_menu_item": "ctxMenuItem"
+      "ctx_menu_item": "ctxMenuItem",
+      "hidden_by_group": "hiddenByGroup"
     },
     "state_variables": {
       "sidebar_collapsed": "sidebarCollapsed",
@@ -41,7 +42,8 @@
       "focus_group_idx": "focusGroupIdx",
       "rename_group_idx": "renameGroupIdx",
       "drag_group_idx": "dragGroupIdx",
-      "group_context_menu": "groupContextMenu"
+      "group_context_menu": "groupContextMenu",
+      "focus_group_hidden_set": "focusGroupHiddenSet"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

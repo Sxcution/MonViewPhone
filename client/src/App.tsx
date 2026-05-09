@@ -572,36 +572,32 @@ export function App() {
     return []
   }, [deviceParam, discoveredDevices])
   const filteredGridDevices = useMemo(() => {
-    let list = gridDevices
-    if (deviceFilter !== 'all') {
-      list = list.filter(id => getDeviceConnectionType(id) === deviceFilter)
-    }
-    if (focusGroupIdx !== null && savedGroups[focusGroupIdx]) {
-      const groupSet = new Set(savedGroups[focusGroupIdx].udids)
-      list = list.filter(id => groupSet.has(id))
-    }
-    return list
-  }, [deviceFilter, gridDevices, getDeviceConnectionType, focusGroupIdx, savedGroups])
+    if (deviceFilter === 'all') return gridDevices
+    return gridDevices.filter(
+      id => getDeviceConnectionType(id) === deviceFilter
+    )
+  }, [deviceFilter, gridDevices, getDeviceConnectionType])
   const { mergedOrder, moveTile, getTileNumber, setTileNumber } =
     useTileOrder(filteredGridDevices)
   const filteredRegistered = useMemo(() => {
     return registeredUdids.filter(id => {
-      if (deviceFilter !== 'all') {
-        const type = getDeviceConnectionType(id)
-        if (type !== deviceFilter) return false
-      }
-      if (focusGroupIdx !== null && savedGroups[focusGroupIdx]) {
-        const groupSet = new Set(savedGroups[focusGroupIdx].udids)
-        if (!groupSet.has(id)) return false
-      }
-      return true
+      if (deviceFilter === 'all') return true
+      const type = getDeviceConnectionType(id)
+      return type === deviceFilter
     })
-  }, [registeredUdids, deviceFilter, getDeviceConnectionType, focusGroupIdx, savedGroups])
+  }, [registeredUdids, deviceFilter, getDeviceConnectionType])
   const orderMap = useMemo(() => {
     const m = new Map<string, number>()
     mergedOrder.forEach((id, idx) => m.set(id, getTileNumber(id, idx + 1)))
     return m
   }, [mergedOrder, getTileNumber])
+
+  const focusGroupHiddenSet = useMemo(() => {
+    if (focusGroupIdx === null || !savedGroups[focusGroupIdx]) return null
+    const groupSet = new Set(savedGroups[focusGroupIdx].udids)
+    // Trả về set các udid CẦN ẨN (không thuộc nhóm)
+    return new Set(mergedOrder.filter(id => !groupSet.has(id)))
+  }, [focusGroupIdx, savedGroups, mergedOrder])
   const orderedRegistered = useMemo(() => {
     const arr = [...filteredRegistered]
     arr.sort((a, b) => {
@@ -1322,7 +1318,8 @@ export function App() {
                 data-udid={udid}
                 className={`tileDraggableWrapper${isSingleDevice ? ' single' : ''
                   }${dragging ? ' dragging' : ''}${viewerUdid === udid ? ' hiddenByViewer' : ''
-                  }${dropTarget === udid ? ' dropTarget' : ''}`}
+                  }${dropTarget === udid ? ' dropTarget' : ''
+                  }${focusGroupHiddenSet?.has(udid) ? ' hiddenByGroup' : ''}`}
                 onPointerDownCapture={e => {
                   if (e.button !== 2) return
                   e.preventDefault()

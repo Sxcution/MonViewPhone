@@ -5199,3 +5199,9 @@ input[type="number"] {
  cursor: grabbing;
 }
 
+
+/* ?n tile không thu?c nhóm dang focus — KHÔNG unmount d? gi? WebSocket */
+.tileDraggableWrapper.hiddenByGroup {
+  display: none !important;
+}
+
