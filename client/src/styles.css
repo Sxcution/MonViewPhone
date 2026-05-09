@@ -5021,3 +5021,58 @@ input[type="number"] {
   -moz-appearance: textfield !important;
   appearance: textfield !important;
 }
+\n
+/* ===== SELECTION COUNT BADGE ===== */
+.selectionCountBadge {
+  position: fixed;
+  bottom: 14px;
+  left: 14px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #1a6a2a;
+  border: 2px solid #2ecc5a;
+  color: #fff;
+  border-radius: 8px;
+  padding: 4px 10px 4px 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.45);
+  transition: background 0.15s, transform 0.1s;
+  animation: badgePopIn 0.15s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.selectionCountBadge:hover {
+  background: #c0392b;
+  border-color: #e74c3c;
+  transform: scale(1.05);
+}
+
+.selectionCountBadge:hover::after {
+  content: ' ✕';
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.selectionCountIcon {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.selectionCountNum {
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  min-width: 18px;
+  text-align: center;
+}
+
+@keyframes badgePopIn {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}

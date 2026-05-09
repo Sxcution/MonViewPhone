@@ -2609,6 +2609,18 @@ export function App() {
           </div>
         </div>
       ) : null}
+
+      {/* === SELECTION COUNT BADGE — góc dưới trái === */}
+      {connectSelection.size > 0 && (
+        <div
+          className='selectionCountBadge'
+          onClick={() => setConnectSelection(new Set())}
+          title='Click để bỏ chọn tất cả'
+        >
+          <span className='selectionCountIcon'>☑</span>
+          <span className='selectionCountNum'>{connectSelection.size}</span>
+        </div>
+      )}
     </>
   )
 }
