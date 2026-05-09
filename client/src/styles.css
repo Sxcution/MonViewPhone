@@ -3536,7 +3536,7 @@ body.alignRight .headerBar {
   max-width: 300px;
   display: flex;
   flex-direction: column;
-  background: rgba(16, 16, 16, 0.98);
+  background: var(--vsp-bg, #1e1e1e);
   border-left: 1px solid #2a2a2a;
   box-shadow: -8px 0 30px rgba(0, 0, 0, 0.4);
   overflow: hidden;
@@ -4269,12 +4269,13 @@ body.alignRight .headerBar {
   width: 220px;
   max-height: 360px;
   overflow-y: auto;
-  background: rgba(18, 18, 18, 0.98);
-  border: 1px solid #333;
-  border-radius: 10px;
-  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.6);
-  padding: 4px;
-  z-index: 200;
+  background: var(--vsp-bg, #1e1e1e);  /* cùng màu với .vsp-panel */
+  border: 1px solid var(--vsp-border, #333);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  min-width: 200px;
+  padding: 4px 0;
+  z-index: 9999;
   display: flex;
   flex-direction: column;
   gap: 2px;

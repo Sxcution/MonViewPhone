@@ -151,7 +151,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
   };
 
   const handleAdbLeave = () => {
-    adbHoverTimer.current = window.setTimeout(() => setShowAdbSubmenu(false), 200);
+    adbHoverTimer.current = window.setTimeout(() => setShowAdbSubmenu(false), 400);
   };
 
   // Push file via HTTP API
@@ -400,7 +400,10 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
             {showAdbSubmenu && ReactDOM.createPortal(
               <div className="vsp-adb-submenu"
                 style={{ position: 'fixed', left: adbSubmenuPos.x, bottom: window.innerHeight - adbSubmenuPos.y, margin: 0 }}
-                onMouseEnter={() => { if (adbHoverTimer.current) clearTimeout(adbHoverTimer.current); }}
+                onMouseEnter={() => {
+                  if (adbHoverTimer.current) clearTimeout(adbHoverTimer.current);
+                  setShowAdbSubmenu(true);
+                }}
                 onMouseLeave={handleAdbLeave}
               >
                 {DEFAULT_PRESETS.map((c, i) => (

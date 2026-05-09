@@ -20,7 +20,11 @@
     "state_variables": {
       "sidebar_collapsed": "sidebarCollapsed",
       "is_sidebar_pinned": "isSidebarPinned",
-      "is_sidebar_hovered": "isSidebarHovered"
+      "sidebar_hovered": "isSidebarHovered",
+      "new_order_viewer": "newOrderViewer"
+    },
+    "handlers": {
+      "change_order_viewer": "handleChangeOrderViewer"
     }
   },
   "key_codes": {

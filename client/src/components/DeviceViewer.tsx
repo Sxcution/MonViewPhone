@@ -102,6 +102,13 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
   const [status, setStatus] = useState<'connecting' | 'ready'>('connecting');
   const [tab, setTab] = useState<ViewerTab>('view');
   const [serialCopied, setSerialCopied] = useState(false);
+  const [newOrderViewer, setNewOrderViewer] = useState('');
+  const handleChangeOrderViewer = () => {
+    const n = parseInt(newOrderViewer, 10);
+    if (!isFinite(n) || n <= 0) return;
+    onChangeOrder?.(udid, n - 1);
+    setNewOrderViewer('');
+  };
 
   const viewerAspectRef = useRef<number>(9 / 16);
   const [viewerAspect, setViewerAspect] = useState<number>(9 / 16);
@@ -398,13 +405,22 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
     >
       <div className="viewerHeader">
         <div className="viewerTitle">
-          <div className="viewerTitleLine" title={`${deviceName} ${udid}`}>
-            <span className="viewerDeviceName">{deviceName}</span>
-            <button className="viewerSerialBtn" type="button" onClick={copySerial} title="Copy serial">
-              {udid}
-            </button>
+          <div className="viewerTitleLine">
+            <span className="viewerDeviceName" style={{ fontSize: '12px', color: 'var(--color-text-muted, #aaa)' }}>Số Máy</span>
+            <input
+              className="vsp-input vsp-input-inline"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder={currentOrder !== undefined ? String(currentOrder + 1) : '?'}
+              value={newOrderViewer}
+              onChange={e => setNewOrderViewer(e.target.value.replace(/[^0-9]/g, ''))}
+              onPointerDown={e => e.stopPropagation()}
+              onKeyDown={e => e.key === 'Enter' && handleChangeOrderViewer()}
+              style={{ width: 52, textAlign: 'center' }}
+            />
+            <button className="vsp-btn vsp-btn-primary" onClick={handleChangeOrderViewer} style={{ padding: '2px 8px', fontSize: '12px' }}>Đổi</button>
             {status !== 'ready' ? <span className="viewerStatus">loading...</span> : null}
-            {serialCopied ? <span className="viewerCopied">Copied</span> : null}
           </div>
         </div>
 
