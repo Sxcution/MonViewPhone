@@ -109,6 +109,11 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
+  const syncTargetsRef = useRef<string[]>(syncTargets);
+  useEffect(() => {
+    syncTargetsRef.current = syncTargets;
+  }, [syncTargets]);
+
   const [altSoloUdid, setAltSoloUdid] = useState<string | null>(null);
   const activeUdidRef = useRef<string | null>(null);
 
@@ -221,32 +226,34 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
     (sourceUdid: string | null): InputTarget[] => {
       if (!sourceUdid) return [];
 
+      const currentSyncTargets = syncTargetsRef.current;
+
       // ÉP ĐÈ ALT: luôn solo device nguồn, bỏ qua sync group
       if (altSoloUdid) {
         return getTargetsByUdids([sourceUdid]);
       }
 
-      // SMART SYNC: If the source device is currently in the selected group (syncTargets),
+      // SMART SYNC: If the source device is currently in the selected group (currentSyncTargets),
       // broadcast the action to ALL devices in that group automatically!
-      if (syncTargets.includes(sourceUdid)) {
-        const ids = uniq([sourceUdid, ...syncTargets.filter(Boolean)]);
+      if (currentSyncTargets.includes(sourceUdid)) {
+        const ids = uniq([sourceUdid, ...currentSyncTargets.filter(Boolean)]);
         return getTargetsByUdids(ids);
       }
 
       // Legacy fallback for old Sync mode
       if (syncAll) {
         if (!syncMain) {
-          const ids = uniq([sourceUdid, ...syncTargets.filter(Boolean)]);
+          const ids = uniq([sourceUdid, ...currentSyncTargets.filter(Boolean)]);
           return getTargetsByUdids(ids);
         }
         if (syncMain && sourceUdid === syncMain) {
-          const ids = uniq([sourceUdid, ...syncTargets.filter(Boolean)]);
+          const ids = uniq([sourceUdid, ...currentSyncTargets.filter(Boolean)]);
           return getTargetsByUdids(ids);
         }
       }
       return getTargetsByUdids([sourceUdid]);
     },
-    [getTargetsByUdids, syncAll, syncMain, syncTargets, altSoloUdid],
+    [getTargetsByUdids, syncAll, syncMain, altSoloUdid],
   );
 
   const getInputTargetsForSource = useCallback(
