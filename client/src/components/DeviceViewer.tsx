@@ -435,7 +435,16 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
         {tab === 'view' ? (
           <div className="viewerMain">
             <div className="viewerCanvasWrap" style={{ transform: 'none' }}>
-              <canvas ref={canvasRef} className="viewerCanvas" style={{ touchAction: 'none' }} tabIndex={0} />
+              <canvas
+                ref={canvasRef}
+                className="viewerCanvas"
+                style={{ touchAction: 'none' }}
+                tabIndex={0}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              />
             </div>
           </div>
         ) : null}

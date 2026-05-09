@@ -220,6 +220,10 @@ function TileComponent({
                     touchAction: 'none',
                 }}
                 tabIndex={0}
+                onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }}
             />
         </div>
     );
