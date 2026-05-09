@@ -2435,10 +2435,15 @@ export function App() {
             }}>
               <span style={{ fontSize: 12, color: '#666' }}>Device</span>
               <input
-                type="number"
-                min={1}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={contextMenuInput}
-                onChange={e => setContextMenuInput(e.target.value)}
+                onChange={e => {
+                  // Chỉ cho nhập số
+                  const val = e.target.value.replace(/[^0-9]/g, '')
+                  setContextMenuInput(val)
+                }}
                 style={{
                   width: 44,
                   background: 'transparent',
