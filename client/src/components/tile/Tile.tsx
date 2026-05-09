@@ -228,6 +228,10 @@ function TileComponent({
         <div
             className={tileClass}
             data-udid={udid}
+            onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }}
         >
             {showTileInfo ? (
                 <TileHeader

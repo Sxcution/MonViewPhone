@@ -110,6 +110,7 @@ export function attachTouchControls(
     onActivate?.();
 
     if (e.button === 2) {
+      e.stopPropagation();
       sendBackKey();
       return;
     }
@@ -196,7 +197,10 @@ export function attachTouchControls(
     });
   }
 
-  const preventContextMenu = (e: Event) => e.preventDefault();
+  const preventContextMenu = (e: Event) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
 
   canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
   canvas.addEventListener('pointermove', onPointerMove, { passive: false });
