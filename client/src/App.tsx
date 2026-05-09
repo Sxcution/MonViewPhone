@@ -601,6 +601,9 @@ export function App() {
     console.log('[focusGroup] idx=', focusGroupIdx, 'groupUdids=', [...groupSet], 'mergedOrder=', mergedOrder, 'hidden=', [...hidden])
     return hidden
   }, [focusGroupIdx, savedGroups, mergedOrder])
+
+  const focusGroupHiddenSetRef = useRef<Set<string> | null>(null)
+  focusGroupHiddenSetRef.current = focusGroupHiddenSet
   const orderedRegistered = useMemo(() => {
     const arr = [...filteredRegistered]
     arr.sort((a, b) => {
@@ -1315,14 +1318,20 @@ export function App() {
               } as React.CSSProperties
             }
           >
-            {mergedOrder.map((udid, idx) => (
-              <div
-                key={udid}
-                data-udid={udid}
-                className={`tileDraggableWrapper${isSingleDevice ? ' single' : ''
-                  }${dragging ? ' dragging' : ''}${viewerUdid === udid ? ' hiddenByViewer' : ''
-                  }${dropTarget === udid ? ' dropTarget' : ''
-                  }${focusGroupHiddenSet?.has(udid) ? ' hiddenByGroup' : ''}`}
+            {mergedOrder.map((udid, idx) => {
+              const isHidden = focusGroupHiddenSetRef.current?.has(udid) ?? false
+              // Tạm thời log để debug
+              if (focusGroupHiddenSetRef.current && isHidden) console.log('[HIDE]', udid)
+              if (focusGroupHiddenSetRef.current && !isHidden) console.log('[SHOW]', udid)
+
+              return (
+                <div
+                  key={udid}
+                  data-udid={udid}
+                  className={`tileDraggableWrapper${isSingleDevice ? ' single' : ''
+                    }${dragging ? ' dragging' : ''}${viewerUdid === udid ? ' hiddenByViewer' : ''
+                    }${dropTarget === udid ? ' dropTarget' : ''
+                    }${isHidden ? ' hiddenByGroup' : ''}`}
                 onPointerDownCapture={e => {
                   if (e.button !== 2) return
                   e.preventDefault()
@@ -1394,14 +1403,15 @@ export function App() {
                 onDragLeave={() => {
                   setDropTarget(prev => (prev === udid ? null : prev))
                 }}
-                style={
-                  isSingleDevice
+                style={{
+                  ...(isSingleDevice
                     ? {
                       ['--drag-x' as any]: `${dragOffset.x}px`,
                       ['--drag-y' as any]: `${dragOffset.y}px`
                     }
-                    : undefined
-                }
+                    : {}),
+                  ...(isHidden ? { display: 'none' } : {})
+                }}
               >
                 <Tile
                   udid={udid}

@@ -5205,3 +5205,19 @@ input[type="number"] {
   display: none !important;
 }
 
+
+/* Strengthened hiddenByGroup */
+.tileDraggableWrapper.hiddenByGroup,
+.tileDraggableWrapper.hiddenByGroup.single,
+.tileDraggableWrapper.hiddenByGroup.dragging,
+#grid .tileDraggableWrapper.hiddenByGroup {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+

@@ -43,7 +43,8 @@
       "rename_group_idx": "renameGroupIdx",
       "drag_group_idx": "dragGroupIdx",
       "group_context_menu": "groupContextMenu",
-      "focus_group_hidden_set": "focusGroupHiddenSet"
+      "focus_group_hidden_set": "focusGroupHiddenSet",
+      "focus_group_hidden_set_ref": "focusGroupHiddenSetRef"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
