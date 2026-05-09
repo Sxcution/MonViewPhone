@@ -2439,7 +2439,6 @@ export function App() {
                 min={1}
                 value={contextMenuInput}
                 onChange={e => setContextMenuInput(e.target.value)}
-                autoFocus
                 style={{
                   width: 44,
                   background: 'transparent',

@@ -5010,3 +5010,14 @@ body.alignRight .sidebar-wrapper.auto-hide.force-show,
 body:not(.alignRight) .sidebar-wrapper.auto-hide.force-show {
   transform: translateX(0);
 }
+\n
+/* ===== GLOBAL RULE: NO SPINNER ON ANY NUMBER INPUT ===== */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+input[type="number"] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
