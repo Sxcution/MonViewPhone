@@ -23,7 +23,10 @@
       "tile_selected": "selected",
       "tile_active": "active",
       "selected_count_badge": "selectedCountBadge",
-      "cursor_device_tooltip": "cursorDeviceTooltip"
+      "cursor_device_tooltip": "cursorDeviceTooltip",
+      "rcp_saved_group_item": "rcpSavedGroupItem",
+      "rcp_group_rename_input": "rcpGroupRenameInput",
+      "ctx_menu_item": "ctxMenuItem"
     },
     "state_variables": {
       "sidebar_collapsed": "sidebarCollapsed",
@@ -34,7 +37,11 @@
       "connect_selection": "connectSelection",
       "profiles": "profiles",
       "selected_user": "selectedUser",
-      "mouse_pos": "mousePos"
+      "mouse_pos": "mousePos",
+      "focus_group_idx": "focusGroupIdx",
+      "rename_group_idx": "renameGroupIdx",
+      "drag_group_idx": "dragGroupIdx",
+      "group_context_menu": "groupContextMenu"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

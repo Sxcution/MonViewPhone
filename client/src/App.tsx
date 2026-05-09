@@ -268,6 +268,21 @@ export function App() {
 
   // Modal xác nhận xoá nhóm
   const [deleteGroupConfirm, setDeleteGroupConfirm] = useState<number | null>(null)
+
+  // State lọc hiển thị theo nhóm (double click nhóm)
+  const [focusGroupIdx, setFocusGroupIdx] = useState<number | null>(null)
+
+  // State đổi tên nhóm
+  const [renameGroupIdx, setRenameGroupIdx] = useState<number | null>(null)
+  const [renameGroupValue, setRenameGroupValue] = useState('')
+
+  // State drag thứ tự nhóm
+  const [dragGroupIdx, setDragGroupIdx] = useState<number | null>(null)
+  const [dragGroupOverIdx, setDragGroupOverIdx] = useState<number | null>(null)
+
+  // Context menu nhóm (right-click)
+  const [groupContextMenu, setGroupContextMenu] = useState<{ x: number; y: number; idx: number } | null>(null)
+
   const [connectPorts, setConnectPorts] = useState<Record<string, number>>({})
   const [connectBusy, setConnectBusy] = useState(false)
   const targetConnect = deviceFilter === 'wifi' ? 'usb' : 'wifi'
@@ -557,20 +572,31 @@ export function App() {
     return []
   }, [deviceParam, discoveredDevices])
   const filteredGridDevices = useMemo(() => {
-    if (deviceFilter === 'all') return gridDevices
-    return gridDevices.filter(
-      id => getDeviceConnectionType(id) === deviceFilter
-    )
-  }, [deviceFilter, gridDevices, getDeviceConnectionType])
+    let list = gridDevices
+    if (deviceFilter !== 'all') {
+      list = list.filter(id => getDeviceConnectionType(id) === deviceFilter)
+    }
+    if (focusGroupIdx !== null && savedGroups[focusGroupIdx]) {
+      const groupSet = new Set(savedGroups[focusGroupIdx].udids)
+      list = list.filter(id => groupSet.has(id))
+    }
+    return list
+  }, [deviceFilter, gridDevices, getDeviceConnectionType, focusGroupIdx, savedGroups])
   const { mergedOrder, moveTile, getTileNumber, setTileNumber } =
     useTileOrder(filteredGridDevices)
   const filteredRegistered = useMemo(() => {
     return registeredUdids.filter(id => {
-      if (deviceFilter === 'all') return true
-      const type = getDeviceConnectionType(id)
-      return type === deviceFilter
+      if (deviceFilter !== 'all') {
+        const type = getDeviceConnectionType(id)
+        if (type !== deviceFilter) return false
+      }
+      if (focusGroupIdx !== null && savedGroups[focusGroupIdx]) {
+        const groupSet = new Set(savedGroups[focusGroupIdx].udids)
+        if (!groupSet.has(id)) return false
+      }
+      return true
     })
-  }, [registeredUdids, deviceFilter, getDeviceConnectionType])
+  }, [registeredUdids, deviceFilter, getDeviceConnectionType, focusGroupIdx, savedGroups])
   const orderMap = useMemo(() => {
     const m = new Map<string, number>()
     mergedOrder.forEach((id, idx) => m.set(id, getTileNumber(id, idx + 1)))
@@ -1814,21 +1840,21 @@ export function App() {
                 <button
                   className={`rcpFilter${deviceFilter === 'all' ? ' active' : ''
                     }`}
-                  onClick={() => setDeviceFilter('all')}
+                  onClick={() => { setDeviceFilter('all'); setFocusGroupIdx(null); }}
                 >
                   {t('All')}
                 </button>
                 <button
                   className={`rcpFilter${deviceFilter === 'usb' ? ' active' : ''
                     }`}
-                  onClick={() => setDeviceFilter('usb')}
+                  onClick={() => { setDeviceFilter('usb'); setFocusGroupIdx(null); }}
                 >
                   USB
                 </button>
                 <button
                   className={`rcpFilter${deviceFilter === 'wifi' ? ' active' : ''
                     }`}
-                  onClick={() => setDeviceFilter('wifi')}
+                  onClick={() => { setDeviceFilter('wifi'); setFocusGroupIdx(null); }}
                 >
                   WIFI
                 </button>
@@ -1907,15 +1933,42 @@ export function App() {
                 {savedGroups.length > 0 && (
                   <div className='rcpSavedGroups'>
                     {savedGroups.map((group, idx) => (
-                      <div key={idx} className='rcpSavedGroupItem'>
+                      <div
+                        key={idx}
+                        className={`rcpSavedGroupItem${focusGroupIdx === idx ? ' focused' : ''}`}
+                        draggable
+                        onDragStart={() => setDragGroupIdx(idx)}
+                        onDragOver={e => { e.preventDefault(); setDragGroupOverIdx(idx) }}
+                        onDragEnd={() => {
+                          if (dragGroupIdx !== null && dragGroupOverIdx !== null && dragGroupIdx !== dragGroupOverIdx) {
+                            setSavedGroups(prev => {
+                              const arr = [...prev]
+                              const [moved] = arr.splice(dragGroupIdx, 1)
+                              arr.splice(dragGroupOverIdx, 0, moved)
+                              // Cập nhật focusGroupIdx nếu cần
+                              if (focusGroupIdx === dragGroupIdx) setFocusGroupIdx(dragGroupOverIdx)
+                              else if (focusGroupIdx !== null) {
+                                if (focusGroupIdx > dragGroupIdx && focusGroupIdx <= dragGroupOverIdx) setFocusGroupIdx(focusGroupIdx - 1)
+                                else if (focusGroupIdx < dragGroupIdx && focusGroupIdx >= dragGroupOverIdx) setFocusGroupIdx(focusGroupIdx + 1)
+                              }
+                              return arr
+                            })
+                          }
+                          setDragGroupIdx(null)
+                          setDragGroupOverIdx(null)
+                        }}
+                        style={{
+                          opacity: dragGroupIdx === idx ? 0.4 : 1,
+                          borderTop: dragGroupOverIdx === idx && dragGroupIdx !== idx ? '2px solid #3ddc84' : undefined,
+                        }}
+                      >
                         {/* Row chính */}
                         <div className='rcpSavedGroupRow'>
-                          {/* Nút load nhóm */}
+                          {/* Nút load/focus nhóm — double click để focus, single click để select */}
                           <button
-                            className={`rcpSavedGroupBtn${activeGroupIdx === idx ? ' active' : ''}`}
-                            title={`Load nhóm: ${group.udids.length} device`}
+                            className={`rcpSavedGroupBtn${activeGroupIdx === idx ? ' active' : ''}${focusGroupIdx === idx ? ' focused' : ''}`}
+                            title={`Click: chọn nhóm | Double click: chỉ hiện nhóm này | Drag: đổi thứ tự`}
                             onClick={() => {
-                              // Toggle: nếu đang active nhóm này thì bỏ chọn, ngược lại load nhóm
                               if (activeGroupIdx === idx) {
                                 setActiveGroupIdx(null)
                                 setConnectSelection(new Set())
@@ -1924,9 +1977,49 @@ export function App() {
                                 setActiveGroupIdx(idx)
                               }
                             }}
+                            onDoubleClick={() => {
+                              if (focusGroupIdx === idx) {
+                                // Double click lại → bỏ focus, hiện hết
+                                setFocusGroupIdx(null)
+                              } else {
+                                setFocusGroupIdx(idx)
+                                setConnectSelection(new Set(group.udids))
+                                setActiveGroupIdx(idx)
+                              }
+                            }}
+                            onContextMenu={e => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setGroupContextMenu({ x: e.clientX, y: e.clientY, idx })
+                            }}
                           >
-                            <span className='rcpSavedGroupName'>{group.name}</span>
+                            {renameGroupIdx === idx ? (
+                              <input
+                                className='rcpGroupRenameInput'
+                                autoFocus
+                                value={renameGroupValue}
+                                onClick={e => e.stopPropagation()}
+                                onDoubleClick={e => e.stopPropagation()}
+                                onChange={e => setRenameGroupValue(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter' && renameGroupValue.trim()) {
+                                    setSavedGroups(prev => prev.map((g, i) => i === idx ? { ...g, name: renameGroupValue.trim() } : g))
+                                    setRenameGroupIdx(null)
+                                  }
+                                  if (e.key === 'Escape') setRenameGroupIdx(null)
+                                }}
+                                onBlur={() => {
+                                  if (renameGroupValue.trim()) {
+                                    setSavedGroups(prev => prev.map((g, i) => i === idx ? { ...g, name: renameGroupValue.trim() } : g))
+                                  }
+                                  setRenameGroupIdx(null)
+                                }}
+                              />
+                            ) : (
+                              <span className='rcpSavedGroupName'>{group.name}</span>
+                            )}
                             <span className='rcpSavedGroupCount'>{group.udids.length}</span>
+                            {focusGroupIdx === idx && <span className='rcpGroupFocusDot' title='Đang lọc nhóm này'>●</span>}
                           </button>
 
                           {/* Nút dropdown xem device */}
@@ -1938,7 +2031,7 @@ export function App() {
                             ▾
                           </button>
 
-                          {/* Nút xoá nhóm — mở confirm thay vì xoá thẳng */}
+                          {/* Nút xoá nhóm */}
                           <button
                             className='rcpSavedGroupDel'
                             title='Xoá nhóm'
@@ -1960,7 +2053,6 @@ export function App() {
                                   onContextMenu={e => {
                                     e.preventDefault()
                                     e.stopPropagation()
-                                    // Truyền groupIdx để biết xoá khỏi nhóm nào
                                     setContextMenuTarget({ x: e.clientX, y: e.clientY, udid: uid, groupIdx: idx, sourceGrid: 'group' })
                                     setContextMenuInput(String(orderMap.get(uid) ?? 0))
                                     setContextMenuOpen(true)
@@ -2419,6 +2511,52 @@ export function App() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* === Context menu nhóm (right-click) === */}
+      {groupContextMenu && (
+        <div
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999998 }}
+          onMouseDown={() => setGroupContextMenu(null)}
+        />
+      )}
+      {groupContextMenu && (
+        <div
+          className='contextMenuPanel'
+          style={{
+            position: 'fixed',
+            top: Math.min(groupContextMenu.y, window.innerHeight - 120),
+            left: Math.min(groupContextMenu.x, window.innerWidth - 180),
+            zIndex: 999999,
+          }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          <button
+            className='ctxMenuItem'
+            onClick={() => {
+              setRenameGroupIdx(groupContextMenu.idx)
+              setRenameGroupValue(savedGroups[groupContextMenu.idx]?.name || '')
+              setGroupContextMenu(null)
+            }}
+          >
+             Đổi tên nhóm
+          </button>
+          <button
+            className='ctxMenuItem'
+            onClick={() => {
+              const idx = groupContextMenu.idx
+              if (focusGroupIdx === idx) {
+                setFocusGroupIdx(null)
+              } else {
+                setFocusGroupIdx(idx)
+                setConnectSelection(new Set(savedGroups[idx].udids))
+                setActiveGroupIdx(idx)
+              }
+              setGroupContextMenu(null)
+            }}
+          >
+            {focusGroupIdx === groupContextMenu.idx ? '👁 Hiện tất cả' : '👁 Chỉ hiện nhóm này'}
+          </button>
         </div>
       )}
       {contextMenuTarget ? (
