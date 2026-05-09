@@ -5323,12 +5323,13 @@ input[type="number"] {
   background: var(--accent-color);
 }
 
-/* 3. Chuẩn hóa RightBar & Sync Panel */
-.RightBar, #rightbar, .sync-panel, .ViewerSidePanel, aside {
+/* 3. Chuẩn hóa RightBar, Sync Panel & Side Panels */
+.RightBar, #rightbar, .sync-panel, .ViewerSidePanel, .vsp-panel, aside, .rightConfigPanel {
   background-color: var(--bg-panel) !important;
   color: var(--text-main) !important;
   border-left: 1px solid var(--border-color) !important;
   border-right: 1px solid var(--border-color) !important;
+  box-shadow: var(--panel-shadow, 0 4px 12px rgba(0, 0, 0, 0.4)) !important;
 }
 
 /* 4. Chuẩn hóa Nút bấm (Button) & Ô nhập liệu (Input/Select) */
@@ -5339,45 +5340,60 @@ button, input, select, textarea {
   border-radius: 4px;
   padding: 6px 10px;
   font-family: inherit;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: all 0.2s ease;
 }
-button:hover {
+
+button:hover:not(:disabled) {
   background-color: var(--bg-hover);
+  border-color: var(--accent-color);
   cursor: pointer;
 }
-input:focus, select:focus, textarea:focus, button:focus {
+
+input:focus, select:focus, textarea:focus, button:focus-visible {
   outline: none;
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 2px rgba(90, 90, 90, 0.4);
+  border-color: var(--accent-color) !important;
+  box-shadow: 0 0 0 2px rgba(90, 90, 90, 0.3) !important;
 }
 
 /* 5. Chuẩn hóa Context Menu (Menu chuột phải / Dropdown) */
-/* Bắt cả các class phổ biến thường dùng cho context menu trong React */
-.react-contexify, .context-menu, .dropdown-menu {
+.react-contexify, .context-menu, .dropdown-menu, .vsp-ctx-menu, .pageContextMenu {
   background-color: var(--bg-panel) !important;
   border: 1px solid var(--border-color) !important;
-  border-radius: 6px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
-  padding: 4px 0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+  padding: 6px 0 !important;
   color: var(--text-main) !important;
+  backdrop-filter: blur(10px);
 }
 
-.react-contexify__item__content, .context-menu-item, .dropdown-item {
+.react-contexify__item__content, .context-menu-item, .dropdown-item, .vsp-ctx-item, .pageContextItem {
   color: var(--text-main) !important;
-  padding: 8px 12px !important;
+  padding: 8px 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 13px !important;
   transition: background 0.15s ease !important;
+  cursor: pointer !important;
 }
 
 .react-contexify__item:hover > .react-contexify__item__content,
 .react-contexify__item:focus > .react-contexify__item__content,
-.context-menu-item:hover, .dropdown-item:hover {
+.context-menu-item:hover, .dropdown-item:hover, .vsp-ctx-item:hover, .pageContextItem:hover {
   background-color: var(--bg-hover) !important;
   color: #ffffff !important;
-  cursor: pointer;
 }
 
 /* Chặn màu nền cũ của divider */
-.react-contexify__separator, .context-menu-divider, .dropdown-divider {
+.react-contexify__separator, .context-menu-divider, .dropdown-divider, .vsp-ctx-divider {
+  height: 1px !important;
   background-color: var(--border-color) !important;
-  margin: 4px 0 !important;
+  margin: 6px 0 !important;
 }
+
+/* Scrollbar cho các panel con */
+.vsp-body, .rcpGridWrap, .viewerAppsList, .vsp-modal-log {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+

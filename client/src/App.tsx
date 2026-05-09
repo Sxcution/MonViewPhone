@@ -230,6 +230,27 @@ export function App() {
     }
   }, [connectSelection])
 
+  // Handle click outside to close context menu and sync sidebar state
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // 1. Ignore if right-click
+      if (event.button === 2) return;
+
+      // 2. Check if click was on a context menu element
+      const target = event.target as Element;
+      const isClickOnContextMenu = target.closest('.react-contexify') || target.closest('.context-menu') || target.closest('.pageContextLayer');
+      
+      // 3. If clicking outside context menu, ensure it closes
+      if (!isClickOnContextMenu && contextMenuOpen) {
+        setContextMenuOpen(false);
+        setContextMenuTarget(null);
+      }
+    };
+
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [contextMenuOpen]);
+
   // Track vị trí chuột cho tooltip
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -1291,8 +1312,14 @@ export function App() {
             if (rubberBandJustFinishedRef.current) return;
 
             const target = e.target as HTMLElement;
-            // Bỏ chọn tất cả nếu bấm vào nền (không trúng điện thoại hay panel nào)
-            if (!target.closest('.tileDraggableWrapper') && !target.closest('.rightConfigPanel') && !target.closest('.headerBar')) {
+            // Bỏ chọn tất cả nếu bấm vào nền (không trúng điện thoại, panel nào, hay context menu)
+            if (!target.closest('.tileDraggableWrapper') && 
+                !target.closest('.rightConfigPanel') && 
+                !target.closest('.headerBar') &&
+                !target.closest('.react-contexify') &&
+                !target.closest('.context-menu') &&
+                !target.closest('.pageContextLayer')
+            ) {
               selectOnly(null);
               setConnectSelection(new Set());
             }

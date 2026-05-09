@@ -8,13 +8,16 @@
       "app": "App",
       "device_viewer": "DeviceViewer",
       "right_bar": "RightBar",
-      "tile": "Tile"
+      "tile": "Tile",
+      "viewer_side_panel": "ViewerSidePanel"
     },
     "css_classes": {
       "right_config_panel": "rightConfigPanel",
       "right_config_panel_collapsed": "collapsed",
-      "sidebar_pinned": "sidebar-pinned",
-      "sidebar_auto_hide": "sidebar-auto-hide",
+      "sidebar_wrapper": "sidebar-wrapper",
+      "sidebar_auto_hide": "auto-hide",
+      "sidebar_force_show": "force-show",
+      "sidebar_pinned": "pinned",
       "btn_pin": "btn-pin",
       "tile_draggable_wrapper": "tileDraggableWrapper",
       "user_profile_select": "userProfileSelect",
@@ -27,7 +30,8 @@
       "group_focused": "focused",
       "group_focus_dot": "rcpGroupFocusDot",
       "group_rename_input": "rcpGroupRenameInput",
-      "ctx_menu_item": "ctxMenuItem"
+      "ctx_menu_item": "ctxMenuItem",
+      "react_contexify": "react-contexify"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -42,6 +46,7 @@
       "sidebar_collapsed": "sidebarCollapsed",
       "is_sidebar_pinned": "isSidebarPinned",
       "sidebar_hovered": "isSidebarHovered",
+      "context_menu_open": "contextMenuOpen",
       "new_order_viewer": "newOrderViewer",
       "rubber_band": "rubberBand",
       "connect_selection": "connectSelection",
@@ -66,7 +71,8 @@
       "set_alt_solo_udid": "setAltSoloUdid",
       "on_pointer_enter_tile": "onPointerEnter",
       "on_pointer_leave_tile": "onPointerLeave",
-      "handle_alt_keyup": "handleKeyUp"
+      "handle_alt_keyup": "handleKeyUp",
+      "handle_click_outside": "handleClickOutside"
     },
     "refs": {
       "rubber_band_ref": "rubberBandRef",

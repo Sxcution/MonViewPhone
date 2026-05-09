@@ -118,12 +118,25 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
     listUserProfiles(wsServer, udid).then(setProfiles).catch(() => {});
   }, [wsServer, udid]);
 
-  // Close context menu on click outside
+  // Handle click outside to close context menu, but ignore right-click and context menu items
   useEffect(() => {
     if (!ctxMenu) return;
-    const h = () => setCtxMenu(null);
-    window.addEventListener('click', h);
-    return () => window.removeEventListener('click', h);
+    const handleClickOutside = (event: MouseEvent) => {
+      // 1. Ignore if right-click
+      if (event.button === 2) return;
+
+      // 2. Check if click was on a context menu element
+      const target = event.target as Element;
+      const isClickOnContextMenu = target.closest('.react-contexify') || target.closest('.vsp-ctx-menu') || target.closest('.context-menu');
+      
+      // 3. If not on a context menu, close the local context menu
+      if (!isClickOnContextMenu) {
+        setCtxMenu(null);
+      }
+    };
+
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
   }, [ctxMenu]);
 
   const handleChangeOrder = () => {
