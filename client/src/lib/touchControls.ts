@@ -115,13 +115,6 @@ export function attachTouchControls(
     e.preventDefault();
     onActivate?.();
 
-    // Giữ Alt = solo mode cho tile này
-    if (e.altKey && onSetAltSolo && udid) {
-      onSetAltSolo(udid);
-    } else {
-      onSetAltSolo?.(null); // release solo khi không giữ Alt
-    }
-
     if (e.button === 2) {
       return;
     }
@@ -168,10 +161,6 @@ export function attachTouchControls(
   }
 
   function onPointerUpOrCancel(e: PointerEvent) {
-    // Release alt solo khi nhả chuột
-    if (!e.altKey) {
-      onSetAltSolo?.(null);
-    }
     const st = active.get(e.pointerId);
     if (!st) return;
     e.preventDefault();

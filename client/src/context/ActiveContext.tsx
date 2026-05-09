@@ -75,6 +75,7 @@ type ActiveContextValue = {
   stopSync: () => void;
   altSoloUdid: string | null;
   setAltSoloUdid: (udid: string | null) => void;
+  isAltHeld: boolean;
 };
 
 const Ctx = createContext<ActiveContextValue | null>(null);
@@ -116,6 +117,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
   }, [syncTargets]);
 
   const [altSoloUdid, setAltSoloUdidState] = useState<string | null>(null);
+  const [isAltHeld, setIsAltHeld] = useState(false);
   const altSoloUdidRef = useRef<string | null>(null);
   const activeUdidRef = useRef<string | null>(null);
 
@@ -130,13 +132,22 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const onKeyUp = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Alt') {
-        setAltSoloUdid(null);
+        e.preventDefault();
+        setIsAltHeld(true);
       }
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        setIsAltHeld(false);
+        setAltSoloUdid(null); // Thả Alt → clear solo, về broadcast
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     return () => {
+      window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
   }, [setAltSoloUdid]);
@@ -374,6 +385,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       stopSync,
       altSoloUdid,
       setAltSoloUdid,
+      isAltHeld,
     }),
     [
       activeUdid,
@@ -395,6 +407,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       stopSync,
       altSoloUdid,
       setAltSoloUdid,
+      isAltHeld,
     ],
   );
 

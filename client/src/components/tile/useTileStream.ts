@@ -29,6 +29,7 @@ type Args = {
     selectOnly: (udid: string) => void;
     getInputTargetsForSource: (udid: string) => InputTarget[];
     setAltSoloUdid?: (udid: string | null) => void;
+    isAltHeld: boolean;
 
   // UI state setters
   setStatus: (s: string) => void;
@@ -68,6 +69,7 @@ export function useTileStream(args: Args) {
         selectOnly,
         getInputTargetsForSource,
         setAltSoloUdid,
+        isAltHeld,
         setStatus,
         setLoading,
         reloadRef,
@@ -84,6 +86,11 @@ export function useTileStream(args: Args) {
     useEffect(() => {
         getInputTargetsRef.current = getInputTargetsForSource;
     }, [getInputTargetsForSource]);
+
+    const isAltHeldRef = useRef(isAltHeld);
+    useEffect(() => {
+        isAltHeldRef.current = isAltHeld;
+    }, [isAltHeld]);
 
     useEffect(() => {
         destroyedRef.current = false;
@@ -189,6 +196,13 @@ export function useTileStream(args: Args) {
         let frameId = 1;
 
         const onActivate = () => selectOnly(udid);
+
+        const handlePointerEnter = () => {
+            if (isAltHeldRef.current) {
+                setAltSoloUdid?.(udid);
+            }
+        };
+        body.addEventListener('pointerenter', handlePointerEnter);
 
         detachControlsRef.current = attachTouchControls(
             canvas,
@@ -679,6 +693,7 @@ export function useTileStream(args: Args) {
             window.visualViewport?.removeEventListener('scroll', scheduleFit as any);
             window.removeEventListener('beforeunload', closeWs);
             window.removeEventListener('pagehide', closeWs);
+            body.removeEventListener('pointerenter', handlePointerEnter);
             if (watchdogTimer != null) {
                 clearInterval(watchdogTimer);
                 watchdogTimer = null;
