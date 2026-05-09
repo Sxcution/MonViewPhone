@@ -271,6 +271,8 @@ export function App() {
 
   // State lọc hiển thị theo nhóm (double click nhóm)
   const [focusGroupIdx, setFocusGroupIdx] = useState<number | null>(null)
+  // Timer để phân biệt single click vs double click trên nhóm
+  const groupClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // State đổi tên nhóm
   const [renameGroupIdx, setRenameGroupIdx] = useState<number | null>(null)
@@ -595,8 +597,9 @@ export function App() {
   const focusGroupHiddenSet = useMemo(() => {
     if (focusGroupIdx === null || !savedGroups[focusGroupIdx]) return null
     const groupSet = new Set(savedGroups[focusGroupIdx].udids)
-    // Trả về set các udid CẦN ẨN (không thuộc nhóm)
-    return new Set(mergedOrder.filter(id => !groupSet.has(id)))
+    const hidden = new Set(mergedOrder.filter(id => !groupSet.has(id)))
+    console.log('[focusGroup] idx=', focusGroupIdx, 'groupUdids=', [...groupSet], 'mergedOrder=', mergedOrder, 'hidden=', [...hidden])
+    return hidden
   }, [focusGroupIdx, savedGroups, mergedOrder])
   const orderedRegistered = useMemo(() => {
     const arr = [...filteredRegistered]
@@ -1964,19 +1967,36 @@ export function App() {
                           {/* Nút load/focus nhóm — double click để focus, single click để select */}
                           <button
                             className={`rcpSavedGroupBtn${activeGroupIdx === idx ? ' active' : ''}${focusGroupIdx === idx ? ' focused' : ''}`}
-                            title={`Click: chọn nhóm | Double click: chỉ hiện nhóm này | Drag: đổi thứ tự`}
+                            title={`Click: chọn nhóm | Double click: chỉ hiện nhóm này`}
                             onClick={() => {
-                              if (activeGroupIdx === idx) {
-                                setActiveGroupIdx(null)
-                                setConnectSelection(new Set())
-                              } else {
-                                setConnectSelection(new Set(group.udids))
-                                setActiveGroupIdx(idx)
+                              // Nếu đang pending double click thì cancel để double click xử lý
+                              if (groupClickTimerRef.current) {
+                                clearTimeout(groupClickTimerRef.current)
+                                groupClickTimerRef.current = null
+                                // Đây là click thứ 2 trong double click → không làm gì, để onDoubleClick xử lý
+                                return
                               }
+                              // Delay single click để chờ xem có double click không
+                              groupClickTimerRef.current = setTimeout(() => {
+                                groupClickTimerRef.current = null
+                                // Single click: toggle select nhóm
+                                if (activeGroupIdx === idx) {
+                                  setActiveGroupIdx(null)
+                                  setConnectSelection(new Set())
+                                } else {
+                                  setConnectSelection(new Set(group.udids))
+                                  setActiveGroupIdx(idx)
+                                }
+                              }, 220)
                             }}
                             onDoubleClick={() => {
+                              // Cancel timer single click nếu còn
+                              if (groupClickTimerRef.current) {
+                                clearTimeout(groupClickTimerRef.current)
+                                groupClickTimerRef.current = null
+                              }
+                              // Double click: toggle focus nhóm (ẩn/hiện device)
                               if (focusGroupIdx === idx) {
-                                // Double click lại → bỏ focus, hiện hết
                                 setFocusGroupIdx(null)
                               } else {
                                 setFocusGroupIdx(idx)

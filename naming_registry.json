@@ -54,7 +54,8 @@
     "refs": {
       "rubber_band_ref": "rubberBandRef",
       "grid_scroll_ref": "gridScrollRef",
-      "rubber_band_just_finished_ref": "rubberBandJustFinishedRef"
+      "rubber_band_just_finished_ref": "rubberBandJustFinishedRef",
+      "group_click_timer_ref": "groupClickTimerRef"
     }
   },
   "key_codes": {
