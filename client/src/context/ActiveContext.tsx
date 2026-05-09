@@ -222,39 +222,41 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
     return out;
   }, []);
 
-  const resolveTargets = useCallback(
-    (sourceUdid: string | null): InputTarget[] => {
-      if (!sourceUdid) return [];
+    const resolveTargets = useCallback(
+      (sourceUdid: string | null): InputTarget[] => {
+        if (!sourceUdid) return [];
 
-      const currentSyncTargets = syncTargetsRef.current;
+        const currentSyncTargets = syncTargetsRef.current;
 
-      // ÉP ĐÈ ALT: luôn solo device nguồn, bỏ qua sync group
-      if (altSoloUdid) {
+        // ÉP ĐÈ ALT: luôn solo device nguồn, bỏ qua sync group
+        if (altSoloUdid) {
+          return getTargetsByUdids([sourceUdid]);
+        }
+
+        // ✅ FIX: Smart Sync — Kiểm tra nếu thiết bị nguồn nằm trong nhóm Sync (bao gồm cả Main)
+        const isInSyncGroup =
+          currentSyncTargets.includes(sourceUdid) ||
+          (syncMain !== null && sourceUdid === syncMain);
+
+        if (isInSyncGroup) {
+          // Broadcast tới cả thiết bị Chính và tất cả thiết bị Phụ trong nhóm
+          const ids = uniq([
+            ...(syncMain ? [syncMain] : []),
+            ...currentSyncTargets,
+          ]);
+          return getTargetsByUdids(ids);
+        }
+
+        // Legacy fallback: Nếu chế độ Đồng bộ tất cả đang bật
+        if (syncAll) {
+          const ids = uniq([sourceUdid, ...currentSyncTargets.filter(Boolean)]);
+          return getTargetsByUdids(ids);
+        }
+
         return getTargetsByUdids([sourceUdid]);
-      }
-
-      // SMART SYNC: If the source device is currently in the selected group (currentSyncTargets),
-      // broadcast the action to ALL devices in that group automatically!
-      if (currentSyncTargets.includes(sourceUdid)) {
-        const ids = uniq([sourceUdid, ...currentSyncTargets.filter(Boolean)]);
-        return getTargetsByUdids(ids);
-      }
-
-      // Legacy fallback for old Sync mode
-      if (syncAll) {
-        if (!syncMain) {
-          const ids = uniq([sourceUdid, ...currentSyncTargets.filter(Boolean)]);
-          return getTargetsByUdids(ids);
-        }
-        if (syncMain && sourceUdid === syncMain) {
-          const ids = uniq([sourceUdid, ...currentSyncTargets.filter(Boolean)]);
-          return getTargetsByUdids(ids);
-        }
-      }
-      return getTargetsByUdids([sourceUdid]);
-    },
-    [getTargetsByUdids, syncAll, syncMain, altSoloUdid],
-  );
+      },
+      [getTargetsByUdids, syncAll, syncMain, altSoloUdid],
+    );
 
   const getInputTargetsForSource = useCallback(
     (sourceUdid: string): InputTarget[] => {
