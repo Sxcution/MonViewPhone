@@ -74,6 +74,7 @@ type ActiveContextValue = {
   setSyncTargetsList: (next: string[]) => void;
   stopSync: () => void;
   altSoloUdid: string | null;
+  setAltSoloUdid: (udid: string | null) => void;
 };
 
 const Ctx = createContext<ActiveContextValue | null>(null);
@@ -114,12 +115,19 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
     syncTargetsRef.current = syncTargets;
   }, [syncTargets]);
 
-  const [altSoloUdid, setAltSoloUdid] = useState<string | null>(null);
+  const [altSoloUdid, setAltSoloUdidState] = useState<string | null>(null);
+  const altSoloUdidRef = useRef<string | null>(null);
   const activeUdidRef = useRef<string | null>(null);
 
   useEffect(() => {
     activeUdidRef.current = activeUdid;
   }, [activeUdid]);
+
+  // Wrap setter để cập nhật cả ref lẫn state đồng bộ
+  const setAltSoloUdid = useCallback((udid: string | null) => {
+    altSoloUdidRef.current = udid; // Cập nhật ref ngay lập tức (đồng bộ)
+    setAltSoloUdidState(udid); // Cập nhật state để re-render UI
+  }, []);
 
   useEffect(() => {
     const onKeyUp = (e: KeyboardEvent) => {
@@ -131,7 +139,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, []);
+  }, [setAltSoloUdid]);
 
   useEffect(() => {
     try {
@@ -220,10 +228,13 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
 
         const currentSyncTargets = syncTargetsRef.current;
 
+        // Đọc từ REF để có giá trị mới nhất ngay lập tức (không bị stale do React async)
+        const currentAltSolo = altSoloUdidRef.current;
+
         // ÉP ĐÈ ALT: luôn solo device nguồn, bỏ qua sync group
-        if (altSoloUdid) {
+        if (currentAltSolo !== null) {
           // Chỉ solo nếu thao tác đến TỪ ĐÚNG tile đang giữ Alt
-          if (sourceUdid === altSoloUdid) {
+          if (sourceUdid === currentAltSolo) {
             return getTargetsByUdids([sourceUdid]);
           }
           // Nếu thao tác từ tile khác khi đang alt-solo tile này -> block hoàn toàn để tránh loạn
@@ -252,7 +263,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
 
         return getTargetsByUdids([sourceUdid]);
       },
-      [getTargetsByUdids, syncAll, syncMain, altSoloUdid, syncTargets],
+      [getTargetsByUdids, syncAll, syncMain, syncTargets],
     );
 
   const getInputTargetsForSource = useCallback(
@@ -383,6 +394,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       setSyncTargetsList,
       stopSync,
       altSoloUdid,
+      setAltSoloUdid,
     ],
   );
 
