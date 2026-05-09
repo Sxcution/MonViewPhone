@@ -191,6 +191,15 @@ export function App () {
     () => new Set(syncTargets)
   )
 
+  // Rubber band selection state
+  const [rubberBand, setRubberBand] = useState<{
+    startX: number; startY: number; currentX: number; currentY: number
+  } | null>(null)
+  const rubberBandRef = useRef<{
+    startX: number; startY: number; active: boolean
+  }>({ startX: 0, startY: 0, active: false })
+  const gridScrollRef = useRef<HTMLDivElement | null>(null)
+
   const [appSettingsVisible, setAppSettingsVisible] = useState(false)
 
   useEffect(() => {
@@ -717,6 +726,62 @@ export function App () {
     window.removeEventListener('pointerup', onPointerUp as any)
   }, [onPointerMove])
 
+  const onGridPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    // Chỉ kéo chuột trái trên nền grid (không phải trên tile)
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement
+    if (
+      target.closest('.tileDraggableWrapper') ||
+      target.closest('.rightConfigPanel') ||
+      target.closest('.headerBar')
+    ) return
+
+    // Nếu không giữ Ctrl, reset selection trước
+    if (!e.ctrlKey && !e.metaKey) {
+      setConnectSelection(new Set())
+      selectOnly(null)
+    }
+
+    rubberBandRef.current.startX = e.clientX
+    rubberBandRef.current.startY = e.clientY
+    rubberBandRef.current.active = true
+
+    setRubberBand({
+      startX: e.clientX, startY: e.clientY,
+      currentX: e.clientX, currentY: e.clientY
+    })
+
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }, [selectOnly])
+
+  const onGridPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!rubberBandRef.current.active) return
+    setRubberBand(prev => prev ? { ...prev, currentX: e.clientX, currentY: e.clientY } : null)
+
+    // Tính rect của vùng kéo
+    const x1 = Math.min(rubberBandRef.current.startX, e.clientX)
+    const y1 = Math.min(rubberBandRef.current.startY, e.clientY)
+    const x2 = Math.max(rubberBandRef.current.startX, e.clientX)
+    const y2 = Math.max(rubberBandRef.current.startY, e.clientY)
+
+    // Kiểm tra tile nào nằm trong vùng kéo
+    const newSelected = new Set<string>()
+    mergedOrder.forEach(udid => {
+      const el = document.querySelector(`[data-udid="${udid}"]`)
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      if (rect.left < x2 && rect.right > x1 && rect.top < y2 && rect.bottom > y1) {
+        newSelected.add(udid)
+      }
+    })
+    setConnectSelection(newSelected)
+  }, [mergedOrder])
+
+  const onGridPointerUp = useCallback(() => {
+    rubberBandRef.current.active = false
+    setRubberBand(null)
+  }, [])
+
   const onTilePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (!isSingleDevice) return
@@ -1087,6 +1152,11 @@ export function App () {
       <div id='main'>
         <div 
           id='gridScroll'
+          ref={gridScrollRef}
+          onPointerDown={onGridPointerDown}
+          onPointerMove={onGridPointerMove}
+          onPointerUp={onGridPointerUp}
+          onPointerCancel={onGridPointerUp}
           onClick={(e) => {
             const target = e.target as HTMLElement;
             // Bỏ chọn tất cả nếu bấm vào nền (không trúng điện thoại hay panel nào)
@@ -1124,6 +1194,7 @@ export function App () {
             {mergedOrder.map((udid, idx) => (
               <div
                 key={udid}
+                data-udid={udid}
                 className={`tileDraggableWrapper${
                   isSingleDevice ? ' single' : ''
                 }${dragging ? ' dragging' : ''}${
@@ -1232,6 +1303,23 @@ export function App () {
               </div>
             ))}
           </div>
+          {rubberBand && (() => {
+            const x = Math.min(rubberBand.startX, rubberBand.currentX)
+            const y = Math.min(rubberBand.startY, rubberBand.currentY)
+            const w = Math.abs(rubberBand.currentX - rubberBand.startX)
+            const h = Math.abs(rubberBand.currentY - rubberBand.startY)
+            return (
+              <div style={{
+                position: 'fixed',
+                left: x, top: y, width: w, height: h,
+                border: '1.5px solid #4f9eff',
+                background: 'rgba(79, 158, 255, 0.12)',
+                pointerEvents: 'none',
+                zIndex: 9000,
+                borderRadius: 3
+              }} />
+            )
+          })()}
         </div>
       </div>
 

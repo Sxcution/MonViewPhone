@@ -15,16 +15,26 @@
       "right_config_panel_collapsed": "collapsed",
       "sidebar_pinned": "sidebar-pinned",
       "sidebar_auto_hide": "sidebar-auto-hide",
-      "btn_pin": "btn-pin"
+      "btn_pin": "btn-pin",
+      "tile_draggable_wrapper": "tileDraggableWrapper"
     },
     "state_variables": {
       "sidebar_collapsed": "sidebarCollapsed",
       "is_sidebar_pinned": "isSidebarPinned",
       "sidebar_hovered": "isSidebarHovered",
-      "new_order_viewer": "newOrderViewer"
+      "new_order_viewer": "newOrderViewer",
+      "rubber_band": "rubberBand",
+      "connect_selection": "connectSelection"
     },
     "handlers": {
-      "change_order_viewer": "handleChangeOrderViewer"
+      "change_order_viewer": "handleChangeOrderViewer",
+      "on_grid_pointer_down": "onGridPointerDown",
+      "on_grid_pointer_move": "onGridPointerMove",
+      "on_grid_pointer_up": "onGridPointerUp"
+    },
+    "refs": {
+      "rubber_band_ref": "rubberBandRef",
+      "grid_scroll_ref": "gridScrollRef"
     }
   },
   "key_codes": {
