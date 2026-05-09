@@ -156,6 +156,7 @@ export function App() {
     groupIdx?: number       // có nghĩa: click từ dropdown nhóm (dùng để xoá khỏi nhóm cụ thể)
     sourceGrid?: 'main' | 'group' // 'main' = grid tổng tile lớn, 'group' = grid nhỏ trong nhóm
   } | null>(null)
+  const [contextMenuOpen, setContextMenuOpen] = useState(false)
   const [pageContextMenu, setPageContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [contextMenuInput, setContextMenuInput] = useState('')
   const [globalAdbOpen, setGlobalAdbOpen] = useState(false)
@@ -1318,6 +1319,7 @@ export function App() {
                   // Mở context menu nhóm cho tile này
                   setContextMenuTarget({ x: e.clientX, y: e.clientY, udid, sourceGrid: 'main', groupIdx: activeGroupIdx ?? undefined })
                   setContextMenuInput(String(orderMap.get(udid) ?? 0))
+                  setContextMenuOpen(true)
                 }}
                 onDragOver={e => {
                   if (draggingTile) e.preventDefault()
@@ -1403,7 +1405,7 @@ export function App() {
         </div>
       </div>
 
-      <div className={`sidebar-wrapper ${isSidebarPinned ? 'pinned' : 'auto-hide'}`}>
+      <div className={`sidebar-wrapper ${isSidebarPinned ? 'pinned' : contextMenuOpen ? 'auto-hide force-show' : 'auto-hide'}`}>
         <RightBar
           hidden={false}
           showExpand={false}
@@ -1937,6 +1939,7 @@ export function App() {
                                     // Truyền groupIdx để biết xoá khỏi nhóm nào
                                     setContextMenuTarget({ x: e.clientX, y: e.clientY, udid: uid, groupIdx: idx, sourceGrid: 'group' })
                                     setContextMenuInput(String(orderMap.get(uid) ?? 0))
+                                    setContextMenuOpen(true)
                                   }}
                                 >
                                   <span>{String(orderMap.get(uid) ?? 0).padStart(2, '0')}</span>
@@ -1967,6 +1970,7 @@ export function App() {
                             sourceGrid: 'main'
                           })
                           setContextMenuInput(String(orderMap.get(id) ?? 0))
+                          setContextMenuOpen(true)
                         }}
                       >
                         <input
@@ -2361,21 +2365,18 @@ export function App() {
         <div
           className='confirmOverlay'
           onMouseDown={() => setDeleteGroupConfirm(null)}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
           <div
             className='confirmPanel'
-            style={{ maxWidth: 340 }}
+            style={{ maxWidth: 320, textAlign: 'center' }}
             onMouseDown={e => e.stopPropagation()}
           >
-            <div className='confirmTitle'>Xoá nhóm?</div>
-            <div className='confirmText'>
+            <div className='confirmText' style={{ marginBottom: 20 }}>
               Bạn có chắc muốn xoá nhóm{' '}
-              <strong>"{savedGroups[deleteGroupConfirm]?.name}"</strong>?<br />
-              <span style={{ color: '#888', fontSize: 12 }}>
-                Hành động này không thể hoàn tác.
-              </span>
+              <strong>"{savedGroups[deleteGroupConfirm]?.name}"</strong>?
             </div>
-            <div className='confirmBtns' style={{ marginTop: 16 }}>
+            <div className='confirmBtns' style={{ marginTop: 0, justifyContent: 'center', display: 'flex', gap: 12 }}>
               <button className='modalBtn' onClick={() => setDeleteGroupConfirm(null)}>
                 Huỷ
               </button>
@@ -2385,7 +2386,6 @@ export function App() {
                 onClick={() => {
                   const idx = deleteGroupConfirm
                   setSavedGroups(prev => prev.filter((_, i) => i !== idx))
-                  // Reset activeGroupIdx nếu đang load nhóm bị xoá
                   if (activeGroupIdx === idx) setActiveGroupIdx(null)
                   if (expandedGroupIdx === idx) setExpandedGroupIdx(null)
                   setDeleteGroupConfirm(null)
@@ -2400,8 +2400,15 @@ export function App() {
       {contextMenuTarget ? (
         <div
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999999 }}
-          onClick={() => setContextMenuTarget(null)}
-          onContextMenu={e => { e.preventDefault(); setContextMenuTarget(null) }}
+          onClick={() => {
+            setContextMenuTarget(null)
+            setContextMenuOpen(false)
+          }}
+          onContextMenu={e => {
+            e.preventDefault()
+            setContextMenuTarget(null)
+            setContextMenuOpen(false)
+          }}
         >
           <div
             style={{
@@ -2421,40 +2428,43 @@ export function App() {
             onClick={e => e.stopPropagation()}
             onContextMenu={e => e.stopPropagation()}
           >
-            {/* Tiêu đề */}
-            <div style={{ fontSize: '11px', color: '#666', padding: '4px 8px 6px', borderBottom: '1px solid #2a2a2a', marginBottom: 4 }}>
-              Device <strong style={{ color: '#aaa' }}>#{String(orderMap.get(contextMenuTarget.udid) ?? 0).padStart(2, '0')}</strong>
-            </div>
-
-            {/* === Đổi số thiết bị === */}
-            <div style={{ fontSize: '12px', color: '#999', padding: '2px 8px' }}>Đổi số thiết bị</div>
-            <div style={{ display: 'flex', gap: '6px', padding: '2px 8px 6px', borderBottom: '1px solid #2a2a2a', marginBottom: 4 }}>
+            {/* Header: Device # + input số inline trong suốt */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '4px 8px 8px', borderBottom: '1px solid #2a2a2a', marginBottom: 4
+            }}>
+              <span style={{ fontSize: 12, color: '#666' }}>Device</span>
               <input
                 type="number"
                 min={1}
                 value={contextMenuInput}
                 onChange={e => setContextMenuInput(e.target.value)}
-                style={{ width: '60px', background: '#0f0f0f', color: '#fff', border: '1px solid #444', borderRadius: '4px', padding: '4px 6px', outline: 'none', fontSize: 13 }}
                 autoFocus
+                style={{
+                  width: 44,
+                  background: 'transparent',
+                  color: '#fff',
+                  border: 'none',
+                  borderBottom: '1px solid #555',
+                  outline: 'none',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  padding: '0 2px',
+                  textAlign: 'center',
+                }}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     const n = Math.max(1, parseInt(contextMenuInput, 10))
-                    if (!isNaN(n)) setTileNumber(contextMenuTarget.udid, n)
+                    if (!isNaN(n)) setTileNumber(contextMenuTarget!.udid, n)
                     setContextMenuTarget(null)
+                    setContextMenuOpen(false)
                   }
                 }}
-              />
-              <button
-                className='modalBtnPrimary'
-                style={{ padding: '4px 10px', minWidth: 'auto', minHeight: 'auto', height: 'auto', fontSize: '12px' }}
-                onClick={() => {
+                onBlur={() => {
                   const n = Math.max(1, parseInt(contextMenuInput, 10))
-                  if (!isNaN(n)) setTileNumber(contextMenuTarget.udid, n)
-                  setContextMenuTarget(null)
+                  if (!isNaN(n)) setTileNumber(contextMenuTarget!.udid, n)
                 }}
-              >
-                Lưu
-              </button>
+              />
             </div>
 
             {/* === Xoá khỏi nhóm — hiện khi click từ grid dropdown nhóm, HOẶC khi đang load nhóm và click từ grid tổng === */}
@@ -2477,6 +2487,7 @@ export function App() {
                       setConnectSelection(prev => { const s = new Set(prev); s.delete(udid); return s })
                     }
                     setContextMenuTarget(null)
+                    setContextMenuOpen(false)
                   }}
                 >
                   <span>🗑</span> Xoá khỏi nhóm <strong style={{ color: '#ff8080', fontSize: 11 }}>"{savedGroups[contextMenuTarget.groupIdx!]?.name}"</strong>
@@ -2542,6 +2553,7 @@ export function App() {
                             i === gIdx ? { ...g, udids: [...g.udids, contextMenuTarget.udid] } : g
                           ))
                           setContextMenuTarget(null)
+                          setContextMenuOpen(false)
                         }}
                       >
                         <span>{grp.name}</span>

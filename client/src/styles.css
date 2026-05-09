@@ -4993,3 +4993,20 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 .ctxAddToGroupWrap:hover .ctxSubMenu {
   display: flex !important;
 }
+\n
+/* ===== PROJECT RULE: NO SPINNER ON NUMBER INPUTS ===== */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Giữ sidebar hiển thị khi context menu đang mở */
+body.alignRight .sidebar-wrapper.auto-hide.force-show,
+body:not(.alignRight) .sidebar-wrapper.auto-hide.force-show {
+  transform: translateX(0);
+}
