@@ -2619,6 +2619,10 @@ export function App() {
         >
           <span className='selectionCountIcon'>☑</span>
           <span className='selectionCountNum'>{connectSelection.size}</span>
+          <span className='selectionCountLabel'>
+            <span className='selectionCountLabelTop'>Đã chọn</span>
+            <span className='selectionCountLabelBot'>thiết bị</span>
+          </span>
         </div>
       )}
     </>
