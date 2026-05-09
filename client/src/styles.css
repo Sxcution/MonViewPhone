@@ -2,18 +2,19 @@
   --rb-width: 54px;
   --config-width: 320px;
   --sidebar-total: var(--config-width);
-  /* Theme tokens */
-  --panel-bg: linear-gradient(145deg, rgba(18, 22, 34, 0.92), rgba(11, 16, 25, 0.94));
-  --panel-border: rgba(88, 163, 255, 0.18);
-  --panel-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
-  --pill-bg: rgba(255, 255, 255, 0.04);
-  --pill-border: rgba(255, 255, 255, 0.08);
-  --pill-fg: #dfe6ff;
-  --pill-active-bg: linear-gradient(135deg, #4da1ff, #3dd0a7);
-  --pill-active-fg: #0b1424;
-  --pill-active-shadow: 0 6px 20px rgba(77, 161, 255, 0.25);
-  --accent-1: rgba(77, 161, 255, 0.6);
-  --accent-2: rgba(61, 208, 167, 0.85);
+  
+  /* Cập nhật Theme tokens sang tông Dark Gray chống chói */
+  --panel-bg: rgba(40, 40, 40, 0.95);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --pill-bg: rgba(255, 255, 255, 0.05);
+  --pill-border: rgba(255, 255, 255, 0.1);
+  --pill-fg: #dcdcdc;
+  --pill-active-bg: rgba(90, 90, 90, 0.8);
+  --pill-active-fg: #ffffff;
+  --pill-active-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --accent-1: rgba(150, 150, 150, 0.6);
+  --accent-2: rgba(120, 120, 120, 0.85);
 }
 
 /*
@@ -27,13 +28,12 @@ body {
   height: calc(var(--vh, 1vh) * 100);
   display: flex;
   flex-direction: column;
-  background: #111;
-  color: #fff;
+  background: #181818; /* Nền xám đen chống chói */
+  color: #e0e0e0;      /* Chữ xám nhạt để dịu mắt */
   font-family: sans-serif;
   padding-left: var(--sidebar-total);
   box-sizing: border-box;
   overflow: hidden;
-  /* tránh scrollbar chung, dùng scroll riêng cho từng khu vực */
 }
 
 #root {
@@ -59,10 +59,9 @@ body.sidebarCollapsed {
   padding: 2px 12px;
   height: 28px;
   flex-wrap: wrap;
-  background: radial-gradient(circle at 18% 20%, rgba(42, 55, 82, 0.18), rgba(14, 14, 14, 0.94));
-  border-bottom: 1px solid #1f2635;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(10px);
+  background: #202020; /* Thay vì radial-gradient xanh */
+  border-bottom: 1px solid #333333;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .headerLeft,
@@ -5171,7 +5170,7 @@ input[type="number"] {
   flex: 1;
 }
 
-/* === Context menu nh�m === */
+/* === Context menu nh�m === */
 .ctxMenuItem {
   background: transparent;
   border: none;
@@ -5190,7 +5189,7 @@ input[type="number"] {
   color: #fff;
 }
 
-/* === Drag reorder nh�m === */
+/* === Drag reorder nh�m === */
 .rcpSavedGroupItem[draggable=" true\] {
  cursor: grab;
 }
@@ -5200,7 +5199,7 @@ input[type="number"] {
 }
 
 
-/* ?n tile kh�ng thu?c nh�m dang focus � KH�NG unmount d? gi? WebSocket */
+/* ?n tile kh�ng thu?c nh�m dang focus � KH�NG unmount d? gi? WebSocket */
 .tileDraggableWrapper.hiddenByGroup {
   display: none !important;
 }
@@ -5259,7 +5258,7 @@ input[type="number"] {
   flex: 1;
 }
 
-/* === Context menu nh�m === */
+/* === Context menu nh�m === */
 .ctxMenuItem {
   background: transparent;
   border: none;
@@ -5278,7 +5277,7 @@ input[type="number"] {
   color: #fff;
 }
 
-/* === Drag reorder nh�m === */
+/* === Drag reorder nh�m === */
 .rcpSavedGroupItem[draggable="true"] {
   cursor: grab;
 }

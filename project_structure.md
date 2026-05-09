@@ -7,7 +7,7 @@ This file documents the structure of the `stream-phonefarm-solumate-main` projec
 ### Core Files
 - `client/src/App.tsx`: Main application component, handles the device grid, drag & drop, and centralized HeaderBar integration. Now includes advanced device group management (focus mode, reordering, and renaming).
 - `client/src/main.tsx`: React entry point.
-- `client/src/styles.css`: Global CSS with high-density UI optimizations and theme tokens.
+- `client/src/styles.css`: Global CSS with high-density UI optimizations, theme tokens, and soothing Dark Mode (Anti-glare) support.
 
 ### Components
 - `client/src/components/DeviceViewer.tsx`: Displays a single device in the expanded viewer mode; UI is optimized to hide redundant controls now present in HeaderBar.
