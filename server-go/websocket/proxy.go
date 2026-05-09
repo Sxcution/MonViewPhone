@@ -55,6 +55,12 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 	port := strings.TrimPrefix(portStr, "tcp:")
 	log.Printf("[%s] Forwarded %s → localhost:%s", udid, remote, port)
 
+	// Ensure the forward is removed when this session ends
+	defer func() {
+		log.Printf("[%s] Removing adb forward on port %s", udid, port)
+		adb.RemoveForward(udid, "tcp:"+port)
+	}()
+
 	// Step 2: Open a WebSocket client to the forwarded port (same as Node.js WebsocketProxy.init)
 	targetUrl := url.URL{
 		Scheme: "ws",
@@ -69,8 +75,6 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[%s] Failed to dial device WS %s: %v", udid, targetUrl.String(), err)
 		clientWs.WriteMessage(websocket.CloseMessage,
 			websocket.FormatCloseMessage(4005, fmt.Sprintf("device WS dial failed: %v", err)))
-		// Clean up the forward
-		adb.RemoveForward(udid, "tcp:"+port)
 		return
 	}
 	defer deviceWs.Close()
