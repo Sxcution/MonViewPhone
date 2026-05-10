@@ -9,7 +9,8 @@
       "device_viewer": "DeviceViewer",
       "right_bar": "RightBar",
       "tile": "Tile",
-      "viewer_side_panel": "ViewerSidePanel"
+      "viewer_side_panel": "ViewerSidePanel",
+      "sidebar_device_grid": "SidebarDeviceGrid"
     },
     "css_classes": {
       "right_config_panel": "rightConfigPanel",
@@ -31,7 +32,14 @@
       "group_focus_dot": "rcpGroupFocusDot",
       "group_rename_input": "rcpGroupRenameInput",
       "ctx_menu_item": "ctxMenuItem",
-      "react_contexify": "react-contexify"
+      "react_contexify": "react-contexify",
+      "sidebar_device_grid": "sidebar-device-grid",
+      "sidebar_device_item": "sidebar-device-item",
+      "device_online": "online",
+      "device_offline": "offline",
+      "dev_index": "dev-index",
+      "dev_status_dot": "dev-status-dot",
+      "dev_label": "dev-label"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -61,7 +69,8 @@
       "group_context_menu": "groupContextMenu",
       "alt_solo_udid": "altSoloUdid",
       "is_alt_held": "isAltHeld",
-      "is_server_restarting": "restarting"
+      "is_server_restarting": "restarting",
+      "all_known_devices": "allKnownDevices"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

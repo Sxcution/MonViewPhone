@@ -8,7 +8,7 @@
 ## Client (React/Vite)
 
 ### Core Files
-- `client/src/App.tsx`: Main application component. Manages the device grid, sidebar states (pinned/auto-hide), and global event listeners. Now includes advanced device group management (focus mode, reordering, and renaming).
+- `client/src/App.tsx`: Main application component. Manages the device grid, sidebar states (pinned/auto-hide), and global event listeners. Now includes advanced device group management and a persistent `SidebarDeviceGrid` tracking online/offline status of all known devices.
 - `client/src/main.tsx`: React entry point.
 - `client/src/styles.css`: Global CSS with high-density UI optimizations, theme tokens, and soothing Dark Mode (Anti-glare) support.
 

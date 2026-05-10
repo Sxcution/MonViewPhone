@@ -3,18 +3,26 @@
   --config-width: 320px;
   --sidebar-total: var(--config-width);
   
-  /* Cập nhật Theme tokens sang tông Dark Gray chống chói */
-  --panel-bg: rgba(40, 40, 40, 0.95);
-  --panel-border: rgba(255, 255, 255, 0.08);
-  --panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --pill-bg: rgba(255, 255, 255, 0.05);
-  --pill-border: rgba(255, 255, 255, 0.1);
-  --pill-fg: #dcdcdc;
-  --pill-active-bg: rgba(90, 90, 90, 0.8);
-  --pill-active-fg: #ffffff;
-  --pill-active-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --accent-1: rgba(150, 150, 150, 0.6);
-  --accent-2: rgba(120, 120, 120, 0.85);
+  /* === DESIGN TOKENS — Dark Gray Theme (chuẩn theo context menu) === */
+  --bg-base:    #181818;   /* Nền toàn app */
+  --bg-panel:   #202020;   /* Panel, sidebar, modal */
+  --bg-hover:   #2a2a2a;   /* Hover state */
+  --bg-input:   #252525;   /* Input, select */
+  --bg-deep:    #141414;   /* Tile nền sâu hơn */
+
+  --border-color:       #333333;
+  --border-subtle:      #2a2a2a;
+  --border-highlight:   #3d3d3d;
+
+  --text-main:    #e0e0e0;
+  --text-muted:   #9e9e9e;
+  --text-faint:   #555555;
+  --text-white:   #ffffff;
+
+  --accent-color:  #5a5a5a;
+  --panel-bg:      #202020;
+  --panel-border:  rgba(255, 255, 255, 0.08);
+  --panel-shadow:  0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 /*
@@ -105,8 +113,8 @@ body.sidebarCollapsed {
   width: 24px;
   height: 24px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(77, 161, 255, 0.18), rgba(61, 208, 167, 0.12));
-  border: 1px solid rgba(77, 161, 255, 0.35);
+  background: rgba(80, 80, 80, 0.2);    /* bỏ gradient xanh */
+  border: 1px solid rgba(255, 255, 255, 0.12);
   display: grid;
   place-items: center;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
@@ -123,7 +131,7 @@ body.sidebarCollapsed {
   margin: 0;
   font-size: 14px;
   font-weight: 800;
-  background: linear-gradient(135deg, #f1d167, #f7e7ae, #f1d167);
+  background: linear-gradient(135deg, #e0e0e0, #ffffff, #e0e0e0);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -236,7 +244,7 @@ body.sidebarCollapsed {
   /* horizontal scroll used when viewer opens */
   scrollbar-gutter: stable both-edges;
   scrollbar-width: thin;
-  scrollbar-color: #5fa7ff #0f1624;
+  scrollbar-color: #5fa7ff #1a1a1a;
 }
 
 #gridScroll::-webkit-scrollbar {
@@ -245,18 +253,18 @@ body.sidebarCollapsed {
 }
 
 #gridScroll::-webkit-scrollbar-track {
-  background: #0f1624;
+  background: #1a1a1a;   /* thay #1a1a1a */
   border-radius: 10px;
 }
 
 #gridScroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #7cb8ff, #4f7fff);
+  background: #3a3a3a;   /* bỏ gradient xanh */
   border-radius: 10px;
-  border: 2px solid #0f1624;
+  border: 2px solid #1a1a1a;
 }
 
 #gridScroll::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #8fc5ff, #5a8cff);
+  background: #4a4a4a;
 }
 
 #grid,
@@ -451,7 +459,7 @@ body.sidebarCollapsed {
   height: 32px;
   border-radius: 8px;
   border: 1px solid #2f2f2f;
-  background: #141414;
+  background: #1c1c1c;
   color: #fff;
   padding: 0 8px;
 }
@@ -581,7 +589,7 @@ body.sidebarCollapsed {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000;
+  background: #181818;
   overflow: hidden;
 }
 
@@ -620,7 +628,7 @@ body.sidebarCollapsed {
   align-items: center;
   justify-content: center;
   transform-origin: center center;
-  background: #000;
+  background: #181818;
 }
 
 .viewerCanvas {
@@ -683,7 +691,7 @@ body.sidebarCollapsed {
   gap: 6px;
   padding: 4px 8px;
   box-sizing: border-box;
-  background: #111;
+  background: #1a1a1a;
 }
 
 .viewerFsTop {
@@ -720,7 +728,7 @@ body.sidebarCollapsed {
   padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid #333;
-  background: #0c0c0c;
+  background: #181818;
   color: #fff;
   font-size: 12px;
 }
@@ -738,7 +746,7 @@ body.sidebarCollapsed {
   border: 1px solid #2a2a2a;
   border-radius: 10px;
   overflow: auto;
-  background: #0a0a0a;
+  background: #161616;
 }
 
 .viewerFsRow {
@@ -778,7 +786,7 @@ body.sidebarCollapsed {
   border: 1px solid #2a2a2a;
   border-radius: 10px;
   overflow: hidden;
-  background: #000;
+  background: #181818;
   display: flex;
   flex-direction: column;
 }
@@ -815,7 +823,7 @@ body.sidebarCollapsed {
   flex: 1;
   font-size: 12px;
   color: #e6e6e6;
-  background: #000;
+  background: #181818;
 }
 
 .viewerHint {
@@ -839,7 +847,7 @@ body.sidebarCollapsed {
   overflow: auto;
   border: 1px solid #2a2a2a;
   border-radius: 10px;
-  background: #0a0a0a;
+  background: #161616;
 }
 
 .viewerAppsRow {
@@ -1145,7 +1153,7 @@ body.sidebarCollapsed {
   max-width: min(calc(var(--viewer-width, 1000px) + 280px), 98vw);
   height: auto;
   max-height: min(90vh, 1200px);
-  background: #111;
+  background: #1a1a1a;
   border-radius: 16px;
   border: 1px solid #2a2a2a;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.65);
@@ -1320,9 +1328,9 @@ body.sidebarCollapsed {
   justify-content: space-between;
   gap: 8px;
   padding: 6px 10px;
-  background: #111827;
+  background: #1e1e1e;
   font-size: 13px;
-  border-bottom: 1px solid #374151;
+  border-bottom: 1px solid #333333;
 }
 
 .tileActions {
@@ -1679,8 +1687,8 @@ video {
 }
 
 .tile {
-  background: #111827;
-  border: 2px solid #374151;
+  background: #1e1e1e;
+  border: 2px solid #333333;
   border-radius: 4px;
   overflow: hidden;
   display: flex;
@@ -1699,7 +1707,7 @@ video {
   display: block;
   width: 100%;
   height: 100%;
-  background: #000;
+  background: #181818;
   overflow: hidden;
   min-height: 0;
   position: relative;
@@ -1710,7 +1718,7 @@ video {
   height: 100%;
   position: relative;
   overflow: hidden;
-  background: #000;
+  background: #181818;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1745,15 +1753,15 @@ video {
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   padding: 8px;
-  background: #111827;
-  border-top: 1px solid #374151;
+  background: #1e1e1e;
+  border-top: 1px solid #333333;
 }
 
 .tileNavBtn {
   height: 32px;
   border-radius: 10px;
-  border: 1px solid #374151;
-  background: #1f2937;
+  border: 1px solid #333333;
+  background: #242424;
   color: #fff;
   cursor: pointer;
   user-select: none;
@@ -1773,7 +1781,7 @@ video {
 .hashPage {
   min-height: 100vh;
   padding: 18px 20px 32px;
-  background: radial-gradient(circle at 20% 20%, #1b2230, #0f1115 45%);
+  background: radial-gradient(circle at 20% 20%, #1e1e1e, #0f1115 45%);
   color: #e8edf5;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -1808,7 +1816,7 @@ video {
 
 .hashPage button,
 .hashPage .uploadLabel {
-  background: #1f2a3d;
+  background: #222222;
   border: 1px solid #2c3a52;
   color: #e8edf5;
   padding: 6px 10px;
@@ -1820,7 +1828,7 @@ video {
 
 .hashPage button:hover,
 .hashPage .uploadLabel:hover {
-  background: #27344b;
+  background: #2a2a2a;
   border-color: #3a4f73;
 }
 
@@ -1845,7 +1853,7 @@ video {
   width: 100%;
   height: calc(100vh - 68px);
   min-height: 0;
-  background: #0c0c0c;
+  background: #181818;
   border-radius: 0;
   overflow: hidden;
   border: none;
@@ -1860,7 +1868,7 @@ video {
 .viewerShellWrap .hashPage.shellPage {
   min-height: 0;
   height: 100%;
-  background: #0c0c0c;
+  background: #181818;
   padding: 10px;
 }
 
@@ -1869,9 +1877,9 @@ video {
 }
 
 .fileListPage .tableWrap {
-  background: #141b27;
+  background: #1c1c1c;
   border-radius: 12px;
-  border: 1px solid #223048;
+  border: 1px solid #2a2a2a;
   overflow: auto;
 }
 
@@ -1884,9 +1892,9 @@ video {
   text-align: left;
   padding: 10px;
   font-weight: 600;
-  border-bottom: 1px solid #223048;
+  border-bottom: 1px solid #2a2a2a;
   color: #cdd7e8;
-  background: #192235;
+  background: #1e1e1e;
 }
 
 .fileListPage td {
@@ -1943,7 +1951,7 @@ video {
 
 canvas {
   display: block;
-  background: #000;
+  background: #181818;
   outline: none;
 }
 
@@ -2078,7 +2086,7 @@ canvas {
 
 .rightConfigPanel {
   scrollbar-width: thin;
-  scrollbar-color: #5fa7ff #0f1624;
+  scrollbar-color: #5fa7ff #1a1a1a;
 }
 
 .rightConfigPanel::-webkit-scrollbar {
@@ -2086,14 +2094,14 @@ canvas {
 }
 
 .rightConfigPanel::-webkit-scrollbar-track {
-  background: #0f1624;
+  background: #1a1a1a;
   border-radius: 10px;
 }
 
 .rightConfigPanel::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #7cb8ff, #4f7fff);
+  background: #3a3a3a;
   border-radius: 10px;
-  border: 2px solid #0f1624;
+  border: 2px solid #1a1a1a;
 }
 
 .rightConfigPanel::-webkit-scrollbar-thumb:hover {
@@ -2105,7 +2113,7 @@ canvas {
   height: 38px;
   border-radius: 12px;
   border: 1px solid #2f2f2f;
-  background: #141414;
+  background: #1c1c1c;
   color: #e6e6e6;
   display: grid;
   place-items: center;
@@ -2747,7 +2755,7 @@ canvas {
   height: 14px;
   border-radius: 50%;
   border: 2px solid #39445a;
-  background: #111;
+  background: #1a1a1a;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
   transition: all 0.16s ease;
 }
@@ -2805,7 +2813,7 @@ canvas {
   height: 18px;
   border-radius: 6px;
   border: 1px solid #3b5a8f;
-  background: #0f1624;
+  background: #1a1a1a;
   box-shadow: 0 1px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   position: relative;
   cursor: pointer;
@@ -2814,7 +2822,7 @@ canvas {
 
 .rcpCheckAll input:checked {
   border-color: #6fa8ff;
-  background: linear-gradient(135deg, #7cb8ff, #4f7fff);
+  background: #3a3a3a;
 }
 
 .rcpCheckAll input:checked::after {
@@ -3151,7 +3159,7 @@ canvas {
   height: 36px;
   border-radius: 10px;
   border: 1px solid #3a3a3a;
-  background: #141414;
+  background: #1c1c1c;
   color: #fff;
   padding: 0 10px;
   outline: none;
@@ -3211,7 +3219,7 @@ canvas {
   height: 28px;
   border-radius: 10px;
   border: 1px solid #3a3a3a;
-  background: #141414;
+  background: #1c1c1c;
   color: #fff;
   padding: 0 8px;
   outline: none;
@@ -3294,7 +3302,7 @@ canvas {
   height: 36px;
   border-radius: 10px;
   border: 1px solid #3a3a3a;
-  background: #141414;
+  background: #1c1c1c;
   color: #fff;
   padding: 0 10px;
   outline: none;
@@ -3312,7 +3320,7 @@ canvas {
   height: 32px;
   border-radius: 10px;
   border: 1px solid #3a3a3a;
-  background: #141414;
+  background: #1c1c1c;
   color: #fff;
   padding: 0 8px;
 }
@@ -3716,7 +3724,7 @@ body.alignRight .headerBar {
   height: 32px;
   border-radius: 8px;
   border: 1px solid #333;
-  background: #0c0c0c;
+  background: #181818;
   color: #fff;
   padding: 0 8px;
   font-size: 13px;
@@ -3743,7 +3751,7 @@ body.alignRight .headerBar {
   height: 30px;
   border-radius: 8px;
   border: 1px solid #333;
-  background: #0c0c0c;
+  background: #181818;
   color: #fff;
   padding: 0 8px;
   font-size: 13px;
@@ -3965,7 +3973,7 @@ body.alignRight .headerBar {
   height: 36px;
   border-radius: 10px;
   border: 1px solid #333;
-  background: #0c0c0c;
+  background: #181818;
   color: #fff;
   padding: 0 12px;
   font-size: 14px;
@@ -4455,7 +4463,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   height: 38px;
   border-radius: 12px;
   border: 1px solid #2f2f2f;
-  background: #141414;
+  background: #1c1c1c;
   color: #e6e6e6;
   display: grid;
   place-items: center;
@@ -4650,7 +4658,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   height: 38px;
   border-radius: 12px;
   border: 1px solid #2f2f2f;
-  background: #141414;
+  background: #1c1c1c;
   color: #e6e6e6;
   display: grid;
   place-items: center;
@@ -4725,7 +4733,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #111;
+  background: #1a1a1a;
   position: relative;
   overflow: hidden;
 }
@@ -5232,6 +5240,101 @@ input[type="number"] {
   background: rgba(61, 220, 132, 0.12) !important;
 }
 
+
+/* ============================================================
+   SIDEBAR DEVICE GRID — All Devices (Online + Offline)
+   ============================================================ */
+
+/* Card thiết bị OFFLINE trong bảng grid tổng */
+.sidebar-device-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 4px;
+  padding: 6px;
+}
+
+.sidebar-device-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 52px;
+  height: 56px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+/* ONLINE */
+.sidebar-device-item.online {
+  background: #2a2a2a;
+  border-color: #3d3d3d;
+  color: #e0e0e0;
+}
+.sidebar-device-item.online:hover {
+  background: #333333;
+  border-color: #505050;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* OFFLINE — xám tối, mờ hơn, như Xiaowei */
+.sidebar-device-item.offline {
+  background: #1e1e1e;
+  border-color: #2a2a2a;
+  color: #555555;
+  opacity: 0.75;
+  cursor: default;
+}
+.sidebar-device-item.offline:hover {
+  background: #222222;
+  border-color: #333333;
+  opacity: 0.85;
+}
+
+/* Số thứ tự điện thoại */
+.sidebar-device-item .dev-index {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sidebar-device-item.online .dev-index {
+  color: #ffffff;
+}
+
+.sidebar-device-item.offline .dev-index {
+  color: #444444;
+}
+
+/* Chấm trạng thái nhỏ */
+.sidebar-device-item .dev-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.sidebar-device-item.online .dev-status-dot {
+  background: #4caf50;
+  box-shadow: 0 0 4px rgba(76,175,80,0.6);
+}
+.sidebar-device-item.offline .dev-status-dot {
+  background: #3a3a3a;
+}
+
+/* Tên ngắn thiết bị */
+.sidebar-device-item .dev-label {
+  font-size: 9px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 48px;
+  color: inherit;
+}
 
 /* ==============================================================
    MODERN DARK THEME - GLOBAL UI SYNCHRONIZATION

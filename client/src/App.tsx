@@ -199,6 +199,19 @@ export function App() {
   )
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
+  const [allKnownDevices, setAllKnownDevices] = useState<Array<{ udid: string; name?: string }>>(() => {
+    try {
+      const saved = localStorage.getItem('allKnownDevices')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('allKnownDevices', JSON.stringify(allKnownDevices))
+    } catch { }
+  }, [allKnownDevices])
+
   // Rubber band selection state
   const [rubberBand, setRubberBand] = useState<{
     startX: number; startY: number; currentX: number; currentY: number
@@ -527,7 +540,20 @@ export function App() {
                 dedup.set(key, { udid: device, type })
               })
               const mapped = Array.from(dedup.values())
-              startTransition(() => setRemoteDevices(mapped))
+              startTransition(() => {
+                setRemoteDevices(mapped)
+                setAllKnownDevices(prev => {
+                  let changed = false
+                  const next = [...prev]
+                  mapped.forEach(d => {
+                    if (!next.find(item => item.udid === d.udid)) {
+                      next.push({ udid: d.udid, name: d.udid })
+                      changed = true
+                    }
+                  })
+                  return changed ? next : prev
+                })
+              })
             }
           } catch {
             // ignore parse errors
@@ -592,6 +618,8 @@ export function App() {
     if (discoveredDevices.length) return discoveredDevices
     return []
   }, [deviceParam, discoveredDevices])
+
+  const connectedUdids = useMemo(() => new Set(gridDevices), [gridDevices])
   const filteredGridDevices = useMemo(() => {
     let list = gridDevices
     if (deviceFilter !== 'all') {
@@ -1281,6 +1309,29 @@ export function App() {
     [runQuickAdbCommands, screenshotActiveCanvas, sendKeyTap, quickCommandTargets, getTargetsByUdids]
   )
 
+  {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */}
+  const SidebarDeviceGrid = () => {
+    return (
+      <div className="sidebar-device-grid">
+        {allKnownDevices.map((device, index) => {
+          const isOnline = connectedUdids.has(device.udid);
+          return (
+            <div
+              key={device.udid}
+              className={`sidebar-device-item ${isOnline ? 'online' : 'offline'}`}
+              title={isOnline ? device.name || device.udid : `[Offline] ${device.name || device.udid}`}
+              onClick={() => isOnline ? selectOnly(device.udid) : null}
+            >
+              <span className="dev-index">{index + 1}</span>
+              <span className="dev-status-dot" />
+              <span className="dev-label">{device.name || `P${index + 1}`}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <>
       <HeaderBar wsServer={wsServer} />
@@ -1518,6 +1569,7 @@ export function App() {
             <Settings size={16} strokeWidth={2} />
           </button>
           <div className='rcpContent'>
+            <SidebarDeviceGrid />
             <details className='rcpSection rcpDropdown'>
               <summary className='rcpTitle rcpDropdownSummary'>
                 {viewerUdid ? t('Stream config (viewer)') : t('Stream config')}
