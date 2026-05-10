@@ -5445,3 +5445,40 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   scrollbar-color: var(--border-color) transparent;
 }
 
+
+.grid-empty-state {
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #8a8a8a;
+  text-align: center;
+  padding: 24px;
+}
+
+.grid-empty-icon {
+  font-size: 40px;
+  opacity: 0.35;
+}
+
+.grid-empty-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #cfcfcf;
+}
+
+.grid-empty-text {
+  max-width: 420px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #7c7c7c;
+}
+
+.sidebar-empty-hint {
+  font-size: 11px;
+  color: #666666;
+  padding: 8px 4px 2px;
+  line-height: 1.4;
+}

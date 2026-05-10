@@ -510,14 +510,13 @@ export function App() {
     } catch { }
   }
 
-  const discoveredDevices = useMemo(
-    () => {
-      if (remoteDevices.length) return remoteDevices.map(d => d.udid)
-      if (androidDevices.length) return androidDevices.map(d => d.udid)
-      return []
-    },
-    [androidDevices, remoteDevices]
-  )
+  const discoveredDevices = useMemo(() => {
+    const all = [
+      ...remoteDevices.map(d => d.udid),
+      ...androidDevices.map(d => d.udid),
+    ];
+    return Array.from(new Set(all));
+  }, [androidDevices, remoteDevices]);
   useEffect(() => {
     const connect = () => {
       try {
@@ -620,6 +619,7 @@ export function App() {
   }, [deviceParam, discoveredDevices])
 
   const connectedUdids = useMemo(() => new Set(gridDevices), [gridDevices])
+  const hasOnlineDevices = gridDevices.length > 0
   const filteredGridDevices = useMemo(() => {
     let list = gridDevices
     if (deviceFilter !== 'all') {
@@ -1311,7 +1311,16 @@ export function App() {
 
   {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */}
   const SidebarDeviceGrid = () => {
-    if (allKnownDevices.length === 0) return null;
+    if (allKnownDevices.length === 0) {
+      return (
+        <div style={{ padding: '6px 4px 8px', borderBottom: '1px solid #2a2a2a', marginBottom: 4 }}>
+          <div style={{ fontSize: 10, color: '#666', padding: '0 4px 4px', letterSpacing: '0.5px' }}>
+            THIẾT BỊ (0)
+          </div>
+          <div className="sidebar-empty-hint">Chưa có thiết bị nào từng kết nối</div>
+        </div>
+      );
+    }
     return (
       <div style={{ padding: '6px 4px 2px', borderBottom: '1px solid #2a2a2a', marginBottom: 4 }}>
         <div style={{ fontSize: 10, color: '#666', padding: '0 4px 4px', letterSpacing: '0.5px' }}>
@@ -1408,10 +1417,10 @@ export function App() {
               } as React.CSSProperties
             }
           >
-            {mergedOrder.map((udid, idx) => {
-              // <!-- isVisible : Kiểm tra thiết bị có khớp với bộ lọc hiện tại không -->
-              const isVisible = (deviceFilter === 'all' || getDeviceConnectionType(udid) === deviceFilter) &&
-                (!currentFocusGroupSet || currentFocusGroupSet.has(udid));
+            {hasOnlineDevices ? (
+              mergedOrder.map((udid, idx) => {
+                const isVisible = (deviceFilter === 'all' || getDeviceConnectionType(udid) === deviceFilter) &&
+                  (!currentFocusGroupSet || currentFocusGroupSet.has(udid));
 
               return (
                 <div
@@ -1419,7 +1428,7 @@ export function App() {
                   data-udid={udid}
                   className={`tileDraggableWrapper${isSingleDevice ? ' single' : ''
                     }${dragging ? ' dragging' : ''}${viewerUdid === udid ? ' hiddenByViewer' : ''
-                    }${dropTarget === udid ? ' dropTarget' : ''}`}
+                    }${dropTarget === udid ? ' dropTarget' : ''}${!isVisible ? ' hiddenByFilter' : ''}`}
                   onPointerDownCapture={e => {
                     if (e.button !== 2) return
                     e.preventDefault()
@@ -1526,7 +1535,17 @@ export function App() {
                   />
                 </div>
               );
-            })}
+            })
+            ) : (
+              <div className="grid-empty-state">
+                <div className="grid-empty-icon">📱</div>
+                <div className="grid-empty-title">Chưa có điện thoại kết nối</div>
+                <div className="grid-empty-text">
+                  Sidebar và bảng điều khiển vẫn phải luôn hiển thị.
+                  Khi có thiết bị online, grid stream sẽ hiện tại đây.
+                </div>
+              </div>
+            )}
           </div>
           {rubberBand && (() => {
             const x = Math.min(rubberBand.startX, rubberBand.currentX)
