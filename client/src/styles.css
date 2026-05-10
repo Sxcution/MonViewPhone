@@ -1,6 +1,6 @@
 :root {
-  --rb-width: 54px;
-  --config-width: 320px;
+  --rb-width: 28px;
+  --config-width: 260px;
   --sidebar-total: var(--config-width);
   
   /* === DESIGN TOKENS — Dark Gray Theme (chuẩn theo context menu) === */

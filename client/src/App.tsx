@@ -1323,7 +1323,11 @@ export function App() {
 
   {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */}
   const SidebarDeviceGrid = () => {
-    if (allKnownDevices.length === 0) return null;
+    if (allKnownDevices.length === 0) return (
+      <div style={{ padding: '8px', color: '#555', fontSize: 11, textAlign: 'center' }}>
+        Chưa có thiết bị
+      </div>
+    );
     return (
       <div style={{ padding: '6px 4px 2px', borderBottom: '1px solid #2a2a2a', marginBottom: 4 }}>
         <div style={{ fontSize: 10, color: '#666', padding: '0 4px 4px', letterSpacing: '0.5px' }}>
@@ -1354,6 +1358,34 @@ export function App() {
   return (
     <>
       <HeaderBar wsServer={wsServer} />
+
+      {/* ===== EMPTY STATE khi không có device nào ===== */}
+      {mergedOrder.length === 0 && allKnownDevices.length === 0 && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#181818',
+          zIndex: 10,
+          gap: 16,
+          pointerEvents: 'none',
+        }}>
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.4">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+            <line x1="12" y1="18" x2="12.01" y2="18" />
+          </svg>
+          <div style={{ color: '#666', fontSize: 14, textAlign: 'center', lineHeight: 1.6 }}>
+            Chưa có thiết bị nào kết nối<br />
+            <span style={{ fontSize: 12, color: '#444' }}>Kết nối điện thoại qua USB hoặc WiFi để bắt đầu</span>
+          </div>
+        </div>
+      )}
       <input
         ref={apkInputRef}
         type='file'
