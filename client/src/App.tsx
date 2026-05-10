@@ -545,9 +545,9 @@ export function App() {
                 setAllKnownDevices(prev => {
                   let changed = false
                   const next = [...prev]
-                  mapped.forEach(d => {
+                  mapped.forEach((d, i) => {
                     if (!next.find(item => item.udid === d.udid)) {
-                      next.push({ udid: d.udid, name: d.udid })
+                      next.push({ udid: d.udid, name: `P${next.length + 1}` }) // ← Dùng số thứ tự
                       changed = true
                     }
                   })
@@ -1311,23 +1311,30 @@ export function App() {
 
   {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */}
   const SidebarDeviceGrid = () => {
+    if (allKnownDevices.length === 0) return null;
     return (
-      <div className="sidebar-device-grid">
-        {allKnownDevices.map((device, index) => {
-          const isOnline = connectedUdids.has(device.udid);
-          return (
-            <div
-              key={device.udid}
-              className={`sidebar-device-item ${isOnline ? 'online' : 'offline'}`}
-              title={isOnline ? device.name || device.udid : `[Offline] ${device.name || device.udid}`}
-              onClick={() => isOnline ? selectOnly(device.udid) : null}
-            >
-              <span className="dev-index">{index + 1}</span>
-              <span className="dev-status-dot" />
-              <span className="dev-label">{device.name || `P${index + 1}`}</span>
-            </div>
-          );
-        })}
+      <div style={{ padding: '6px 4px 2px', borderBottom: '1px solid #2a2a2a', marginBottom: 4 }}>
+        <div style={{ fontSize: 10, color: '#666', padding: '0 4px 4px', letterSpacing: '0.5px' }}>
+          THIẾT BỊ ({allKnownDevices.length})
+        </div>
+        <div className="sidebar-device-grid">
+          {allKnownDevices.map((device, index) => {
+            const isOnline = connectedUdids.has(device.udid);
+            const label = `P${index + 1}`;
+            return (
+              <div
+                key={device.udid}
+                className={`sidebar-device-item ${isOnline ? 'online' : 'offline'}`}
+                title={isOnline ? `[Online] ${device.udid}` : `[Offline] ${device.udid}`}
+                onClick={() => { if (isOnline) selectOnly(device.udid); }}
+              >
+                <span className="dev-index">{index + 1}</span>
+                <span className="dev-status-dot" />
+                <span className="dev-label">{label}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -2138,7 +2145,7 @@ export function App() {
                         {expandedGroupIdx === idx && (
                           <div className='rcpSavedGroupDevices'>
                             <div className='rcpGrid rcpGridCompact' style={{ marginTop: 4 }}>
-                              {group.udids.map(uid => (
+                              {group.udids.filter(uid => connectedUdids.has(uid)).map(uid => (
                                 <div
                                   key={uid}
                                   className={`rcpGridItem${connectSelection.has(uid) ? ' on' : ''} rcpGroupDeviceItem`}

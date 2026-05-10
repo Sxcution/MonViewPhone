@@ -5308,7 +5308,11 @@ input[type="number"] {
 }
 
 .sidebar-device-item.offline .dev-index {
-  color: #444444;
+  color: #383838;  /* tối hơn nữa so với hiện tại #444444 */
+}
+
+.sidebar-device-item.offline .dev-label {
+  color: #383838;
 }
 
 /* Chấm trạng thái nhỏ */
