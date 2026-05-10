@@ -1359,34 +1359,6 @@ export function App() {
   return (
     <>
       <HeaderBar wsServer={wsServer} />
-
-      {/* ===== EMPTY STATE khi không có device nào ===== */}
-      {mergedOrder.length === 0 && allKnownDevices.length === 0 && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#181818',
-          zIndex: 1,
-          gap: 16,
-          pointerEvents: 'none',
-        }}>
-          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.4">
-            <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-            <line x1="12" y1="18" x2="12.01" y2="18" />
-          </svg>
-          <div style={{ color: '#666', fontSize: 14, textAlign: 'center', lineHeight: 1.6 }}>
-            Chưa có thiết bị nào kết nối<br />
-            <span style={{ fontSize: 12, color: '#444' }}>Kết nối điện thoại qua USB hoặc WiFi để bắt đầu</span>
-          </div>
-        </div>
-      )}
       <input
         ref={apkInputRef}
         type='file'
@@ -1403,6 +1375,30 @@ export function App() {
         onChange={handleContextImportSelect}
       />
       <div id='main'>
+        {/* ===== EMPTY STATE khi không có device nào ===== */}
+        {mergedOrder.length === 0 && allKnownDevices.length === 0 && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#181818',
+            zIndex: 0,
+            gap: 16,
+            pointerEvents: 'none',
+          }}>
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="1.2">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+              <line x1="12" y1="18" x2="12.01" y2="18" />
+            </svg>
+            <div style={{ color: '#888', fontSize: 15, textAlign: 'center', lineHeight: 1.6, fontWeight: 500 }}>
+              Chưa có thiết bị nào kết nối<br />
+              <span style={{ fontSize: 13, color: '#555', fontWeight: 400 }}>Kết nối điện thoại qua USB hoặc WiFi để bắt đầu</span>
+            </div>
+          </div>
+        )}
         <div
           id='gridScroll'
           ref={gridScrollRef}
