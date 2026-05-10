@@ -37,20 +37,28 @@ export function ServerProvider({ wsServer, children }: { wsServer: string; child
     const { ws, sendCommand } = connectGoogDeviceTracker(
       wsServer,
       (list, meta) => {
-        setAndroidDevices(list);
-        setTrackerMeta(meta);
+        const safeList = Array.isArray(list) ? list : [];
+        setAndroidDevices(safeList);
+        setTrackerMeta(meta ?? null);
       },
       (dev, meta) => {
+        if (!dev || typeof dev !== 'object' || !('udid' in dev)) {
+          setTrackerMeta(meta ?? null);
+          return;
+        }
+
         setAndroidDevices((prev) => {
-          const idx = prev.findIndex((d) => d.udid === dev.udid);
+          const safePrev = Array.isArray(prev) ? prev : [];
+          const idx = safePrev.findIndex((d) => d.udid === dev.udid);
           if (idx >= 0) {
-            const next = [...prev];
+            const next = [...safePrev];
             next[idx] = dev;
             return next;
           }
-          return [...prev, dev];
+          return [...safePrev, dev];
         });
-        setTrackerMeta(meta);
+
+        setTrackerMeta(meta ?? null);
       }
     );
     sendRef.current = sendCommand;
@@ -62,7 +70,10 @@ export function ServerProvider({ wsServer, children }: { wsServer: string; child
 
   const androidDeviceMap = useMemo(() => {
     const out: Record<string, GoogDeviceDescriptor> = {};
-    for (const d of androidDevices) out[d.udid] = d;
+    const safeDevices = Array.isArray(androidDevices) ? androidDevices : [];
+    for (const d of safeDevices) {
+      if (d?.udid) out[d.udid] = d;
+    }
     return out;
   }, [androidDevices]);
 
