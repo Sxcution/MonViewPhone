@@ -12,6 +12,7 @@ export type TileProps = {
     isViewing?: boolean;
     selected?: boolean;
     showTileInfo?: boolean;
+    isDisconnected?: boolean;
     onRegisterReload?: (udid: string, reload: () => void) => void;
     onUnregisterReload?: (udid: string) => void;
     onViewDevice?: (udid: string) => void;

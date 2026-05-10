@@ -619,6 +619,18 @@ export function App() {
     return []
   }, [deviceParam, discoveredDevices])
 
+  // Danh sách tất cả UDID cần hiện trong grid (bao gồm cả thiết bị đã ngắt kết nối)
+  const allGridUdids = useMemo(() => {
+    if (deviceParam) return [deviceParam]
+    // Gộp: thiết bị đang online + thiết bị đã từng kết nối (allKnownDevices)
+    const onlineSet = new Set(gridDevices)
+    const allUdids = [...gridDevices]
+    allKnownDevices.forEach(d => {
+      if (!onlineSet.has(d.udid)) allUdids.push(d.udid)
+    })
+    return allUdids
+  }, [deviceParam, gridDevices, allKnownDevices])
+
   const connectedUdids = useMemo(() => new Set(gridDevices), [gridDevices])
   const filteredGridDevices = useMemo(() => {
     let list = gridDevices
@@ -632,7 +644,7 @@ export function App() {
     return list
   }, [deviceFilter, gridDevices, getDeviceConnectionType, focusGroupIdx, savedGroups])
   const { mergedOrder, moveTile, getTileNumber, setTileNumber } =
-    useTileOrder(gridDevices)
+    useTileOrder(allGridUdids)
   const filteredRegistered = useMemo(() => {
     return registeredUdids.filter(id => {
       if (deviceFilter !== 'all') {
@@ -1409,7 +1421,8 @@ export function App() {
             }
           >
             {mergedOrder.map((udid, idx) => {
-              // <!-- isVisible : Kiểm tra thiết bị có khớp với bộ lọc hiện tại không -->
+              const isConnected = connectedUdids.has(udid)
+              // isVisible: kiểm tra bộ lọc loại kết nối và nhóm
               const isVisible = (deviceFilter === 'all' || getDeviceConnectionType(udid) === deviceFilter) &&
                 (!currentFocusGroupSet || currentFocusGroupSet.has(udid));
 
@@ -1509,6 +1522,7 @@ export function App() {
                     isViewing={viewerUdid === udid}
                     selected={connectSelection.has(udid)}
                     showTileInfo={showTileInfo}
+                    isDisconnected={!isConnected}   // <-- THÊM DÒNG NÀY
                     streamConfig={
                       viewerUdid === udid && viewerOverrideConfig
                         ? viewerOverrideConfig
