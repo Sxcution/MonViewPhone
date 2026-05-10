@@ -9,7 +9,8 @@
 
 ### Core Files
 - `client/src/App.tsx`: Main application component. Manages the device grid, sidebar states (pinned/auto-hide), and global event listeners. Now includes advanced device group management and a persistent `SidebarDeviceGrid` tracking online/offline status of all known devices.
-- `client/src/main.tsx`: React entry point.
+- `client/src/main.tsx`: React entry point. Now uses `ErrorBoundary` for improved stability.
+- `client/src/components/ErrorBoundary.tsx`: Component that catches runtime errors to prevent blank screens.
 - `client/src/styles.css`: Global CSS with high-density UI optimizations, theme tokens, and soothing Dark Mode (Anti-glare) support.
 
 ### Components

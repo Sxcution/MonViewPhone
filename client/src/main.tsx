@@ -8,6 +8,7 @@ import { readHashAction, readPageParams } from '@/lib/params';
 import { ShellPage } from '@/pages/ShellPage';
 import { FileListingPage } from '@/pages/FileListingPage';
 import { I18nProvider } from '@/context/I18nContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Fix mobile rotation / address-bar resize issues by mapping the *visual* viewport height
 // to a CSS variable. Some browsers keep `100vh` stale after orientation changes.
@@ -36,7 +37,7 @@ if (window.location.pathname.startsWith('/docs')) {
   const hashAction = readHashAction();
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
+    <ErrorBoundary>
       <I18nProvider>
         {hashAction.action === 'shell' ? (
           <ShellPage wsServer={wsServer} udid={hashAction.params.get('udid') || ''} />
@@ -54,6 +55,6 @@ if (window.location.pathname.startsWith('/docs')) {
           </ActiveProvider>
         )}
       </I18nProvider>
-    </React.StrictMode>,
+    </ErrorBoundary>,
   );
 }
