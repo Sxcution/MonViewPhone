@@ -1323,34 +1323,35 @@ export function App() {
 
   {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */}
   const SidebarDeviceGrid = () => {
-    if (allKnownDevices.length === 0) return (
-      <div style={{ padding: '8px', color: '#555', fontSize: 11, textAlign: 'center' }}>
-        Chưa có thiết bị
-      </div>
-    );
     return (
       <div style={{ padding: '6px 4px 2px', borderBottom: '1px solid #2a2a2a', marginBottom: 4 }}>
         <div style={{ fontSize: 10, color: '#666', padding: '0 4px 4px', letterSpacing: '0.5px' }}>
           THIẾT BỊ ({allKnownDevices.length})
         </div>
-        <div className="sidebar-device-grid">
-          {allKnownDevices.map((device, index) => {
-            const isOnline = connectedUdids.has(device.udid);
-            const label = `P${index + 1}`;
-            return (
-              <div
-                key={device.udid}
-                className={`sidebar-device-item ${isOnline ? 'online' : 'offline'}`}
-                title={isOnline ? `[Online] ${device.udid}` : `[Offline] ${device.udid}`}
-                onClick={() => { if (isOnline) selectOnly(device.udid); }}
-              >
-                <span className="dev-index">{index + 1}</span>
-                <span className="dev-status-dot" />
-                <span className="dev-label">{label}</span>
-              </div>
-            );
-          })}
-        </div>
+        {allKnownDevices.length === 0 ? (
+          <div style={{ padding: '8px', color: '#555', fontSize: 11, textAlign: 'center' }}>
+            Kết nối điện thoại để bắt đầu
+          </div>
+        ) : (
+          <div className="sidebar-device-grid">
+            {allKnownDevices.map((device, index) => {
+              const isOnline = connectedUdids.has(device.udid);
+              const label = `P${index + 1}`;
+              return (
+                <div
+                  key={device.udid}
+                  className={`sidebar-device-item ${isOnline ? 'online' : 'offline'}`}
+                  title={isOnline ? `[Online] ${device.udid}` : `[Offline] ${device.udid}`}
+                  onClick={() => { if (isOnline) selectOnly(device.udid); }}
+                >
+                  <span className="dev-index">{index + 1}</span>
+                  <span className="dev-status-dot" />
+                  <span className="dev-label">{label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
@@ -1372,7 +1373,7 @@ export function App() {
           alignItems: 'center',
           justifyContent: 'center',
           background: '#181818',
-          zIndex: 10,
+          zIndex: 1,
           gap: 16,
           pointerEvents: 'none',
         }}>
