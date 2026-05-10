@@ -14,7 +14,7 @@
 
 ### Components
 - `client/src/components/DeviceViewer.tsx`: Displays a single device in the expanded viewer mode; UI is optimized to hide redundant controls now present in HeaderBar.
-- `client/src/components/HeaderBar.tsx`: Top navigation bar hosting centralized device numbering, reordering controls, and server restart functions.
+- `client/src/components/HeaderBar.tsx`: Top navigation bar hosting centralized device numbering, reordering controls, and server restart functions. Now includes robust server restart polling (via `/health`) and status feedback.
 - `client/src/components/RightBar.tsx`: Thin right sidebar containing quick action icons (Power, Volume, Home, etc.).
 - `client/src/components/SyncPanel.tsx`: Panel for device synchronization settings and group selection.
 - `client/src/components/ViewerSidePanel.tsx`: Right-side panel specifically for the `DeviceViewer`. Handles context menu closure with robust click-outside detection.
@@ -49,6 +49,7 @@
 
 ## Server (Node.js)
 - `server/`: Backend service that interfaces with Scrcpy and ADB (Legacy Backend).
+  - `server/src/server/services/HttpServer.ts`: Manages REST API endpoints, including `/health` for status checks and `/api/server/restart` for PM2/Launcher-aware reboots.
 
 ## Server Go (Golang Backend)
 - `server-go/`: New highly-concurrent backend service written in Go.

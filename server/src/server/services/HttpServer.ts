@@ -229,6 +229,9 @@ export class HttpServer extends TypedEmitter<HttpServerEvents> implements Servic
             this.mainApp.get('/mjpeg/:udid', new MjpegProxyFactory().proxyRequest);
             /// #endif
         }
+        this.mainApp.get('/health', (_req, res) => {
+            res.json({ ok: true, status: 'alive' });
+        });
         /// #if INCLUDE_GOOG
         this.mainApp.post('/api/goog/device/pid', async (req, res) => {
             const { udid } = req.body || {};
@@ -1040,10 +1043,25 @@ export class HttpServer extends TypedEmitter<HttpServerEvents> implements Servic
         // ===== SERVER RESTART API =====
         this.mainApp.post('/api/server/restart', async (_req, res) => {
             res.json({ ok: true, message: 'Server restarting...' });
-            // Delay nhỏ để response kịp gửi về client trước khi process thoát
+            
+            // Delay để response kịp gửi về client
             setTimeout(() => {
-                process.exit(0); // PM2 / nodemon / Start_PhoneFarm.bat sẽ tự restart
-            }, 300);
+                const isPm2 = !!(process.env.PM2_HOME || process.env.PM2_JSON_CONFIG_PHP_SET);
+                if (isPm2) {
+                    const { exec } = require('child_process');
+                    // Restart qua PM2 với tên process cụ thể
+                    exec('pm2 restart monview-server', (err: any) => {
+                        if (err) {
+                            console.error('PM2 restart failed:', err);
+                            process.exit(1);
+                        }
+                    });
+                } else {
+                    // Nếu chạy bằng .bat hoặc trực tiếp, exit(0) để launcher loop (Start_PhoneFarm.bat) tự restart
+                    console.log('Server exiting for external launcher restart...');
+                    process.exit(0);
+                }
+            }, 500);
         });
         const config = Config.getInstance();
         config.servers.forEach((serverItem) => {

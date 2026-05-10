@@ -60,7 +60,8 @@
       "drag_group_over_idx": "dragGroupOverIdx",
       "group_context_menu": "groupContextMenu",
       "alt_solo_udid": "altSoloUdid",
-      "is_alt_held": "isAltHeld"
+      "is_alt_held": "isAltHeld",
+      "is_server_restarting": "restarting"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
