@@ -1,0 +1,71 @@
+[2026-05-10 13:01:44.421] PID: 21200 | Command: tools/adb nodaemon server start
+[2026-05-10 13:04:09.910] PID: 21200 | Command: tools/adb nodaemon server start
+[2026-05-10 14:54:38.296] PID: 7408 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd notification set_dnd off
+[2026-05-10 14:54:38.429] PID: 12548 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd media_session volume --stream 3 --set 7
+[2026-05-10 14:54:39.080] PID: 33528 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd notification set_dnd off
+[2026-05-10 14:54:39.201] PID: 9200 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd media_session volume --stream 5 --set 15
+[2026-05-10 14:54:39.209] PID: 31136 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd notification set_dnd off
+[2026-05-10 14:54:39.327] PID: 25388 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd media_session volume --stream 5 --set 15
+[2026-05-10 14:54:39.330] PID: 35948 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd media_session volume --stream 2 --set 15
+[2026-05-10 14:54:39.450] PID: 30212 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd media_session volume --stream 4 --set 15
+[2026-05-10 14:54:39.567] PID: 12812 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd media_session volume --stream 4 --set 15
+[2026-05-10 14:54:39.569] PID: 15316 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd notification set_dnd off
+[2026-05-10 14:54:40.093] PID: 12644 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd media_session volume --stream 3 --set 7
+[2026-05-10 14:54:40.237] PID: 34704 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd media_session volume --stream 4 --set 7
+[2026-05-10 14:54:40.984] PID: 34100 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell input keyevent KEYCODE_VOLUME_UP
+[2026-05-10 14:54:41.367] PID: 36752 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell input keyevent KEYCODE_VOLUME_UP
+[2026-05-10 16:35:25.717] PID: 1132 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s eubqcykrhm8dw8hy shell cmd display power-on 0
+[2026-05-10 16:35:25.747] PID: 30092 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s kvrcpvx4w86hnvci shell cmd display power-on 0
+[2026-05-10 16:35:25.749] PID: 35304 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s R3CR200MXTR shell cmd display power-on 0
+[2026-05-10 16:35:25.873] PID: 6488 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s R58N30MBK4F shell cmd display power-on 0
+[2026-05-10 16:35:25.886] PID: 18620 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 2870da3de13f7ece shell cmd display power-on 0
+[2026-05-10 16:35:25.887] PID: 19724 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 2793a9a5021c7ece shell cmd display power-on 0
+[2026-05-10 16:35:25.888] PID: 20872 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28c42e85853f7ece shell cmd display power-on 0
+[2026-05-10 16:35:25.890] PID: 22548 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 27fda9ec9e217ece shell cmd display power-on 0
+[2026-05-10 16:35:25.895] PID: 30988 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 2760466d28217ece shell cmd display power-on 0
+[2026-05-10 16:35:25.896] PID: 31324 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 1d65d69e shell cmd display power-on 0
+[2026-05-10 16:35:25.897] PID: 32456 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28548fcc38017ece shell cmd display power-on 0
+[2026-05-10 16:35:25.897] PID: 32572 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 24c24e6c370c7ece shell cmd display power-on 0
+[2026-05-10 16:35:25.898] PID: 33900 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 2a0bab48843f7ece shell cmd display power-on 0
+[2026-05-10 16:35:25.899] PID: 34272 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd display power-on 0
+[2026-05-10 16:35:25.899] PID: 34476 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s R58R12B2NLZ shell cmd display power-on 0
+[2026-05-10 16:35:25.899] PID: 34896 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28d96cc4ce0c7ece shell cmd display power-on 0
+[2026-05-10 16:35:28.149] PID: 19316 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s eubqcykrhm8dw8hy shell cmd display power-on 0
+[2026-05-10 16:35:28.154] PID: 30620 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s xklrgm6tj74pnruc shell cmd display power-on 0
+[2026-05-10 16:35:28.154] PID: 31028 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 1d65d69e shell cmd display power-on 0
+[2026-05-10 16:35:28.154] PID: 32424 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s kvrcpvx4w86hnvci shell cmd display power-on 0
+[2026-05-10 16:35:28.156] PID: 33844 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 3b87f833 shell cmd display power-on 0
+[2026-05-10 16:35:28.156] PID: 34132 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 27119d12 shell cmd display power-on 0
+[2026-05-10 16:35:28.277] PID: 8596 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 2a7daa5dee3f7ece shell cmd display power-on 0
+[2026-05-10 16:35:28.287] PID: 30544 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s ce0817187cd6803d027e shell cmd display power-on 0
+[2026-05-10 16:35:28.288] PID: 30868 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 27f30c41a3217ece shell cmd display power-on 0
+[2026-05-10 16:35:28.288] PID: 33160 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 25f5db2d04057ece shell cmd display power-on 0
+[2026-05-10 16:35:28.288] PID: 34596 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 2851aa1728017ece shell cmd display power-on 0
+[2026-05-10 16:35:28.290] PID: 35192 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 289cabc94e1c7ece shell cmd display power-on 0
+[2026-05-10 16:35:28.412] PID: 16268 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28548fcc38017ece shell cmd display power-on 0
+[2026-05-10 16:35:28.415] PID: 19528 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 2760466d28217ece shell cmd display power-on 0
+[2026-05-10 16:35:28.425] PID: 33088 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 24c24e6c370c7ece shell cmd display power-on 0
+[2026-05-10 16:35:28.428] PID: 34336 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28c42e85853f7ece shell cmd display power-on 0
+[2026-05-10 16:35:28.429] PID: 36568 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd display power-on 0
+[2026-05-10 16:35:28.937] PID: 23080 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 3b87f833 shell cmd display power-on 0
+[2026-05-10 16:35:28.940] PID: 26008 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 27119d12 shell cmd display power-on 0
+[2026-05-10 16:35:28.941] PID: 30124 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s kvrcpvx4w86hnvci shell cmd display power-on 0
+[2026-05-10 16:35:28.942] PID: 30480 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 33c8cd7e shell cmd display power-on 0
+[2026-05-10 16:35:28.942] PID: 32176 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 1d65d69e shell cmd display power-on 0
+[2026-05-10 16:35:28.943] PID: 33504 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s eubqcykrhm8dw8hy shell cmd display power-on 0
+[2026-05-10 16:35:28.944] PID: 34056 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s xklrgm6tj74pnruc shell cmd display power-on 0
+[2026-05-10 16:35:29.054] PID: 4744 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 27f30c41a3217ece shell cmd display power-on 0
+[2026-05-10 16:35:29.056] PID: 7232 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s ce0817187cd6803d027e shell cmd display power-on 0
+[2026-05-10 16:35:29.064] PID: 19288 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 289cabc94e1c7ece shell cmd display power-on 0
+[2026-05-10 16:35:29.070] PID: 32012 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 2619e1eb2a057ece shell cmd display power-on 0
+[2026-05-10 16:35:29.071] PID: 32888 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 2793a9a5021c7ece shell cmd display power-on 0
+[2026-05-10 16:35:29.072] PID: 33860 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 25f5db2d04057ece shell cmd display power-on 0
+[2026-05-10 16:35:29.072] PID: 34220 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28083aacbd217ece shell cmd display power-on 0
+[2026-05-10 16:35:29.073] PID: 35492 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 2a7daa5dee3f7ece shell cmd display power-on 0
+[2026-05-10 16:35:29.176] PID: 528 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s R58N30MBK4F shell cmd display power-on 0
+[2026-05-10 16:35:29.182] PID: 4452 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28d96cc4ce0c7ece shell cmd display power-on 0
+[2026-05-10 16:35:29.192] PID: 16560 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 24c24e6c370c7ece shell cmd display power-on 0
+[2026-05-10 16:35:29.197] PID: 26908 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 2760466d28217ece shell cmd display power-on 0
+[2026-05-10 16:35:29.199] PID: 34108 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28c42e85853f7ece shell cmd display power-on 0
+[2026-05-10 16:35:29.200] PID: 36268 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd display power-on 0
+[2026-05-10 16:35:29.201] PID: 36292 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28548fcc38017ece shell cmd display power-on 0
