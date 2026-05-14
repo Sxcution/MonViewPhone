@@ -69,3 +69,11 @@
 [2026-05-10 16:35:29.199] PID: 34108 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28c42e85853f7ece shell cmd display power-on 0
 [2026-05-10 16:35:29.200] PID: 36268 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28b85ba51b1c7ece shell cmd display power-on 0
 [2026-05-10 16:35:29.201] PID: 36292 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 28548fcc38017ece shell cmd display power-on 0
+[2026-05-12 06:57:54.036] PID: 14748 | Command: tools/adb nodaemon server start
+[2026-05-12 06:58:02.008] PID: 22424 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 3b87f833 shell cmd notification set_dnd none
+[2026-05-12 06:58:02.011] PID: 30040 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 1264215f shell cmd notification set_dnd none
+[2026-05-12 06:58:02.126] PID: 26988 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 3b87f833 shell cmd notification set_dnd none
+[2026-05-12 06:58:02.127] PID: 27496 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 1264215f shell cmd notification set_dnd none
+[2026-05-12 06:58:02.232] PID: 5248 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s eubqcykrhm8dw8hy shell cmd notification set_dnd none
+[2026-05-12 06:58:02.239] PID: 28308 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 3b87f833 shell cmd notification set_dnd none
+[2026-05-12 06:58:02.241] PID: 28608 | Command: C:\Program Files (x86)\xiaowei\tools\adb.exe -s 1264215f shell cmd notification set_dnd none
