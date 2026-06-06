@@ -114,10 +114,13 @@ body.sidebarCollapsed {
   gap: 2px !important;
   padding: 2px;
   box-sizing: border-box;
-  grid-template-columns: repeat(auto-fit, minmax(var(--tile-width, 120px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-width, 120px), var(--tile-width, 120px)));
   grid-auto-rows: max-content;
-  width: var(--grid-width, 100%);
+  width: 100%;
   min-width: 100%;
+  justify-content: start;
+  justify-items: stretch;
+  align-content: start;
 }
 
 #grid.singleMode {

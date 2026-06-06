@@ -391,6 +391,7 @@ export function App() {
     document.body.classList.remove('alignRight')
   }, [])
 
+
   // Đẩy connectSelection vào syncTargets để kích hoạt Smart Sync (khi thao tác 1 máy, cả group ăn theo)
   useEffect(() => {
     setSyncTargetsList(Array.from(connectSelection))
@@ -635,6 +636,14 @@ export function App() {
       return DEFAULT_DIMS
     }
   })
+
+  // Reset horizontal scroll when viewer is opened/closed, tile size changes, or filters change
+  useEffect(() => {
+    const el = gridScrollRef.current
+    if (el) {
+      el.scrollLeft = 0
+    }
+  }, [viewerUdid, tileDims.width, deviceFilter, focusGroupIdx])
 
   const tileAspectRef = useRef<number>(PHONE_SHELL_RATIO)
 
@@ -2971,49 +2980,6 @@ export function App() {
               />
             </div>
 
-            {/* === Xoá khỏi nhóm — hiện khi click từ grid dropdown nhóm, HOẶC khi đang load nhóm và click từ grid tổng === */}
-            {contextMenuTarget.groupIdx !== undefined && (() => {
-              const grp = savedGroups[contextMenuTarget.groupIdx]
-              const isInGroup = grp?.udids.includes(contextMenuTarget.udid)
-              if (!isInGroup) return null
-              return (
-                <button
-                  style={{ background: 'transparent', border: 'none', color: '#ff6060', fontSize: '13px', cursor: 'pointer', padding: '7px 8px', textAlign: 'left', width: '100%', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,96,96,0.1)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    const { udid, groupIdx } = contextMenuTarget!;
-                    if (groupIdx === undefined) return;
-
-                    setSavedGroups(prev =>
-                      prev.map((g, i) =>
-                        i === groupIdx
-                          ? { ...g, udids: g.udids.filter(u => u !== udid) }
-                          : g
-                      )
-                    );
-
-                    if (activeGroupIdx === groupIdx || focusGroupIdx === groupIdx) {
-                      setConnectSelection(prev => {
-                        const next = new Set(prev);
-                        next.delete(udid);
-                        return next;
-                      });
-                    }
-
-                    setContextMenuTarget(null);
-                    setContextMenuOpen(false);
-                    setSubMenuOpen(false);
-                  }}
-                >
-                  <span>🗑</span> Xoá khỏi nhóm <strong style={{ color: '#ff8080', fontSize: 11 }}>"{savedGroups[contextMenuTarget.groupIdx!]?.name}"</strong>
-                </button>
-              )
-            })()}
-
             {/* === Thêm vào nhóm (submenu) — hiện khi có nhóm đã tạo === */}
             {savedGroups.length > 0 && (
               <div style={{ position: 'relative' }} className='ctxAddToGroupWrap' onMouseEnter={() => setSubMenuOpen(true)} onMouseLeave={() => setSubMenuOpen(false)}>
@@ -3106,6 +3072,49 @@ export function App() {
                 </div>
               </div>
             )}
+
+            {/* === Xoá khỏi nhóm — hiện khi click từ grid dropdown nhóm, HOẶC khi đang load nhóm và click từ grid tổng === */}
+            {contextMenuTarget.groupIdx !== undefined && (() => {
+              const grp = savedGroups[contextMenuTarget.groupIdx]
+              const isInGroup = grp?.udids.includes(contextMenuTarget.udid)
+              if (!isInGroup) return null
+              return (
+                <button
+                  style={{ background: 'transparent', border: 'none', color: '#ff6060', fontSize: '13px', cursor: 'pointer', padding: '7px 8px', textAlign: 'left', width: '100%', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,96,96,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const { udid, groupIdx } = contextMenuTarget!;
+                    if (groupIdx === undefined) return;
+
+                    setSavedGroups(prev =>
+                      prev.map((g, i) =>
+                        i === groupIdx
+                          ? { ...g, udids: g.udids.filter(u => u !== udid) }
+                          : g
+                      )
+                    );
+
+                    if (activeGroupIdx === groupIdx || focusGroupIdx === groupIdx) {
+                      setConnectSelection(prev => {
+                        const next = new Set(prev);
+                        next.delete(udid);
+                        return next;
+                      });
+                    }
+
+                    setContextMenuTarget(null);
+                    setContextMenuOpen(false);
+                    setSubMenuOpen(false);
+                  }}
+                >
+                  <span>🗑</span> Xoá khỏi nhóm <strong style={{ color: '#ff8080', fontSize: 11 }}>"{savedGroups[contextMenuTarget.groupIdx!]?.name}"</strong>
+                </button>
+              )
+            })()}
           </div>
         </div>
       ) : null}
