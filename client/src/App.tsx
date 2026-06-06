@@ -606,7 +606,7 @@ export function App() {
     root.style.setProperty('--config-width', '320px')
     root.style.setProperty(
       '--sidebar-total',
-      isSidebarPinned ? 'var(--config-width)' : '20px'
+      isSidebarPinned ? 'var(--config-width)' : '0px'
     )
     return () => {
       document.body.classList.remove(cls)

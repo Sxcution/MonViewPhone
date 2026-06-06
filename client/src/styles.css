@@ -80,7 +80,7 @@ body.sidebarCollapsed {
   /* luôn hiện scrollbar dọc khi nội dung dài */
   overflow-x: auto;
   /* horizontal scroll used when viewer opens */
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: #5fa7ff #1a1a1a;
 }
