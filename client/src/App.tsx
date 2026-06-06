@@ -48,7 +48,7 @@ const BITRATE_WARN_THRESHOLD = Math.floor(BITRATE_MAX * 0.6) // ~60%
 const TILE_WIDTH_MIN = 100
 const TILE_WIDTH_MAX = 726
 const VIEWER_WIDTH_MIN = 400
-const VIEWER_WIDTH_MAX = 726
+const VIEWER_WIDTH_MAX = 900
 const STREAM_WIDTH_MIN = 100
 const STREAM_WIDTH_MAX = 726
 const VIEWER_STREAM_WIDTH = STREAM_WIDTH_MAX
@@ -638,10 +638,14 @@ export function App() {
     const width = clamp(w, TILE_WIDTH_MIN, TILE_WIDTH_MAX)
     const height = Math.round(width * PHONE_SHELL_RATIO)
     const next = { width, height }
+
     dimsRef.current = next
     applyDimsToGrid(next)
-    setTileDims(next)
     scheduleSave(next)
+
+    startTransition(() => {
+      setTileDims(next)
+    })
   }
   const updateViewerWidthPx = (w: number) => {
     const next = clamp(w, VIEWER_WIDTH_MIN, VIEWER_WIDTH_MAX)
@@ -1224,27 +1228,15 @@ export function App() {
     }
   }, [])
 
-  // When switching viewer device, reset offset and apply per-viewer config; when closing, revert and reload tile.
+  // When switching viewer device, reset offset
   useEffect(() => {
-    const prevViewed = lastViewedRef.current
     if (viewerUdid) {
       lastViewedRef.current = viewerUdid
       setViewerOffset({ x: 0, y: 0 })
-      const nextCfg = buildViewerConfig(streamConfig)
-      setViewerOverrideConfig(prev =>
-        prev && sameStreamConfig(prev, nextCfg) ? prev : nextCfg
-      )
     } else {
-      setViewerOverrideConfig(prev => (prev ? null : prev))
-      if (prevViewed) {
-        const fn = reloadMap.current.get(prevViewed)
-        try {
-          fn?.()
-        } catch { }
-      }
       lastViewedRef.current = null
     }
-  }, [viewerUdid, streamConfig, buildViewerConfig])
+  }, [viewerUdid])
 
   const updateBoundsWidth = (widthRaw: number) => {
     const width = clamp(widthRaw, STREAM_WIDTH_MIN, STREAM_WIDTH_MAX)
@@ -1265,14 +1257,7 @@ export function App() {
     })
   }, [])
 
-  useEffect(() => {
-    if (viewerUdid && viewerOverrideConfig) {
-      const fn = reloadMap.current.get(viewerUdid)
-      try {
-        fn?.()
-      } catch { }
-    }
-  }, [viewerOverrideConfig, viewerUdid])
+
 
   const applyDraftConfig = useCallback(() => {
     const next = normalizeStreamConfig(draftConfig)
