@@ -350,7 +350,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
           </div>
 
           {/* 2. Profile selector (shared) */}
-          {profiles.length > 1 && (
+          {profiles.length > 0 && (
             <div className="vsp-section">
               <div className="vsp-profile-inline">
                 <span className="vsp-label">{t('Profile:')}</span>

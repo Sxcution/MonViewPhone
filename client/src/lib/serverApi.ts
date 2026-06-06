@@ -42,7 +42,7 @@ export type RemoteDevtoolsInfo = {
   [k: string]: any;
 };
 
-// Matches server/src/types/FileStats.ts
+// File metadata shape returned by the backend file API.
 export type FileStats = {
   name: string;
   isDir: 0 | 1;

@@ -2,10 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, startTransiti
 import { readPageParams } from '@/lib/params'
 import { useServer } from '@/context/ServerContext'
 import { Tile } from '@/components/Tile'
-import { RightBar } from '@/components/RightBar'
 import { STREAM_CONFIG, type StreamConfig } from '@/lib/config'
 import { useI18n } from '@/context/I18nContext'
-import { HeaderBar } from '@/components/HeaderBar'
+import { useDirectKeyboard } from '@/hooks/useDirectKeyboard'
 import { DeviceViewer } from '@/components/DeviceViewer'
 import { useActive } from '@/context/ActiveContext'
 import { AndroidKeycode } from '@/lib/keyEvent'
@@ -19,20 +18,21 @@ import { SyncPanel } from '@/components/SyncPanel'
 import { useTileOrder } from '@/store/useTileOrder'
 import {
   ArrowLeft,
+  Bot,
   Camera,
-  ChevronsLeft,
-  ChevronsRight,
-  Home,
+  ChevronDown,
+  ChevronUp,
   MonitorOff,
-  Menu,
   Pin,
   PinOff,
   Package,
+  RotateCcw,
   Settings,
   Terminal,
   Upload,
   Volume2,
-  VolumeX
+  VolumeX,
+  X
 } from 'lucide-react'
 
 type TileDims = { width: number; height: number }
@@ -45,7 +45,13 @@ function clamp(n: number, min: number, max: number): number {
 const BITRATE_MIN = 524_288
 const BITRATE_MAX = 8_388_608
 const BITRATE_WARN_THRESHOLD = Math.floor(BITRATE_MAX * 0.6) // ~60%
-const VIEWER_STREAM_WIDTH = 1000
+const TILE_WIDTH_MIN = 100
+const TILE_WIDTH_MAX = 726
+const VIEWER_WIDTH_MIN = 400
+const VIEWER_WIDTH_MAX = 726
+const STREAM_WIDTH_MIN = 100
+const STREAM_WIDTH_MAX = 726
+const VIEWER_STREAM_WIDTH = STREAM_WIDTH_MAX
 
 type ConnectRequestPayload = {
   device: string
@@ -53,10 +59,98 @@ type ConnectRequestPayload = {
   port?: number
 }
 
-const CONNECT_API_URL = 'http://127.0.0.1:11000/api/devices/connect'
 const CONNECT_CHECK_DEVICE_MESSAGE =
   'Please check that the device is properly plugged into the host'
 const QUICK_ACTION_ORDER_KEY = 'quickActionOrder'
+const SAVED_GROUPS_KEY = 'savedGroups'
+const STREAM_CONFIG_KEY = 'streamConfig'
+const SAVED_GROUPS_BACKUP_KEY = 'savedGroupsBackupV1'
+const SAVED_GROUPS_DELETED_ALL_KEY = 'savedGroupsDeletedAllV1'
+
+type SavedDeviceGroup = { name: string; udids: string[] }
+
+function uniqueStrings(values: unknown): string[] {
+  if (!Array.isArray(values)) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const value of values) {
+    if (typeof value !== 'string') continue
+    const id = value.trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
+function normalizeSavedGroups(value: unknown): SavedDeviceGroup[] {
+  if (!Array.isArray(value)) return []
+  const out: SavedDeviceGroup[] = []
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue
+    const name = typeof (item as any).name === 'string' ? (item as any).name.trim() : ''
+    const udids = uniqueStrings((item as any).udids)
+    if (!name || udids.length === 0) continue
+    out.push({ name, udids })
+  }
+  return out
+}
+
+function parseSavedGroups(raw: string | null): SavedDeviceGroup[] {
+  if (!raw) return []
+  try {
+    return normalizeSavedGroups(JSON.parse(raw))
+  } catch {
+    return []
+  }
+}
+
+function loadSavedGroups(): SavedDeviceGroup[] {
+  const current = parseSavedGroups(localStorage.getItem(SAVED_GROUPS_KEY))
+  if (current.length > 0) return current
+
+  if (localStorage.getItem(SAVED_GROUPS_DELETED_ALL_KEY) === '1') return []
+
+  try {
+    const backupRaw = localStorage.getItem(SAVED_GROUPS_BACKUP_KEY)
+    if (!backupRaw) return []
+    const parsed = JSON.parse(backupRaw)
+    return normalizeSavedGroups(parsed?.groups ?? parsed)
+  } catch {
+    return []
+  }
+}
+
+function backupSavedGroups(groups: SavedDeviceGroup[]) {
+  try {
+    if (groups.length === 0) return
+    localStorage.removeItem(SAVED_GROUPS_DELETED_ALL_KEY)
+    localStorage.setItem(
+      SAVED_GROUPS_BACKUP_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        groups,
+      })
+    )
+  } catch {
+    // ignore
+  }
+}
+
+function wsActionUrl(wsServer: string, action: string): string {
+  const url = new URL(wsServer)
+  url.searchParams.set('action', action)
+  return url.toString()
+}
+
+function httpApiUrl(wsServer: string, path: string): string {
+  const url = new URL(wsServer)
+  url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:'
+  url.pathname = path
+  url.search = ''
+  url.hash = ''
+  return url.toString()
+}
 
 type QuickActionId =
   | 'screenOff'
@@ -64,9 +158,8 @@ type QuickActionId =
   | 'soundOn'
   | 'maxVolume'
   | 'back'
-  | 'home'
-  | 'recent'
   | 'screenshot'
+  | 'automation'
 
 const DEFAULT_QUICK_ACTION_ORDER: QuickActionId[] = [
   'screenOff',
@@ -74,9 +167,8 @@ const DEFAULT_QUICK_ACTION_ORDER: QuickActionId[] = [
   'soundOn',
   'maxVolume',
   'back',
-  'home',
-  'recent',
-  'screenshot'
+  'screenshot',
+  'automation'
 ]
 
 function loadQuickActionOrder(): QuickActionId[] {
@@ -108,7 +200,8 @@ function sameStreamConfig(a: StreamConfig, b: StreamConfig): boolean {
 }
 
 export function App() {
-  const { t, locale, setLocale, available } = useI18n()
+  useDirectKeyboard(true)
+  const { t } = useI18n()
   const { deviceParam, wsServer } = useMemo(() => readPageParams(), [])
   const { androidDevices, pushFile } = useServer()
   const {
@@ -122,7 +215,28 @@ export function App() {
     setSyncTargetsList
   } = useActive()
 
-  const [streamConfig, setStreamConfig] = useState<StreamConfig>(STREAM_CONFIG)
+  const [streamConfig, setStreamConfig] = useState<StreamConfig>(() => {
+    try {
+      const saved = localStorage.getItem(STREAM_CONFIG_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // Validate parsed config has required fields, fallback to default if not
+        if (
+          typeof parsed.bitrate === 'number' &&
+          typeof parsed.maxFps === 'number' &&
+          typeof parsed.bounds?.width === 'number' &&
+          typeof parsed.bounds?.height === 'number'
+        ) {
+          return {
+            ...STREAM_CONFIG,
+            ...parsed,
+            bounds: { ...STREAM_CONFIG.bounds, ...parsed.bounds }
+          }
+        }
+      }
+    } catch { }
+    return STREAM_CONFIG
+  })
   const reloadMap = useRef<Map<string, () => void>>(new Map())
   const [viewerUdid, setViewerUdid] = useState<string | null>(null)
   const apkInputRef = useRef<HTMLInputElement | null>(null)
@@ -137,12 +251,12 @@ export function App() {
   })
   const [viewerWidthPx, setViewerWidthPx] = useState<number>(() => {
     try {
-      const saved = Number(localStorage.getItem('viewerWidthPx') || '900')
+      const saved = Number(localStorage.getItem('viewerWidthPx') || String(VIEWER_WIDTH_MAX))
       if (Number.isFinite(saved)) {
-        return clamp(saved, 400, 1400)
+        return clamp(saved, VIEWER_WIDTH_MIN, VIEWER_WIDTH_MAX)
       }
     } catch { }
-    return 900
+    return VIEWER_WIDTH_MAX
   })
   const [viewerOverrideConfig, setViewerOverrideConfig] =
     useState<StreamConfig | null>(null)
@@ -157,6 +271,7 @@ export function App() {
     sourceGrid?: 'main' | 'group' // 'main' = grid tổng tile lớn, 'group' = grid nhỏ trong nhóm
   } | null>(null)
   const [contextMenuOpen, setContextMenuOpen] = useState(false)
+  const [subMenuOpen, setSubMenuOpen] = useState(false)
   const [pageContextMenu, setPageContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [contextMenuInput, setContextMenuInput] = useState('')
   const [globalAdbOpen, setGlobalAdbOpen] = useState(false)
@@ -178,11 +293,18 @@ export function App() {
       localStorage.setItem('isSidebarPinned', String(isSidebarPinned))
     } catch { }
   }, [isSidebarPinned])
+
+  // Persist streamConfig to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STREAM_CONFIG_KEY, JSON.stringify(streamConfig))
+    } catch { }
+  }, [streamConfig])
   const [showTileInfo, setShowTileInfo] = useState(() => {
     try {
-      return localStorage.getItem('showTileInfo') !== 'false'
+      return localStorage.getItem('showTileInfo') === 'true'
     } catch {
-      return true
+      return false
     }
   })
   useEffect(() => {
@@ -223,6 +345,8 @@ export function App() {
   const rubberBandJustFinishedRef = useRef(false)
 
   const [appSettingsVisible, setAppSettingsVisible] = useState(false)
+  const [streamControlsOpen, setStreamControlsOpen] = useState(true)
+  const [quickControlsOpen, setQuickControlsOpen] = useState(true)
 
   useEffect(() => {
     try {
@@ -252,7 +376,7 @@ export function App() {
       // 2. Check if click was on a context menu element
       const target = event.target as Element;
       const isClickOnContextMenu = target.closest('.react-contexify') || target.closest('.context-menu') || target.closest('.pageContextLayer');
-      
+
       // 3. If clicking outside context menu, ensure it closes
       if (!isClickOnContextMenu && contextMenuOpen) {
         setContextMenuOpen(false);
@@ -276,18 +400,13 @@ export function App() {
   const [connectModalOpen, setConnectModalOpen] = useState(false)
 
   // ===== SAVED GROUPS =====
-  const [savedGroups, setSavedGroups] = useState<Array<{ name: string; udids: string[] }>>(() => {
-    try {
-      const raw = localStorage.getItem('savedGroups')
-      if (!raw) return []
-      const parsed = JSON.parse(raw)
-      return Array.isArray(parsed) ? parsed : []
-    } catch { return [] }
-  })
+  const [savedGroups, setSavedGroups] = useState<SavedDeviceGroup[]>(loadSavedGroups)
 
   useEffect(() => {
     try {
-      localStorage.setItem('savedGroups', JSON.stringify(savedGroups))
+      const normalized = normalizeSavedGroups(savedGroups)
+      localStorage.setItem(SAVED_GROUPS_KEY, JSON.stringify(normalized))
+      backupSavedGroups(normalized)
     } catch { }
   }, [savedGroups])
 
@@ -374,7 +493,7 @@ export function App() {
       setConnectBusy(true)
       setConnectNotification(null)
       try {
-        const response = await fetch(CONNECT_API_URL, {
+        const response = await fetch(httpApiUrl(wsServer, '/api/devices/connect'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -399,7 +518,7 @@ export function App() {
         setConnectBusy(false)
       }
     },
-    [formatConnectNotification, t]
+    [formatConnectNotification, t, wsServer]
   )
   const closeConnectModal = useCallback(() => {
     setConnectModalOpen(false)
@@ -454,7 +573,7 @@ export function App() {
       const saved = localStorage.getItem('deviceDimensions')
       if (!saved) return DEFAULT_DIMS
       const p = JSON.parse(saved)
-      const w = clamp(Number(p?.width), 100, 4000)
+      const w = clamp(Number(p?.width), TILE_WIDTH_MIN, TILE_WIDTH_MAX)
       const h = Math.round(w * PHONE_SHELL_RATIO)
       return { width: w, height: h }
     } catch {
@@ -494,7 +613,7 @@ export function App() {
   }, [])
 
   const updateWidth = (w: number) => {
-    const width = clamp(w, 100, 4000)
+    const width = clamp(w, TILE_WIDTH_MIN, TILE_WIDTH_MAX)
     const height = Math.round(width * PHONE_SHELL_RATIO)
     const next = { width, height }
     dimsRef.current = next
@@ -503,7 +622,7 @@ export function App() {
     scheduleSave(next)
   }
   const updateViewerWidthPx = (w: number) => {
-    const next = clamp(w, 400, 1400)
+    const next = clamp(w, VIEWER_WIDTH_MIN, VIEWER_WIDTH_MAX)
     setViewerWidthPx(next)
     try {
       localStorage.setItem('viewerWidthPx', String(next))
@@ -521,7 +640,7 @@ export function App() {
   useEffect(() => {
     const connect = () => {
       try {
-        const ws = new WebSocket('ws://localhost:11000/?action=devices-list')
+        const ws = new WebSocket(wsActionUrl(wsServer, 'devices-list'))
         wsDevicesRef.current = ws
         ws.onmessage = ev => {
           try {
@@ -574,7 +693,7 @@ export function App() {
       wsDevicesRef.current?.close()
       wsDevicesRef.current = null
     }
-  }, [])
+  }, [wsServer])
 
   useEffect(() => {
     // Reset selection when switching filter to avoid cross-filter confusion
@@ -999,12 +1118,12 @@ export function App() {
         )
           return
         e.preventDefault()
-        setConnectSelection(new Set(mergedOrder))
+        setConnectSelection(new Set(orderedRegistered))
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [mergedOrder])
+  }, [orderedRegistered])
 
   const [draftConfig, setDraftConfig] = useState<StreamConfig>(STREAM_CONFIG)
   // Track aspect ratio so stream height follows width
@@ -1042,8 +1161,8 @@ export function App() {
     const bitrate = clamp(cfg.bitrate, 524288, 8_388_608)
     const maxFps = clamp(cfg.maxFps, 1, 60)
     const iFrameInterval = clamp(cfg.iFrameInterval, 0, 60)
-    const width = clamp(cfg.bounds?.width ?? 0, 400, 1200)
-    const height = clamp(cfg.bounds?.height ?? 0, 400, 4000)
+    const width = clamp(cfg.bounds?.width ?? 0, STREAM_WIDTH_MIN, STREAM_WIDTH_MAX)
+    const height = clamp(cfg.bounds?.height ?? 0, STREAM_WIDTH_MIN, 4000)
     const displayId = Math.max(0, Math.floor(cfg.displayId ?? 0))
     return {
       bitrate,
@@ -1058,12 +1177,12 @@ export function App() {
   }
 
   const buildViewerConfig = useCallback((base: StreamConfig): StreamConfig => {
-    const width = clamp(VIEWER_STREAM_WIDTH, 400, 1200)
+    const width = clamp(VIEWER_STREAM_WIDTH, STREAM_WIDTH_MIN, STREAM_WIDTH_MAX)
     const aspect =
       base.bounds?.width && base.bounds?.height
         ? base.bounds.height / base.bounds.width
         : boundsAspectRef.current || 1
-    const height = clamp(Math.round(width * aspect), 400, 4000)
+    const height = clamp(Math.round(width * aspect), STREAM_WIDTH_MIN, 4000)
     return {
       ...base,
       bounds: { width, height },
@@ -1095,7 +1214,7 @@ export function App() {
   }, [viewerUdid, streamConfig, buildViewerConfig])
 
   const updateBoundsWidth = (widthRaw: number) => {
-    const width = clamp(widthRaw, 400, 1200)
+    const width = clamp(widthRaw, STREAM_WIDTH_MIN, STREAM_WIDTH_MAX)
     const height = Math.max(1, Math.round(width * boundsAspectRef.current))
     setDraftConfig(prev => ({
       ...prev,
@@ -1282,83 +1401,23 @@ export function App() {
           }
         }
       },
-      home: {
-        label: 'Home',
-        icon: <Home size={15} strokeWidth={1.8} />,
-        run: () => {
-          const targets = quickCommandTargets()
-          const keyTargets = getTargetsByUdids(targets)
-          if (keyTargets.length) {
-            const down = encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_HOME)
-            const up = encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_HOME)
-            for (const t of keyTargets) { try { t.ws.send(down); t.ws.send(up) } catch { } }
-          } else {
-            sendKeyTap(AndroidKeycode.KEYCODE_HOME)
-          }
-        }
-      },
-      recent: {
-        label: 'Đa nhiệm',
-        icon: <Menu size={15} strokeWidth={1.8} />,
-        run: () => {
-          const targets = quickCommandTargets()
-          const keyTargets = getTargetsByUdids(targets)
-          if (keyTargets.length) {
-            const down = encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_APP_SWITCH)
-            const up = encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_APP_SWITCH)
-            for (const t of keyTargets) { try { t.ws.send(down); t.ws.send(up) } catch { } }
-          } else {
-            sendKeyTap(AndroidKeycode.KEYCODE_APP_SWITCH)
-          }
-        }
-      },
       screenshot: {
         label: 'Chụp màn hình',
         icon: <Camera size={15} strokeWidth={1.8} />,
         run: () => screenshotActiveCanvas()
+      },
+      automation: {
+        label: 'Automation',
+        icon: <Bot size={15} strokeWidth={1.8} />,
+        run: () => setGlobalAdbOpen(true)
       }
     }),
     [runQuickAdbCommands, screenshotActiveCanvas, sendKeyTap, quickCommandTargets, getTargetsByUdids]
   )
 
-  {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */}
-  const SidebarDeviceGrid = () => {
-    return (
-      <div style={{ padding: '6px 4px 2px', borderBottom: '1px solid #2a2a2a', marginBottom: 4 }}>
-        <div style={{ fontSize: 10, color: '#666', padding: '0 4px 4px', letterSpacing: '0.5px' }}>
-          THIẾT BỊ ({allKnownDevices.length})
-        </div>
-        {allKnownDevices.length === 0 ? (
-          <div style={{ padding: '8px', color: '#555', fontSize: 11, textAlign: 'center' }}>
-            Kết nối điện thoại để bắt đầu
-          </div>
-        ) : (
-          <div className="sidebar-device-grid">
-            {allKnownDevices.map((device, index) => {
-              const isOnline = connectedUdids.has(device.udid);
-              const label = `P${index + 1}`;
-              return (
-                <div
-                  key={device.udid}
-                  className={`sidebar-device-item ${isOnline ? 'online' : 'offline'}`}
-                  title={isOnline ? `[Online] ${device.udid}` : `[Offline] ${device.udid}`}
-                  onClick={() => { if (isOnline) selectOnly(device.udid); }}
-                >
-                  <span className="dev-index">{index + 1}</span>
-                  <span className="dev-status-dot" />
-                  <span className="dev-label">{label}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
-
+  {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */ }
   return (
     <>
-      <HeaderBar wsServer={wsServer} />
       <input
         ref={apkInputRef}
         type='file'
@@ -1412,12 +1471,12 @@ export function App() {
 
             const target = e.target as HTMLElement;
             // Bỏ chọn tất cả nếu bấm vào nền (không trúng điện thoại, panel nào, hay context menu)
-            if (!target.closest('.tileDraggableWrapper') && 
-                !target.closest('.rightConfigPanel') && 
-                !target.closest('.headerBar') &&
-                !target.closest('.react-contexify') &&
-                !target.closest('.context-menu') &&
-                !target.closest('.pageContextLayer')
+            if (!target.closest('.tileDraggableWrapper') &&
+              !target.closest('.rightConfigPanel') &&
+              !target.closest('.headerBar') &&
+              !target.closest('.react-contexify') &&
+              !target.closest('.context-menu') &&
+              !target.closest('.pageContextLayer')
             ) {
               selectOnly(null);
               setConnectSelection(new Set());
@@ -1592,12 +1651,6 @@ export function App() {
       </div>
 
       <div className={`sidebar-wrapper ${isSidebarPinned ? 'pinned' : (contextMenuOpen || !!groupContextMenu) ? 'auto-hide force-show' : 'auto-hide'}`}>
-        <RightBar
-          hidden={false}
-          showExpand={false}
-          hideSyncButtons={false}
-          onExpand={() => { }}
-        />
         <div className='rightConfigPanel'>
           <button
             className='btn-pin'
@@ -1619,19 +1672,52 @@ export function App() {
             <Settings size={16} strokeWidth={2} />
           </button>
           <div className='rcpContent'>
-            <SidebarDeviceGrid />
-            <details className='rcpSection rcpDropdown'>
-              <summary className='rcpTitle rcpDropdownSummary'>
-                {viewerUdid ? t('Stream config (viewer)') : t('Stream config')}
-              </summary>
+            <div className={`rcpSection rcpDropdown rcpDropdownStatic${streamControlsOpen ? '' : ' rcpSectionCollapsed'}`}>
+              <div className='rcpTitleBar'>
+                <div className='rcpTitle'>
+                  {viewerUdid ? t('Stream config (viewer)') : t('Stream config')}
+                </div>
+                <div className='rcpTitleActions'>
+                  <button
+                    className='rcpMiniBtn'
+                    title={t('Reset stream config to default')}
+                    aria-label={t('Reset stream config to default')}
+                    onClick={() => {
+                      setStreamConfig(STREAM_CONFIG)
+                      setDraftConfig(STREAM_CONFIG)
+                      updateWidth(350)
+                      updateViewerWidthPx(VIEWER_WIDTH_MAX)
+                      setBitrateWarnAccepted(false)
+                      setBitrateConfirmVisible(false)
+                      setBitratePending(null)
+                      setBitrateNeedsConfirm(false)
+                      setBitrateLastSafe(STREAM_CONFIG.bitrate)
+                      reloadAllTiles()
+                    }}
+                  >
+                    <RotateCcw size={12} strokeWidth={2} />
+                    <span>Reset</span>
+                  </button>
+                  <button
+                    className='rcpIconBtn'
+                    title={streamControlsOpen ? t('Collapse stream config') : t('Expand stream config')}
+                    aria-label={streamControlsOpen ? t('Collapse stream config') : t('Expand stream config')}
+                    onClick={() => setStreamControlsOpen(prev => !prev)}
+                  >
+                    {streamControlsOpen ? <ChevronUp size={15} strokeWidth={2} /> : <ChevronDown size={15} strokeWidth={2} />}
+                  </button>
+                </div>
+              </div>
               <div className='rcpToggleRow'>
                 <span>{t('Hiển thị Title / Nav')}</span>
-                <button
-                  className={`rcpToggleBtn ${showTileInfo ? 'on' : ''}`}
-                  onClick={() => setShowTileInfo(prev => !prev)}
-                >
-                  {showTileInfo ? t('Bật') : t('Tắt')}
-                </button>
+                <div style={{ display: 'contents' }}>
+                  <button
+                    className={`rcpToggleBtn ${showTileInfo ? 'on' : ''}`}
+                    onClick={() => setShowTileInfo(prev => !prev)}
+                  >
+                    {showTileInfo ? t('Bật') : t('Ẩn')}
+                  </button>
+                </div>
               </div>
               <div className='rcpSliderRow'>
                 <div className='rcpSliderLabel'>Kích thước</div>
@@ -1644,8 +1730,8 @@ export function App() {
                 </button>
                 <input
                   type='range'
-                  min='150'
-                  max='2000'
+                  min={TILE_WIDTH_MIN}
+                  max={TILE_WIDTH_MAX}
                   value={tileDims.width}
                   onChange={e => updateWidth(Number(e.target.value))}
                   className='modalRange'
@@ -1670,8 +1756,8 @@ export function App() {
                 </button>
                 <input
                   type='range'
-                  min='400'
-                  max='1400'
+                  min={VIEWER_WIDTH_MIN}
+                  max={VIEWER_WIDTH_MAX}
                   value={viewerWidthPx}
                   onChange={e => updateViewerWidthPx(Number(e.target.value))}
                   className='modalRange'
@@ -1862,8 +1948,8 @@ export function App() {
                     if (viewerUdid && viewerOverrideConfig) {
                       const w = clamp(
                         (viewerOverrideConfig?.bounds?.width || 400) - 20,
-                        400,
-                        1200
+                        STREAM_WIDTH_MIN,
+                        STREAM_WIDTH_MAX
                       )
                       const h = Math.max(
                         1,
@@ -1881,8 +1967,8 @@ export function App() {
                 </button>
                 <input
                   type='range'
-                  min='400'
-                  max='1200'
+                  min={STREAM_WIDTH_MIN}
+                  max={STREAM_WIDTH_MAX}
                   value={
                     viewerUdid && viewerOverrideConfig
                       ? viewerOverrideConfig.bounds.width
@@ -1890,7 +1976,7 @@ export function App() {
                   }
                   onChange={e => {
                     if (viewerUdid && viewerOverrideConfig) {
-                      const w = clamp(Number(e.target.value), 400, 1200)
+                      const w = clamp(Number(e.target.value), STREAM_WIDTH_MIN, STREAM_WIDTH_MAX)
                       const h = Math.max(
                         1,
                         Math.round(w * boundsAspectRef.current)
@@ -1911,8 +1997,8 @@ export function App() {
                     if (viewerUdid && viewerOverrideConfig) {
                       const w = clamp(
                         (viewerOverrideConfig?.bounds?.width || 400) + 20,
-                        400,
-                        1200
+                        STREAM_WIDTH_MIN,
+                        STREAM_WIDTH_MAX
                       )
                       const h = Math.max(
                         1,
@@ -1935,11 +2021,21 @@ export function App() {
                   px
                 </div>
               </div>
-            </details>
+            </div>
 
             <div className='rcpSection'>
-              <div className='rcpTitle'>{t('Điều khiển nhanh')}</div>
-              <div className='rcpActions rcpQuickActions'>
+              <div className='rcpTitleBar'>
+                <div className='rcpTitle'>{t('Điều khiển nhanh')}</div>
+                <button
+                  className='rcpIconBtn'
+                  title={quickControlsOpen ? t('Collapse quick controls') : t('Expand quick controls')}
+                  aria-label={quickControlsOpen ? t('Collapse quick controls') : t('Expand quick controls')}
+                  onClick={() => setQuickControlsOpen(prev => !prev)}
+                >
+                  {quickControlsOpen ? <ChevronUp size={15} strokeWidth={2} /> : <ChevronDown size={15} strokeWidth={2} />}
+                </button>
+              </div>
+              <div className={`rcpActions rcpQuickActions${quickControlsOpen ? '' : ' rcpCollapsedBody'}`}>
                 {quickActionOrder.map(id => {
                   const action = quickActions[id]
                   return (
@@ -2211,62 +2307,7 @@ export function App() {
                     ))}
                   </div>
                 )}
-                <div className='rcpGridWrap' style={{ marginTop: '12px' }}>
-                  <div className='rcpGrid rcpGridCompact'>
-                    {orderedRegistered.map((id) => (
-                      <label
-                        key={id}
-                        className={`rcpGridItem${connectSelection.has(id) ? ' on' : ''}`}
-                        onContextMenu={e => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          // Truyền thêm activeGroupIdx để context menu biết đang active nhóm nào
-                          setContextMenuTarget({
-                            x: e.clientX,
-                            y: e.clientY,
-                            udid: id,
-                            groupIdx: activeGroupIdx ?? undefined,  // nếu đang load nhóm thì truyền idx nhóm đó
-                            sourceGrid: 'main'
-                          })
-                          setContextMenuInput(String(orderMap.get(id) ?? 0))
-                          setContextMenuOpen(true)
-                        }}
-                      >
-                        <input
-                          type='checkbox'
-                          checked={connectSelection.has(id)}
-                          onChange={(e) => {
-                            setConnectSelection((prev) => {
-                              const next = new Set(prev)
-                              if (e.target.checked) next.add(id)
-                              else next.delete(id)
-                              return next
-                            })
-                          }}
-                        />
-                        <span>{String(orderMap.get(id) ?? 0).padStart(2, '0')}</span>
-                      </label>
-                    ))}
-                  </div>
-                  {!orderedRegistered.length ? <div className='rcpHint'>{t('Chưa có device')}</div> : null}
-                </div>
-              </div>
-            </div>
-            <div className='rcpSection' style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #2a2a2a' }}>
-              <div className='rcpSliderRow' style={{ marginBottom: 0 }}>
-                <div className='rcpSliderLabel'>{t('Ngôn ngữ')}</div>
-                <select
-                  className='headerLangSelect'
-                  value={locale}
-                  onChange={e => setLocale(e.target.value as any)}
-                  style={{ marginLeft: 'auto', background: '#111', color: '#fff', border: '1px solid #333', borderRadius: '4px', padding: '2px 6px' }}
-                >
-                  {available.map(code => (
-                    <option key={code} value={code}>
-                      {code.toUpperCase()}
-                    </option>
-                  ))}
-                </select>
+
               </div>
             </div>
           </div>
@@ -2315,8 +2356,16 @@ export function App() {
       ) : null}
 
       {appSettingsVisible ? (
-        <div className='confirmOverlay' style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(5, 5, 5, 0.75)' }} onMouseDown={() => setAppSettingsVisible(false)}>
-          <div className='confirmPanel' style={{ maxWidth: 480, padding: '24px 32px', borderRadius: 20, background: 'linear-gradient(145deg, #161616, #222222)', boxShadow: '0 24px 64px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05)', border: '1px solid #333' }} onMouseDown={e => e.stopPropagation()}>
+        <div className='appSettingsOverlay'>
+          <div className='confirmPanel appSettingsPanel' onMouseDown={e => e.stopPropagation()}>
+            <button
+              className='appSettingsClose'
+              title={t('Close settings')}
+              aria-label={t('Close settings')}
+              onClick={() => setAppSettingsVisible(false)}
+            >
+              <X size={16} strokeWidth={2} />
+            </button>
             <div className='confirmTitle' style={{ fontSize: 22, fontWeight: 700, background: 'linear-gradient(90deg, #fff, #999)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: 24, borderBottom: 'none' }}>Cài Đặt Hệ Thống</div>            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1, marginRight: 16 }}>Chế độ mã hoá video</div>
@@ -2644,7 +2693,15 @@ export function App() {
                 style={{ background: '#e94560', borderColor: '#e94560' }}
                 onClick={() => {
                   const idx = deleteGroupConfirm
-                  setSavedGroups(prev => prev.filter((_, i) => i !== idx))
+                  setSavedGroups(prev => {
+                    const next = prev.filter((_, i) => i !== idx)
+                    if (next.length === 0) {
+                      try {
+                        localStorage.setItem(SAVED_GROUPS_DELETED_ALL_KEY, '1')
+                      } catch { }
+                    }
+                    return next
+                  })
                   if (activeGroupIdx === idx) setActiveGroupIdx(null)
                   if (expandedGroupIdx === idx) setExpandedGroupIdx(null)
                   setDeleteGroupConfirm(null)
@@ -2682,7 +2739,7 @@ export function App() {
               setGroupContextMenu(null)
             }}
           >
-             Đổi tên nhóm
+            Đổi tên nhóm
           </button>
           <button
             className='ctxMenuItem'
@@ -2708,11 +2765,13 @@ export function App() {
           onClick={() => {
             setContextMenuTarget(null)
             setContextMenuOpen(false)
+            setSubMenuOpen(false)
           }}
           onContextMenu={e => {
             e.preventDefault()
             setContextMenuTarget(null)
             setContextMenuOpen(false)
+            setSubMenuOpen(false)
           }}
         >
           <div
@@ -2786,7 +2845,9 @@ export function App() {
                   style={{ background: 'transparent', border: 'none', color: '#ff6060', fontSize: '13px', cursor: 'pointer', padding: '7px 8px', textAlign: 'left', width: '100%', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,96,96,0.1)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  onClick={() => {
+                  onPointerDown={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
                     const { udid, groupIdx } = contextMenuTarget!
                     if (groupIdx === undefined) return
                     setSavedGroups(prev => prev.map((g, i) =>
@@ -2806,13 +2867,11 @@ export function App() {
 
             {/* === Thêm vào nhóm (submenu) — hiện khi có nhóm đã tạo === */}
             {savedGroups.length > 0 && (
-              <div style={{ position: 'relative' }} className='ctxAddToGroupWrap'>
+              <div style={{ position: 'relative' }} className='ctxAddToGroupWrap' onMouseEnter={() => setSubMenuOpen(true)} onMouseLeave={() => setSubMenuOpen(false)}>
                 <button
                   style={{ background: 'transparent', border: 'none', color: '#7aadff', fontSize: '13px', cursor: 'pointer', padding: '7px 8px', textAlign: 'left', width: '100%', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                   onMouseEnter={e => {
                     e.currentTarget.style.background = 'rgba(122,173,255,0.1)';
-                    const sub = e.currentTarget.nextElementSibling as HTMLElement
-                    if (sub) sub.style.display = 'flex'
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.background = 'transparent'
@@ -2825,10 +2884,10 @@ export function App() {
                 <div
                   className='ctxSubMenu'
                   style={{
-                    display: 'none',
+                    display: subMenuOpen ? 'flex' : 'none',
                     position: 'absolute',
                     top: 0,
-                    left: '100%',
+                    left: 'calc(100% - 4px)',
                     background: '#1a1a1a',
                     border: '1px solid #333',
                     borderRadius: 8,
@@ -2839,8 +2898,6 @@ export function App() {
                     boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                     zIndex: 10
                   }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.display = 'flex' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.display = 'none' }}
                 >
                   {savedGroups.map((grp, gIdx) => {
                     const alreadyIn = grp.udids.includes(contextMenuTarget.udid)
@@ -2856,7 +2913,9 @@ export function App() {
                         }}
                         onMouseEnter={e => { if (!alreadyIn) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                        onClick={() => {
+                        onPointerDown={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
                           if (alreadyIn) return
 
                           // Lấy tất cả device đang được chọn (connectSelection)

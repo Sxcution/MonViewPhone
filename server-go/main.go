@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"server-go/adb"
 	"server-go/websocket"
@@ -40,10 +41,42 @@ func main() {
 		// CORS headers
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-UDID, X-Filename, X-File-Size, X-Remote-Path")
+		w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length")
+		w.Header().Set("X-Solumate-Backend", "server-go")
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		if r.URL.Path == "/healthz" {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"ok":true,"backend":"server-go"}`))
+			return
+		}
+
+		switch r.URL.Path {
+		case "/api/goog/device/user-profiles":
+			handleUserProfiles(w, r)
+			return
+		case "/api/goog/device/adb-command":
+			handleAdbCommand(w, r)
+			return
+		case "/api/goog/device/install-apk-binary":
+			handleInstallApkBinary(w, r)
+			return
+		case "/api/goog/device/install-uploaded":
+			handleInstallUploaded(w, r)
+			return
+		case "/api/goog/device/install-apk-user":
+			handleInstallApkUser(w, r)
+			return
+		case "/api/goog/device/push-file":
+			handlePushFile(w, r)
+			return
+		case "/api/goog/device/pull-file":
+			handlePullFile(w, r)
 			return
 		}
 
@@ -51,6 +84,8 @@ func main() {
 		switch action {
 		case "proxy-adb":
 			websocket.HandleProxyAdb(w, r)
+		case "devices-list":
+			websocket.HandleSimpleDevicesList(w, r, tracker)
 		case "goog-device-list":
 			websocket.HandleDeviceList(w, r, tracker)
 		default:
@@ -59,7 +94,17 @@ func main() {
 		}
 	})
 
-	port := ":11000"
+	portValue := os.Getenv("MONVIEWPHONE_GO_PORT")
+	if portValue == "" {
+		portValue = os.Getenv("PORT")
+	}
+	if portValue == "" {
+		portValue = "11000"
+	}
+	port := portValue
+	if port[0] != ':' {
+		port = ":" + port
+	}
 	log.Printf("Server listening on port %s", port)
 
 	err := http.ListenAndServe(port, nil)

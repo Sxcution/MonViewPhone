@@ -4,6 +4,14 @@ import { AndroidKeycode, KeyToCodeMap } from '@/lib/keyEvent';
 import { useActive } from '@/context/ActiveContext';
 
 type GlobalWithToggle = typeof window & { __disableDirectKeyboard?: boolean };
+const PASTE_SINK_ID = '__scrcpy_paste_sink';
+
+function isUserEditableElement(el: Element | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.id === PASTE_SINK_ID) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+}
 
 /**
  * Tạo một textarea ẩn (invisible) trong DOM để trình duyệt có nơi nhận
@@ -11,11 +19,10 @@ type GlobalWithToggle = typeof window & { __disableDirectKeyboard?: boolean };
  * focus thì browser sẽ KHÔNG bắn event paste.
  */
 function getOrCreateHiddenPasteTarget(): HTMLTextAreaElement {
-  const ID = '__scrcpy_paste_sink';
-  let el = document.getElementById(ID) as HTMLTextAreaElement | null;
+  let el = document.getElementById(PASTE_SINK_ID) as HTMLTextAreaElement | null;
   if (!el) {
     el = document.createElement('textarea');
-    el.id = ID;
+    el.id = PASTE_SINK_ID;
     el.setAttribute('autocomplete', 'off');
     el.setAttribute('autocorrect', 'off');
     el.setAttribute('autocapitalize', 'off');
@@ -82,19 +89,12 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
     // Re-focus khi click ra ngoài (trừ khi click vào input/textarea thật)
     const refocus = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'SELECT' ||
-        target.isContentEditable
-      ) {
+      if (isUserEditableElement(target)) {
         return;
       }
       // Delay 1 frame để DOM events hoàn tất rồi mới focus lại
       requestAnimationFrame(() => {
-        if (document.activeElement?.tagName === 'INPUT' ||
-          document.activeElement?.tagName === 'TEXTAREA' ||
-          document.activeElement?.tagName === 'SELECT') {
+        if (isUserEditableElement(document.activeElement)) {
           return;
         }
         sink.focus({ preventScroll: true });
@@ -123,7 +123,7 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
 
       // Skip when user is typing in any input/textarea/select
       const ae = document.activeElement;
-      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || (ae as HTMLElement).isContentEditable)) return;
+      if (isUserEditableElement(ae)) return;
 
       // Allow typing into the on-screen input/textarea
       if (allowedContainer && e.target instanceof Node && allowedContainer.contains(e.target)) {
@@ -189,7 +189,7 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       if (!enabled || (window as GlobalWithToggle).__disableDirectKeyboard) return;
 
       const ae = document.activeElement;
-      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || (ae as HTMLElement).isContentEditable)) return;
+      if (isUserEditableElement(ae)) return;
 
       if (allowedContainer && e.target instanceof Node && allowedContainer.contains(e.target)) {
         return;
@@ -236,7 +236,7 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
     const onPaste = (e: ClipboardEvent) => {
       if (!enabled || (window as GlobalWithToggle).__disableDirectKeyboard) return;
       const ae = document.activeElement;
-      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || (ae as HTMLElement).isContentEditable)) return;
+      if (isUserEditableElement(ae)) return;
       if (allowedContainer && e.target instanceof Node && allowedContainer.contains(e.target)) {
         return;
       }
@@ -245,7 +245,7 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
         sendToActive(encodeSetClipboardMessage(text, true));
         e.preventDefault();
         // Xóa nội dung textarea ẩn để không lưu rác
-        const sink = document.getElementById('__scrcpy_paste_sink') as HTMLTextAreaElement | null;
+        const sink = document.getElementById(PASTE_SINK_ID) as HTMLTextAreaElement | null;
         if (sink) sink.value = '';
       }
     };

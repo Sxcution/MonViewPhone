@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"server-go/adb"
+	"server-go/scrcpy"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -43,6 +44,15 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[%s] Proxy WS connected (remote=%s, path=%s)", udid, remote, wsPath)
 
+	if remote == "tcp:8886" {
+		if err := scrcpy.EnsureServer(udid); err != nil {
+			log.Printf("[%s] scrcpy server start failed: %v", udid, err)
+			clientWs.WriteMessage(websocket.CloseMessage,
+				websocket.FormatCloseMessage(4005, fmt.Sprintf("scrcpy server start failed: %v", err)))
+			return
+		}
+	}
+
 	// Step 1: adb forward tcp:0 <remote>  →  get local port
 	portStr, err := adb.Forward(udid, "tcp:0", remote)
 	if err != nil {
@@ -62,10 +72,20 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	// Step 2: Open a WebSocket client to the forwarded port (same as Node.js WebsocketProxy.init)
+	targetPath := wsPath
+	targetQuery := ""
+	if queryStart := strings.Index(targetPath, "?"); queryStart >= 0 {
+		targetQuery = targetPath[queryStart+1:]
+		targetPath = targetPath[:queryStart]
+		if targetPath == "" {
+			targetPath = "/"
+		}
+	}
 	targetUrl := url.URL{
-		Scheme: "ws",
-		Host:   "127.0.0.1:" + port,
-		Path:   wsPath,
+		Scheme:   "ws",
+		Host:     "127.0.0.1:" + port,
+		Path:     targetPath,
+		RawQuery: targetQuery,
 	}
 	log.Printf("[%s] Connecting to device WS: %s", udid, targetUrl.String())
 

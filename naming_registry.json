@@ -7,7 +7,6 @@
     "components": {
       "app": "App",
       "device_viewer": "DeviceViewer",
-      "right_bar": "RightBar",
       "tile": "Tile",
       "viewer_side_panel": "ViewerSidePanel",
       "sidebar_device_grid": "SidebarDeviceGrid"
@@ -22,8 +21,6 @@
       "btn_pin": "btn-pin",
       "tile_draggable_wrapper": "tileDraggableWrapper",
       "user_profile_select": "userProfileSelect",
-      "header_device_num_input": "headerDeviceNumInput",
-      "header_device_control": "headerDeviceControl",
       "tile_selected": "selected",
       "tile_active": "active",
       "selected_count_badge": "selectedCountBadge",
@@ -39,7 +36,8 @@
       "device_offline": "offline",
       "dev_index": "dev-index",
       "dev_status_dot": "dev-status-dot",
-      "dev_label": "dev-label"
+      "dev_label": "dev-label",
+      "reset_btn": "resetBtn"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -70,7 +68,10 @@
       "alt_solo_udid": "altSoloUdid",
       "is_alt_held": "isAltHeld",
       "is_server_restarting": "restarting",
-      "all_known_devices": "allKnownDevices"
+      "all_known_devices": "allKnownDevices",
+      "stream_config_key": "streamConfig",
+      "draft_config": "draftConfig",
+      "sub_menu_open": "subMenuOpen"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

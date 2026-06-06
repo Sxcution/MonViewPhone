@@ -34,37 +34,74 @@ export function ServerProvider({ wsServer, children }: { wsServer: string; child
   const sendRef = useRef<any>(null);
 
   useEffect(() => {
-    const { ws, sendCommand } = connectGoogDeviceTracker(
-      wsServer,
-      (list, meta) => {
-        const safeList = Array.isArray(list) ? list : [];
-        setAndroidDevices(safeList);
-        setTrackerMeta(meta ?? null);
-      },
-      (dev, meta) => {
-        if (!dev || typeof dev !== 'object' || !('udid' in dev)) {
-          setTrackerMeta(meta ?? null);
-          return;
-        }
+    let ws: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let stopped = false;
 
-        setAndroidDevices((prev) => {
-          const safePrev = Array.isArray(prev) ? prev : [];
-          const idx = safePrev.findIndex((d) => d.udid === dev.udid);
-          if (idx >= 0) {
-            const next = [...safePrev];
-            next[idx] = dev;
-            return next;
-          }
-          return [...safePrev, dev];
-        });
+    const onList = (list: GoogDeviceDescriptor[], meta: { id: string; name: string }) => {
+      const safeList = Array.isArray(list) ? list : [];
+      setAndroidDevices(safeList);
+      setTrackerMeta(meta ?? null);
+    };
 
+    const onDevice = (dev: GoogDeviceDescriptor, meta: { id: string; name: string }) => {
+      if (!dev || typeof dev !== 'object' || !('udid' in dev)) {
         setTrackerMeta(meta ?? null);
+        return;
       }
-    );
-    sendRef.current = sendCommand;
+
+      setAndroidDevices((prev) => {
+        const safePrev = Array.isArray(prev) ? prev : [];
+        const idx = safePrev.findIndex((d) => d.udid === dev.udid);
+        if (idx >= 0) {
+          const next = [...safePrev];
+          next[idx] = dev;
+          return next;
+        }
+        return [...safePrev, dev];
+      });
+
+      setTrackerMeta(meta ?? null);
+    };
+
+    const scheduleReconnect = () => {
+      if (stopped || reconnectTimer !== null) return;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, 1000);
+    };
+
+    const connect = () => {
+      try {
+        const tracker = connectGoogDeviceTracker(wsServer, onList, onDevice);
+        ws = tracker.ws;
+        sendRef.current = tracker.sendCommand;
+        ws.addEventListener('close', () => {
+          if (ws === tracker.ws) {
+            sendRef.current = null;
+            ws = null;
+          }
+          scheduleReconnect();
+        });
+        ws.addEventListener('error', () => {
+          tracker.ws.close();
+        });
+      } catch {
+        scheduleReconnect();
+      }
+    };
+
+    connect();
 
     return () => {
-      ws.close();
+      stopped = true;
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      sendRef.current = null;
+      ws?.close();
     };
   }, [wsServer]);
 

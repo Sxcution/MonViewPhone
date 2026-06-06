@@ -4,7 +4,7 @@
 //   [type: u8][channelId: u32LE][payload...]
 //
 // Nested channels are created by sending a CreateChannel message as *Data* to the parent channel.
-// This matches `server/src/packages/multiplexer/*`.
+// This matches the backend WebSocket multiplexer framing.
 
 export enum MuxMessageType {
   CreateChannel = 4,

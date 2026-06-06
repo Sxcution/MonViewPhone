@@ -183,6 +183,14 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
     };
   }, [udid, tab, getInputTargetsForSource, selectOnly]);
 
+  useEffect(() => {
+    if (tab !== 'view') return;
+    selectOnly(udid);
+    requestAnimationFrame(() => {
+      canvasRef.current?.focus?.();
+    });
+  }, [udid, tab, selectOnly]);
+
   // ===== Mirror tile canvas into viewer canvas (RAF), only in view tab.
   useEffect(() => {
     if (tab !== 'view') return;

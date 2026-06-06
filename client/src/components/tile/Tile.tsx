@@ -243,6 +243,7 @@ function TileComponent({
         <div
             className="tileVideoFrame"
             ref={frameRef}
+            style={{ cursor: 'pointer' }}
             aria-hidden={isViewing}
         >
             <canvas

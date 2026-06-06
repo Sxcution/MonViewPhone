@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"server-go/adb"
+	"strings"
 	"time"
 )
 
@@ -22,6 +23,62 @@ type TrackerMessage struct {
 	Id   int64           `json:"id"`
 	Type string          `json:"type"`
 	Data DeviceListEvent `json:"data"`
+}
+
+type SimpleDevicePayload struct {
+	Device       string `json:"device"`
+	StatusRecodd string `json:"status_recodd"`
+	IPv4         string `json:"ipv4"`
+	UUID         string `json:"uuid"`
+	ConnectType  string `json:"connect_type"`
+}
+
+func simpleDevicePayloads(tracker *adb.Tracker) []SimpleDevicePayload {
+	devices := tracker.GetDevices()
+	payloads := make([]SimpleDevicePayload, 0, len(devices))
+	for id, dev := range devices {
+		if dev.Status != adb.StatusOnline {
+			continue
+		}
+		connectType := "usb"
+		ipv4 := ""
+		if len(id) > 0 {
+			for i := 0; i < len(id); i++ {
+				if id[i] == ':' {
+					connectType = "wifi"
+					ipv4 = id[:i]
+					break
+				}
+			}
+		}
+		payloads = append(payloads, SimpleDevicePayload{
+			Device:       id,
+			StatusRecodd: "stop",
+			IPv4:         ipv4,
+			UUID:         id,
+			ConnectType:  connectType,
+		})
+	}
+	return payloads
+}
+
+func HandleSimpleDevicesList(w http.ResponseWriter, r *http.Request, tracker *adb.Tracker) {
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("Failed to upgrade devices-list connection: %v", err)
+		return
+	}
+	defer ws.Close()
+
+	for {
+		if err := ws.WriteJSON(simpleDevicePayloads(tracker)); err != nil {
+			if !isExpectedCloseError(err) && !isClientDisconnect(err) {
+				log.Printf("Devices-list WS write error: %v", err)
+			}
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
 }
 
 func HandleDeviceList(w http.ResponseWriter, r *http.Request, tracker *adb.Tracker) {
@@ -55,10 +112,23 @@ func HandleDeviceList(w http.ResponseWriter, r *http.Request, tracker *adb.Track
 
 		err = ws.WriteJSON(msg)
 		if err != nil {
-			log.Printf("Device list WS write error: %v", err)
+			if !isExpectedCloseError(err) && !isClientDisconnect(err) {
+				log.Printf("Device list WS write error: %v", err)
+			}
 			break
 		}
 
 		time.Sleep(2 * time.Second)
 	}
+}
+
+func isClientDisconnect(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "use of closed network connection") ||
+		strings.Contains(msg, "connection reset by peer") ||
+		strings.Contains(msg, "connection was aborted") ||
+		strings.Contains(msg, "broken pipe")
 }

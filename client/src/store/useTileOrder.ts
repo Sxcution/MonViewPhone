@@ -1,23 +1,138 @@
 import { useEffect, useMemo, useState } from 'react';
 
 const TILE_NUMBER_KEY = 'tileOrderNumbers';
+const TILE_NUMBER_BACKUP_KEY = 'tileOrderNumbersBackupV1';
+const TILE_NUMBER_RESTORE_KEY = 'tileOrderNumbersRestoredKnownFarmV1';
+const TILE_NUMBER_PRE_RESTORE_KEY = 'tileOrderNumbersBeforeKnownRestoreV1';
+
+const KNOWN_FARM_TILE_NUMBERS: Record<string, number> = {
+  '27f30c41a3217ece': 1,
+  '2793a9a5021c7ece': 2,
+  '2870da3de13f7ece': 3,
+  '28083aacbd217ece': 4,
+  R58N22PK6XH: 5,
+  R58R12B2NLZ: 6,
+  '2851aa1728017ece': 7,
+  '289cabc94e1c7ece': 8,
+  kvrcpvx4w86hnvci: 9,
+  '2760466d28217ece': 10,
+  '2a7daa5dee3f7ece': 11,
+  R58N30MBK4F: 12,
+  '28c42e85853f7ece': 13,
+  RFCN30H078F: 14,
+  '269c5ad06a0d7ece': 15,
+  '2808133db6217ece': 16,
+  '28548fcc38017ece': 17,
+  xklrgm6tj74pnruc: 18,
+  '2619e1eb2a057ece': 19,
+  '24c24e6c370c7ece': 20,
+  ce0817187cd6803d027e: 21,
+  '6294909c': 22,
+  '28b85ba51b1c7ece': 23,
+  '3b87f833': 24,
+  '27fda9ec9e217ece': 25,
+  '1264215f': 26,
+  eubqcykrhm8dw8hy: 27,
+  '33c8cd7e': 28,
+  '27119d12': 29,
+  '2a0bab48843f7ece': 30,
+  '28d96cc4ce0c7ece': 31,
+  '1d65d69e': 32,
+  R3CR200MXTR: 33,
+  RFCRB1CQ2VE: 34,
+  '25f5db2d04057ece': 35,
+};
+
+const KNOWN_FARM_TILE_ORDER = Object.entries(KNOWN_FARM_TILE_NUMBERS)
+  .sort((a, b) => a[1] - b[1])
+  .map(([udid]) => udid);
+
+function parseTileNumbers(raw: string | null): Record<string, number> {
+  if (!raw) return {};
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  const out: Record<string, number> = {};
+  for (const [id, value] of Object.entries(parsed)) {
+    const n = Number(value);
+    if (typeof id === 'string' && Number.isFinite(n) && n > 0) {
+      out[id] = Math.floor(n);
+    }
+  }
+  return out;
+}
+
+function loadTileNumbersBackup(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(TILE_NUMBER_BACKUP_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parseTileNumbers(JSON.stringify(parsed?.orderNumbers ?? parsed));
+  } catch {
+    return {};
+  }
+}
+
+function saveTileNumbersSnapshot(key: string, orderNumbers: Record<string, number>) {
+  try {
+    if (Object.keys(orderNumbers).length === 0) return;
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        savedAt: Date.now(),
+        orderNumbers,
+      }),
+    );
+  } catch {
+    // ignore
+  }
+}
+
+function shouldRestoreKnownFarmOrder(orderNumbers: Record<string, number>): boolean {
+  if (typeof window === 'undefined' || window.location.protocol !== 'file:') return false;
+
+  try {
+    if (localStorage.getItem(TILE_NUMBER_RESTORE_KEY) === '1') return false;
+  } catch {
+    return false;
+  }
+
+  const knownKeys = Object.keys(KNOWN_FARM_TILE_NUMBERS);
+  const presentKeys = knownKeys.filter((id) => Number.isFinite(orderNumbers[id]));
+  if (presentKeys.length === 0) return true;
+  if (presentKeys.length < 20) return false;
+
+  const mismatchCount = presentKeys.filter((id) => orderNumbers[id] !== KNOWN_FARM_TILE_NUMBERS[id]).length;
+  if (mismatchCount === 0) {
+    try {
+      localStorage.setItem(TILE_NUMBER_RESTORE_KEY, '1');
+    } catch {
+      // ignore
+    }
+    return false;
+  }
+  return mismatchCount >= 5;
+}
+
+function restoreKnownFarmOrder(previous: Record<string, number>): Record<string, number> {
+  try {
+    saveTileNumbersSnapshot(TILE_NUMBER_PRE_RESTORE_KEY, previous);
+    localStorage.setItem(TILE_NUMBER_KEY, JSON.stringify(KNOWN_FARM_TILE_NUMBERS));
+    localStorage.setItem('tileOrder', JSON.stringify(KNOWN_FARM_TILE_ORDER));
+    localStorage.setItem(TILE_NUMBER_RESTORE_KEY, '1');
+  } catch {
+    // ignore
+  }
+  return { ...KNOWN_FARM_TILE_NUMBERS };
+}
 
 function loadTileNumbers(): Record<string, number> {
   try {
-    const raw = localStorage.getItem(TILE_NUMBER_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    const out: Record<string, number> = {};
-    for (const [id, value] of Object.entries(parsed)) {
-      const n = Number(value);
-      if (typeof id === 'string' && Number.isFinite(n) && n > 0) {
-        out[id] = Math.floor(n);
-      }
-    }
-    return out;
+    const current = parseTileNumbers(localStorage.getItem(TILE_NUMBER_KEY));
+    const loaded = Object.keys(current).length > 0 ? current : loadTileNumbersBackup();
+    return shouldRestoreKnownFarmOrder(loaded) ? restoreKnownFarmOrder(loaded) : loaded;
   } catch {
-    return {};
+    const backup = loadTileNumbersBackup();
+    return shouldRestoreKnownFarmOrder(backup) ? restoreKnownFarmOrder(backup) : backup;
   }
 }
 
@@ -90,6 +205,7 @@ export function useTileOrder(defaultDevices: string[]) {
   useEffect(() => {
     try {
       localStorage.setItem(TILE_NUMBER_KEY, JSON.stringify(orderNumbers));
+      saveTileNumbersSnapshot(TILE_NUMBER_BACKUP_KEY, orderNumbers);
     } catch {
       // ignore
     }

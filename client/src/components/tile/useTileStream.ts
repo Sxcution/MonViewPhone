@@ -9,6 +9,7 @@ type Args = {
     udid: string;
     deviceParam: string | null;
     wsServer: string;
+    enabled?: boolean;
 
     // DOM refs
     canvasRef: MutableRefObject<HTMLCanvasElement | null>;
@@ -57,6 +58,7 @@ export function useTileStream(args: Args) {
         udid,
         deviceParam,
         wsServer,
+        enabled = true,
         canvasRef,
         bodyRef,
         frameRef,
@@ -101,6 +103,15 @@ export function useTileStream(args: Args) {
     useEffect(() => {
         destroyedRef.current = false;
         closingRef.current = false;
+        if (!enabled) {
+            setLoading(false);
+            setStatus(tRef.current('Mất Kết Nối'));
+            reloadRef.current = null;
+            return () => {
+                destroyedRef.current = true;
+                closingRef.current = true;
+            };
+        }
 
         const canvas = canvasRef.current;
         const body = frameRef.current || bodyRef.current;
@@ -159,11 +170,9 @@ export function useTileStream(args: Args) {
         }
 
         function fnv1a32(u8: Uint8Array): number {
-            // 32-bit FNV-1a
             let h = 0x811c9dc5;
             for (let i = 0; i < u8.length; i++) {
                 h ^= u8[i];
-                // h *= 16777619 (use bit ops)
                 h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
             }
             return h >>> 0;
@@ -182,18 +191,15 @@ export function useTileStream(args: Args) {
         // or the WS stays open but stops delivering usable frames.
         let lastPacketAt = Date.now();
         let lastBitmapAt = 0;
-        // Track last decoded dimensions. Some devices change stream resolution on rotation.
-        // A few decoders/workers may get stuck (white screen) on mid-stream dimension changes.
-        // We auto-recover by forcing a fresh connection when it happens.
         let lastVideoW = 0;
         let lastVideoH = 0;
         let lastDimRestartAt = 0;
-        // Track SPS/PPS changes (can happen on some devices when rotating even if width/height stays the same).
-        // tinyh264 sometimes gets stuck on mid-stream parameter set changes -> force reconnect when SPS/PPS changes.
         let lastSpsHash = 0;
         let lastPpsHash = 0;
         let lastParamRestartAt = 0;
-
+        // Changing stream config legitimately changes dimensions/SPS/PPS.
+        // Reconnecting on those successful frames causes the "Đang chờ phản hồi" loop.
+        const reconnectOnStreamParamChange = false;
         let watchdogTimer: number | null = null;
         let initialLoadTimer: number | null = null;
         // Render throttling: keep at most 1 in-flight render per tile, drop older frames.
@@ -379,7 +385,7 @@ export function useTileStream(args: Args) {
                     // A subset of devices/decoders can get stuck (white screen) after that.
                     // When we detect a dimension change after the first frame, force a fresh
                     // WS connection (restart=1) to recover.
-                    if (firstFrame && (width !== lastVideoW || height !== lastVideoH)) {
+                    if (reconnectOnStreamParamChange && firstFrame && (width !== lastVideoW || height !== lastVideoH)) {
                         const now = Date.now();
                         // Throttle: avoid loops if device toggles frequently.
                         if (now - lastDimRestartAt > 1500) {
@@ -443,7 +449,7 @@ export function useTileStream(args: Args) {
                 let startLen = 0;
                 if (payload[2] === 0x01) startLen = 3;
                 else if (payload[2] === 0x00 && payload[3] === 0x01) startLen = 4;
-                if (startLen) {
+                if (reconnectOnStreamParamChange && startLen) {
                     const nalType = payload[startLen] & 0x1f;
                     if (nalType === 7 || nalType === 8) {
                         const now = Date.now();
@@ -716,5 +722,5 @@ export function useTileStream(args: Args) {
             closeWs();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [udid, deviceParam, wsServer, selectOnly]);
+    }, [enabled, udid, deviceParam, wsServer, selectOnly]);
 }
