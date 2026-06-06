@@ -155,9 +155,7 @@ body.sidebarCollapsed {
 
 /* ======= Open device (viewer) ======= */
 #viewerPanel {
-  width: min(560px, 42vw);
-  min-width: 360px;
-  max-width: 95vw;
+  width: 100%;
   background: rgba(18, 18, 18, 0.96);
   border-left: 1px solid #2a2a2a;
   display: flex;
@@ -461,9 +459,9 @@ body.sidebarCollapsed {
 }
 
 .viewerCanvasWrap {
-  height: 100%;
-  max-height: 100%;
-  max-width: 100%;
+  width: 100%;
+  height: auto;
+  max-height: min(90vh, 1200px);
   aspect-ratio: var(--viewer-aspect, 0.5625);
   display: flex;
   align-items: center;
@@ -983,6 +981,8 @@ body.sidebarCollapsed {
 }
 
 .viewerOverlayPanelWrap {
+  width: min(var(--viewer-width, 900px), calc(100vw - 48px));
+  max-width: 98vw;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -991,8 +991,8 @@ body.sidebarCollapsed {
 }
 
 .viewerOverlayPanel {
-  width: fit-content;
-  max-width: min(calc(var(--viewer-width, 1000px) + 280px), 98vw);
+  width: 100%;
+  max-width: 100%;
   height: auto;
   max-height: min(90vh, 1200px);
   background: #1a1a1a;
