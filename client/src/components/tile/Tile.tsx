@@ -204,12 +204,11 @@ function TileComponent({
         selectOnly(udid);
     }, [selectOnly, udid]);
 
-    const onPointerEnter = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-        if (e.altKey) {
-            selectOnly(udid);
-            canvasRef.current?.focus?.();
-        }
-    }, [selectOnly, udid]);
+    const onPointerEnter = useCallback(() => {
+        if (isDisconnected || isViewing) return;
+        selectOnly(udid);
+        canvasRef.current?.focus?.({ preventScroll: true });
+    }, [isDisconnected, isViewing, selectOnly, udid]);
 
     const onPointerLeave = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
         // Khi chuột rời khỏi máy này, nếu đang bật đồng bộ thì lập tức trả focus về máy Main
