@@ -2271,7 +2271,18 @@ export function App() {
                         onContextMenu={e => {
                           e.preventDefault()
                           e.stopPropagation()
-                          setContextMenuTarget({ x: e.clientX, y: e.clientY, udid: id, sourceGrid: 'main', groupIdx: undefined })
+                          const removeGroupIdx =
+                            activeGroupIdx !== null &&
+                            savedGroups[activeGroupIdx]?.udids.includes(id)
+                              ? activeGroupIdx
+                              : undefined;
+                          setContextMenuTarget({
+                            x: e.clientX,
+                            y: e.clientY,
+                            udid: id,
+                            sourceGrid: 'main',
+                            groupIdx: removeGroupIdx
+                          })
                           setContextMenuInput(String(orderMap.get(id) ?? 0))
                           setContextMenuOpen(true)
                         }}
@@ -2971,18 +2982,31 @@ export function App() {
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,96,96,0.1)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   onPointerDown={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    const { udid, groupIdx } = contextMenuTarget!
-                    if (groupIdx === undefined) return
-                    setSavedGroups(prev => prev.map((g, i) =>
-                      i === groupIdx ? { ...g, udids: g.udids.filter(u => u !== udid) } : g
-                    ))
-                    if (activeGroupIdx === groupIdx) {
-                      setConnectSelection(prev => { const s = new Set(prev); s.delete(udid); return s })
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const { udid, groupIdx } = contextMenuTarget!;
+                    if (groupIdx === undefined) return;
+
+                    setSavedGroups(prev =>
+                      prev.map((g, i) =>
+                        i === groupIdx
+                          ? { ...g, udids: g.udids.filter(u => u !== udid) }
+                          : g
+                      )
+                    );
+
+                    if (activeGroupIdx === groupIdx || focusGroupIdx === groupIdx) {
+                      setConnectSelection(prev => {
+                        const next = new Set(prev);
+                        next.delete(udid);
+                        return next;
+                      });
                     }
-                    setContextMenuTarget(null)
-                    setContextMenuOpen(false)
+
+                    setContextMenuTarget(null);
+                    setContextMenuOpen(false);
+                    setSubMenuOpen(false);
                   }}
                 >
                   <span>🗑</span> Xoá khỏi nhóm <strong style={{ color: '#ff8080', fontSize: 11 }}>"{savedGroups[contextMenuTarget.groupIdx!]?.name}"</strong>
