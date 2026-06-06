@@ -319,7 +319,7 @@ export function App() {
   const [connectSelection, setConnectSelection] = useState<Set<string>>(
     () => new Set(syncTargets)
   )
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const selectionBadgeRef = useRef<HTMLDivElement | null>(null);
 
   const [allKnownDevices, setAllKnownDevices] = useState<Array<{ udid: string; name?: string }>>(() => {
     try {
@@ -388,13 +388,35 @@ export function App() {
     return () => window.removeEventListener('mousedown', handleClickOutside);
   }, [contextMenuOpen]);
 
-  // Track vị trí chuột cho tooltip
+  // Track vị trí chuột cho tooltip (dùng RAF + style transform trực tiếp để tránh rerender)
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY });
+    let raf = 0;
+    let lastX = 0;
+    let lastY = 0;
+
+    const apply = () => {
+      raf = 0;
+      const el = selectionBadgeRef.current;
+      if (!el) return;
+
+      el.style.transform = `translate3d(${lastX + 14}px, ${lastY + 14}px, 0)`;
     };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+
+    const onPointerMove = (e: PointerEvent) => {
+      lastX = e.clientX;
+      lastY = e.clientY;
+
+      if (!raf) {
+        raf = window.requestAnimationFrame(apply);
+      }
+    };
+
+    window.addEventListener('pointermove', onPointerMove, true);
+
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove, true);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
   }, []);
 
   const [connectModalOpen, setConnectModalOpen] = useState(false)
@@ -3013,18 +3035,14 @@ export function App() {
         </div>
       )}
 
-      {/* === Tooltip số device theo con trỏ chuột === */}
-      {connectSelection.size > 0 && (
-        <div
-          className="cursorDeviceTooltip"
-          style={{
-            left: mousePos.x + 14,
-            top: mousePos.y + 14,
-          }}
-        >
-          {connectSelection.size}
-        </div>
-      )}
+      {/* === Floating Badge số device theo con trỏ chuột (tối ưu hiệu năng) === */}
+      <div
+        ref={selectionBadgeRef}
+        className={`selectionFloatingBadge${selectedVisible.length > 0 ? ' visible' : ''}`}
+        aria-hidden={selectedVisible.length === 0}
+      >
+        {selectedVisible.length}
+      </div>
     </>
   )
 }
