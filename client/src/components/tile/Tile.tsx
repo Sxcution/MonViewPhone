@@ -275,6 +275,8 @@ function TileComponent({
         <div
             className={tileClass}
             data-udid={udid}
+            onPointerEnter={onPointerEnter}
+            onPointerLeave={onPointerLeave}
         >
             {showTileInfo ? (
                 <TileHeader
@@ -300,7 +302,7 @@ function TileComponent({
                 />
             ) : null}
 
-            <div className="tileBody" ref={bodyRef} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
+            <div className="tileBody" ref={bodyRef}>
                 {isDisconnected ? (
                     <div className="tileDisconnectedOverlay">
                         <div className="tileDisconnectedIcon" aria-hidden="true">

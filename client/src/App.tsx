@@ -776,6 +776,7 @@ export function App() {
     useTileOrder(allGridUdids)
   const filteredRegistered = useMemo(() => {
     return registeredUdids.filter(id => {
+      if (!connectedUdids.has(id)) return false
       if (deviceFilter !== 'all') {
         const type = getDeviceConnectionType(id)
         if (type !== deviceFilter) return false
@@ -786,7 +787,7 @@ export function App() {
       }
       return true
     })
-  }, [registeredUdids, deviceFilter, getDeviceConnectionType, focusGroupIdx, savedGroups])
+  }, [registeredUdids, connectedUdids, deviceFilter, getDeviceConnectionType, focusGroupIdx, savedGroups])
   const orderMap = useMemo(() => {
     const m = new Map<string, number>()
     mergedOrder.forEach((id, idx) => m.set(id, getTileNumber(id, idx + 1)))
@@ -1119,7 +1120,7 @@ export function App() {
   // Ctrl + A chon tat ca thiet bi để chọn tất cả thiết bị
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+A chọn tất cả (chỉ chọn nhóm online)
+      // Ctrl+A chọn tất cả (chỉ chọn nhóm online vì đã lọc ở filteredRegistered)
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA') {
         const active = document.activeElement?.nodeName.toLowerCase()
         if (
@@ -1128,12 +1129,12 @@ export function App() {
         )
           return
         e.preventDefault()
-        setConnectSelection(new Set(orderedRegistered.filter(id => connectedUdids.has(id))))
+        setConnectSelection(new Set(orderedRegistered))
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [orderedRegistered, connectedUdids])
+  }, [orderedRegistered])
 
   const [draftConfig, setDraftConfig] = useState<StreamConfig>(STREAM_CONFIG)
   // Track aspect ratio so stream height follows width
