@@ -70,7 +70,10 @@
       "is_server_restarting": "restarting",
       "all_known_devices": "allKnownDevices",
       "stream_config_key": "streamConfig",
+      "viewer_stream_config_key": "viewerStreamConfig",
       "draft_config": "draftConfig",
+      "draft_viewer_config": "draftViewerConfig",
+      "suppress_loading_overlay": "suppressLoadingOverlay",
       "sub_menu_open": "subMenuOpen"
     },
     "handlers": {

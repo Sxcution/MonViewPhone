@@ -102,7 +102,7 @@ function TileComponent({
 
     // Expose a per-tile reload handler to the UI (header/menu buttons)
     // and to parent App ("reload all tiles").
-    const reloadRef = useRef<(() => void) | null>(null);
+    const reloadRef = useRef<((opts?: { silent?: boolean }) => void) | null>(null);
 
     // Keep latest streamConfig in a ref so ws.onopen/reload always send newest config
     // without forcing the heavy streaming effect to re-run on every slider tick.
@@ -114,9 +114,9 @@ function TileComponent({
     // Register a stable reload wrapper with the parent (App) so it can "reload all tiles".
     useEffect(() => {
         if (!onRegisterReload) return;
-        const wrapper = () => {
+        const wrapper = (opts?: { silent?: boolean }) => {
             try {
-                reloadRef.current?.();
+                reloadRef.current?.(opts);
             } catch {
                 // ignore
             }
@@ -159,6 +159,7 @@ function TileComponent({
             if (!w || !h) return;
             setVideoAspect(w / h);
         },
+        suppressLoadingOverlay: isViewing,
     });
 
     // Lắng nghe sự kiện nhả phím Alt (KeyUp) để khôi phục focus về máy Main

@@ -10,6 +10,7 @@ type Args = {
     deviceParam: string | null;
     wsServer: string;
     enabled?: boolean;
+    suppressLoadingOverlay?: boolean;
 
     // DOM refs
     canvasRef: MutableRefObject<HTMLCanvasElement | null>;
@@ -37,7 +38,7 @@ type Args = {
     setLoading: (b: boolean) => void;
 
     // Exposed reload ref (used by header/menu + parent App for reload-all)
-    reloadRef: MutableRefObject<(() => void) | null>;
+    reloadRef: MutableRefObject<((opts?: { silent?: boolean }) => void) | null>;
 
     // Notify caller about current video dimensions (per-tile aspect ratio)
     onVideoDims?: (w: number, h: number) => void;
@@ -59,6 +60,7 @@ export function useTileStream(args: Args) {
         deviceParam,
         wsServer,
         enabled = true,
+        suppressLoadingOverlay = false,
         canvasRef,
         bodyRef,
         frameRef,
@@ -99,6 +101,14 @@ export function useTileStream(args: Args) {
     useEffect(() => {
         setAltSoloUdidRef.current = setAltSoloUdid;
     }, [setAltSoloUdid]);
+
+    const suppressLoadingOverlayRef = useRef(suppressLoadingOverlay);
+    useEffect(() => {
+        suppressLoadingOverlayRef.current = suppressLoadingOverlay;
+    }, [suppressLoadingOverlay]);
+
+    const silentReconnectRef = useRef(false);
+    const isSilent = () => suppressLoadingOverlayRef.current || silentReconnectRef.current;
 
     useEffect(() => {
         destroyedRef.current = false;
@@ -234,7 +244,9 @@ export function useTileStream(args: Args) {
 
         function makeDecoder() {
             firstFrame = false;
-            setLoading(true);
+            if (!isSilent()) {
+                setLoading(true);
+            }
             decoderReady = false;
 
             // Tear down previous worker if any
@@ -332,6 +344,7 @@ export function useTileStream(args: Args) {
                         }
                         setLoading(false);
                         setStatus('');
+                        silentReconnectRef.current = false;
                     }
 
                     // Mark render as healthy.
@@ -577,7 +590,9 @@ export function useTileStream(args: Args) {
             closingRef.current = false;
             wsRef.current = ws;
 
-            setStatus(tRef.current('Đang kết nối…'));
+            if (!isSilent()) {
+                setStatus(tRef.current('Đang kết nối…'));
+            }
 
             // If we don't get the first decoded frame within 10 seconds,
             // auto-reload this tile (same device) to recover from the stuck 'loading' state.
@@ -588,17 +603,23 @@ export function useTileStream(args: Args) {
             initialLoadTimer = window.setTimeout(() => {
                 if (destroyedRef.current || closingRef.current) return;
                 if (firstFrame) return;
-                setStatus(tRef.current('⏱️ tải >10s - đang reload…'));
-                setLoading(true);
+                if (!isSilent()) {
+                    setStatus(tRef.current('⏱️ tải >10s - đang reload…'));
+                    setLoading(true);
+                }
                 firstConnect = true; // force fresh GOP (SPS/PPS + IDR)
                 connect();
             }, 10_000);
 
             ws.onopen = () => {
-                setStatus(tRef.current('WS mở → gửi config BINARY…'));
+                if (!isSilent()) {
+                    setStatus(tRef.current('WS mở → gửi config BINARY…'));
+                }
                 try {
                     ws.send(buildConfigBinary(streamCfgRef.current));
-                    setStatus(tRef.current("Đang chờ phản hồi"));
+                    if (!isSilent()) {
+                        setStatus(tRef.current("Đang chờ phản hồi"));
+                    }
                 } catch (e) {
                     console.error('send binary config failed', e);
                     setStatus(tRef.current('❌ Thất bại'));
@@ -622,6 +643,8 @@ export function useTileStream(args: Args) {
                     clearTimeout(initialLoadTimer);
                     initialLoadTimer = null;
                 }
+                // When WS closes unexpectedly, fall back to normal non-silent connection state
+                silentReconnectRef.current = false;
                 setStatus(
                     tRef.current('WS đóng ({code}{reason}) - thử lại…', {
                         code: e.code,
@@ -643,10 +666,13 @@ export function useTileStream(args: Args) {
         }
 
         // Allow user to manually reload this tile (recreate workers + reconnect WS).
-        reloadRef.current = () => {
+        reloadRef.current = (opts?: { silent?: boolean }) => {
             if (destroyedRef.current) return;
-            setLoading(true);
-            setStatus(tRef.current('Đang reload…'));
+            silentReconnectRef.current = Boolean(opts?.silent);
+            if (!silentReconnectRef.current) {
+                setLoading(true);
+                setStatus(tRef.current('Đang reload…'));
+            }
             // Force server-side restart on next connect (same behavior as first connect).
             firstConnect = true;
             connect();

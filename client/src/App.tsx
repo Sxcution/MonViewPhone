@@ -52,6 +52,7 @@ const VIEWER_WIDTH_MAX = 900
 const STREAM_WIDTH_MIN = 100
 const STREAM_WIDTH_MAX = 726
 const VIEWER_STREAM_WIDTH = STREAM_WIDTH_MAX
+const VIEWER_STREAM_WIDTH_MAX = 1200
 
 type ConnectRequestPayload = {
   device: string
@@ -64,6 +65,7 @@ const CONNECT_CHECK_DEVICE_MESSAGE =
 const QUICK_ACTION_ORDER_KEY = 'quickActionOrder'
 const SAVED_GROUPS_KEY = 'savedGroups'
 const STREAM_CONFIG_KEY = 'streamConfig'
+const VIEWER_STREAM_CONFIG_KEY = 'viewerStreamConfig'
 const SAVED_GROUPS_BACKUP_KEY = 'savedGroupsBackupV1'
 const SAVED_GROUPS_DELETED_ALL_KEY = 'savedGroupsDeletedAllV1'
 
@@ -237,7 +239,43 @@ export function App() {
     } catch { }
     return STREAM_CONFIG
   })
-  const reloadMap = useRef<Map<string, () => void>>(new Map())
+  const reloadMap = useRef<Map<string, (opts?: { silent?: boolean }) => void>>(new Map())
+
+  const [viewerStreamConfig, setViewerStreamConfig] = useState<StreamConfig>(() => {
+    try {
+      const saved = localStorage.getItem(VIEWER_STREAM_CONFIG_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        return {
+          ...STREAM_CONFIG,
+          ...parsed,
+          bounds: { ...STREAM_CONFIG.bounds, ...parsed.bounds }
+        }
+      }
+    } catch {}
+
+    const width = 1000
+    const baseAspect =
+      STREAM_CONFIG.bounds.width && STREAM_CONFIG.bounds.height
+        ? STREAM_CONFIG.bounds.height / STREAM_CONFIG.bounds.width
+        : 16 / 9
+
+    return {
+      ...STREAM_CONFIG,
+      bitrate: 8_388_608,
+      maxFps: 60,
+      bounds: {
+        width,
+        height: Math.round(width * baseAspect)
+      }
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEWER_STREAM_CONFIG_KEY, JSON.stringify(viewerStreamConfig))
+    } catch {}
+  }, [viewerStreamConfig])
   const [viewerUdid, setViewerUdid] = useState<string | null>(null)
   const apkInputRef = useRef<HTMLInputElement | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
@@ -258,8 +296,6 @@ export function App() {
     } catch { }
     return VIEWER_WIDTH_MAX
   })
-  const [viewerOverrideConfig, setViewerOverrideConfig] =
-    useState<StreamConfig | null>(null)
   const lastViewedRef = useRef<string | null>(null)
   const [draggingTile, setDraggingTile] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
@@ -583,9 +619,6 @@ export function App() {
   const unregisterReload = useCallback((udid: string) => {
     reloadMap.current.delete(udid)
   }, [])
-  // useEffect(() => {
-  //   console.log(viewerOverrideConfig)
-  // }, [viewerOverrideConfig])
   const PHONE_SHELL_RATIO = 20 / 9;
   const DEFAULT_DIMS: TileDims = { width: 350, height: Math.round(350 * PHONE_SHELL_RATIO) }
 
@@ -1163,6 +1196,8 @@ export function App() {
   }, [orderedRegistered])
 
   const [draftConfig, setDraftConfig] = useState<StreamConfig>(STREAM_CONFIG)
+  const [draftViewerConfig, setDraftViewerConfig] = useState<StreamConfig>(viewerStreamConfig)
+
   // Track aspect ratio so stream height follows width
   const boundsAspectRef = useRef<number>(
     STREAM_CONFIG.bounds.height && STREAM_CONFIG.bounds.width
@@ -1194,6 +1229,10 @@ export function App() {
     bitrateDragRef.current = false
   }, [streamConfig])
 
+  useEffect(() => {
+    setDraftViewerConfig(viewerStreamConfig)
+  }, [viewerStreamConfig])
+
   const normalizeStreamConfig = (cfg: StreamConfig): StreamConfig => {
     const bitrate = clamp(cfg.bitrate, 524288, 8_388_608)
     const maxFps = clamp(cfg.maxFps, 1, 60)
@@ -1213,32 +1252,48 @@ export function App() {
     }
   }
 
-  const buildViewerConfig = useCallback((base: StreamConfig): StreamConfig => {
-    const width = clamp(VIEWER_STREAM_WIDTH, STREAM_WIDTH_MIN, STREAM_WIDTH_MAX)
-    const aspect =
-      base.bounds?.width && base.bounds?.height
-        ? base.bounds.height / base.bounds.width
-        : boundsAspectRef.current || 1
-    const height = clamp(Math.round(width * aspect), STREAM_WIDTH_MIN, 4000)
+  const normalizeViewerStreamConfig = (cfg: StreamConfig): StreamConfig => {
+    const bitrate = clamp(cfg.bitrate, 524288, 8_388_608)
+    const maxFps = clamp(cfg.maxFps, 1, 60)
+    const iFrameInterval = clamp(cfg.iFrameInterval, 0, 60)
+    const width = clamp(cfg.bounds?.width ?? 0, STREAM_WIDTH_MIN, VIEWER_STREAM_WIDTH_MAX)
+    const height = clamp(cfg.bounds?.height ?? 0, STREAM_WIDTH_MIN, 4000)
+    const displayId = Math.max(0, Math.floor(cfg.displayId ?? 0))
     return {
-      ...base,
+      bitrate,
+      maxFps,
+      iFrameInterval,
       bounds: { width, height },
-      bitrate: 8_388_608,
-      maxFps: 60
+      sendFrameMeta: Boolean(cfg.sendFrameMeta),
+      displayId,
+      codecOptions: cfg.codecOptions,
+      encoderName: cfg.encoderName
     }
-  }, [])
+  }
 
-  // When switching viewer device, reset offset
-  useEffect(() => {
+  const isViewerConfigMode = viewerUdid !== null
+  const activeDraftConfig = isViewerConfigMode ? draftViewerConfig : draftConfig
+
+  const setActiveDraftConfig = useCallback((updater: React.SetStateAction<StreamConfig>) => {
     if (viewerUdid) {
-      lastViewedRef.current = viewerUdid
-      setViewerOffset({ x: 0, y: 0 })
+      setDraftViewerConfig(updater)
     } else {
-      lastViewedRef.current = null
+      setDraftConfig(updater)
     }
   }, [viewerUdid])
 
-  const updateBoundsWidth = (widthRaw: number) => {
+  const reloadAllTiles = useCallback(() => {
+    reloadMap.current.forEach((fn, udid) => {
+      if (viewerUdid === udid) return
+      try {
+        fn?.()
+      } catch {
+        // ignore
+      }
+    })
+  }, [viewerUdid])
+
+  const updateGridBoundsWidth = (widthRaw: number) => {
     const width = clamp(widthRaw, STREAM_WIDTH_MIN, STREAM_WIDTH_MAX)
     const height = Math.max(1, Math.round(width * boundsAspectRef.current))
     setDraftConfig(prev => ({
@@ -1247,19 +1302,20 @@ export function App() {
     }))
   }
 
-  const reloadAllTiles = useCallback(() => {
-    reloadMap.current.forEach(fn => {
-      try {
-        fn?.()
-      } catch {
-        // ignore
-      }
-    })
-  }, [])
+  const updateViewerBoundsWidth = (widthRaw: number) => {
+    const width = clamp(widthRaw, STREAM_WIDTH_MIN, VIEWER_STREAM_WIDTH_MAX)
+    const aspect =
+      draftViewerConfig.bounds.width && draftViewerConfig.bounds.height
+        ? draftViewerConfig.bounds.height / draftViewerConfig.bounds.width
+        : boundsAspectRef.current || 1
+    const height = Math.max(1, Math.round(width * aspect))
+    setDraftViewerConfig(prev => ({
+      ...prev,
+      bounds: { width, height }
+    }))
+  }
 
-
-
-  const applyDraftConfig = useCallback(() => {
+  const applyGridDraftConfig = useCallback(() => {
     const next = normalizeStreamConfig(draftConfig)
     setStreamConfig(prev => {
       if (sameStreamConfig(prev, next)) return prev
@@ -1267,6 +1323,22 @@ export function App() {
       return next
     })
   }, [draftConfig, reloadAllTiles])
+
+  const applyViewerDraftConfig = useCallback(() => {
+    const next = normalizeViewerStreamConfig(draftViewerConfig)
+    setViewerStreamConfig(prev => {
+      if (sameStreamConfig(prev, next)) return prev
+      return next
+    })
+  }, [draftViewerConfig])
+
+  const applyActiveDraftConfig = useCallback(() => {
+    if (viewerUdid) {
+      applyViewerDraftConfig()
+    } else {
+      applyGridDraftConfig()
+    }
+  }, [viewerUdid, applyViewerDraftConfig, applyGridDraftConfig])
 
   const handleBitrateChange = (val: number) => {
     const needsConfirm = val > BITRATE_WARN_THRESHOLD && !bitrateWarnAccepted
@@ -1293,6 +1365,38 @@ export function App() {
     }
   }
 
+  const prevViewerRef = useRef<string | null>(null)
+
+  // Reload single tile silently when opening/closing viewer or when viewer config changes
+  useEffect(() => {
+    const prev = prevViewerRef.current
+
+    // Case 1: Viewer is currently open
+    if (viewerUdid) {
+      const fn = reloadMap.current.get(viewerUdid)
+      try {
+        fn?.({ silent: true })
+      } catch {}
+
+      // If we switched from another viewer device, reload that previous device silently so it returns to grid config
+      if (prev && prev !== viewerUdid) {
+        const prevFn = reloadMap.current.get(prev)
+        try {
+          prevFn?.({ silent: true })
+        } catch {}
+      }
+      prevViewerRef.current = viewerUdid
+    }
+    // Case 2: Viewer was closed (viewerUdid is null)
+    else if (prev) {
+      const fn = reloadMap.current.get(prev)
+      try {
+        fn?.({ silent: true })
+      } catch {}
+      prevViewerRef.current = null
+    }
+  }, [viewerUdid, viewerStreamConfig])
+
   // Auto-apply on slider changes with debounce to avoid spamming reconnects
   useEffect(() => {
     if (skipNextAutoApply.current) {
@@ -1307,7 +1411,7 @@ export function App() {
     }
     if (autoApplyTimer.current) window.clearTimeout(autoApplyTimer.current)
     autoApplyTimer.current = window.setTimeout(() => {
-      applyDraftConfig()
+      applyActiveDraftConfig()
       autoApplyTimer.current = null
     }, 600)
     return () => {
@@ -1318,7 +1422,8 @@ export function App() {
     }
   }, [
     draftConfig,
-    applyDraftConfig,
+    draftViewerConfig,
+    applyActiveDraftConfig,
     bitrateNeedsConfirm,
     bitrateWarnAccepted,
     bitrateConfirmVisible
@@ -1630,9 +1735,7 @@ export function App() {
                     showTileInfo={showTileInfo}
                     isDisconnected={!isConnected}   // <-- THÊM DÒNG NÀY
                     streamConfig={
-                      viewerUdid === udid && viewerOverrideConfig
-                        ? viewerOverrideConfig
-                        : streamConfig
+                      viewerUdid === udid ? viewerStreamConfig : streamConfig
                     }
                     onRegisterReload={registerReload}
                     onUnregisterReload={unregisterReload}
@@ -1701,16 +1804,35 @@ export function App() {
                     title={t('Reset stream config to default')}
                     aria-label={t('Reset stream config to default')}
                     onClick={() => {
-                      setStreamConfig(STREAM_CONFIG)
-                      setDraftConfig(STREAM_CONFIG)
-                      updateWidth(350)
-                      updateViewerWidthPx(VIEWER_WIDTH_MAX)
-                      setBitrateWarnAccepted(false)
-                      setBitrateConfirmVisible(false)
-                      setBitratePending(null)
-                      setBitrateNeedsConfirm(false)
-                      setBitrateLastSafe(STREAM_CONFIG.bitrate)
-                      reloadAllTiles()
+                      if (viewerUdid) {
+                        const defaultViewerCfg = {
+                          ...STREAM_CONFIG,
+                          bitrate: 8_388_608,
+                          maxFps: 60,
+                          bounds: {
+                            width: 1000,
+                            height: Math.round(1000 * (boundsAspectRef.current || 16 / 9))
+                          }
+                        }
+                        setViewerStreamConfig(defaultViewerCfg)
+                        setDraftViewerConfig(defaultViewerCfg)
+                        updateViewerWidthPx(900)
+                        const fn = reloadMap.current.get(viewerUdid)
+                        try {
+                          fn?.({ silent: true })
+                        } catch {}
+                      } else {
+                        setStreamConfig(STREAM_CONFIG)
+                        setDraftConfig(STREAM_CONFIG)
+                        updateWidth(350)
+                        updateViewerWidthPx(900)
+                        setBitrateWarnAccepted(false)
+                        setBitrateConfirmVisible(false)
+                        setBitratePending(null)
+                        setBitrateNeedsConfirm(false)
+                        setBitrateLastSafe(STREAM_CONFIG.bitrate)
+                        reloadAllTiles()
+                      }
                     }}
                   >
                     <RotateCcw size={12} strokeWidth={2} />
@@ -1796,22 +1918,14 @@ export function App() {
                   aria-label={t('Decrease bitrate')}
                   onClick={() => {
                     const delta = -131072
-                    if (viewerUdid && viewerOverrideConfig) {
-                      const next = clamp(
-                        (viewerOverrideConfig?.bitrate || 0) + delta,
-                        BITRATE_MIN,
-                        BITRATE_MAX
-                      )
-                      setViewerOverrideConfig(prev =>
-                        prev ? { ...prev, bitrate: next } : prev
-                      )
+                    if (viewerUdid) {
+                      setDraftViewerConfig(prev => ({
+                        ...prev,
+                        bitrate: clamp(prev.bitrate + delta, BITRATE_MIN, BITRATE_MAX)
+                      }))
                     } else {
                       handleBitrateChange(
-                        clamp(
-                          draftConfig.bitrate + delta,
-                          BITRATE_MIN,
-                          BITRATE_MAX
-                        )
+                        clamp(draftConfig.bitrate + delta, BITRATE_MIN, BITRATE_MAX)
                       )
                     }
                   }}
@@ -1824,19 +1938,21 @@ export function App() {
                   max={BITRATE_MAX}
                   step='131072'
                   value={
-                    viewerUdid && viewerOverrideConfig
-                      ? viewerOverrideConfig.bitrate
+                    viewerUdid
+                      ? draftViewerConfig.bitrate
                       : draftConfig.bitrate
                   }
-                  onChange={e =>
-                    viewerUdid && viewerOverrideConfig
-                      ? setViewerOverrideConfig(prev =>
-                        prev
-                          ? { ...prev, bitrate: Number(e.target.value) }
-                          : prev
-                      )
-                      : handleBitrateChange(Number(e.target.value))
-                  }
+                  onChange={e => {
+                    const val = Number(e.target.value)
+                    if (viewerUdid) {
+                      setDraftViewerConfig(prev => ({
+                        ...prev,
+                        bitrate: val
+                      }))
+                    } else {
+                      handleBitrateChange(val)
+                    }
+                  }}
                   onMouseDown={onBitratePointerDown}
                   onTouchStart={onBitratePointerDown}
                   onMouseUp={onBitratePointerUp}
@@ -1849,22 +1965,14 @@ export function App() {
                   aria-label={t('Increase bitrate')}
                   onClick={() => {
                     const delta = 131072
-                    if (viewerUdid && viewerOverrideConfig) {
-                      const next = clamp(
-                        (viewerOverrideConfig?.bitrate || 0) + delta,
-                        BITRATE_MIN,
-                        BITRATE_MAX
-                      )
-                      setViewerOverrideConfig(prev =>
-                        prev ? { ...prev, bitrate: next } : prev
-                      )
+                    if (viewerUdid) {
+                      setDraftViewerConfig(prev => ({
+                        ...prev,
+                        bitrate: clamp(prev.bitrate + delta, BITRATE_MIN, BITRATE_MAX)
+                      }))
                     } else {
                       handleBitrateChange(
-                        clamp(
-                          draftConfig.bitrate + delta,
-                          BITRATE_MIN,
-                          BITRATE_MAX
-                        )
+                        clamp(draftConfig.bitrate + delta, BITRATE_MIN, BITRATE_MAX)
                       )
                     }
                   }}
@@ -1872,8 +1980,8 @@ export function App() {
                   +
                 </button>
                 <div className='rcpValue'>
-                  {(viewerUdid && viewerOverrideConfig
-                    ? viewerOverrideConfig.bitrate
+                  {(viewerUdid
+                    ? draftViewerConfig.bitrate
                     : draftConfig.bitrate
                   ).toLocaleString()}
                 </div>
@@ -1884,15 +1992,11 @@ export function App() {
                   className='rcpStepBtn'
                   aria-label={t('Decrease FPS')}
                   onClick={() => {
-                    if (viewerUdid && viewerOverrideConfig) {
-                      const next = clamp(
-                        (viewerOverrideConfig?.maxFps || 1) - 1,
-                        1,
-                        60
-                      )
-                      setViewerOverrideConfig(prev =>
-                        prev ? { ...prev, maxFps: next } : prev
-                      )
+                    if (viewerUdid) {
+                      setDraftViewerConfig(prev => ({
+                        ...prev,
+                        maxFps: clamp(prev.maxFps - 1, 1, 60)
+                      }))
                     } else {
                       setDraftConfig(prev => ({
                         ...prev,
@@ -1908,37 +2012,35 @@ export function App() {
                   min='1'
                   max='60'
                   value={
-                    viewerUdid && viewerOverrideConfig
-                      ? viewerOverrideConfig.maxFps
+                    viewerUdid
+                      ? draftViewerConfig.maxFps
                       : draftConfig.maxFps
                   }
-                  onChange={e =>
-                    viewerUdid && viewerOverrideConfig
-                      ? setViewerOverrideConfig(prev =>
-                        prev
-                          ? { ...prev, maxFps: Number(e.target.value) }
-                          : prev
-                      )
-                      : setDraftConfig(prev => ({
+                  onChange={e => {
+                    const val = Number(e.target.value)
+                    if (viewerUdid) {
+                      setDraftViewerConfig(prev => ({
                         ...prev,
-                        maxFps: Number(e.target.value)
+                        maxFps: val
                       }))
-                  }
+                    } else {
+                      setDraftConfig(prev => ({
+                        ...prev,
+                        maxFps: val
+                      }))
+                    }
+                  }}
                   className='modalRange'
                 />
                 <button
                   className='rcpStepBtn'
                   aria-label={t('Increase FPS')}
                   onClick={() => {
-                    if (viewerUdid && viewerOverrideConfig) {
-                      const next = clamp(
-                        (viewerOverrideConfig?.maxFps || 1) + 1,
-                        1,
-                        60
-                      )
-                      setViewerOverrideConfig(prev =>
-                        prev ? { ...prev, maxFps: next } : prev
-                      )
+                    if (viewerUdid) {
+                      setDraftViewerConfig(prev => ({
+                        ...prev,
+                        maxFps: clamp(prev.maxFps + 1, 1, 60)
+                      }))
                     } else {
                       setDraftConfig(prev => ({
                         ...prev,
@@ -1950,8 +2052,8 @@ export function App() {
                   +
                 </button>
                 <div className='rcpValue'>
-                  {viewerUdid && viewerOverrideConfig
-                    ? viewerOverrideConfig.maxFps
+                  {viewerUdid
+                    ? draftViewerConfig.maxFps
                     : draftConfig.maxFps}{' '}
                   fps
                 </div>
@@ -1963,21 +2065,10 @@ export function App() {
                   className='rcpStepBtn'
                   aria-label={t('Decrease stream width')}
                   onClick={() => {
-                    if (viewerUdid && viewerOverrideConfig) {
-                      const w = clamp(
-                        (viewerOverrideConfig?.bounds?.width || 400) - 20,
-                        STREAM_WIDTH_MIN,
-                        STREAM_WIDTH_MAX
-                      )
-                      const h = Math.max(
-                        1,
-                        Math.round(w * boundsAspectRef.current)
-                      )
-                      setViewerOverrideConfig(prev =>
-                        prev ? { ...prev, bounds: { width: w, height: h } } : prev
-                      )
+                    if (viewerUdid) {
+                      updateViewerBoundsWidth(draftViewerConfig.bounds.width - 20)
                     } else {
-                      updateBoundsWidth(draftConfig.bounds.width - 20)
+                      updateGridBoundsWidth(draftConfig.bounds.width - 20)
                     }
                   }}
                 >
@@ -1986,24 +2077,18 @@ export function App() {
                 <input
                   type='range'
                   min={STREAM_WIDTH_MIN}
-                  max={STREAM_WIDTH_MAX}
+                  max={viewerUdid ? VIEWER_STREAM_WIDTH_MAX : STREAM_WIDTH_MAX}
                   value={
-                    viewerUdid && viewerOverrideConfig
-                      ? viewerOverrideConfig.bounds.width
+                    viewerUdid
+                      ? draftViewerConfig.bounds.width
                       : draftConfig.bounds.width
                   }
                   onChange={e => {
-                    if (viewerUdid && viewerOverrideConfig) {
-                      const w = clamp(Number(e.target.value), STREAM_WIDTH_MIN, STREAM_WIDTH_MAX)
-                      const h = Math.max(
-                        1,
-                        Math.round(w * boundsAspectRef.current)
-                      )
-                      setViewerOverrideConfig(prev =>
-                        prev ? { ...prev, bounds: { width: w, height: h } } : prev
-                      )
+                    const val = Number(e.target.value)
+                    if (viewerUdid) {
+                      updateViewerBoundsWidth(val)
                     } else {
-                      updateBoundsWidth(Number(e.target.value))
+                      updateGridBoundsWidth(val)
                     }
                   }}
                   className='modalRange'
@@ -2012,29 +2097,18 @@ export function App() {
                   className='rcpStepBtn'
                   aria-label={t('Increase stream width')}
                   onClick={() => {
-                    if (viewerUdid && viewerOverrideConfig) {
-                      const w = clamp(
-                        (viewerOverrideConfig?.bounds?.width || 400) + 20,
-                        STREAM_WIDTH_MIN,
-                        STREAM_WIDTH_MAX
-                      )
-                      const h = Math.max(
-                        1,
-                        Math.round(w * boundsAspectRef.current)
-                      )
-                      setViewerOverrideConfig(prev =>
-                        prev ? { ...prev, bounds: { width: w, height: h } } : prev
-                      )
+                    if (viewerUdid) {
+                      updateViewerBoundsWidth(draftViewerConfig.bounds.width + 20)
                     } else {
-                      updateBoundsWidth(draftConfig.bounds.width + 20)
+                      updateGridBoundsWidth(draftConfig.bounds.width + 20)
                     }
                   }}
                 >
                   +
                 </button>
                 <div className='rcpValue'>
-                  {viewerUdid && viewerOverrideConfig
-                    ? viewerOverrideConfig.bounds.width
+                  {viewerUdid
+                    ? draftViewerConfig.bounds.width
                     : draftConfig.bounds.width}
                   px
                 </div>
@@ -2500,7 +2574,7 @@ export function App() {
                   setBitratePending(null)
                   setBitrateLastSafe(target)
                   setDraftConfig(prev => ({ ...prev, bitrate: target }))
-                  applyDraftConfig()
+                  applyGridDraftConfig()
                 }}
               >
                 {t('Tiếp tục')}
