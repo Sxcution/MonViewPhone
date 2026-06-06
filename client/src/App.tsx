@@ -1119,7 +1119,7 @@ export function App() {
   // Ctrl + A chon tat ca thiet bi để chọn tất cả thiết bị
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+A chọn tất cả
+      // Ctrl+A chọn tất cả (chỉ chọn nhóm online)
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA') {
         const active = document.activeElement?.nodeName.toLowerCase()
         if (
@@ -1128,12 +1128,12 @@ export function App() {
         )
           return
         e.preventDefault()
-        setConnectSelection(new Set(orderedRegistered))
+        setConnectSelection(new Set(orderedRegistered.filter(id => connectedUdids.has(id))))
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [orderedRegistered])
+  }, [orderedRegistered, connectedUdids])
 
   const [draftConfig, setDraftConfig] = useState<StreamConfig>(STREAM_CONFIG)
   // Track aspect ratio so stream height follows width
@@ -2179,6 +2179,39 @@ export function App() {
                     {connectNotification.text}
                   </div>
                 ) : null}
+                <div className='rcpGridWrap' style={{ marginTop: '12px' }}>
+                  <div className='rcpGrid rcpGridCompact'>
+                    {orderedRegistered.map((id) => (
+                      <label
+                        key={id}
+                        className={`rcpGridItem${connectSelection.has(id) ? ' on' : ''}`}
+                        title={id}
+                        onContextMenu={e => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setContextMenuTarget({ x: e.clientX, y: e.clientY, udid: id, sourceGrid: 'main', groupIdx: undefined })
+                          setContextMenuInput(String(orderMap.get(id) ?? 0))
+                          setContextMenuOpen(true)
+                        }}
+                      >
+                        <input
+                          type='checkbox'
+                          className='sr-only'
+                          checked={connectSelection.has(id)}
+                          onChange={e => {
+                            setConnectSelection(prev => {
+                              const next = new Set(prev)
+                              if (e.target.checked) next.add(id)
+                              else next.delete(id)
+                              return next
+                            })
+                          }}
+                        />
+                        <span>{String(orderMap.get(id) ?? 0).padStart(2, '0')}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 {savedGroups.length > 0 && (
                   <div className='rcpSavedGroups'>
                     {savedGroups.map((group, idx) => (
