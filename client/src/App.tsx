@@ -638,6 +638,9 @@ export function App() {
     [androidDevices, remoteDevices]
   )
   useEffect(() => {
+    let active = true
+    let timeoutId: number | null = null
+
     const connect = () => {
       try {
         const ws = new WebSocket(wsActionUrl(wsServer, 'devices-list'))
@@ -680,16 +683,23 @@ export function App() {
         }
         ws.onclose = () => {
           wsDevicesRef.current = null
+          if (active) {
+            timeoutId = window.setTimeout(connect, 3000)
+          }
         }
         ws.onerror = () => {
           ws.close()
         }
       } catch {
-        // ignore
+        if (active) {
+          timeoutId = window.setTimeout(connect, 3000)
+        }
       }
     }
     connect()
     return () => {
+      active = false
+      if (timeoutId) window.clearTimeout(timeoutId)
       wsDevicesRef.current?.close()
       wsDevicesRef.current = null
     }

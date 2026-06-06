@@ -135,6 +135,7 @@ function TileComponent({
 
     // ===== Streaming pipeline (WS + workers + canvas fit + touch controls) =====
     useTileStream({
+        enabled: !isDisconnected && !isViewing,
         udid,
         deviceParam,
         wsServer,
