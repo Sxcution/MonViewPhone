@@ -1,12 +1,14 @@
 import { clamp, encodeKeycodeMessage, encodeScrollMessage, encodeTouchMessage, KeyEventAction, MotionAction } from './control';
 import type { InputTarget } from '@/context/ActiveContext';
 import { AndroidKeycode } from './keyEvent';
+import { emitAutomationClick } from './automation';
 
 type TargetsGetter = () => InputTarget[];
 
 type ActivePointerState = {
   pid: number;
   // Normalized (0..1) coords from the source canvas, later mapped to each target device.
+  startClient: { x: number; y: number };
   lastXY: { x01: number; y01: number };
   lastButtons: number;
   dirty: boolean;
@@ -132,6 +134,7 @@ export function attachTouchControls(
 
     active.set(e.pointerId, {
       pid,
+      startClient: { x: e.clientX, y: e.clientY },
       lastXY: { x01, y01 },
       lastButtons: buttons,
       dirty: false,
@@ -184,6 +187,21 @@ export function attachTouchControls(
       const { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
       return encodeTouchMessage(MotionAction.UP, st.pid, x, y, w, h, 0, 0);
     }, st.isolated);
+
+    const movedPx = Math.hypot(e.clientX - st.startClient.x, e.clientY - st.startClient.y);
+    if (udid && movedPx <= 8) {
+      const { x, y, w, h } = mapNormToDeviceXY(canvas, x01, y01);
+      emitAutomationClick({
+        udid,
+        x01,
+        y01,
+        x,
+        y,
+        width: w,
+        height: h,
+        timestamp: Date.now(),
+      });
+    }
 
     active.delete(e.pointerId);
     ptr.free(e.pointerId);

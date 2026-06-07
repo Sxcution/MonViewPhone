@@ -6,6 +6,8 @@ import { STREAM_CONFIG, type StreamConfig } from '@/lib/config'
 import { useI18n } from '@/context/I18nContext'
 import { useDirectKeyboard } from '@/hooks/useDirectKeyboard'
 import { DeviceViewer } from '@/components/DeviceViewer'
+import { DeviceSelectionGrid, type DeviceSelectionGridItem } from '@/components/DeviceSelectionGrid'
+import { AutomationModal, type AutomationDeviceOption } from '@/components/AutomationModal'
 import { useActive } from '@/context/ActiveContext'
 import { AndroidKeycode } from '@/lib/keyEvent'
 import { encodeKeycodeMessage, KeyEventAction } from '@/lib/control'
@@ -311,6 +313,7 @@ export function App() {
   const [pageContextMenu, setPageContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [contextMenuInput, setContextMenuInput] = useState('')
   const [globalAdbOpen, setGlobalAdbOpen] = useState(false)
+  const [automationOpen, setAutomationOpen] = useState(false)
   const [globalAdbCommand, setGlobalAdbCommand] = useState('')
   const [globalAdbRunning, setGlobalAdbRunning] = useState(false)
   const [globalAdbStatus, setGlobalAdbStatus] = useState<string | null>(null)
@@ -880,6 +883,18 @@ export function App() {
   const selectedVisible = useMemo(
     () => orderedRegistered.filter(id => connectSelection.has(id)),
     [orderedRegistered, connectSelection]
+  )
+  const automationDevices = useMemo<AutomationDeviceOption[]>(
+    () => orderedRegistered.map(udid => ({ udid, number: orderMap.get(udid) ?? 0 })),
+    [orderedRegistered, orderMap]
+  )
+  const controlGridDevices = useMemo<DeviceSelectionGridItem[]>(
+    () => orderedRegistered.map(udid => ({
+      udid,
+      label: String(orderMap.get(udid) ?? 0).padStart(2, '0'),
+      title: udid
+    })),
+    [orderedRegistered, orderMap]
   )
   const [quickActionOrder, setQuickActionOrder] = useState<QuickActionId[]>(
     loadQuickActionOrder
@@ -1541,7 +1556,7 @@ export function App() {
       automation: {
         label: 'Automation',
         icon: <Bot size={15} strokeWidth={1.8} />,
-        run: () => setGlobalAdbOpen(true)
+        run: () => setAutomationOpen(true)
       }
     }),
     [runQuickAdbCommands, screenshotActiveCanvas, sendKeyTap, quickCommandTargets, getTargetsByUdids]
@@ -2271,48 +2286,36 @@ export function App() {
                   </div>
                 ) : null}
                 <div className='rcpGridWrap' style={{ marginTop: '12px' }}>
-                  <div className='rcpGrid rcpGridCompact'>
-                    {orderedRegistered.map((id) => (
-                      <label
-                        key={id}
-                        className={`rcpGridItem${connectSelection.has(id) ? ' on' : ''}`}
-                        title={id}
-                        onContextMenu={e => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          const removeGroupIdx =
-                            activeGroupIdx !== null &&
-                            savedGroups[activeGroupIdx]?.udids.includes(id)
-                              ? activeGroupIdx
-                              : undefined;
-                          setContextMenuTarget({
-                            x: e.clientX,
-                            y: e.clientY,
-                            udid: id,
-                            sourceGrid: 'main',
-                            groupIdx: removeGroupIdx
-                          })
-                          setContextMenuInput(String(orderMap.get(id) ?? 0))
-                          setContextMenuOpen(true)
-                        }}
-                      >
-                        <input
-                          type='checkbox'
-                          className='sr-only'
-                          checked={connectSelection.has(id)}
-                          onChange={e => {
-                            setConnectSelection(prev => {
-                              const next = new Set(prev)
-                              if (e.target.checked) next.add(id)
-                              else next.delete(id)
-                              return next
-                            })
-                          }}
-                        />
-                        <span>{String(orderMap.get(id) ?? 0).padStart(2, '0')}</span>
-                      </label>
-                    ))}
-                  </div>
+                  <DeviceSelectionGrid
+                    devices={controlGridDevices}
+                    selectedUdids={connectSelection}
+                    onToggleDevice={(id, checked) => {
+                      setConnectSelection(prev => {
+                        const next = new Set(prev)
+                        if (checked) next.add(id)
+                        else next.delete(id)
+                        return next
+                      })
+                    }}
+                    onDeviceContextMenu={(e, id) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      const removeGroupIdx =
+                        activeGroupIdx !== null &&
+                        savedGroups[activeGroupIdx]?.udids.includes(id)
+                          ? activeGroupIdx
+                          : undefined;
+                      setContextMenuTarget({
+                        x: e.clientX,
+                        y: e.clientY,
+                        udid: id,
+                        sourceGrid: 'main',
+                        groupIdx: removeGroupIdx
+                      })
+                      setContextMenuInput(String(orderMap.get(id) ?? 0))
+                      setContextMenuOpen(true)
+                    }}
+                  />
                 </div>
                 {savedGroups.length > 0 && (
                   <div className='rcpSavedGroups'>
@@ -2754,6 +2757,31 @@ export function App() {
           </div>
         </div>
       ) : null}
+
+      <AutomationModal
+        open={automationOpen}
+        devices={automationDevices}
+        selectedUdids={selectedVisible}
+        onToggleDevice={(udid, checked) => {
+          setConnectSelection(prev => {
+            const next = new Set(prev)
+            if (checked) next.add(udid)
+            else next.delete(udid)
+            return next
+          })
+        }}
+        onToggleAllDevices={(checked) => {
+          setConnectSelection(prev => {
+            const next = new Set(prev)
+            automationDevices.forEach(device => {
+              if (checked) next.add(device.udid)
+              else next.delete(device.udid)
+            })
+            return next
+          })
+        }}
+        onClose={() => setAutomationOpen(false)}
+      />
 
       {/* Modal Thêm Nhóm */}
       {groupModalOpen && (

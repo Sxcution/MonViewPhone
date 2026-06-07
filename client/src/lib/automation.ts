@@ -7,7 +7,25 @@ import {
 } from '@/lib/control';
 import type { InputTarget } from '@/context/ActiveContext';
 
-export type ScriptStep =
+export const AUTOMATION_CLICK_EVENT = 'monviewphone:automation-click';
+
+export type AutomationClickDetail = {
+  udid: string;
+  x01: number;
+  y01: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  timestamp: number;
+};
+
+export function emitAutomationClick(detail: AutomationClickDetail) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent<AutomationClickDetail>(AUTOMATION_CLICK_EVENT, { detail }));
+}
+
+export type AutomationStep =
   | { type: 'wait'; ms: number }
   | { type: 'tap'; x01: number; y01: number }
   | { type: 'swipe'; x1: number; y1: number; x2: number; y2: number; durationMs: number }
@@ -15,7 +33,7 @@ export type ScriptStep =
   | { type: 'text'; text: string };
 
 export type ParsedScript = {
-  steps: ScriptStep[];
+  steps: AutomationStep[];
   errors: string[];
 };
 
@@ -45,7 +63,7 @@ function sendSafe(t: InputTarget, u8: Uint8Array) {
 }
 
 export function parseScriptDsl(dsl: string, keyNameToCode: Record<string, number>): ParsedScript {
-  const steps: ScriptStep[] = [];
+  const steps: AutomationStep[] = [];
   const errors: string[] = [];
   const lines = (dsl ?? '').split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
@@ -130,7 +148,7 @@ export function parseScriptDsl(dsl: string, keyNameToCode: Record<string, number
 
 export async function runScript(
   targets: InputTarget[],
-  steps: ScriptStep[],
+  steps: AutomationStep[],
   opts?: { signal?: AbortSignal; log?: (msg: string) => void },
 ) {
   const log = opts?.log ?? (() => {});
@@ -138,7 +156,7 @@ export async function runScript(
 
   for (const step of steps) {
     if (opts?.signal?.aborted) {
-      log('⛔️ Script aborted');
+      log('Script aborted');
       return;
     }
 
@@ -216,5 +234,5 @@ export async function runScript(
     }
   }
 
-  log('✅ Script done');
+  log('Script done');
 }
