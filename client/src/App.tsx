@@ -2769,6 +2769,7 @@ export function App() {
       <AutomationModal
         open={automationOpen}
         devices={automationDevices}
+        savedGroups={savedGroups}
         selectedUdids={selectedVisible}
         onToggleDevice={(udid, checked) => {
           setConnectSelection(prev => {

@@ -5908,7 +5908,7 @@ button:focus-visible {
 
 .automationMacroTable th:nth-child(3),
 .automationMacroTable td:nth-child(3) {
-  width: 88px;
+  width: 112px;
   text-align: center;
 }
 
@@ -5929,6 +5929,7 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+.automationActionSelect,
 .automationDelayInput,
 .automationNoteInput {
   width: 100%;
@@ -5940,10 +5941,35 @@ button:focus-visible {
   border-radius: 4px;
 }
 
+.automationActionSelect {
+  cursor: pointer;
+  background: #252525;
+  border-color: #3d3d3d;
+  font-weight: 650;
+}
+
+.automationDelayCell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-height: 24px;
+}
+
 .automationDelayInput {
   text-align: center;
 }
 
+.automationDelayRandomBadge {
+  display: block;
+  color: #aab4c4;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.automationActionSelect:focus,
 .automationDelayInput:focus,
 .automationNoteInput:focus {
   border-color: #0d6efd;
@@ -6212,6 +6238,13 @@ button:focus-visible {
   background: #3a3a3a;
 }
 
+.automationContextMenuHint {
+  padding: 6px 10px 4px;
+  color: #9aa5b6;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .automationContextMacroItem span {
   min-width: 0;
   overflow: hidden;
@@ -6279,6 +6312,195 @@ button:focus-visible {
   font-weight: 700;
 }
 
+.automationSeedingDialog {
+  width: min(920px, calc(100vw - 470px));
+  max-height: calc(100dvh - 92px);
+  margin: 0;
+}
+
+.automationSeedingContent {
+  max-height: calc(100dvh - 92px);
+}
+
+.automationSeedingBody {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.automationSeedingSection {
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-sm);
+  background: rgba(255, 255, 255, .025);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.automationSeedingJobsSection,
+.automationSeedingLogSection {
+  grid-row: span 2;
+}
+
+.automationSeedingLogSection {
+  grid-column: 1 / -1;
+  grid-row: auto;
+}
+
+.automationSeedingSectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--md-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.automationSeedingSectionHead small {
+  color: var(--md-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.automationSeedingJobList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 315px;
+  overflow: auto;
+}
+
+.automationSeedingJobItem {
+  min-height: 44px;
+  height: auto !important;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  color: var(--md-text);
+  text-align: left;
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-sm);
+}
+
+.automationSeedingJobItem.active,
+.automationSeedingJobItem:hover {
+  border-color: var(--md-border-strong);
+  background: rgba(255, 255, 255, .09);
+}
+
+.automationSeedingJobItem small {
+  color: var(--md-muted);
+  font-size: 11px;
+}
+
+.automationSeedingInput,
+.automationSeedingTextarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-sm);
+  background: rgba(255, 255, 255, .055);
+  color: var(--md-text);
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.automationSeedingTextarea {
+  min-height: 112px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.automationSeedingGroupGrid,
+.automationSeedingFormGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.automationSeedingFormGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.automationSeedingGroupGrid label,
+.automationSeedingFormGrid label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  color: var(--md-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.automationSeedingToggleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--md-text-soft);
+  font-size: 12px;
+}
+
+.automationSeedingToggleRow label,
+.automationSeedingSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.automationSeedingPreview,
+.automationSeedingMeta,
+.automationSeedingWarning {
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-sm);
+  background: rgba(255, 255, 255, .035);
+  padding: 8px;
+  color: var(--md-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.automationSeedingPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+
+.automationSeedingWarning {
+  border-color: rgba(245, 158, 11, .45);
+  color: #fbbf24;
+  background: rgba(245, 158, 11, .09);
+}
+
+.automationSeedingActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.automationSeedingLog {
+  min-height: 88px;
+  max-height: 160px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--md-text-soft);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 @media (max-width: 860px) {
   .automationFloatingLayer {
     top: 56px;
@@ -6304,6 +6526,16 @@ button:focus-visible {
   }
 
   .automationTables {
+    grid-template-columns: 1fr;
+  }
+
+  .automationSeedingDialog {
+    width: 100%;
+  }
+
+  .automationSeedingBody,
+  .automationSeedingGroupGrid,
+  .automationSeedingFormGrid {
     grid-template-columns: 1fr;
   }
 }
@@ -6591,6 +6823,7 @@ textarea,
 .vsp-select,
 .vsp-modal-input,
 .modalDeviceRow,
+.automationActionSelect,
 .automationDelayInput,
 .automationNoteInput {
   background: rgba(255, 255, 255, .055);
@@ -6608,6 +6841,7 @@ textarea:focus,
 .vsp-input:focus,
 .vsp-select:focus,
 .vsp-modal-input:focus,
+.automationActionSelect:focus,
 .automationDelayInput:focus,
 .automationNoteInput:focus {
   border-color: var(--md-border-strong) !important;
