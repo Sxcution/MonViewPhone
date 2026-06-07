@@ -93,9 +93,12 @@
       "assign_devices_to_profile": "assignDevicesToProfile",
       "create_profile_for_devices": "createProfileForDevices",
       "assign_macro_to_action": "assignMacroToAction",
+      "remove_binding_impl": "removeBindingImpl",
       "play_app_action": "playAppAction",
-      "get_profile_for_udid": "getProfileForUdid",
-      "get_profiles_for_selected_devices": "getProfilesForSelectedDevices"
+      "rename_profile": "renameProfile",
+      "delete_profile_impl": "deleteProfileImpl",
+      "rename_app_action": "renameAppAction",
+      "delete_app_action_impl": "deleteAppActionImpl"
     },
     "refs": {
       "rubber_band_ref": "rubberBandRef",
@@ -111,12 +114,17 @@
       "automation_app_id": "AutomationAppId",
       "automation_action_macro_binding": "AutomationActionMacroBinding",
       "automation_app_action": "AutomationAppAction",
-      "automation_device_profile": "AutomationDeviceProfile"
+      "automation_device_profile": "AutomationDeviceProfile",
+      "ctx_sub_state": "CtxSubState",
+      "confirm_modal_state": "ConfirmModalState"
     },
     "local_storage_keys": {
       "macros": "automationMacrosV1",
       "app_actions": "automationAppActionsV1",
       "device_profiles": "automationDeviceProfilesV1"
+    },
+    "components": {
+      "confirm_delete_modal": "ConfirmDeleteModal"
     }
   },
   "key_codes": {
