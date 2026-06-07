@@ -3172,8 +3172,8 @@ export function App() {
       {/* === Floating Badge số device theo con trỏ chuột (tối ưu hiệu năng) === */}
       <div
         ref={selectionBadgeRef}
-        className={`selectionFloatingBadge${selectedVisible.length > 0 ? ' visible' : ''}`}
-        aria-hidden={selectedVisible.length === 0}
+        className={`selectionFloatingBadge${selectedVisible.length >= 2 ? ' visible' : ''}`}
+        aria-hidden={selectedVisible.length < 2}
       >
         {selectedVisible.length}
       </div>

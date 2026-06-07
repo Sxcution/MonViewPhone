@@ -1,6 +1,6 @@
 /**
  * VisualAlertPanel.tsx
- * UI component for Visual Alert settings, ROI setup, and toast notifications.
+ * UI component for Visual Alert settings, Multi-ROI setup, and toast notifications.
  * Rendered inside the right config panel in App.tsx.
  */
 
@@ -13,7 +13,9 @@ import {
   ChevronUp,
   Crosshair,
   Eye,
+  Plus,
   RotateCcw,
+  Trash2,
   Volume2,
   X,
 } from 'lucide-react';
@@ -21,10 +23,13 @@ import { useActive } from '@/context/ActiveContext';
 import {
   type VisualAlertConfig,
   type VisualAlertROI,
+  type MultiROIResult,
   DEFAULT_VISUAL_ALERT_CONFIG,
   loadVisualAlertConfig,
   saveVisualAlertConfig,
   scanCanvasROI,
+  scanCanvasROIs,
+  generateROIId,
   playAlertSound,
 } from '@/lib/visualAlertEngine';
 import { useVisualAlert } from '@/hooks/useVisualAlert';
@@ -97,11 +102,15 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
     [],
   );
 
-  // Test scan
+  // Test scan (multi-ROI)
   const [testResult, setTestResult] = useState<string | null>(null);
   const handleTestScan = useCallback(() => {
     if (!registeredUdids.length) {
       setTestResult('Không có máy online');
+      return;
+    }
+    if (!config.rois.length) {
+      setTestResult('Chưa thiết lập điểm quét');
       return;
     }
     const udid = registeredUdids[0];
@@ -110,31 +119,31 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
     if (!result.scanned) {
       setTestResult(`Máy ${String(num).padStart(2, '0')}: Không thể đọc canvas`);
     } else {
-      setTestResult(
-        `Máy ${String(num).padStart(2, '0')}: ${result.pixelCount} pixel đỏ ` +
-        `(ngưỡng: ${config.redThreshold.minPixels})`
+      const lines = result.hits.map(
+        h => `${h.roiName}: ${h.redPixelCount} px ${h.detected ? '✅' : '❌'}`,
       );
+      setTestResult(`Máy ${String(num).padStart(2, '0')}:\n${lines.join('\n')}`);
     }
-    setTimeout(() => setTestResult(null), 4000);
-  }, [registeredUdids, testScanDevice, orderMap, config.redThreshold.minPixels]);
+    setTimeout(() => setTestResult(null), 5000);
+  }, [registeredUdids, testScanDevice, orderMap, config.rois.length]);
 
   const handleTestSound = useCallback(() => {
     testSound();
   }, [testSound]);
 
-  const handleResetROI = useCallback(() => {
-    updateConfig({ roi: { ...DEFAULT_VISUAL_ALERT_CONFIG.roi } });
+  const handleResetROIs = useCallback(() => {
+    updateConfig({ rois: [] });
   }, [updateConfig]);
 
   const handleROISave = useCallback(
-    (roi: VisualAlertROI) => {
-      updateConfig({ roi });
+    (rois: VisualAlertROI[]) => {
+      updateConfig({ rois });
       setRoiModalOpen(false);
     },
     [updateConfig],
   );
 
-  const roiText = `x:${config.roi.x.toFixed(2)} y:${config.roi.y.toFixed(2)} w:${config.roi.w.toFixed(2)} h:${config.roi.h.toFixed(2)}`;
+  const roiCountText = `${config.rois.length} điểm quét`;
 
   return (
     <>
@@ -172,9 +181,11 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
           <div className="visualAlertBody">
             {/* ROI info + setup */}
             <div className="visualAlertRow">
-              <span className="visualAlertLabel">Vùng nhận diện (ROI)</span>
-              <span className="visualAlertROIText">{roiText}</span>
+              <span className="visualAlertLabel">Vùng nhận diện: {roiCountText}</span>
             </div>
+            {config.rois.length > 10 && (
+              <div className="visualAlertROIWarning">⚠ Nhiều ROI có thể ảnh hưởng hiệu năng</div>
+            )}
             <div className="visualAlertActions">
               <button
                 className="visualAlertBtn"
@@ -186,8 +197,8 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
               </button>
               <button
                 className="visualAlertBtn"
-                onClick={handleResetROI}
-                title="Reset ROI"
+                onClick={handleResetROIs}
+                title="Xoá tất cả ROI"
               >
                 <RotateCcw size={13} />
                 <span>Reset</span>
@@ -210,7 +221,7 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
               </button>
             </div>
             {testResult && (
-              <div className="visualAlertTestResult">{testResult}</div>
+              <div className="visualAlertTestResult" style={{ whiteSpace: 'pre-line' }}>{testResult}</div>
             )}
 
             {/* Settings */}
@@ -334,10 +345,10 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
 
       {/* ROI Setup Modal */}
       {roiModalOpen && (
-        <ROISetupModal
+        <MultiROISetupModal
           registeredUdids={registeredUdids}
           orderMap={orderMap}
-          currentROI={config.roi}
+          currentROIs={config.rois}
           redThreshold={config.redThreshold}
           onSave={handleROISave}
           onClose={() => setRoiModalOpen(false)}
@@ -365,30 +376,36 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
   );
 }
 
-/* ── ROI Setup Modal ────────────────────────────────────────────── */
+/* ── Multi-ROI Setup Modal ──────────────────────────────────────── */
 
-type ROISetupModalProps = {
+type MultiROISetupModalProps = {
   registeredUdids: string[];
   orderMap: Map<string, number>;
-  currentROI: VisualAlertROI;
+  currentROIs: VisualAlertROI[];
   redThreshold: VisualAlertConfig['redThreshold'];
-  onSave: (roi: VisualAlertROI) => void;
+  onSave: (rois: VisualAlertROI[]) => void;
   onClose: () => void;
 };
 
-function ROISetupModal({
+function MultiROISetupModal({
   registeredUdids,
   orderMap,
-  currentROI,
+  currentROIs,
   redThreshold,
   onSave,
   onClose,
-}: ROISetupModalProps) {
+}: MultiROISetupModalProps) {
   const { getCanvasForUdid } = useActive();
 
   const [selectedUdid, setSelectedUdid] = useState<string | null>(null);
-  const [roi, setRoi] = useState<VisualAlertROI>({ ...currentROI });
-  const [testResultText, setTestResultText] = useState<string | null>(null);
+  const [draftROIs, setDraftROIs] = useState<VisualAlertROI[]>(
+    currentROIs.map(r => ({ ...r })),
+  );
+  const [activeROIId, setActiveROIId] = useState<string | null>(
+    currentROIs.length > 0 ? currentROIs[0].id : null,
+  );
+  const [testResults, setTestResults] = useState<MultiROIResult | null>(null);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
 
   // Canvas preview ref
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -404,16 +421,30 @@ function ROISetupModal({
     const ctx = dst.getContext('2d');
     if (!ctx) return;
 
-    // Match preview canvas to source aspect ratio
     const container = containerRef.current;
-    const containerW = container?.clientWidth ?? 400;
+    // Use parent width as base (modal body), not container itself (which may auto-size)
+    const parentW = container?.parentElement?.clientWidth ?? 500;
+    const maxW = parentW - 2; // account for border
     const aspect = srcCanvas.height / srcCanvas.width;
-    const previewW = containerW;
-    const previewH = Math.round(containerW * aspect);
+
+    // Cap preview height to ~48vh so the phone screen is fully visible
+    const maxH = Math.round(window.innerHeight * 0.48);
+    let previewW = maxW;
+    let previewH = Math.round(maxW * aspect);
+
+    if (previewH > maxH) {
+      previewH = maxH;
+      previewW = Math.round(maxH / aspect);
+    }
 
     dst.width = previewW;
     dst.height = previewH;
     ctx.drawImage(srcCanvas, 0, 0, previewW, previewH);
+
+    // Sync container size so ROI overlay percentages align with canvas
+    if (container) {
+      container.style.width = `${previewW}px`;
+    }
   }, [selectedUdid, getCanvasForUdid]);
 
   // Draw preview when device selected, and refresh periodically
@@ -427,24 +458,29 @@ function ROISetupModal({
   // ROI drag state
   const dragRef = useRef<{
     type: 'move' | 'resize';
+    roiId: string;
     startX: number;
     startY: number;
     startROI: VisualAlertROI;
   } | null>(null);
 
   const handleROIPointerDown = useCallback(
-    (e: React.PointerEvent, type: 'move' | 'resize') => {
+    (e: React.PointerEvent, roiId: string, type: 'move' | 'resize') => {
       e.preventDefault();
       e.stopPropagation();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      setActiveROIId(roiId);
+      const roi = draftROIs.find(r => r.id === roiId);
+      if (!roi) return;
       dragRef.current = {
         type,
+        roiId,
         startX: e.clientX,
         startY: e.clientY,
         startROI: { ...roi },
       };
     },
-    [roi],
+    [draftROIs],
   );
 
   const handleROIPointerMove = useCallback(
@@ -461,23 +497,27 @@ function ROISetupModal({
       const dy = (e.clientY - dragRef.current.startY) / ch;
 
       const s = dragRef.current.startROI;
+      const roiId = dragRef.current.roiId;
+      const dragType = dragRef.current.type;
 
-      if (dragRef.current.type === 'move') {
-        setRoi({
-          x: Math.max(0, Math.min(1 - s.w, s.x + dx)),
-          y: Math.max(0, Math.min(1 - s.h, s.y + dy)),
-          w: s.w,
-          h: s.h,
-        });
-      } else {
-        // resize
-        setRoi({
-          x: s.x,
-          y: s.y,
-          w: Math.max(0.02, Math.min(1 - s.x, s.w + dx)),
-          h: Math.max(0.02, Math.min(1 - s.y, s.h + dy)),
-        });
-      }
+      setDraftROIs(prev =>
+        prev.map(r => {
+          if (r.id !== roiId) return r;
+          if (dragType === 'move') {
+            return {
+              ...r,
+              x: Math.max(0, Math.min(1 - s.w, s.x + dx)),
+              y: Math.max(0, Math.min(1 - s.h, s.y + dy)),
+            };
+          } else {
+            return {
+              ...r,
+              w: Math.max(0.02, Math.min(1 - s.x, s.w + dx)),
+              h: Math.max(0.02, Math.min(1 - s.y, s.h + dy)),
+            };
+          }
+        }),
+      );
     },
     [],
   );
@@ -486,26 +526,49 @@ function ROISetupModal({
     dragRef.current = null;
   }, []);
 
-  // Test scan inside modal
+  // Add new ROI
+  const handleAddROI = useCallback(() => {
+    const idx = draftROIs.length + 1;
+    const newROI: VisualAlertROI = {
+      id: generateROIId(),
+      name: `Badge ${idx}`,
+      x: 0.45,
+      y: 0.45,
+      w: 0.06,
+      h: 0.04,
+    };
+    setDraftROIs(prev => [...prev, newROI]);
+    setActiveROIId(newROI.id);
+  }, [draftROIs.length]);
+
+  // Delete ROI
+  const handleDeleteROI = useCallback((roiId: string) => {
+    setDraftROIs(prev => {
+      const next = prev.filter(r => r.id !== roiId);
+      return next;
+    });
+    setActiveROIId(prev => (prev === roiId ? null : prev));
+  }, []);
+
+  // Rename ROI
+  const handleRenameROI = useCallback((roiId: string, newName: string) => {
+    setDraftROIs(prev =>
+      prev.map(r => (r.id === roiId ? { ...r, name: newName || r.name } : r)),
+    );
+  }, []);
+
+  // Test scan inside modal (multi-ROI)
   const handleTestInModal = useCallback(() => {
-    if (!selectedUdid) return;
+    if (!selectedUdid || !draftROIs.length) return;
     const canvas = getCanvasForUdid(selectedUdid);
     if (!canvas) {
-      setTestResultText('Không thể đọc canvas');
+      setTestResults(null);
       return;
     }
-    const result = scanCanvasROI(canvas, roi, redThreshold);
-    if (!result.scanned) {
-      setTestResultText('Không thể quét');
-    } else {
-      setTestResultText(
-        `${result.redPixelCount} pixel đỏ (ngưỡng: ${redThreshold.minPixels}) — ${
-          result.redPixelCount >= redThreshold.minPixels ? '✅ ĐỦ' : '❌ CHƯA ĐỦ'
-        }`,
-      );
-    }
-    setTimeout(() => setTestResultText(null), 5000);
-  }, [selectedUdid, getCanvasForUdid, roi, redThreshold]);
+    const result = scanCanvasROIs(canvas, draftROIs, redThreshold);
+    setTestResults(result);
+    setTimeout(() => setTestResults(null), 8000);
+  }, [selectedUdid, getCanvasForUdid, draftROIs, redThreshold]);
 
   // Sort devices by number
   const sortedDevices = useMemo(() => {
@@ -517,17 +580,23 @@ function ROISetupModal({
       .sort((a, b) => a.number - b.number);
   }, [registeredUdids, orderMap]);
 
+  // Active ROI object
+  const activeROI = draftROIs.find(r => r.id === activeROIId) ?? null;
+
   return createPortal(
     <>
-      {/* visualAlertModal : Modal thiết lập vùng ROI */}
+      {/* visualAlertModal : Modal thiết lập Multi-ROI */}
       <div className="visualAlertModalBackdrop" onClick={onClose} />
       <div className="visualAlertModalOverlay" onClick={onClose}>
-        <div className="visualAlertModalCard" onClick={e => e.stopPropagation()}>
+        <div className="visualAlertModalCard visualAlertModalCardWide" onClick={e => e.stopPropagation()}>
           {/* Header */}
           <div className="visualAlertModalHeader">
             <h5 className="visualAlertModalTitle">
               <Crosshair size={16} />
               <span>Thiết lập vùng nhận diện</span>
+              {draftROIs.length > 0 && (
+                <span className="visualAlertROICountBadge">{draftROIs.length}</span>
+              )}
             </h5>
             <button
               type="button"
@@ -568,7 +637,12 @@ function ROISetupModal({
               </>
             ) : (
               <>
-                {/* Canvas preview + ROI overlay */}
+                {/* Guide text */}
+                <div className="visualAlertGuideText">
+                  Chỉ khoanh đúng ô badge đỏ, không khoanh vùng avatar để tránh nhận nhầm ảnh màu đỏ
+                </div>
+
+                {/* Canvas preview + ROI overlays */}
                 <div className="visualAlertPreviewWrap" ref={containerRef}>
                   <canvas
                     ref={previewCanvasRef}
@@ -576,37 +650,139 @@ function ROISetupModal({
                     onPointerMove={handleROIPointerMove}
                     onPointerUp={handleROIPointerUp}
                   />
-                  {/* ROI box overlay */}
-                  <div
-                    className="visualAlertROIBox"
-                    style={{
-                      left: `${roi.x * 100}%`,
-                      top: `${roi.y * 100}%`,
-                      width: `${roi.w * 100}%`,
-                      height: `${roi.h * 100}%`,
-                    }}
-                    onPointerDown={e => handleROIPointerDown(e, 'move')}
-                    onPointerMove={handleROIPointerMove}
-                    onPointerUp={handleROIPointerUp}
-                  >
-                    {/* Resize handle (bottom-right corner) */}
-                    <div
-                      className="visualAlertROIResizeHandle"
-                      onPointerDown={e => handleROIPointerDown(e, 'resize')}
-                    />
+                  {/* Render all ROI overlays */}
+                  {draftROIs.map(roi => {
+                    const isActive = roi.id === activeROIId;
+                    const isLarge = roi.w * roi.h > 0.05;
+                    return (
+                      <div
+                        key={roi.id}
+                        className={`visualAlertROIBox${isActive ? '' : ' inactive'}`}
+                        style={{
+                          left: `${roi.x * 100}%`,
+                          top: `${roi.y * 100}%`,
+                          width: `${roi.w * 100}%`,
+                          height: `${roi.h * 100}%`,
+                        }}
+                        onPointerDown={e => handleROIPointerDown(e, roi.id, 'move')}
+                        onPointerMove={handleROIPointerMove}
+                        onPointerUp={handleROIPointerUp}
+                      >
+                        {/* ROI label */}
+                        <span className="visualAlertROILabel">{roi.name}</span>
+                        {/* Large ROI warning */}
+                        {isLarge && isActive && (
+                          <span className="visualAlertROILargeWarn">⚠</span>
+                        )}
+                        {/* Resize handle only for active ROI */}
+                        {isActive && (
+                          <div
+                            className="visualAlertROIResizeHandle"
+                            onPointerDown={e => handleROIPointerDown(e, roi.id, 'resize')}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Active ROI coordinates */}
+                {activeROI && (
+                  <div className="visualAlertROICoords">
+                    <span>x: {activeROI.x.toFixed(3)}</span>
+                    <span>y: {activeROI.y.toFixed(3)}</span>
+                    <span>w: {activeROI.w.toFixed(3)}</span>
+                    <span>h: {activeROI.h.toFixed(3)}</span>
+                    {activeROI.w * activeROI.h > 0.05 && (
+                      <span className="visualAlertROIWarning" style={{ marginLeft: 4 }}>⚠ Vùng quá lớn</span>
+                    )}
                   </div>
+                )}
+
+                {/* ROI List */}
+                <div className="visualAlertROIList">
+                  <div className="visualAlertROIListHeader">
+                    <span>Danh sách điểm quét ({draftROIs.length})</span>
+                    <button
+                      className="visualAlertAddROIBtn"
+                      onClick={handleAddROI}
+                      title="Thêm điểm quét mới"
+                    >
+                      <Plus size={13} />
+                      Thêm
+                    </button>
+                  </div>
+                  {draftROIs.length === 0 && (
+                    <div className="visualAlertROIEmpty">
+                      Chưa có điểm quét. Nhấn "+ Thêm" để tạo.
+                    </div>
+                  )}
+                  {draftROIs.map(roi => (
+                    <div
+                      key={roi.id}
+                      className={`visualAlertROIItem${roi.id === activeROIId ? ' active' : ''}`}
+                      onClick={() => setActiveROIId(roi.id)}
+                    >
+                      <div className="visualAlertROIItemLeft">
+                        {editingNameId === roi.id ? (
+                          <input
+                            className="visualAlertROINameInput"
+                            autoFocus
+                            defaultValue={roi.name}
+                            onClick={e => e.stopPropagation()}
+                            onBlur={e => {
+                              handleRenameROI(roi.id, e.target.value.trim());
+                              setEditingNameId(null);
+                            }}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                handleRenameROI(roi.id, (e.target as HTMLInputElement).value.trim());
+                                setEditingNameId(null);
+                              }
+                              if (e.key === 'Escape') setEditingNameId(null);
+                            }}
+                          />
+                        ) : (
+                          <span
+                            className="visualAlertROIItemName"
+                            onDoubleClick={e => {
+                              e.stopPropagation();
+                              setEditingNameId(roi.id);
+                            }}
+                            title="Double-click để đổi tên"
+                          >
+                            {roi.name}
+                          </span>
+                        )}
+                        <span className="visualAlertROIItemCoords">
+                          {roi.w.toFixed(2)}×{roi.h.toFixed(2)}
+                        </span>
+                      </div>
+                      <button
+                        className="visualAlertROIDeleteBtn"
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleDeleteROI(roi.id);
+                        }}
+                        title="Xoá điểm quét"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
 
-                {/* ROI coordinates */}
-                <div className="visualAlertROICoords">
-                  <span>x: {roi.x.toFixed(3)}</span>
-                  <span>y: {roi.y.toFixed(3)}</span>
-                  <span>w: {roi.w.toFixed(3)}</span>
-                  <span>h: {roi.h.toFixed(3)}</span>
-                </div>
-
-                {testResultText && (
-                  <div className="visualAlertModalTestResult">{testResultText}</div>
+                {/* Test results */}
+                {testResults && testResults.scanned && (
+                  <div className="visualAlertMultiTestResult">
+                    {testResults.hits.map(h => (
+                      <div key={h.roiId} className="visualAlertMultiTestRow">
+                        <span>{h.roiName}:</span>
+                        <span>{h.redPixelCount} px</span>
+                        <span>{h.detected ? '✅' : '❌'}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
 
                 {/* Modal Actions */}
@@ -620,6 +796,7 @@ function ROISetupModal({
                   <button
                     className="visualAlertModalBtn secondary"
                     onClick={handleTestInModal}
+                    disabled={!draftROIs.length}
                   >
                     <Eye size={13} />
                     Test quét
@@ -633,14 +810,14 @@ function ROISetupModal({
                   </button>
                   <button
                     className="visualAlertModalBtn secondary"
-                    onClick={() => setRoi({ ...DEFAULT_VISUAL_ALERT_CONFIG.roi })}
+                    onClick={() => { setDraftROIs([]); setActiveROIId(null); }}
                   >
                     <RotateCcw size={13} />
                     Reset
                   </button>
                   <button
                     className="visualAlertModalBtn primary"
-                    onClick={() => onSave(roi)}
+                    onClick={() => onSave(draftROIs)}
                   >
                     Lưu
                   </button>

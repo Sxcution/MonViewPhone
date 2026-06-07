@@ -2,12 +2,14 @@
  * useVisualAlert.ts
  * React hook managing the stagger-scan loop, per-device confirm count,
  * cooldown tracking, and alert triggering.
+ * Supports Multi-ROI scanning.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type VisualAlertConfig,
-  scanCanvasROI,
+  type MultiROIResult,
+  scanCanvasROIs,
   playAlertSound,
   showAlertNotification,
   requestNotificationPermission,
@@ -65,25 +67,28 @@ export function useVisualAlert({
     }
   }, [config.enabled]);
 
-  // Core scan function for a single device
+  // Core scan function for a single device (multi-ROI)
   const scanDevice = useCallback(
-    (udid: string): { detected: boolean; pixelCount: number } => {
+    (udid: string): { detected: boolean; totalPixelCount: number } => {
       const cfg = configRef.current;
-      const canvas = getCanvasRef.current(udid);
-      if (!canvas) return { detected: false, pixelCount: 0 };
+      // Skip if no ROIs configured
+      if (!cfg.rois.length) return { detected: false, totalPixelCount: 0 };
 
-      const result = scanCanvasROI(canvas, cfg.roi, cfg.redThreshold);
-      if (!result.scanned) return { detected: false, pixelCount: 0 };
+      const canvas = getCanvasRef.current(udid);
+      if (!canvas) return { detected: false, totalPixelCount: 0 };
+
+      const result: MultiROIResult = scanCanvasROIs(canvas, cfg.rois, cfg.redThreshold);
+      if (!result.scanned) return { detected: false, totalPixelCount: 0 };
 
       const state = deviceStateRef.current.get(udid) ?? { consecutiveHits: 0, lastAlertAt: 0 };
 
       // Check cooldown
       const now = Date.now();
       if (now - state.lastAlertAt < cfg.cooldownSec * 1000) {
-        return { detected: false, pixelCount: result.redPixelCount };
+        return { detected: false, totalPixelCount: result.totalRedPixelCount };
       }
 
-      if (result.redPixelCount >= cfg.redThreshold.minPixels) {
+      if (result.detected) {
         state.consecutiveHits++;
       } else {
         state.consecutiveHits = 0;
@@ -98,18 +103,26 @@ export function useVisualAlert({
         deviceStateRef.current.set(udid, state);
 
         const deviceNumber = orderMapRef.current.get(udid) ?? 0;
+
+        // Collect names of ROIs that triggered
+        const hitNames = result.hits
+          .filter(h => h.detected)
+          .map(h => h.roiName);
+
         playAlertSound();
-        showAlertNotification(deviceNumber);
+        showAlertNotification(deviceNumber, hitNames);
+
+        const roiSuffix = hitNames.length ? `: ${hitNames.slice(0, 2).join(', ')}` : '';
         setLastAlert({
           deviceNumber,
-          message: `Máy ${String(deviceNumber).padStart(2, '0')} phát hiện chấm đỏ`,
+          message: `Máy ${String(deviceNumber).padStart(2, '0')} phát hiện chấm đỏ${roiSuffix}`,
           timestamp: now,
         });
 
-        return { detected: true, pixelCount: result.redPixelCount };
+        return { detected: true, totalPixelCount: result.totalRedPixelCount };
       }
 
-      return { detected: false, pixelCount: result.redPixelCount };
+      return { detected: false, totalPixelCount: result.totalRedPixelCount };
     },
     [],
   );
@@ -156,14 +169,15 @@ export function useVisualAlert({
     };
   }, [config.enabled, config.scanIntervalSec, scanDevice]);
 
-  // Test scan: scan a specific device and return result
+  // Test scan: scan a specific device and return multi-ROI result
   const testScanDevice = useCallback(
-    (udid: string): { pixelCount: number; scanned: boolean } => {
+    (udid: string): MultiROIResult => {
       const cfg = configRef.current;
       const canvas = getCanvasRef.current(udid);
-      if (!canvas) return { pixelCount: 0, scanned: false };
-      const result = scanCanvasROI(canvas, cfg.roi, cfg.redThreshold);
-      return { pixelCount: result.redPixelCount, scanned: result.scanned };
+      if (!canvas || !cfg.rois.length) {
+        return { scanned: false, detected: false, totalRedPixelCount: 0, hits: [] };
+      }
+      return scanCanvasROIs(canvas, cfg.rois, cfg.redThreshold);
     },
     [],
   );
