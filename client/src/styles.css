@@ -28,6 +28,52 @@
   --panel-bg: #202020;
   --panel-border: rgba(255, 255, 255, 0.08);
   --panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+  /* === DESIGN TOKENS - MonDashboard command-center theme === */
+  --md-bg: #020203;
+  --md-bg-soft: #050608;
+  --md-header: #000000;
+  --md-surface: #11141a;
+  --md-surface-2: #18181b;
+  --md-card: #141416;
+  --md-panel: #141416;
+  --md-border: rgba(255, 255, 255, .10);
+  --md-border-strong: rgba(255, 255, 255, .18);
+  --md-text: #f5f5f5;
+  --md-text-soft: #d4d4d8;
+  --md-muted: #9ca3af;
+  --md-muted-2: #71717a;
+  --md-success: #22c55e;
+  --md-warning: #f59e0b;
+  --md-danger: #ef4444;
+  --md-info: #38bdf8;
+  --md-wechat: #07c160;
+  --md-blue: #1677ff;
+  --md-radius-sm: 8px;
+  --md-radius-md: 12px;
+  --md-radius-lg: 16px;
+  --md-shadow-soft: 0 12px 32px rgba(0, 0, 0, .28);
+  --md-shadow-panel: 0 18px 48px rgba(0, 0, 0, .38);
+
+  --bg-base: var(--md-bg);
+  --bg-panel: var(--md-card);
+  --bg-hover: rgba(255, 255, 255, .09);
+  --bg-input: rgba(255, 255, 255, .055);
+  --bg-deep: var(--md-bg-soft);
+
+  --border-color: var(--md-border);
+  --border-subtle: rgba(255, 255, 255, .08);
+  --border-highlight: var(--md-border-strong);
+
+  --text-main: var(--md-text);
+  --text-muted: var(--md-muted);
+  --text-faint: var(--md-muted-2);
+  --text-white: #ffffff;
+
+  --accent-color: var(--md-info);
+  --panel-bg: var(--md-card);
+  --panel-border: var(--md-border);
+  --panel-shadow: var(--md-shadow-soft);
 }
 
 /*
@@ -41,11 +87,14 @@ body {
   height: calc(var(--vh, 1vh) * 100);
   display: flex;
   flex-direction: column;
-  background: #181818;
+  background:
+    radial-gradient(circle at 14% 4%, rgba(56, 189, 248, 0.10), transparent 28%),
+    radial-gradient(circle at 86% 8%, rgba(22, 119, 255, 0.08), transparent 30%),
+    var(--md-bg);
   /* Nền xám đen chống chói */
-  color: #e0e0e0;
+  color: var(--md-text);
   /* Chữ xám nhạt để dịu mắt */
-  font-family: sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   padding-left: var(--sidebar-total);
   box-sizing: border-box;
   overflow: hidden;
@@ -57,6 +106,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: transparent;
 }
 
 body.sidebarCollapsed {
@@ -82,7 +132,8 @@ body.sidebarCollapsed {
   /* horizontal scroll used when viewer opens */
   scrollbar-gutter: stable;
   scrollbar-width: thin;
-  scrollbar-color: #5fa7ff #1a1a1a;
+  background: transparent;
+  scrollbar-color: rgba(255, 255, 255, .16) #050608;
 }
 
 #gridScroll::-webkit-scrollbar {
@@ -91,20 +142,20 @@ body.sidebarCollapsed {
 }
 
 #gridScroll::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: #050608;
   /* thay #1a1a1a */
   border-radius: 10px;
 }
 
 #gridScroll::-webkit-scrollbar-thumb {
-  background: #3a3a3a;
+  background: rgba(255, 255, 255, .16);
   /* bỏ gradient xanh */
   border-radius: 10px;
-  border: 2px solid #1a1a1a;
+  border: 2px solid #050608;
 }
 
 #gridScroll::-webkit-scrollbar-thumb:hover {
-  background: #4a4a4a;
+  background: rgba(255, 255, 255, .24);
 }
 
 #grid,
@@ -5232,13 +5283,13 @@ input[type="number"] {
 
 /* 1. Định nghĩa chuẩn lại bộ biến nếu chưa có (Backup) */
 :root {
-  --bg-base: #181818;
-  --bg-panel: #202020;
-  --bg-hover: #2a2a2a;
-  --text-main: #e0e0e0;
-  --text-muted: #9e9e9e;
-  --border-color: #333333;
-  --accent-color: #5a5a5a;
+  --bg-base: var(--md-bg);
+  --bg-panel: var(--md-card);
+  --bg-hover: rgba(255, 255, 255, .09);
+  --text-main: var(--md-text);
+  --text-muted: var(--md-muted);
+  --border-color: var(--md-border);
+  --accent-color: var(--md-info);
 }
 
 /* 2. Scrollbar đồng bộ Dark Mode */
@@ -6205,4 +6256,452 @@ button:focus-visible {
   .automationTables {
     grid-template-columns: 1fr;
   }
+}
+
+/* === MonDashboard command-center reskin overrides === */
+html,
+body {
+  background-color: var(--md-bg) !important;
+}
+
+#main,
+#gridScroll,
+#grid,
+.devices-grid,
+.tiles-container {
+  background: transparent;
+}
+
+#grid,
+.devices-grid,
+.tiles-container {
+  padding: 4px;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050608;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, .16);
+  border-radius: 8px;
+  border: 2px solid #050608;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, .24);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, .16) #050608;
+}
+
+.tile,
+.modalPanel,
+.confirmPanel,
+.syncModalPanel,
+.vsp-modal,
+.automationContent,
+.automationCoordinatePanel .automationContent,
+.rightConfigPanel,
+.sync-panel,
+.ViewerSidePanel,
+.vsp-panel,
+.rcpSection,
+.modalSubsection,
+.viewerAppsList,
+.tileMenu,
+.contextMenuPanel,
+.pageContextMenu,
+.automationContextMenuPanel,
+.automationChildActionOverlay {
+  color: var(--md-text);
+  background: var(--md-card);
+  border-color: var(--md-border);
+  border-radius: var(--md-radius-sm);
+  box-shadow: var(--md-shadow-soft);
+}
+
+.tile {
+  border: 1px solid var(--md-border);
+  background: var(--md-card);
+  box-shadow: var(--md-shadow-soft);
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.tile:hover {
+  border-color: var(--md-border-strong);
+  background: rgba(255, 255, 255, .09);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .32);
+  transform: translateY(-2px);
+}
+
+.tileBody,
+.tileVideoFrame,
+.viewerBody,
+.viewerCanvasWrap {
+  background: var(--md-bg-soft);
+}
+
+.tileHeader,
+.tileNav,
+.viewerHeader,
+.modalHeader,
+.syncModalHeader,
+.vsp-header,
+.vsp-modal-header,
+.automationHeader,
+.automationSectionTitle {
+  background: rgba(255, 255, 255, .025);
+  border-color: var(--md-border);
+}
+
+#viewerPanel {
+  background: rgba(20, 20, 22, .96);
+  border-left: 1px solid var(--md-border);
+  box-shadow: var(--md-shadow-panel);
+}
+
+.viewerPanelInner,
+.viewerBody.viewMode {
+  background: transparent;
+}
+
+.viewerActions {
+  background: var(--md-card);
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-sm);
+  box-shadow: var(--md-shadow-panel);
+}
+
+.viewerTitle,
+.viewerDeviceName,
+.viewerTab,
+.modalTitle,
+.syncModalTitle,
+.vsp-header-title,
+.vsp-modal-title,
+.automationTitle,
+.rcpTitle,
+.tileHeader .udid,
+.tileHeader .status,
+.tileIndex,
+.confirmTitle,
+.grid-empty-title {
+  color: var(--md-text);
+}
+
+.viewerStatus,
+.viewerToolLabel,
+.viewerToolValue,
+.modalLabel,
+.modalHint,
+.syncModalSubtitle,
+.syncModalHint,
+.vsp-label,
+.vsp-modal-udid,
+.automationCoordinateMeta,
+.automationStatus.muted,
+.automationCoordinateHelp,
+.automationSelectedLabel,
+.grid-empty-text,
+.sidebar-empty-hint {
+  color: var(--md-muted);
+}
+
+button,
+input,
+select,
+textarea,
+.modalBtn,
+.modalBtnPrimary,
+.viewerClose,
+.viewerTab,
+.viewerActionBtn,
+.tileNavBtn,
+.tileMenuBtn,
+.tileRightBtn,
+.tileReloadBtn,
+.tileViewBtn,
+#bottombar button,
+.rcpCollapseBtn,
+.rcpTab,
+.rcpPill,
+.vsp-btn,
+.vsp-modal-tab,
+.automationFloatingLayer .btn,
+.automationBtn,
+.automationCoordinateBtn,
+.automationArrowBtn,
+.automationAppIconButton,
+.automationContextMenuItem {
+  min-height: 0;
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-sm);
+  background: rgba(255, 255, 255, .055);
+  color: var(--md-text);
+  box-shadow: none;
+}
+
+button,
+.modalBtn,
+.modalBtnPrimary,
+.viewerClose,
+.viewerTab,
+.tileNavBtn,
+.tileMenuBtn,
+#bottombar button,
+.rcpCollapseBtn,
+.rcpTab,
+.rcpPill,
+.vsp-btn,
+.vsp-modal-tab,
+.automationFloatingLayer .btn,
+.automationBtn,
+.automationCoordinateBtn,
+.automationArrowBtn,
+.automationAppIconButton,
+.automationContextMenuItem {
+  height: 34px;
+}
+
+button:hover:not(:disabled),
+.modalBtn:hover,
+.viewerClose:hover,
+.viewerTab:hover,
+.tileNavBtn:hover,
+.tileMenuBtn:hover,
+.rcpCollapseBtn:hover,
+.rcpTab:hover,
+.rcpPill:hover,
+.vsp-btn:hover,
+.vsp-modal-tab:hover,
+.automationBtn:hover,
+.automationCoordinateBtn:hover,
+.automationArrowBtn:hover,
+.automationAppIconButton:hover,
+.automationContextMenuItem:hover,
+.automationContextMenuItem:focus {
+  border-color: var(--md-border-strong);
+  background: rgba(255, 255, 255, .09);
+  color: #ffffff;
+}
+
+.modalBtnPrimary,
+.modalBtnPrimary:hover,
+.rcpTab.active,
+.automationBtn.active,
+.automationCoordinateBtn.active,
+.automationBindingBadge,
+.viewerTab.on,
+.vsp-modal-tab.on,
+.automationTitleIcon {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--md-info), var(--md-blue));
+  color: #050608;
+  box-shadow: 0 10px 28px rgba(22, 119, 255, .24);
+}
+
+.modalBtnDanger,
+.automationContextMenuDanger,
+.confirmTitle,
+.modalWarnTitle,
+.automationStatus.error,
+.automationErrorText {
+  color: var(--md-danger) !important;
+}
+
+input,
+select,
+textarea,
+.connectPort,
+.confirmInput,
+.cp-input,
+.cp-select,
+.vsp-input,
+.vsp-select,
+.vsp-modal-input,
+.modalDeviceRow,
+.automationDelayInput,
+.automationNoteInput {
+  background: rgba(255, 255, 255, .055);
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-sm);
+  color: var(--md-text);
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.confirmInput:focus,
+.cp-input:focus,
+.cp-select:focus,
+.vsp-input:focus,
+.vsp-select:focus,
+.vsp-modal-input:focus,
+.automationDelayInput:focus,
+.automationNoteInput:focus {
+  border-color: var(--md-border-strong) !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, .14) !important;
+}
+
+.modalOverlay,
+.syncModalOverlay,
+.vsp-modal-overlay,
+.automationModalBackdrop {
+  background: rgba(0, 0, 0, .62);
+}
+
+.confirmOverlay {
+  z-index: 27000;
+  background: rgba(0, 0, 0, .62);
+}
+
+.modalPanel,
+.confirmPanel,
+.syncModalPanel,
+.vsp-modal,
+.automationContent {
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-sm);
+  background: var(--md-card);
+  box-shadow: var(--md-shadow-panel);
+}
+
+.modalBody,
+.syncModalBody,
+.vsp-body,
+.automationBody,
+.automationCoordinateBody {
+  background: transparent;
+}
+
+.modalSyncBox,
+.syncModalSection,
+.vsp-section,
+.vsp-profile-picker,
+.rcpHeader,
+.rcpPill,
+.automationDeviceBlock,
+.automationActionBlock,
+.automationCoordinateRow,
+.automationCoordinateContext,
+.automationSelectedDeviceBox {
+  background: rgba(255, 255, 255, .025);
+  border-color: var(--md-border);
+  border-radius: var(--md-radius-sm);
+}
+
+.automationCoordinateRow:hover,
+.automationCoordinateRow.open,
+.automationAppIconButton.active,
+.automationSavedMacroBtn:hover,
+.vsp-profile-row:hover,
+.vsp-profile-row.on {
+  border-color: var(--md-border-strong);
+  background: rgba(255, 255, 255, .09);
+}
+
+.automationMacroTable,
+.automationSavedTable,
+.automationCoordinateMiniTable {
+  color: var(--md-text);
+}
+
+.automationMacroTable th,
+.automationSavedTable th,
+.automationCoordinateMiniTable th {
+  background: rgba(255, 255, 255, .055);
+  border-color: var(--md-border);
+  color: var(--md-text);
+}
+
+.automationMacroTable td,
+.automationSavedTable td,
+.automationCoordinateMiniTable td {
+  background: rgba(255, 255, 255, .025);
+  border-color: var(--md-border);
+  color: var(--md-text);
+}
+
+.automationChildActionOverlay::before {
+  background: var(--md-card);
+  border-color: var(--md-border);
+}
+
+.automationChildActionBtn {
+  height: auto;
+  background: transparent;
+  border: 0;
+  color: var(--md-text);
+}
+
+.automationChildActionIcon {
+  border-radius: var(--md-radius-sm);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .34);
+}
+
+.automationContextMenuPanel,
+.contextMenuPanel,
+.pageContextMenu,
+.vsp-ctx-menu,
+.vsp-adb-submenu,
+.dropdown-menu,
+.context-menu {
+  color: var(--md-text) !important;
+  background: var(--md-card) !important;
+  border: 1px solid var(--md-border) !important;
+  border-radius: var(--md-radius-sm) !important;
+  box-shadow: var(--md-shadow-panel) !important;
+}
+
+.automationContextMenuItem,
+.pageContextItem,
+.context-menu-item,
+.dropdown-item,
+.vsp-ctx-item,
+.vsp-adb-submenu-item {
+  color: var(--md-text) !important;
+  border-radius: var(--md-radius-sm);
+}
+
+.automationContextMenuItem:hover,
+.automationContextMenuItem:focus,
+.pageContextItem:hover,
+.context-menu-item:hover,
+.dropdown-item:hover,
+.vsp-ctx-item:hover,
+.vsp-adb-submenu-item:hover {
+  background: rgba(255, 255, 255, .09) !important;
+  color: #ffffff !important;
+}
+
+.automationContextMenuItem:disabled,
+.automationContextMenuItem:disabled:hover {
+  opacity: .48;
+  background: transparent !important;
+  color: var(--md-muted) !important;
+}
+
+.automationContextMenuDivider,
+.context-menu-divider,
+.dropdown-divider,
+.vsp-ctx-divider,
+.tileMenuSep {
+  background: var(--md-border) !important;
+}
+
+.rightConfigPanel,
+.ViewerSidePanel,
+.vsp-panel,
+.sync-panel {
+  background: var(--md-card) !important;
+  border-color: var(--md-border) !important;
+  box-shadow: var(--md-shadow-panel) !important;
 }
