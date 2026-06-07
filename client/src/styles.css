@@ -7011,11 +7011,512 @@ textarea:focus,
   background: var(--md-border) !important;
 }
 
-.rightConfigPanel,
-.ViewerSidePanel,
-.vsp-panel,
-.sync-panel {
-  background: var(--md-card) !important;
-  border-color: var(--md-border) !important;
-  box-shadow: var(--md-shadow-panel) !important;
+
+/* ── Visual Alert ─────────────────────────────────────────────── */
+
+.visualAlertSection {
+  border: 1px solid #343434;
+  border-radius: 6px;
+  background: #202020;
+}
+
+.visualAlertScanBadge {
+  margin-left: 8px;
+  padding: 1px 7px;
+  color: #8ec5ff;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(13, 110, 253, 0.18);
+  border: 1px solid rgba(13, 110, 253, 0.4);
+  border-radius: 999px;
+  animation: visualAlertPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes visualAlertPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Toggle switch */
+.visualAlertToggle {
+  position: relative;
+  width: 38px;
+  height: 20px;
+  padding: 0;
+  background: #3a3a3a;
+  border: 1px solid #555;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.visualAlertToggle.on {
+  background: rgba(13, 110, 253, 0.55);
+  border-color: rgba(13, 110, 253, 0.75);
+}
+
+.visualAlertToggleKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #888;
+  border-radius: 50%;
+  transition: left 0.2s ease, background 0.2s ease;
+}
+
+.visualAlertToggle.on .visualAlertToggleKnob {
+  left: 20px;
+  background: #8ec5ff;
+}
+
+/* Body */
+.visualAlertBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid #343434;
+}
+
+.visualAlertRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.visualAlertLabel {
+  color: #c9d4e5;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.visualAlertROIText {
+  color: #8590a3;
+  font-size: 11px;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+/* Action buttons */
+.visualAlertActions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.visualAlertBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 8px;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 600;
+  background: #2b2b2b;
+  border: 1px solid #3b3b3b;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.visualAlertBtn:hover {
+  border-color: #5a5a5a;
+  background: #343434;
+}
+
+.visualAlertTestResult {
+  padding: 6px 10px;
+  color: #8ec5ff;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(13, 110, 253, 0.1);
+  border: 1px solid rgba(13, 110, 253, 0.3);
+  border-radius: 4px;
+}
+
+/* Settings grid */
+.visualAlertSettingsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.visualAlertSettingItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.visualAlertSettingItem > span {
+  color: #9ca3af;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.visualAlertInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.visualAlertInputWrap input,
+.visualAlertThresholdItem input {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 2px 6px;
+  color: #f8fafc;
+  font-size: 12px;
+  background: #181818;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.visualAlertInputWrap input:focus,
+.visualAlertThresholdItem input:focus {
+  border-color: #0d6efd;
+  outline: none;
+}
+
+/* Hide number spinners */
+.visualAlertInputWrap input[type=number]::-webkit-inner-spin-button,
+.visualAlertInputWrap input[type=number]::-webkit-outer-spin-button,
+.visualAlertThresholdItem input[type=number]::-webkit-inner-spin-button,
+.visualAlertThresholdItem input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.visualAlertUnit {
+  color: #8590a3;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Threshold */
+.visualAlertThresholdTitle {
+  color: #9ca3af;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.visualAlertThresholdGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.visualAlertThresholdItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.visualAlertThresholdItem > span {
+  color: #9ca3af;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.visualAlertLastAlert {
+  padding: 6px 10px;
+  color: #ff9f43;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 159, 67, 0.08);
+  border: 1px solid rgba(255, 159, 67, 0.25);
+  border-radius: 4px;
+}
+
+/* ── Visual Alert Modal ─────────────────────────────────────────── */
+
+.visualAlertModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 27000;
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.visualAlertModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 27001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.visualAlertModalCard {
+  width: 100%;
+  min-width: 380px;
+  max-width: 520px;
+  max-height: calc(100dvh - 80px);
+  color: #f3f4f6;
+  background: #1f1f1f;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.visualAlertModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #242424;
+  border-bottom: 1px solid #343434;
+}
+
+.visualAlertModalTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.visualAlertModalCloseBtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #d9d9d9;
+  background: #2b2b2b;
+  border: 1px solid #454545;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.visualAlertModalCloseBtn:hover {
+  background: #363636;
+}
+
+.visualAlertModalBody {
+  padding: 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Device picker */
+.visualAlertPickerTitle {
+  color: #c9d4e5;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.visualAlertPickerEmpty {
+  color: #8590a3;
+  font-size: 12px;
+  text-align: center;
+  padding: 20px;
+}
+
+.visualAlertPickerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 6px;
+}
+
+.visualAlertPickerDevice {
+  display: grid;
+  place-items: center;
+  height: 42px;
+  padding: 0;
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 700;
+  background: #2a2a2a;
+  border: 1px solid #424242;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.visualAlertPickerDevice:hover {
+  border-color: rgba(13, 110, 253, 0.65);
+  background: #273040;
+}
+
+/* Canvas preview */
+.visualAlertPreviewWrap {
+  position: relative;
+  width: 100%;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #111;
+}
+
+.visualAlertPreviewCanvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* visualAlertROIBox : Draggable ROI overlay */
+.visualAlertROIBox {
+  position: absolute;
+  border: 2px dashed #ff4444;
+  background: rgba(255, 68, 68, 0.12);
+  cursor: move;
+  touch-action: none;
+  box-shadow: 0 0 0 1px rgba(255, 68, 68, 0.3);
+}
+
+.visualAlertROIResizeHandle {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 12px;
+  height: 12px;
+  background: #ff4444;
+  border: 1px solid #cc0000;
+  border-radius: 2px;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.visualAlertROICoords {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 6px;
+  color: #8590a3;
+  font-size: 11px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-weight: 600;
+}
+
+.visualAlertModalTestResult {
+  padding: 6px 10px;
+  color: #8ec5ff;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  background: rgba(13, 110, 253, 0.1);
+  border: 1px solid rgba(13, 110, 253, 0.3);
+  border-radius: 4px;
+}
+
+.visualAlertModalActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.visualAlertModalBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.visualAlertModalBtn.secondary {
+  color: #f8fafc;
+  background: #2b2b2b;
+  border: 1px solid #3b3b3b;
+}
+
+.visualAlertModalBtn.secondary:hover {
+  border-color: #5a5a5a;
+  background: #343434;
+}
+
+.visualAlertModalBtn.primary {
+  color: #8ec5ff;
+  background: rgba(13, 110, 253, 0.22);
+  border: 1px solid rgba(13, 110, 253, 0.75);
+}
+
+.visualAlertModalBtn.primary:hover {
+  background: rgba(13, 110, 253, 0.35);
+}
+
+/* ── Toast Notifications ─────────────────────────────────────── */
+
+/* visualAlertToast : Toast hiển thị khi phát hiện chấm đỏ */
+.visualAlertToastContainer {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 30000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.visualAlertToast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  min-width: 260px;
+  color: #fff;
+  background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(192, 57, 43, 0.45);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: auto;
+  animation: visualAlertToastIn 0.3s ease-out;
+}
+
+@keyframes visualAlertToastIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.visualAlertToast span {
+  flex: 1;
+  min-width: 0;
+}
+
+.visualAlertToastClose {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.12);
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.visualAlertToastClose:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.25);
 }

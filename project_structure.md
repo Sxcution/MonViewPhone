@@ -18,10 +18,13 @@ Removed legacy layers:
 - `client/src/components/ViewerSidePanel.tsx`: Viewer-side controls for profiles, APK install, file import/export, and ADB commands.
 - `client/src/components/SyncPanel.tsx`: Device synchronization UI.
 - `client/src/components/AutomationModal.tsx`: Automation modal with Action + Device Profile + Macro binding system. Manages macro recording/playback, app actions (WeChat/Line/Tantan/Setting), and device profile assignment. Data persisted in localStorage keys: `automationMacrosV1`, `automationAppActionsV1`, `automationDeviceProfilesV1`.
+- `client/src/components/VisualAlertPanel.tsx`: Visual Alert UI panel for red-dot notification detection. Settings, ROI setup modal with canvas preview and draggable ROI overlay, toast notifications. Rendered in right config panel.
 - `client/src/components/tile/`: Tile-specific helpers, headers, stream hook, and phone controls.
 - `client/src/context/ActiveContext.tsx`: Active device, multi-control, and focus state.
 - `client/src/context/I18nContext.tsx`: Translation helper.
 - `client/src/context/ServerContext.tsx`: Backend URL state.
+- `client/src/hooks/useVisualAlert.ts`: React hook managing stagger-scan loop, per-device confirm count, cooldown tracking, and alert triggering for Visual Alert.
+- `client/src/lib/visualAlertEngine.ts`: Pure logic engine for Visual Alert — canvas ROI scanning via getImageData, red pixel counting, AudioContext beep sound, browser Notification API. No React dependencies. Settings persisted in localStorage key: `visualAlertGlobalSettingsV1`.
 - `client/src/lib/serverApi.ts`: HTTP API client for the Go backend.
 - `client/src/store/useTileOrder.ts`: Persistent device numbering and ordering.
 - `client/src/styles.css`: Main application styling.

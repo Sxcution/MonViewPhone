@@ -8,6 +8,7 @@ import { useDirectKeyboard } from '@/hooks/useDirectKeyboard'
 import { DeviceViewer } from '@/components/DeviceViewer'
 import { DeviceSelectionGrid, type DeviceSelectionGridItem } from '@/components/DeviceSelectionGrid'
 import { AutomationModal, type AutomationDeviceOption } from '@/components/AutomationModal'
+import { VisualAlertPanel } from '@/components/VisualAlertPanel'
 import { useActive } from '@/context/ActiveContext'
 import { AndroidKeycode } from '@/lib/keyEvent'
 import { encodeKeycodeMessage, KeyEventAction } from '@/lib/control'
@@ -2195,7 +2196,11 @@ export function App() {
               </div>
             </div>
 
-
+            {/* visualAlertPanel : Section Visual Alert - quét chấm đỏ notification */}
+            <VisualAlertPanel
+              registeredUdids={registeredUdids}
+              orderMap={orderMap}
+            />
 
             <div className='rcpSection rcpDevicePanel'>
 

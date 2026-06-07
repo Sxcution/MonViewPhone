@@ -40,7 +40,14 @@
       "dev_label": "dev-label",
       "reset_btn": "resetBtn",
       "automation_context_profile_current": "automationContextProfileCurrent",
-      "automation_header_notification": "automationHeaderNotification"
+      "automation_header_notification": "automationHeaderNotification",
+      "visual_alert_section": "visualAlertSection",
+      "visual_alert_toggle": "visualAlertToggle",
+      "visual_alert_scan_badge": "visualAlertScanBadge",
+      "visual_alert_roi_box": "visualAlertROIBox",
+      "visual_alert_modal": "visualAlertModalOverlay",
+      "visual_alert_toast": "visualAlertToast",
+      "visual_alert_toast_container": "visualAlertToastContainer"
     },
     "css_variables": {
       "bg_base": "--bg-base",
