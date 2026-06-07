@@ -5627,6 +5627,23 @@ button:focus-visible {
   cursor: grabbing;
 }
 
+.automationHeaderNotification {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex: 1;
+  max-width: 480px;
+  margin: 0 24px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: #181818;
+  border: 1px solid #343434;
+  font-size: 12px;
+  font-weight: 700;
+  color: #dbeafe;
+}
+
 .automationTitle {
   display: flex;
   align-items: center;

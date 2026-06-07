@@ -1868,6 +1868,13 @@ export function AutomationModal({
             <div className='modal-content automationContent automationCoordinateContent'>
               <div className='modal-header automationHeader' onPointerDown={startDrag}>
                 <div className='automationTitle'><Video size={17} /><span>Thiết Lập Macro</span></div>
+                {/* automationHeaderNotification : Thông báo trạng thái thiết bị và macro trên header */}
+                <div className='automationHeaderNotification'>
+                  <span className={selectedList.length > 1 ? 'automationErrorText' : undefined}>
+                    {selectedRecordDevice ? `Máy ghi: #${formatDeviceNo(selectedRecordDevice.number)}` : selectedList.length > 1 ? 'Chỉ chọn 1 thiết bị' : 'Chưa chọn máy'}
+                  </span>
+                  {status ? <span className={`automationStatus${selectedList.length > 1 ? ' error' : ''}`}>{status}</span> : null}
+                </div>
                 <button className='btn-close automationClose' aria-label='Close coordinate panel' onClick={() => setCoordinatePanelOpen(false)}><X size={16} strokeWidth={2} /></button>
               </div>
               <div className='modal-body automationCoordinateBody'>
@@ -1920,12 +1927,6 @@ export function AutomationModal({
                   </div>
                 ) : null}
 
-                <div className='automationCoordinateContext'>
-                  <span className={selectedList.length > 1 ? 'automationErrorText' : undefined}>
-                    {selectedRecordDevice ? `Máy ghi: #${formatDeviceNo(selectedRecordDevice.number)}` : selectedList.length > 1 ? 'Chỉ chọn 1 thiết bị' : 'Chưa chọn máy'}
-                  </span>
-                  {status ? <span className={`automationStatus full${selectedList.length > 1 ? ' error' : ''}`}>{status}</span> : null}
-                </div>
                 <div className='automationCoordinateTables'>
                   <div className='automationMainTableWrap'>
                     <table className='table table-dark table-sm automationMacroTable'>

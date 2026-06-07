@@ -39,7 +39,8 @@
       "dev_status_dot": "dev-status-dot",
       "dev_label": "dev-label",
       "reset_btn": "resetBtn",
-      "automation_context_profile_current": "automationContextProfileCurrent"
+      "automation_context_profile_current": "automationContextProfileCurrent",
+      "automation_header_notification": "automationHeaderNotification"
     },
     "css_variables": {
       "bg_base": "--bg-base",
