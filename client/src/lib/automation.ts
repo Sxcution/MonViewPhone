@@ -222,7 +222,7 @@ export async function runScript(
     }
 
     if (step.type === 'swipe') {
-      const nMoves = Math.max(3, Math.min(30, Math.round(step.durationMs / 40)));
+      const nMoves = Math.max(5, Math.min(60, Math.round(step.durationMs / 16)));
       log(
         `swipe ${step.x1.toFixed(3)} ${step.y1.toFixed(3)} -> ${step.x2.toFixed(3)} ${step.y2.toFixed(3)} (${step.durationMs}ms)`,
       );
@@ -232,9 +232,10 @@ export async function runScript(
       }
 
       const start = Date.now();
+      // Loop intermediate moves. The very last move will be sent instantly before UP to trigger Android Fling.
       for (let i = 1; i < nMoves; i++) {
         if (opts?.signal?.aborted) return;
-        const a = i / (nMoves - 1);
+        const a = i / nMoves;
         const x01 = step.x1 + (step.x2 - step.x1) * a;
         const y01 = step.y1 + (step.y2 - step.y1) * a;
         for (const t of targets) {
@@ -242,13 +243,15 @@ export async function runScript(
           sendSafe(t, encodeTouchMessage(MotionAction.MOVE, 0, x, y, w, h, 1, 1));
         }
         const elapsed = Date.now() - start;
-        const targetElapsed = (step.durationMs * i) / (nMoves - 1);
+        const targetElapsed = (step.durationMs * i) / nMoves;
         const wait = Math.max(0, Math.round(targetElapsed - elapsed));
         if (wait) await sleep(wait);
       }
 
+      // Send the final MOVE at the exact destination immediately followed by UP to maintain high velocity.
       for (const t of targets) {
         const { x, y, w, h } = mapNormToDeviceXY(t.canvas, step.x2, step.y2);
+        sendSafe(t, encodeTouchMessage(MotionAction.MOVE, 0, x, y, w, h, 1, 1));
         sendSafe(t, encodeTouchMessage(MotionAction.UP, 0, x, y, w, h, 0, 0));
       }
       await sleep(120);
