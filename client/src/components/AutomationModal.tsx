@@ -26,6 +26,7 @@ import {
   runScript,
   type AutomationClickDetail,
   type AutomationSwipeDetail,
+  type AutomationStep,
 } from '@/lib/automation';
 
 /* ── types ─────────────────────────────────────────────────────── */
@@ -142,6 +143,26 @@ const AUTOMATION_MACROS_KEY = 'automationMacrosV1';
 const AUTOMATION_APP_ACTIONS_KEY = 'automationAppActionsV1';
 const AUTOMATION_DEVICE_PROFILES_KEY = 'automationDeviceProfilesV1';
 const DEFAULT_DELAY_MS = 1000;
+const AUTOMATION_SETTINGS_KEY = 'automationSettingsV1';
+
+function loadAutomationSettings(): { realtimeRecording: boolean } {
+  try { const v = JSON.parse(localStorage.getItem(AUTOMATION_SETTINGS_KEY) || '{}'); return { realtimeRecording: !!v.realtimeRecording }; } catch { return { realtimeRecording: false }; }
+}
+function saveAutomationSettings(s: { realtimeRecording: boolean }) {
+  try { localStorage.setItem(AUTOMATION_SETTINGS_KEY, JSON.stringify(s)); } catch { /* */ }
+}
+
+/* Convert a macro row to automation steps */
+function rowToSteps(row: AutomationMacroRow): AutomationStep[] {
+  const steps: AutomationStep[] = [];
+  if (row.action === 'swipe' && row.x01 != null && row.y01 != null && row.endX01 != null && row.endY01 != null) {
+    steps.push({ type: 'swipe', x1: row.x01, y1: row.y01, x2: row.endX01, y2: row.endY01, durationMs: row.durationMs ?? 300 });
+  } else if (row.x01 != null && row.y01 != null) {
+    steps.push({ type: 'tap', x01: row.x01, y01: row.y01 });
+  }
+  if (row.delayMs > 0) steps.push({ type: 'wait', ms: row.delayMs });
+  return steps;
+}
 const ONLY_ONE_DEVICE_MSG = 'Chỉ chọn 1 thiết bị';
 const SELECT_ONE_DEVICE_MSG = 'Chọn 1 thiết bị';
 
@@ -345,6 +366,9 @@ export function AutomationModal({
   const selectedRef = useRef<string[]>([]);
   const abortPlaybackRef = useRef<AbortController | null>(null);
   const dragRef = useRef({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 });
+  const [realtimeRecording, setRealtimeRecording] = useState(() => loadAutomationSettings().realtimeRecording);
+  const lastRecordTimestampRef = useRef<number>(0);
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
 
   /* ── memos ── */
 
@@ -505,13 +529,17 @@ export function AutomationModal({
       const selected = selectedRef.current;
       if (!detail?.udid || selected.length !== 1 || detail.udid !== selected[0]) return;
       const sourceNo = deviceByUdid.get(detail.udid)?.number;
+      const now = Date.now();
+      const elapsed = lastRecordTimestampRef.current > 0 ? now - lastRecordTimestampRef.current : 0;
+      const delayMs = realtimeRecording && elapsed > 0 ? elapsed : DEFAULT_DELAY_MS;
+      lastRecordTimestampRef.current = now;
       setRows(prev => [...prev, {
-        id: makeId('step'), action: 'touch', delayMs: DEFAULT_DELAY_MS,
+        id: makeId('step'), action: 'touch', delayMs,
         x01: detail.x01, y01: detail.y01, x: detail.x, y: detail.y,
         width: detail.width, height: detail.height,
         sourceUdid: detail.udid, targetUdids: [detail.udid], note: '',
       }]);
-      setStatus(`Touch${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: x=${detail.x}, y=${detail.y}`);
+      setStatus(`Touch${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: x=${detail.x}, y=${detail.y}${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
     };
     const onAutomationSwipe = (event: Event) => {
       if (!recordingRef.current) return;
@@ -519,14 +547,18 @@ export function AutomationModal({
       const selected = selectedRef.current;
       if (!detail?.udid || selected.length !== 1 || detail.udid !== selected[0]) return;
       const sourceNo = deviceByUdid.get(detail.udid)?.number;
+      const now = Date.now();
+      const elapsed = lastRecordTimestampRef.current > 0 ? now - lastRecordTimestampRef.current : 0;
+      const delayMs = realtimeRecording && elapsed > 0 ? elapsed : DEFAULT_DELAY_MS;
+      lastRecordTimestampRef.current = now;
       setRows(prev => [...prev, {
-        id: makeId('step'), action: 'swipe', delayMs: DEFAULT_DELAY_MS,
+        id: makeId('step'), action: 'swipe', delayMs,
         x01: detail.startX01, y01: detail.startY01, x: detail.startX, y: detail.startY,
         endX01: detail.endX01, endY01: detail.endY01, endX: detail.endX, endY: detail.endY,
         width: detail.width, height: detail.height, durationMs: detail.durationMs,
         sourceUdid: detail.udid, targetUdids: [detail.udid], note: '',
       }]);
-      setStatus(`Swipe${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: (${detail.startX},${detail.startY}) → (${detail.endX},${detail.endY}) ${detail.durationMs}ms`);
+      setStatus(`Swipe${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: (${detail.startX},${detail.startY}) → (${detail.endX},${detail.endY}) ${detail.durationMs}ms${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
     };
     window.addEventListener(AUTOMATION_CLICK_EVENT, onAutomationClick as EventListener);
     window.addEventListener(AUTOMATION_SWIPE_EVENT, onAutomationSwipe as EventListener);
@@ -534,7 +566,7 @@ export function AutomationModal({
       window.removeEventListener(AUTOMATION_CLICK_EVENT, onAutomationClick as EventListener);
       window.removeEventListener(AUTOMATION_SWIPE_EVENT, onAutomationSwipe as EventListener);
     };
-  }, [deviceByUdid]);
+  }, [deviceByUdid, realtimeRecording]);
 
   /* ── drag ── */
 
@@ -642,9 +674,10 @@ export function AutomationModal({
     if (selectedList.length > 1) { setRecording(false); setStatus(ONLY_ONE_DEVICE_MSG); return; }
     if (selectedList.length === 0) { setRecording(false); setStatus(SELECT_ONE_DEVICE_MSG); return; }
     setRecording(true);
+    lastRecordTimestampRef.current = 0;
     const no = deviceByUdid.get(selectedList[0])?.number;
-    setStatus(`Đang ghi tọa độ${no ? ` máy #${formatDeviceNo(no)}` : ''}`);
-  }, [deviceByUdid, selectedList]);
+    setStatus(`Đang ghi${realtimeRecording ? ' (Realtime)' : ''}${no ? ` máy #${formatDeviceNo(no)}` : ''}`);
+  }, [deviceByUdid, selectedList, realtimeRecording]);
 
   const toggleRecording = useCallback(() => {
     if (recording) { setRecording(false); setStatus('Đã dừng ghi tọa độ'); return; }
@@ -827,7 +860,7 @@ export function AutomationModal({
         if (row.x01 == null || row.y01 == null) continue;
         const targets = getTargetsByUdids(row.targetUdids);
         if (!targets.length) continue;
-        await runScript(targets, [{ type: 'tap', x01: row.x01, y01: row.y01 }, { type: 'wait', ms: row.delayMs }], { signal: controller.signal, log: msg => setStatus(msg) });
+        await runScript(targets, rowToSteps(row), { signal: controller.signal, log: msg => setStatus(msg) });
       }
       setStatus(controller.signal.aborted ? 'Đã dừng phát' : 'Đã phát xong');
     } finally { setPlaying(false); abortPlaybackRef.current = null; }
@@ -881,7 +914,7 @@ export function AutomationModal({
           for (const row of macro.rows) {
             if (controller.signal.aborted) break;
             if (row.x01 == null || row.y01 == null) continue;
-            await runScript(targets, [{ type: 'tap', x01: row.x01, y01: row.y01 }, { type: 'wait', ms: row.delayMs }], { signal: controller.signal, log: msg => setStatus(msg) });
+            await runScript(targets, rowToSteps(row), { signal: controller.signal, log: msg => setStatus(msg) });
           }
         })());
       }
@@ -894,7 +927,7 @@ export function AutomationModal({
           for (const row of macro.rows) {
             if (controller.signal.aborted) break;
             if (row.x01 == null || row.y01 == null) continue;
-            await runScript(targets, [{ type: 'tap', x01: row.x01, y01: row.y01 }, { type: 'wait', ms: row.delayMs }], { signal: controller.signal, log: msg => setStatus(msg) });
+            await runScript(targets, rowToSteps(row), { signal: controller.signal, log: msg => setStatus(msg) });
           }
         })());
       }
@@ -1063,8 +1096,43 @@ export function AutomationModal({
                     {playing ? <Square size={16} /> : <Play size={16} />}<span>{playing ? 'Dừng' : 'Phát'}</span>
                   </button>
                   <button className='btn automationBtn automationNarrowBtn' onClick={() => setStatus(status || 'Automation ready')} title='Log'><Info size={16} /><span>!</span></button>
-                  <button className='btn automationBtn' onClick={() => setStatus('Settings Automation sẽ thêm sau')} title='Settings'><Settings size={16} /><span>Settings</span></button>
+                  <button className={`btn automationBtn${settingsPanelOpen ? ' active' : ''}`} onClick={() => setSettingsPanelOpen(v => !v)} title='Settings'><Settings size={16} /><span>Settings</span></button>
                 </div>
+
+                {/* ── Settings Panel ── */}
+                {settingsPanelOpen ? (
+                  <div className='automationDeviceBlock' style={{ padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#f3f4f6' }}>Ghi Macro: Realtime</span>
+                        <span style={{ fontSize: 11, color: '#8590a3', lineHeight: 1.4 }}>Tự động ghi chính xác thao tác Touch, Swipe, thời gian chờ giữa các bước</span>
+                      </div>
+                      <button
+                        type='button'
+                        onClick={() => {
+                          const next = !realtimeRecording;
+                          setRealtimeRecording(next);
+                          saveAutomationSettings({ realtimeRecording: next });
+                          setStatus(next ? 'Realtime ON — Ghi chính xác thời gian thực' : 'Realtime OFF — Delay mặc định 1000ms');
+                        }}
+                        style={{
+                          position: 'relative', width: 44, height: 24, padding: 0, borderRadius: 12, cursor: 'pointer',
+                          background: realtimeRecording ? 'rgba(13,110,253,0.55)' : '#3a3a3a',
+                          border: `1px solid ${realtimeRecording ? 'rgba(13,110,253,0.75)' : '#555'}`,
+                          transition: 'all 0.2s ease', flexShrink: 0,
+                        }}
+                      >
+                        <span style={{
+                          position: 'absolute', top: 2, left: realtimeRecording ? 22 : 2,
+                          width: 18, height: 18, borderRadius: '50%',
+                          background: realtimeRecording ? '#8ec5ff' : '#888',
+                          transition: 'left 0.2s ease, background 0.2s ease',
+                        }} />
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className='automationCoordinateContext'>
                   <span className={selectedList.length > 1 ? 'automationErrorText' : undefined}>
                     {selectedRecordDevice ? `Máy ghi: #${formatDeviceNo(selectedRecordDevice.number)}` : selectedList.length > 1 ? 'Chỉ chọn 1 thiết bị' : 'Chưa chọn máy'}

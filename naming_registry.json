@@ -130,7 +130,8 @@
     "local_storage_keys": {
       "macros": "automationMacrosV1",
       "app_actions": "automationAppActionsV1",
-      "device_profiles": "automationDeviceProfilesV1"
+      "device_profiles": "automationDeviceProfilesV1",
+      "settings": "automationSettingsV1"
     },
     "components": {
       "confirm_delete_modal": "ConfirmDeleteModal",
