@@ -110,13 +110,22 @@
     "types": {
       "automation_device_option": "AutomationDeviceOption",
       "automation_macro_row": "AutomationMacroRow",
+      "automation_macro_row_action": "'touch' | 'swipe'",
       "saved_automation_macro": "SavedAutomationMacro",
       "automation_app_id": "AutomationAppId",
       "automation_action_macro_binding": "AutomationActionMacroBinding",
       "automation_app_action": "AutomationAppAction",
       "automation_device_profile": "AutomationDeviceProfile",
       "ctx_sub_state": "CtxSubState",
-      "confirm_modal_state": "ConfirmModalState"
+      "confirm_modal_state": "ConfirmModalState",
+      "input_modal_state": "InputModalState",
+      "macro_ctx_menu_state": "MacroCtxMenuState",
+      "automation_click_detail": "AutomationClickDetail",
+      "automation_swipe_detail": "AutomationSwipeDetail"
+    },
+    "events": {
+      "automation_click_event": "monviewphone:automation-click",
+      "automation_swipe_event": "monviewphone:automation-swipe"
     },
     "local_storage_keys": {
       "macros": "automationMacrosV1",
@@ -124,7 +133,16 @@
       "device_profiles": "automationDeviceProfilesV1"
     },
     "components": {
-      "confirm_delete_modal": "ConfirmDeleteModal"
+      "confirm_delete_modal": "ConfirmDeleteModal",
+      "input_modal": "InputModal",
+      "input_modal_inner": "InputModalInner"
+    },
+    "handlers": {
+      "rename_macro": "renameMacro",
+      "delete_macro_impl": "deleteMacroImpl",
+      "open_rename_action": "openRenameAction",
+      "emit_automation_click": "emitAutomationClick",
+      "emit_automation_swipe": "emitAutomationSwipe"
     }
   },
   "key_codes": {

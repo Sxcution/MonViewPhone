@@ -8,6 +8,7 @@ import {
 import type { InputTarget } from '@/context/ActiveContext';
 
 export const AUTOMATION_CLICK_EVENT = 'monviewphone:automation-click';
+export const AUTOMATION_SWIPE_EVENT = 'monviewphone:automation-swipe';
 
 export type AutomationClickDetail = {
   udid: string;
@@ -20,9 +21,30 @@ export type AutomationClickDetail = {
   timestamp: number;
 };
 
+export type AutomationSwipeDetail = {
+  udid: string;
+  startX01: number;
+  startY01: number;
+  endX01: number;
+  endY01: number;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  width: number;
+  height: number;
+  durationMs: number;
+  timestamp: number;
+};
+
 export function emitAutomationClick(detail: AutomationClickDetail) {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent<AutomationClickDetail>(AUTOMATION_CLICK_EVENT, { detail }));
+}
+
+export function emitAutomationSwipe(detail: AutomationSwipeDetail) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent<AutomationSwipeDetail>(AUTOMATION_SWIPE_EVENT, { detail }));
 }
 
 export type AutomationStep =

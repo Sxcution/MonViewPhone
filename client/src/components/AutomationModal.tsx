@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ChevronDown,
   ChevronRight,
@@ -21,8 +22,10 @@ import { useActive } from '@/context/ActiveContext';
 import { DeviceSelectionGrid, type DeviceSelectionGridItem } from '@/components/DeviceSelectionGrid';
 import {
   AUTOMATION_CLICK_EVENT,
+  AUTOMATION_SWIPE_EVENT,
   runScript,
   type AutomationClickDetail,
+  type AutomationSwipeDetail,
 } from '@/lib/automation';
 
 /* ── types ─────────────────────────────────────────────────────── */
@@ -36,8 +39,13 @@ export type AutomationDeviceOption = {
 
 type AutomationMacroRow = {
   id: string;
-  action: 'click';
+  action: 'touch' | 'swipe';
   delayMs: number;
+  endX01?: number;
+  endY01?: number;
+  endX?: number;
+  endY?: number;
+  durationMs?: number;
   x01?: number;
   y01?: number;
   x?: number;
@@ -91,15 +99,32 @@ type AutomationContextMenuInput =
   | { type: 'action'; appId: AutomationAppId; actionId: string }
   | { type: 'device'; udid: string };
 
+/* Submenu state: level 2 + optional level 3 */
 type CtxSubState = {
-  main: 'profile' | 'noProfileAssign' | { appId: AutomationAppId; actionId: string };
-  nested?: 'profileAssign' | 'macroList';
+  main: 'profileList' | { appId: AutomationAppId; actionId: string };
+  nested?: { type: 'profileActions'; profileId: string } | 'macroList';
 } | null;
 
 type ConfirmModalState = {
   title: string;
   message: string;
   onConfirm: () => void;
+} | null;
+
+type InputModalState = {
+  key: string;
+  title: string;
+  label?: string;
+  placeholder?: string;
+  defaultValue?: string;
+  confirmText?: string;
+  onConfirm: (value: string) => void;
+} | null;
+
+type MacroCtxMenuState = {
+  macroId: string;
+  x: number;
+  y: number;
 } | null;
 
 type AutomationModalProps = {
@@ -127,7 +152,7 @@ const AUTOMATION_APPS: Array<{ id: AutomationAppId; label: string; icon: string 
   { id: 'setting', label: 'Setting', icon: '/automation-icons/setting.png' },
 ];
 
-/* ── utility functions ─────────────────────────────────────────── */
+/* ── utility ───────────────────────────────────────────────────── */
 
 function emptyAppActions(): Record<AutomationAppId, AutomationAppAction[]> {
   return { wechat: [], line: [], tantan: [], setting: [] };
@@ -145,7 +170,6 @@ function loadSavedMacros(): SavedAutomationMacro[] {
     return parsed.filter((item): item is SavedAutomationMacro => Boolean(item?.id && item?.name && Array.isArray(item?.rows)));
   } catch { return []; }
 }
-
 function saveSavedMacros(macros: SavedAutomationMacro[]) {
   try { localStorage.setItem(AUTOMATION_MACROS_KEY, JSON.stringify(macros)); } catch { /* ignore */ }
 }
@@ -176,7 +200,6 @@ function loadAppActions(): Record<AutomationAppId, AutomationAppAction[]> {
     return next;
   } catch { return fallback; }
 }
-
 function saveAppActions(actions: Record<AutomationAppId, AutomationAppAction[]>) {
   try { localStorage.setItem(AUTOMATION_APP_ACTIONS_KEY, JSON.stringify(actions)); } catch { /* ignore */ }
 }
@@ -188,7 +211,6 @@ function loadDeviceProfiles(): AutomationDeviceProfile[] {
     return parsed.filter((item): item is AutomationDeviceProfile => Boolean(item?.id && item?.name && Array.isArray(item?.udids)));
   } catch { return []; }
 }
-
 function saveDeviceProfiles(profiles: AutomationDeviceProfile[]) {
   try { localStorage.setItem(AUTOMATION_DEVICE_PROFILES_KEY, JSON.stringify(profiles)); } catch { /* ignore */ }
 }
@@ -198,37 +220,98 @@ function cloneRows(rows: AutomationMacroRow[]) {
 }
 
 function formatDeviceNo(n: number) { return String(n || 0).padStart(2, '0'); }
-function formatStepDetails(row: AutomationMacroRow) { return `X=${row.x == null ? '' : row.x}, Y=${row.y == null ? '' : row.y}`; }
+function formatStepDetails(row: AutomationMacroRow) {
+  if (row.action === 'swipe') return `(${row.x ?? ''},${row.y ?? ''}) → (${row.endX ?? ''},${row.endY ?? ''}) ${row.durationMs ?? 0}ms`;
+  return `X=${row.x == null ? '' : row.x}, Y=${row.y == null ? '' : row.y}`;
+}
 function clampPosition(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
 
-/* ── ConfirmDeleteModal (Bootstrap 5) ──────────────────────────── */
+/* ── Shared modal styles — matches Automation modal theme ───────── */
+
+const MODAL_BACKDROP: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.62)', zIndex: 27000 };
+const MODAL_OVERLAY: React.CSSProperties = { position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 27001, padding: 24 };
+const MODAL_CARD: React.CSSProperties = { background: '#1f1f1f', color: '#f3f4f6', border: '1px solid #3c3c3c', borderRadius: 6, minWidth: 380, maxWidth: 480, width: '100%', boxShadow: '0 24px 70px rgba(0,0,0,0.58)', overflow: 'hidden' };
+const MODAL_HEADER: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderBottom: '1px solid #343434', background: '#242424' };
+const MODAL_BODY: React.CSSProperties = { padding: '16px 14px' };
+const MODAL_FOOTER: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 14px', borderTop: '1px solid #343434', background: '#242424' };
+const MODAL_TITLE: React.CSSProperties = { margin: 0, fontSize: 16, fontWeight: 700 };
+const MODAL_CLOSE_BTN: React.CSSProperties = { display: 'grid', placeItems: 'center', width: 30, height: 30, padding: 0, color: '#d9d9d9', background: '#2b2b2b', border: '1px solid #454545', borderRadius: 4, cursor: 'pointer', fontSize: 14, lineHeight: 1 };
+const BTN_BASE: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 34, padding: '0 16px', border: '1px solid #3b3b3b', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#f8fafc', background: '#2b2b2b', transition: 'all 0.15s ease' };
+const BTN_CANCEL: React.CSSProperties = { ...BTN_BASE };
+const BTN_DANGER: React.CSSProperties = { ...BTN_BASE, background: '#c0392b', borderColor: 'rgba(192,57,43,0.6)', color: '#fff' };
+const BTN_PRIMARY: React.CSSProperties = { ...BTN_BASE, background: 'rgba(13,110,253,0.22)', borderColor: 'rgba(13,110,253,0.75)', color: '#8ec5ff' };
+const INPUT_STYLE: React.CSSProperties = { width: '100%', padding: '8px 12px', background: '#181818', color: '#f3f4f6', border: '1px solid #3c3c3c', borderRadius: 4, fontSize: 14, outline: 'none', boxSizing: 'border-box' };
+const LABEL_STYLE: React.CSSProperties = { display: 'block', marginBottom: 8, fontSize: 13, fontWeight: 600, color: '#c9d4e5' };
 
 function ConfirmDeleteModal({ state, onClose }: { state: ConfirmModalState; onClose: () => void }) {
   if (!state) return null;
-  return (
+  return createPortal(
     <>
-      {/* modal-backdrop : Bootstrap 5 */}
-      <div className='modal-backdrop fade show' style={{ zIndex: 9998 }} onClick={onClose} />
-      {/* modal : Bootstrap 5 */}
-      <div className='modal fade show d-block' style={{ zIndex: 9999 }} tabIndex={-1} role='dialog' aria-modal='true'>
-        <div className='modal-dialog modal-dialog-centered'>
-          <div className='modal-content' style={{ background: '#1e1e2e', color: '#e0e0e0', border: '1px solid #444' }}>
-            <div className='modal-header' style={{ borderBottom: '1px solid #333' }}>
-              <h5 className='modal-title' style={{ fontSize: '1rem' }}>{state.title}</h5>
-              <button type='button' className='btn-close btn-close-white' aria-label='Close' onClick={onClose} />
-            </div>
-            <div className='modal-body'>
-              <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{state.message}</p>
-            </div>
-            <div className='modal-footer' style={{ borderTop: '1px solid #333' }}>
-              <button type='button' className='btn btn-secondary' onClick={onClose}>Huỷ</button>
-              <button type='button' className='btn btn-danger' onClick={state.onConfirm}>Xác Nhận</button>
-            </div>
+      <div style={MODAL_BACKDROP} onClick={onClose} />
+      <div style={MODAL_OVERLAY} onClick={onClose}>
+        <div style={MODAL_CARD} onClick={e => e.stopPropagation()}>
+          <div style={MODAL_HEADER}>
+            <h5 style={MODAL_TITLE}>{state.title}</h5>
+            <button type='button' style={MODAL_CLOSE_BTN} aria-label='Close' onClick={onClose}>✕</button>
+          </div>
+          <div style={MODAL_BODY}>
+            <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: 14 }}>{state.message}</p>
+          </div>
+          <div style={MODAL_FOOTER}>
+            <button type='button' style={BTN_CANCEL} onClick={onClose}>Huỷ</button>
+            <button type='button' style={BTN_DANGER} onClick={state.onConfirm}>Xác Nhận</button>
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
+}
+
+/* ── InputModal (fully self-contained, Portal) ─────────────────── */
+
+function InputModalInner({ state, onClose }: { state: NonNullable<InputModalState>; onClose: () => void }) {
+  const [value, setValue] = useState(state.defaultValue ?? '');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 60);
+    return () => clearTimeout(t);
+  }, []);
+
+  const handleSubmit = () => { const v = value.trim(); if (!v) return; state.onConfirm(v); };
+
+  return createPortal(
+    <>
+      <div style={MODAL_BACKDROP} onClick={onClose} />
+      <div style={MODAL_OVERLAY} onClick={onClose}>
+        <div style={MODAL_CARD} onClick={e => e.stopPropagation()}>
+          <div style={MODAL_HEADER}>
+            <h5 style={MODAL_TITLE}>{state.title}</h5>
+            <button type='button' style={MODAL_CLOSE_BTN} aria-label='Close' onClick={onClose}>✕</button>
+          </div>
+          <div style={MODAL_BODY}>
+            {state.label ? <label style={LABEL_STYLE}>{state.label}</label> : null}
+            <input ref={inputRef} type='text' style={INPUT_STYLE}
+              placeholder={state.placeholder ?? ''} value={value}
+              onChange={e => setValue(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); if (e.key === 'Escape') onClose(); }}
+            />
+          </div>
+          <div style={MODAL_FOOTER}>
+            <button type='button' style={BTN_CANCEL} onClick={onClose}>Huỷ</button>
+            <button type='button' style={{ ...BTN_PRIMARY, opacity: value.trim() ? 1 : 0.5, cursor: value.trim() ? 'pointer' : 'not-allowed' }} disabled={!value.trim()} onClick={handleSubmit}>{state.confirmText ?? 'Xác Nhận'}</button>
+          </div>
+        </div>
+      </div>
+    </>,
+    document.body,
+  );
+}
+
+function InputModal({ state, onClose }: { state: InputModalState; onClose: () => void }) {
+  if (!state) return null;
+  return <InputModalInner key={state.key} state={state} onClose={onClose} />;
 }
 
 /* ── component ─────────────────────────────────────────────────── */
@@ -254,6 +337,8 @@ export function AutomationModal({
   const [automationContextMenu, setAutomationContextMenu] = useState<AutomationContextMenuTarget | null>(null);
   const [ctxSub, setCtxSub] = useState<CtxSubState>(null);
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(null);
+  const [inputModal, setInputModal] = useState<InputModalState>(null);
+  const [macroCtxMenu, setMacroCtxMenu] = useState<MacroCtxMenuState>(null);
   const [currentMacroName, setCurrentMacroName] = useState('');
   const [position, setPosition] = useState({ x: 120, y: 80 });
   const recordingRef = useRef(false);
@@ -304,7 +389,7 @@ export function AutomationModal({
   const automationContextDeviceTargets = automationContextMenu?.type === 'device'
     ? getDeviceContextTargets(automationContextMenu.udid) : [];
 
-  /* Thông tin profile của target devices */
+  /* Profile info cho context menu device */
   const ctxProfileInfo = useMemo(() => {
     if (automationContextMenu?.type !== 'device' || !automationContextDeviceTargets.length) return null;
     const profileSet = new Map<string, AutomationDeviceProfile>();
@@ -322,13 +407,12 @@ export function AutomationModal({
     };
   }, [automationContextMenu, automationContextDeviceTargets, deviceProfiles]);
 
-  /* Thông tin binding cho action submenu */
+  /* Binding info cho action submenu */
   const actionSubmenuInfo = useMemo(() => {
     if (!ctxSub || typeof ctxSub.main !== 'object' || automationContextMenu?.type !== 'device') return null;
     const { appId, actionId } = ctxSub.main;
     const action = appActions[appId]?.find(a => a.id === actionId);
     if (!action) return null;
-
     const profileMap = new Map<string, AutomationDeviceProfile>();
     const unassigned: string[] = [];
     for (const udid of automationContextDeviceTargets) {
@@ -340,7 +424,6 @@ export function AutomationModal({
     const singleProfile = profileCount === 1 && unassigned.length === 0 ? [...profileMap.values()][0] : null;
     const binding = singleProfile ? (action.bindings ?? []).find(b => b.profileId === singleProfile.id) ?? null : null;
     const macroExists = binding ? savedMacros.some(m => m.id === binding.macroId) : false;
-
     return { action, profiles: [...profileMap.values()], profileCount, singleProfile, unassigned, binding, macroExists };
   }, [ctxSub, automationContextMenu, automationContextDeviceTargets, appActions, deviceProfiles, savedMacros]);
 
@@ -370,12 +453,13 @@ export function AutomationModal({
 
   useEffect(() => {
     if (open) return;
-    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null);
+    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null); setMacroCtxMenu(null);
     abortPlaybackRef.current?.abort();
   }, [open]);
 
   useEffect(() => { setCtxSub(null); }, [automationContextMenu]);
 
+  /* close automation context menu on outside click */
   useEffect(() => {
     if (!automationContextMenu) return;
     const close = (e: Event) => {
@@ -395,6 +479,25 @@ export function AutomationModal({
     };
   }, [automationContextMenu]);
 
+  /* close macro context menu on outside click */
+  useEffect(() => {
+    if (!macroCtxMenu) return;
+    const close = (e: Event) => {
+      if ((e.target as HTMLElement | null)?.closest('.automationMacroCtxPanel')) return;
+      setMacroCtxMenu(null);
+    };
+    const closeKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMacroCtxMenu(null); };
+    window.addEventListener('mousedown', close, true);
+    window.addEventListener('contextmenu', close, true);
+    window.addEventListener('keydown', closeKey);
+    return () => {
+      window.removeEventListener('mousedown', close, true);
+      window.removeEventListener('contextmenu', close, true);
+      window.removeEventListener('keydown', closeKey);
+    };
+  }, [macroCtxMenu]);
+
+  /* automation click + swipe recording */
   useEffect(() => {
     const onAutomationClick = (event: Event) => {
       if (!recordingRef.current) return;
@@ -403,15 +506,34 @@ export function AutomationModal({
       if (!detail?.udid || selected.length !== 1 || detail.udid !== selected[0]) return;
       const sourceNo = deviceByUdid.get(detail.udid)?.number;
       setRows(prev => [...prev, {
-        id: makeId('step'), action: 'click', delayMs: DEFAULT_DELAY_MS,
+        id: makeId('step'), action: 'touch', delayMs: DEFAULT_DELAY_MS,
         x01: detail.x01, y01: detail.y01, x: detail.x, y: detail.y,
         width: detail.width, height: detail.height,
         sourceUdid: detail.udid, targetUdids: [detail.udid], note: '',
       }]);
-      setStatus(`Đã ghi tọa độ${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: x=${detail.x}, y=${detail.y}`);
+      setStatus(`Touch${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: x=${detail.x}, y=${detail.y}`);
+    };
+    const onAutomationSwipe = (event: Event) => {
+      if (!recordingRef.current) return;
+      const detail = (event as CustomEvent<AutomationSwipeDetail>).detail;
+      const selected = selectedRef.current;
+      if (!detail?.udid || selected.length !== 1 || detail.udid !== selected[0]) return;
+      const sourceNo = deviceByUdid.get(detail.udid)?.number;
+      setRows(prev => [...prev, {
+        id: makeId('step'), action: 'swipe', delayMs: DEFAULT_DELAY_MS,
+        x01: detail.startX01, y01: detail.startY01, x: detail.startX, y: detail.startY,
+        endX01: detail.endX01, endY01: detail.endY01, endX: detail.endX, endY: detail.endY,
+        width: detail.width, height: detail.height, durationMs: detail.durationMs,
+        sourceUdid: detail.udid, targetUdids: [detail.udid], note: '',
+      }]);
+      setStatus(`Swipe${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: (${detail.startX},${detail.startY}) → (${detail.endX},${detail.endY}) ${detail.durationMs}ms`);
     };
     window.addEventListener(AUTOMATION_CLICK_EVENT, onAutomationClick as EventListener);
-    return () => window.removeEventListener(AUTOMATION_CLICK_EVENT, onAutomationClick as EventListener);
+    window.addEventListener(AUTOMATION_SWIPE_EVENT, onAutomationSwipe as EventListener);
+    return () => {
+      window.removeEventListener(AUTOMATION_CLICK_EVENT, onAutomationClick as EventListener);
+      window.removeEventListener(AUTOMATION_SWIPE_EVENT, onAutomationSwipe as EventListener);
+    };
   }, [deviceByUdid]);
 
   /* ── drag ── */
@@ -444,21 +566,32 @@ export function AutomationModal({
   /* ── callbacks ── */
 
   const closeModal = useCallback(() => {
-    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null);
+    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null); setMacroCtxMenu(null);
     abortPlaybackRef.current?.abort(); onClose();
   }, [onClose]);
 
+  /* ── addAppAction (InputModal) ── */
   const addAppAction = useCallback((appId: AutomationAppId) => {
     const app = AUTOMATION_APPS.find(a => a.id === appId);
-    const name = window.prompt(`Thêm hành động ${app?.label ?? appId}`, '');
-    if (!name?.trim()) return;
-    setAppActions(prev => {
-      const next = { ...prev, [appId]: [...prev[appId], { id: makeId(`${appId}-action`), name: name.trim(), bindings: [] }] };
-      saveAppActions(next); return next;
+    setAutomationContextMenu(null);
+    setInputModal({
+      key: makeId('input'),
+      title: `Thêm hành động ${app?.label ?? appId}`,
+      label: 'Tên hành động',
+      placeholder: 'Ví dụ: Wechat Nearby People',
+      onConfirm: (name) => {
+        setAppActions(prev => {
+          const next = { ...prev, [appId]: [...prev[appId], { id: makeId(`${appId}-action`), name, bindings: [] }] };
+          saveAppActions(next); return next;
+        });
+        setActiveActionApp(appId); setActionOverlayOpen(appId);
+        setStatus(`Đã thêm hành động: ${name}`);
+        setInputModal(null);
+      },
     });
-    setActiveActionApp(appId); setActionOverlayOpen(appId);
   }, []);
 
+  /* ── deleteAppAction (ConfirmDeleteModal) ── */
   const deleteAppActionImpl = useCallback((appId: AutomationAppId, actionId: string) => {
     const actionName = appActions[appId].find(a => a.id === actionId)?.name;
     setAppActions(prev => {
@@ -468,15 +601,24 @@ export function AutomationModal({
     setStatus(actionName ? `Đã xoá hành động: ${actionName}` : 'Đã xoá hành động');
   }, [appActions]);
 
-  const renameAppAction = useCallback((appId: AutomationAppId, actionId: string) => {
+  /* ── renameAppAction (InputModal) ── */
+  const openRenameAction = useCallback((appId: AutomationAppId, actionId: string) => {
     const current = appActions[appId].find(a => a.id === actionId);
-    const name = window.prompt('Đổi tên hành động', current?.name ?? '');
-    if (!name?.trim() || name.trim() === current?.name) return;
-    setAppActions(prev => {
-      const next = { ...prev, [appId]: prev[appId].map(a => a.id === actionId ? { ...a, name: name.trim() } : a) };
-      saveAppActions(next); return next;
+    setAutomationContextMenu(null);
+    setInputModal({
+      key: makeId('input'),
+      title: 'Đổi tên hành động',
+      label: 'Tên mới',
+      defaultValue: current?.name ?? '',
+      onConfirm: (name) => {
+        setAppActions(prev => {
+          const next = { ...prev, [appId]: prev[appId].map(a => a.id === actionId ? { ...a, name } : a) };
+          saveAppActions(next); return next;
+        });
+        setStatus(`Đã đổi tên thành "${name}"`);
+        setInputModal(null);
+      },
     });
-    setStatus(`Đã đổi tên thành "${name.trim()}"`);
   }, [appActions]);
 
   const openAutomationContextMenu = useCallback((event: React.MouseEvent<HTMLElement>, target: AutomationContextMenuInput) => {
@@ -511,7 +653,7 @@ export function AutomationModal({
 
   const addBlankStep = useCallback(() => {
     setRows(prev => [...prev, {
-      id: makeId('step'), action: 'click', delayMs: DEFAULT_DELAY_MS,
+      id: makeId('step'), action: 'touch', delayMs: DEFAULT_DELAY_MS,
       targetUdids: selectedList.length === 1 ? [selectedList[0]] : [], note: '',
     }]);
   }, [selectedList]);
@@ -520,8 +662,62 @@ export function AutomationModal({
     setRows(prev => prev.map(row => (row.id === id ? { ...row, ...patch } : row)));
   }, []);
 
-  /* ── assignMacroToAction (nhận profile trực tiếp) ── */
+  /* ── macro save (InputModal) ── */
+  const saveMacro = useCallback(() => {
+    setInputModal({
+      key: makeId('input'),
+      title: 'Lưu File Macro',
+      label: 'Tên File Macro',
+      placeholder: 'Ví dụ: Samsung Note 9 WN Macro',
+      defaultValue: currentMacroName || `Macro ${new Date().toLocaleTimeString('vi-VN')}`,
+      confirmText: 'Lưu',
+      onConfirm: (cleanName) => {
+        const nextMacro: SavedAutomationMacro = { id: makeId('macro'), name: cleanName, rows: cloneRows(rows), updatedAt: Date.now() };
+        setSavedMacros(prev => {
+          const next = [nextMacro, ...prev.filter(m => m.name !== cleanName)].slice(0, 50);
+          saveSavedMacros(next); return next;
+        });
+        setCurrentMacroName(cleanName);
+        setStatus(`Đã lưu File Macro: ${cleanName}`);
+        setInputModal(null);
+      },
+    });
+  }, [currentMacroName, rows]);
 
+  const loadMacro = useCallback((macro: SavedAutomationMacro) => {
+    if (recordingRef.current) { setStatus('⚠ Đang ghi macro – hãy Dừng ghi hoặc Lưu trước khi mở file khác'); return; }
+    setRows(cloneRows(macro.rows)); setCurrentMacroName(macro.name);
+    setStatus(`Đã mở File Macro: ${macro.name}`);
+  }, []);
+
+  /* ── macro rename / delete ── */
+  const renameMacro = useCallback((macroId: string, newName: string) => {
+    const oldMacro = savedMacros.find(m => m.id === macroId);
+    setSavedMacros(prev => {
+      const next = prev.map(m => m.id === macroId ? { ...m, name: newName, updatedAt: Date.now() } : m);
+      saveSavedMacros(next); return next;
+    });
+    if (oldMacro && currentMacroName === oldMacro.name) setCurrentMacroName(newName);
+    setAppActions(prev => {
+      const next = { ...prev };
+      for (const appId of Object.keys(next) as AutomationAppId[]) {
+        next[appId] = next[appId].map(action => ({
+          ...action, bindings: action.bindings.map(b => b.macroId === macroId ? { ...b, macroName: newName } : b),
+        }));
+      }
+      saveAppActions(next); return next;
+    });
+    setStatus(`Đã đổi tên File Macro thành "${newName}"`);
+  }, [savedMacros, currentMacroName]);
+
+  const deleteMacroImpl = useCallback((macroId: string) => {
+    const macro = savedMacros.find(m => m.id === macroId);
+    setSavedMacros(prev => { const next = prev.filter(m => m.id !== macroId); saveSavedMacros(next); return next; });
+    if (macro && currentMacroName === macro.name) setCurrentMacroName('');
+    setStatus(`Đã xoá File Macro: ${macro?.name ?? ''}`);
+  }, [savedMacros, currentMacroName]);
+
+  /* ── assignMacroToAction ── */
   const assignMacroToAction = useCallback((
     appId: AutomationAppId, actionId: string, macro: SavedAutomationMacro, profile: AutomationDeviceProfile,
   ) => {
@@ -542,8 +738,7 @@ export function AutomationModal({
     setStatus(`Đã gán "${macro.name}" vào ${actionName} cho profile "${profile.name}"`);
   }, [appActions]);
 
-  /* ── removeBindingFromAction (thực thi thực tế, được gọi từ confirm modal) ── */
-
+  /* ── removeBindingFromAction (confirm modal) ── */
   const removeBindingImpl = useCallback((appId: AutomationAppId, actionId: string, profileId: string) => {
     const profileName = deviceProfiles.find(p => p.id === profileId)?.name ?? 'profile';
     setAppActions(prev => {
@@ -559,7 +754,6 @@ export function AutomationModal({
   }, [appActions, deviceProfiles]);
 
   /* ── profile management ── */
-
   const assignDevicesToProfile = useCallback((profileId: string, targetUdids: string[]) => {
     setDeviceProfiles(prev => {
       const next = prev.map(p => ({
@@ -590,13 +784,11 @@ export function AutomationModal({
       const next = prev.map(p => p.id === profileId ? { ...p, name: newName, updatedAt: Date.now() } : p);
       saveDeviceProfiles(next); return next;
     });
-    /* Cập nhật profileName trong tất cả bindings */
     setAppActions(prev => {
       const next = { ...prev };
       for (const appId of Object.keys(next) as AutomationAppId[]) {
         next[appId] = next[appId].map(action => ({
-          ...action,
-          bindings: action.bindings.map(b => b.profileId === profileId ? { ...b, profileName: newName } : b),
+          ...action, bindings: action.bindings.map(b => b.profileId === profileId ? { ...b, profileName: newName } : b),
         }));
       }
       saveAppActions(next); return next;
@@ -606,17 +798,12 @@ export function AutomationModal({
 
   const deleteProfileImpl = useCallback((profileId: string) => {
     const profileName = deviceProfiles.find(p => p.id === profileId)?.name ?? 'profile';
-    setDeviceProfiles(prev => {
-      const next = prev.filter(p => p.id !== profileId);
-      saveDeviceProfiles(next); return next;
-    });
-    /* Xoá toàn bộ binding liên quan */
+    setDeviceProfiles(prev => { const next = prev.filter(p => p.id !== profileId); saveDeviceProfiles(next); return next; });
     setAppActions(prev => {
       const next = { ...prev };
       for (const appId of Object.keys(next) as AutomationAppId[]) {
         next[appId] = next[appId].map(action => ({
-          ...action,
-          bindings: action.bindings.filter(b => b.profileId !== profileId),
+          ...action, bindings: action.bindings.filter(b => b.profileId !== profileId),
         }));
       }
       saveAppActions(next); return next;
@@ -624,30 +811,9 @@ export function AutomationModal({
     setStatus(`Đã xoá profile "${profileName}"`);
   }, [deviceProfiles]);
 
-  /* ── macro save / load ── */
-
   const newMacro = useCallback(() => { setRows([]); setCurrentMacroName(''); setStatus('Đã tạo macro mới'); }, []);
 
-  const saveMacro = useCallback(() => {
-    const name = window.prompt('Tên File Macro', currentMacroName || `Macro ${new Date().toLocaleTimeString('vi-VN')}`);
-    if (!name?.trim()) return;
-    const cleanName = name.trim();
-    const nextMacro: SavedAutomationMacro = { id: makeId('macro'), name: cleanName, rows: cloneRows(rows), updatedAt: Date.now() };
-    setSavedMacros(prev => {
-      const next = [nextMacro, ...prev.filter(m => m.name !== cleanName)].slice(0, 50);
-      saveSavedMacros(next); return next;
-    });
-    setCurrentMacroName(cleanName);
-    setStatus(`Đã lưu File Macro: ${cleanName}`);
-  }, [currentMacroName, rows]);
-
-  const loadMacro = useCallback((macro: SavedAutomationMacro) => {
-    setRows(cloneRows(macro.rows)); setCurrentMacroName(macro.name);
-    setStatus(`Đã mở File Macro: ${macro.name}`);
-  }, []);
-
   /* ── playMacro (coordinate panel) ── */
-
   const playMacro = useCallback(async () => {
     if (playing) { abortPlaybackRef.current?.abort(); setStatus('Đang dừng phát'); return; }
     const runnableRows = rows.filter(r => r.x01 != null && r.y01 != null);
@@ -667,8 +833,7 @@ export function AutomationModal({
     } finally { setPlaying(false); abortPlaybackRef.current = null; }
   }, [getTargetsByUdids, playing, rows]);
 
-  /* ── playAppAction (group by profile, Promise.all, status chi tiết) ── */
-
+  /* ── playAppAction ── */
   const playAppAction = useCallback(async (appId: AutomationAppId, actionId: string) => {
     if (playing) { abortPlaybackRef.current?.abort(); setStatus('Đang dừng phát'); return; }
     const action = appActions[appId].find(a => a.id === actionId);
@@ -704,7 +869,6 @@ export function AutomationModal({
 
     try {
       const tasks: Promise<void>[] = [];
-
       for (const [, group] of profileGroups) {
         const binding = (action.bindings ?? []).find(b => b.profileId === group.profile.id);
         if (!binding) { missingMacroProfiles.push(group.profile.name); continue; }
@@ -721,7 +885,6 @@ export function AutomationModal({
           }
         })());
       }
-
       for (const { binding, udids } of legacyTasks) {
         const macro = savedMacros.find(m => m.id === binding.macroId);
         if (!macro) continue;
@@ -735,7 +898,6 @@ export function AutomationModal({
           }
         })());
       }
-
       if (!tasks.length) {
         const parts: string[] = [];
         if (missingMacroProfiles.length) parts.push(`Thiếu macro: ${missingMacroProfiles.join(', ')}`);
@@ -746,12 +908,8 @@ export function AutomationModal({
         setStatus(parts.length ? `Không có macro hợp lệ | ${parts.join(' | ')}` : `Không có macro hợp lệ để chạy cho ${action.name}`);
         return;
       }
-
       await Promise.all(tasks);
-
-      if (controller.signal.aborted) {
-        setStatus('Đã dừng phát');
-      } else {
+      if (controller.signal.aborted) { setStatus('Đã dừng phát'); } else {
         const parts: string[] = [];
         if (ranProfiles.length) parts.push(`Đã chạy: ${ranProfiles.join(', ')}`);
         if (missingMacroProfiles.length) parts.push(`Thiếu macro: ${missingMacroProfiles.join(', ')}`);
@@ -766,11 +924,11 @@ export function AutomationModal({
 
   if (!open) return null;
 
-  /* ══════════════════ RENDER ══════════════════ */
-
-  /* helper: target udids cho context menu device */
+  /* ── short aliases for context menu ── */
   const ctxTargets = automationContextDeviceTargets;
+  const currentProfileId = ctxProfileInfo?.singleProfile?.id ?? null;
 
+  /* ══════════════════ RENDER ══════════════════ */
   return (
     <div className={`automationFloatingLayer${coordinatePanelOpen ? ' withCoordinatePanel' : ''}`} style={{ left: position.x, top: position.y }}>
       <div className='automationModal modal show d-block' role='dialog' aria-modal='false'>
@@ -787,7 +945,7 @@ export function AutomationModal({
 
             <div className='modal-body automationBody'>
 
-              {/* ── SECTION: Hành Động (đổi từ "Chạy Thao Tác") ── */}
+              {/* ── SECTION: Hành Động ── */}
               <div className='automationActionBlock'>
                 <div className='automationSectionTitle'>
                   <span>Hành Động</span>
@@ -796,7 +954,6 @@ export function AutomationModal({
                     <span>{actionRunnerOpen ? 'Ẩn' : 'Hiện'}</span>
                   </button>
                 </div>
-
                 {actionRunnerOpen ? (
                   <div className='automationActionIconArea'>
                     <div className='automationAppIconRow'>
@@ -810,7 +967,6 @@ export function AutomationModal({
                           >
                             <img src={app.icon} alt='' className='automationAppIconOnly' />
                           </button>
-
                           {actionOverlayOpen === app.id ? (
                             <div className='automationChildActionOverlay' role='dialog' aria-label={`${app.label} actions`}
                               onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
@@ -873,7 +1029,7 @@ export function AutomationModal({
                 ) : null}
               </div>
 
-              {/* ── Thiết Lập Macro (đổi từ "Nhập tọa độ") ── */}
+              {/* ── Thiết Lập Macro ── */}
               <button className={`automationCoordinateRow${coordinatePanelOpen ? ' open' : ''}`} onClick={openCoordinatePanel}>
                 <div className='automationCoordinateTitle'>Thiết Lập Macro</div>
                 <div className='automationCoordinateMeta'>{selectedList.length ? `${selectedList.length} máy được chọn` : 'Chưa chọn máy'}</div>
@@ -897,7 +1053,7 @@ export function AutomationModal({
               <div className='modal-body automationCoordinateBody'>
                 <div className='automationToolbar'>
                   <button className='btn automationBtn' onClick={newMacro} title='Mới'><Plus size={16} /><span>Mới</span></button>
-                  <button className='btn automationBtn' onClick={() => setStatus('Chọn macro trong cột File Macro để mở')} title='Mở Macro'><FolderOpen size={16} /><span>Mở Macro</span></button>
+
                   <button className='btn automationBtn' onClick={saveMacro} disabled={!rows.length} title='Lưu Macro'><Save size={16} /><span>Lưu Macro</span></button>
                   <button className='btn automationBtn' onClick={addBlankStep} title='Thêm bước'><CirclePlus size={16} /><span>Thêm bước</span></button>
                   <button className={`btn automationBtn${recording ? ' active' : ''}`} onClick={toggleRecording} title='Ghi Macro'>
@@ -922,7 +1078,7 @@ export function AutomationModal({
                       <tbody>
                         {rows.map((row, i) => (
                           <tr key={row.id}>
-                            <td>{i + 1}</td><td>Click to setup</td>
+                            <td>{i + 1}</td><td style={{ textTransform: 'capitalize' }}>{row.action === 'swipe' ? 'Swipe' : 'Touch'}</td>
                             <td><input className='automationDelayInput' type='number' min={0} value={row.delayMs} onChange={e => updateRow(row.id, { delayMs: Math.max(0, Number(e.target.value) || 0) })} /></td>
                             <td className='automationDetailsCell'>{formatStepDetails(row)}</td>
                             <td><input className='automationNoteInput' type='text' value={row.note ?? ''} onChange={e => updateRow(row.id, { note: e.target.value })} /></td>
@@ -936,7 +1092,16 @@ export function AutomationModal({
                     <table className='table table-dark table-sm automationSavedTable'>
                       <thead><tr><th>File Macro</th></tr></thead>
                       <tbody>
-                        {savedMacros.map(m => <tr key={m.id}><td><button className='automationSavedMacroBtn' onClick={() => loadMacro(m)} title={m.name}>{m.name}</button></td></tr>)}
+                        {savedMacros.map(m => (
+                          <tr key={m.id}><td>
+                            <button className='automationSavedMacroBtn' onClick={() => loadMacro(m)} title={m.name}
+                              onContextMenu={e => {
+                                e.preventDefault(); e.stopPropagation();
+                                setMacroCtxMenu({ macroId: m.id, x: e.clientX, y: e.clientY });
+                              }}
+                            >{m.name}</button>
+                          </td></tr>
+                        ))}
                         {!savedMacros.length ? <tr><td className='automationEmptyRow'>Trống</td></tr> : null}
                       </tbody>
                     </table>
@@ -956,23 +1121,22 @@ export function AutomationModal({
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
         >
 
-          {/* ── context menu: app cha → Thêm hành động ── */}
+          {/* ── Context: app cha → Thêm hành động ── */}
           {automationContextMenu.type === 'app' ? (
             <button type='button' className='automationContextMenuItem dropdown-item'
-              onPointerDown={e => { e.preventDefault(); e.stopPropagation(); addAppAction(automationContextMenu.appId); setAutomationContextMenu(null); }}
+              onPointerDown={e => { e.preventDefault(); e.stopPropagation(); addAppAction(automationContextMenu.appId); }}
             >
               <Plus size={14} /><span>Thêm hành động {automationContextApp?.label}</span>
             </button>
           ) : null}
 
-          {/* ── context menu: action con → Đổi tên / Xoá (confirm modal) ── */}
+          {/* ── Context: action con → Đổi tên / Xoá ── */}
           {automationContextMenu.type === 'action' ? (
             <>
               <button type='button' className='automationContextMenuItem dropdown-item'
                 onPointerDown={e => {
                   e.preventDefault(); e.stopPropagation();
-                  renameAppAction(automationContextMenu.appId, automationContextMenu.actionId);
-                  setAutomationContextMenu(null);
+                  openRenameAction(automationContextMenu.appId, automationContextMenu.actionId);
                 }}
               >
                 <Pencil size={14} /><span>Đổi tên hành động</span>
@@ -1000,166 +1164,144 @@ export function AutomationModal({
             </>
           ) : null}
 
-          {/* ── context menu: device → Device Profile + App Actions ── */}
+          {/* ── Context: device → Device Profile + App Actions ── */}
           {automationContextMenu.type === 'device' && ctxProfileInfo ? (
             <>
-              {/* ═══ SECTION: Device Profile ═══ */}
+              {/* ═══ Device Profile section ═══ */}
               <div className='automationContextMenuLabel' onMouseEnter={() => setCtxSub(null)}>Device Profile</div>
 
-              {/* ─── Case: Single profile ─── */}
-              {ctxProfileInfo.singleProfile ? (
-                <div style={{ position: 'relative' }} onMouseEnter={() => setCtxSub({ main: 'profile' })}>
-                  <button type='button' className='automationContextMenuItem dropdown-item'
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                      <Users size={14} style={{ flexShrink: 0 }} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Hiện tại: {ctxProfileInfo.singleProfile.name}</span>
+              {/* Profile trigger row → opens profile list submenu */}
+              <div style={{ position: 'relative' }} onMouseEnter={() => setCtxSub({ main: 'profileList' })}>
+                <button type='button' className='automationContextMenuItem dropdown-item'
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                    <Users size={14} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {ctxProfileInfo.singleProfile
+                        ? `Hiện tại: ${ctxProfileInfo.singleProfile.name}`
+                        : ctxProfileInfo.profileCount > 1
+                          ? `Nhiều profile (${ctxProfileInfo.profileCount})`
+                          : 'Chưa có Device Profile'}
                     </span>
-                    <ChevronRight size={12} style={{ flexShrink: 0, opacity: 0.5 }} />
-                  </button>
+                  </span>
+                  <ChevronRight size={12} style={{ flexShrink: 0, opacity: 0.5 }} />
+                </button>
 
-                  {/* ═ Level 2: Profile management submenu ═ */}
-                  {ctxSub?.main === 'profile' ? (
-                    <div className='automationContextMenuPanel contextMenuPanel dropdown-menu show'
-                      style={{ position: 'absolute', left: 'calc(100% - 4px)', top: '-4px', minWidth: '200px', zIndex: 10 }}
-                      onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
-                      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
+                {/* ═ Level 2: Profile list submenu ═ */}
+                {ctxSub?.main === 'profileList' ? (
+                  <div className='automationContextMenuPanel contextMenuPanel dropdown-menu show'
+                    style={{ position: 'absolute', left: 'calc(100% - 4px)', top: '-4px', minWidth: 220, zIndex: 10 }}
+                    onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
+                    onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
+                  >
+                    {/* Tạo Profile mới (always first) */}
+                    <button type='button' className='automationContextMenuItem dropdown-item'
+                      onMouseEnter={() => setCtxSub({ main: 'profileList' })}
+                      onPointerDown={e => {
+                        e.preventDefault(); e.stopPropagation();
+                        const hints = ctxTargets.map(u => { const d = deviceByUdid.get(u); return [d?.manufacturer, d?.model].filter(Boolean).join(' '); }).filter(Boolean);
+                        setAutomationContextMenu(null);
+                        setInputModal({
+                          key: makeId('input'),
+                          title: 'Tạo Device Profile mới',
+                          label: 'Tên Profile',
+                          placeholder: 'Ví dụ: Samsung Note 9 Pixel ROM',
+                          defaultValue: hints[0] || '',
+                          onConfirm: (name) => { createProfileForDevices(name, ctxTargets); setInputModal(null); },
+                        });
+                      }}
                     >
-                      {/* Gán vào Profile (switch) – chỉ hiện nếu có profile khác */}
-                      {deviceProfiles.filter(p => p.id !== ctxProfileInfo.singleProfile!.id).length > 0 ? (
-                        <div style={{ position: 'relative' }}
-                          onMouseEnter={() => setCtxSub({ main: 'profile', nested: 'profileAssign' })}
+                      <Plus size={14} /><span>Tạo Profile mới</span>
+                    </button>
+
+                    {deviceProfiles.length > 0 ? <div className='automationContextMenuDivider' /> : null}
+
+                    {/* Each profile → Level 3 actions */}
+                    {deviceProfiles.map(profile => {
+                      const isCurrentProfile = profile.id === currentProfileId;
+                      const nested = ctxSub?.nested;
+                      const isL3Open = typeof nested === 'object' && nested !== null && nested.type === 'profileActions' && nested.profileId === profile.id;
+                      return (
+                        <div key={profile.id} style={{ position: 'relative' }}
+                          onMouseEnter={() => setCtxSub({ main: 'profileList', nested: { type: 'profileActions', profileId: profile.id } })}
                         >
                           <button type='button' className='automationContextMenuItem dropdown-item'
                             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
                           >
-                            <span>Gán vào Profile</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {profile.name}{isCurrentProfile ? ' (hiện tại)' : ''}
+                            </span>
                             <ChevronRight size={12} style={{ flexShrink: 0, opacity: 0.5 }} />
                           </button>
-                          {/* ═ Level 3: Profile list ═ */}
-                          {ctxSub?.nested === 'profileAssign' ? (
+
+                          {/* ═ Level 3: Profile actions submenu ═ */}
+                          {isL3Open ? (
                             <div className='automationContextMenuPanel contextMenuPanel dropdown-menu show'
-                              style={{ position: 'absolute', left: 'calc(100% - 4px)', top: '-4px', minWidth: '180px', zIndex: 11 }}
+                              style={{ position: 'absolute', left: 'calc(100% - 4px)', top: '-4px', minWidth: 180, zIndex: 11 }}
                               onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
+                              onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
                             >
-                              {deviceProfiles.filter(p => p.id !== ctxProfileInfo.singleProfile!.id).map(p => (
-                                <button key={p.id} type='button' className='automationContextMenuItem dropdown-item'
-                                  onPointerDown={e => { e.preventDefault(); e.stopPropagation(); assignDevicesToProfile(p.id, ctxTargets); setAutomationContextMenu(null); }}
-                                >
-                                  <span>{p.name}</span>
-                                </button>
-                              ))}
+                              {/* Gán vào Profile này */}
+                              <button type='button' className='automationContextMenuItem dropdown-item'
+                                disabled={isCurrentProfile}
+                                onPointerDown={e => {
+                                  e.preventDefault(); e.stopPropagation();
+                                  if (isCurrentProfile) return;
+                                  assignDevicesToProfile(profile.id, ctxTargets);
+                                  setAutomationContextMenu(null);
+                                }}
+                              >
+                                <Users size={14} /><span>{isCurrentProfile ? 'Đang dùng Profile này' : 'Gán vào Profile này'}</span>
+                              </button>
+
+                              <div className='automationContextMenuDivider' />
+
+                              {/* Đổi tên Profile → InputModal */}
+                              <button type='button' className='automationContextMenuItem dropdown-item'
+                                onPointerDown={e => {
+                                  e.preventDefault(); e.stopPropagation();
+                                  setAutomationContextMenu(null);
+                                  setInputModal({
+                                    key: makeId('input'),
+                                    title: 'Đổi tên Device Profile',
+                                    label: 'Tên mới',
+                                    defaultValue: profile.name,
+                                    onConfirm: (newName) => { renameProfile(profile.id, newName); setInputModal(null); },
+                                  });
+                                }}
+                              >
+                                <Pencil size={14} /><span>Đổi tên Profile</span>
+                              </button>
+
+                              {/* Xoá Profile → ConfirmDeleteModal */}
+                              <button type='button' className='automationContextMenuItem automationContextMenuDanger dropdown-item'
+                                onPointerDown={e => {
+                                  e.preventDefault(); e.stopPropagation();
+                                  const pId = profile.id;
+                                  const pName = profile.name;
+                                  const bindingCount = AUTOMATION_APPS.reduce((sum, app) =>
+                                    sum + appActions[app.id].reduce((s, a) => s + (a.bindings ?? []).filter(b => b.profileId === pId).length, 0), 0);
+                                  setAutomationContextMenu(null);
+                                  setConfirmModal({
+                                    title: 'Xoá Device Profile',
+                                    message: `Xoá Device Profile "${pName}" sẽ gỡ toàn bộ máy khỏi Profile và xoá ${bindingCount} macro binding đã gán cho Profile này.\n\nFile macro gốc vẫn được giữ.\n\nBạn có chắc muốn xoá không?`,
+                                    onConfirm: () => { deleteProfileImpl(pId); setConfirmModal(null); },
+                                  });
+                                }}
+                              >
+                                <Trash2 size={14} /><span>Xoá Profile</span>
+                              </button>
                             </div>
                           ) : null}
                         </div>
-                      ) : null}
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
 
-                      {/* Đổi tên Profile */}
-                      <button type='button' className='automationContextMenuItem dropdown-item'
-                        onMouseEnter={() => setCtxSub({ main: 'profile' })}
-                        onPointerDown={e => {
-                          e.preventDefault(); e.stopPropagation();
-                          const p = ctxProfileInfo.singleProfile!;
-                          const newName = window.prompt('Đổi tên Device Profile', p.name);
-                          if (!newName?.trim() || newName.trim() === p.name) return;
-                          renameProfile(p.id, newName.trim());
-                          setAutomationContextMenu(null);
-                        }}
-                      >
-                        <Pencil size={14} /><span>Đổi tên Profile</span>
-                      </button>
-
-                      {/* Xoá Profile → confirm modal */}
-                      <button type='button' className='automationContextMenuItem automationContextMenuDanger dropdown-item'
-                        onMouseEnter={() => setCtxSub({ main: 'profile' })}
-                        onPointerDown={e => {
-                          e.preventDefault(); e.stopPropagation();
-                          const p = ctxProfileInfo.singleProfile!;
-                          const bindingCount = AUTOMATION_APPS.reduce((sum, app) =>
-                            sum + appActions[app.id].reduce((s, a) => s + (a.bindings ?? []).filter(b => b.profileId === p.id).length, 0), 0);
-                          setAutomationContextMenu(null);
-                          setConfirmModal({
-                            title: 'Xoá Device Profile',
-                            message: `Xoá Device Profile "${p.name}" sẽ gỡ toàn bộ máy khỏi Profile và xoá ${bindingCount} macro binding đã gán cho Profile này.\n\nFile macro gốc vẫn được giữ.\n\nBạn có chắc muốn xoá không?`,
-                            onConfirm: () => { deleteProfileImpl(p.id); setConfirmModal(null); },
-                          });
-                        }}
-                      >
-                        <Trash2 size={14} /><span>Xoá Profile</span>
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-
-              ) : ctxProfileInfo.profileCount === 0 ? (
-                /* ─── Case: No profile ─── */
-                <>
-                  <button type='button' className='automationContextMenuItem dropdown-item' disabled
-                    onMouseEnter={() => setCtxSub(null)}
-                  >
-                    <Users size={14} /><span>Chưa có Device Profile</span>
-                  </button>
-
-                  {/* Gán vào Profile (submenu) */}
-                  {deviceProfiles.length > 0 ? (
-                    <div style={{ position: 'relative' }}
-                      onMouseEnter={() => setCtxSub({ main: 'noProfileAssign' })}
-                    >
-                      <button type='button' className='automationContextMenuItem dropdown-item'
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
-                      >
-                        <span>Gán vào Profile</span>
-                        <ChevronRight size={12} style={{ flexShrink: 0, opacity: 0.5 }} />
-                      </button>
-                      {ctxSub?.main === 'noProfileAssign' ? (
-                        <div className='automationContextMenuPanel contextMenuPanel dropdown-menu show'
-                          style={{ position: 'absolute', left: 'calc(100% - 4px)', top: '-4px', minWidth: '180px', zIndex: 10 }}
-                          onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
-                        >
-                          {deviceProfiles.map(p => (
-                            <button key={p.id} type='button' className='automationContextMenuItem dropdown-item'
-                              onPointerDown={e => { e.preventDefault(); e.stopPropagation(); assignDevicesToProfile(p.id, ctxTargets); setAutomationContextMenu(null); }}
-                            >
-                              <span>{p.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-
-                  {/* Tạo Profile mới */}
-                  <button type='button' className='automationContextMenuItem dropdown-item'
-                    onMouseEnter={() => setCtxSub(null)}
-                    onPointerDown={e => {
-                      e.preventDefault(); e.stopPropagation();
-                      const hints = ctxTargets.map(u => { const d = deviceByUdid.get(u); return [d?.manufacturer, d?.model].filter(Boolean).join(' '); }).filter(Boolean);
-                      const name = window.prompt('Tạo Device Profile mới', hints[0] || '');
-                      if (!name?.trim()) return;
-                      createProfileForDevices(name.trim(), ctxTargets);
-                      setAutomationContextMenu(null);
-                    }}
-                  >
-                    <Plus size={14} /><span>Tạo Profile mới</span>
-                  </button>
-                </>
-
-              ) : (
-                /* ─── Case: Multiple/mixed profiles ─── */
-                <button type='button' className='automationContextMenuItem dropdown-item' disabled
-                  onMouseEnter={() => setCtxSub(null)}
-                >
-                  <Users size={14} />
-                  <span>
-                    {ctxProfileInfo.profileCount > 1
-                      ? `Nhiều profile: ${ctxProfileInfo.currentProfiles.map(p => p.name).join(', ')}`
-                      : `${ctxProfileInfo.currentProfiles[0]?.name} + ${ctxProfileInfo.unassigned.length} máy chưa có Profile`}
-                  </span>
-                </button>
-              )}
-
-              {/* ═══ SECTION: App Actions (dynamic) ═══ */}
+              {/* ═══ App Actions (dynamic) ═══ */}
               {AUTOMATION_APPS.map(app => {
                 const actions = appActions[app.id];
                 if (!actions.length) return null;
@@ -1183,34 +1325,22 @@ export function AutomationModal({
                           {/* ═ Level 2: Action binding submenu ═ */}
                           {isOpen && actionSubmenuInfo ? (
                             <div className='automationContextMenuPanel contextMenuPanel dropdown-menu show'
-                              style={{ position: 'absolute', left: 'calc(100% - 4px)', top: '-4px', minWidth: '240px', zIndex: 10, maxHeight: '320px', overflowY: 'auto' }}
+                              style={{ position: 'absolute', left: 'calc(100% - 4px)', top: '-4px', minWidth: 260, zIndex: 10 }}
                               onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
                               onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
                             >
-                              {/* ── Case: chưa có profile ── */}
+                              {/* chưa profile */}
                               {actionSubmenuInfo.unassigned.length > 0 ? (
                                 <>
-                                  <button type='button' className='automationContextMenuItem dropdown-item' disabled>
-                                    <Users size={14} /><span>Chưa có Device Profile</span>
-                                  </button>
-                                  <button type='button' className='automationContextMenuItem dropdown-item' disabled>
-                                    <span>Hãy gán/tạo Profile trước</span>
-                                  </button>
+                                  <button type='button' className='automationContextMenuItem dropdown-item' disabled><Users size={14} /><span>Chưa có Device Profile</span></button>
+                                  <button type='button' className='automationContextMenuItem dropdown-item' disabled><span>Hãy gán/tạo Profile trước</span></button>
                                 </>
-
                               ) : actionSubmenuInfo.profileCount > 1 ? (
-                                /* ── Case: nhiều profile ── */
                                 <>
-                                  <button type='button' className='automationContextMenuItem dropdown-item' disabled>
-                                    <span>Các máy thuộc nhiều Device Profile khác nhau</span>
-                                  </button>
-                                  <button type='button' className='automationContextMenuItem dropdown-item' disabled>
-                                    <span>Chọn cùng Device Profile để gán macro</span>
-                                  </button>
+                                  <button type='button' className='automationContextMenuItem dropdown-item' disabled><span>Các máy thuộc nhiều Device Profile khác nhau</span></button>
+                                  <button type='button' className='automationContextMenuItem dropdown-item' disabled><span>Chọn cùng Device Profile để gán macro</span></button>
                                 </>
-
                               ) : actionSubmenuInfo.singleProfile ? (
-                                /* ── Case: 1 profile → quản lý macro ── */
                                 <>
                                   {/* Info: Device Profile */}
                                   <button type='button' className='automationContextMenuItem dropdown-item' disabled
@@ -1237,7 +1367,7 @@ export function AutomationModal({
 
                                   <div className='automationContextMenuDivider' />
 
-                                  {/* Đổi File Macro / Chọn File Macro → Level 3 submenu */}
+                                  {/* Đổi / Chọn File Macro → Level 3 */}
                                   <div style={{ position: 'relative' }}
                                     onMouseEnter={() => setCtxSub({ main: { appId: app.id, actionId: action.id }, nested: 'macroList' })}
                                   >
@@ -1248,15 +1378,15 @@ export function AutomationModal({
                                       <ChevronRight size={12} style={{ flexShrink: 0, opacity: 0.5 }} />
                                     </button>
 
-                                    {/* ═ Level 3: Macro list ═ */}
+                                    {/* ═ Level 3: Macro list (no clip, proper width) ═ */}
                                     {ctxSub?.nested === 'macroList' ? (
                                       <div className='automationContextMenuPanel contextMenuPanel dropdown-menu show'
-                                        style={{ position: 'absolute', left: 'calc(100% - 4px)', top: '-4px', minWidth: '200px', zIndex: 11, maxHeight: '280px', overflowY: 'auto' }}
+                                        style={{ position: 'absolute', left: 'calc(100% - 4px)', top: '-4px', minWidth: 280, maxWidth: 400, zIndex: 11, maxHeight: 400, overflowY: 'auto', overflowX: 'hidden' }}
                                         onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
                                       >
                                         {savedMacros.map(macro => (
                                           <button key={macro.id} type='button'
-                                            className='automationContextMenuItem automationContextMacroItem dropdown-item'
+                                            className='automationContextMenuItem dropdown-item'
                                             disabled={actionSubmenuInfo.binding?.macroId === macro.id}
                                             title={macro.name}
                                             onPointerDown={e => {
@@ -1266,20 +1396,18 @@ export function AutomationModal({
                                               setAutomationContextMenu(null);
                                             }}
                                           >
-                                            {actionSubmenuInfo.binding?.macroId === macro.id ? <Save size={14} /> : <FolderOpen size={14} />}
-                                            <span>{macro.name}</span>
+                                            {actionSubmenuInfo.binding?.macroId === macro.id ? <Save size={14} style={{ flexShrink: 0 }} /> : <FolderOpen size={14} style={{ flexShrink: 0 }} />}
+                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{macro.name}</span>
                                           </button>
                                         ))}
                                         {!savedMacros.length ? (
-                                          <button type='button' className='automationContextMenuItem dropdown-item' disabled>
-                                            <span>Chưa có File Macro</span>
-                                          </button>
+                                          <button type='button' className='automationContextMenuItem dropdown-item' disabled><span>Chưa có File Macro</span></button>
                                         ) : null}
                                       </div>
                                     ) : null}
                                   </div>
 
-                                  {/* Xoá gán macro → confirm modal */}
+                                  {/* Xoá gán macro → ConfirmDeleteModal */}
                                   {actionSubmenuInfo.binding ? (
                                     <>
                                       <div className='automationContextMenuDivider' />
@@ -1318,8 +1446,64 @@ export function AutomationModal({
         </div>
       ) : null}
 
-      {/* ══════════════════ CONFIRM DELETE MODAL ══════════════════ */}
+      {/* ══════════════════ MACRO CONTEXT MENU (Portal, fixed) ══════════════════ */}
+      {macroCtxMenu ? (() => {
+        const macro = savedMacros.find(m => m.id === macroCtxMenu.macroId);
+        if (!macro) return null;
+        const bindingCount = AUTOMATION_APPS.reduce((sum, app) =>
+          sum + appActions[app.id].reduce((s, a) => s + (a.bindings ?? []).filter(b => b.macroId === macro.id).length, 0), 0);
+        return createPortal(
+          <div className='automationMacroCtxPanel automationContextMenuPanel contextMenuPanel dropdown-menu show'
+            style={{ position: 'fixed', left: macroCtxMenu.x, top: macroCtxMenu.y, zIndex: 27000, minWidth: 200 }}
+            onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
+            onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
+          >
+
+            {/* Đổi tên File Macro → InputModal */}
+            <button type='button' className='automationContextMenuItem dropdown-item'
+              onPointerDown={e => {
+                e.preventDefault(); e.stopPropagation();
+                setMacroCtxMenu(null);
+                setInputModal({
+                  key: makeId('input'),
+                  title: 'Đổi tên File Macro',
+                  label: 'Tên mới',
+                  defaultValue: macro.name,
+                  onConfirm: (newName) => { renameMacro(macro.id, newName); setInputModal(null); },
+                });
+              }}
+            >
+              <Pencil size={14} /><span>Đổi tên File Macro</span>
+            </button>
+
+            <div className='automationContextMenuDivider' />
+
+            {/* Xoá File Macro → ConfirmDeleteModal */}
+            <button type='button' className='automationContextMenuItem automationContextMenuDanger dropdown-item'
+              onPointerDown={e => {
+                e.preventDefault(); e.stopPropagation();
+                const mId = macro.id;
+                const mName = macro.name;
+                setMacroCtxMenu(null);
+                setConfirmModal({
+                  title: 'Xoá File Macro',
+                  message: bindingCount > 0
+                    ? `File Macro "${mName}" đang được dùng bởi ${bindingCount} hành động/profile. Xoá file macro sẽ làm các hành động đó báo "Macro đã mất". File binding không bị xoá.\n\nBạn có chắc muốn xoá không?`
+                    : `Xoá File Macro "${mName}"? Thao tác này không thể hoàn tác.\n\nBạn có chắc muốn xoá không?`,
+                  onConfirm: () => { deleteMacroImpl(mId); setConfirmModal(null); },
+                });
+              }}
+            >
+              <Trash2 size={14} /><span>Xoá File Macro</span>
+            </button>
+          </div>,
+          document.body,
+        );
+      })() : null}
+
+      {/* ══════════════════ MODALS (Portal → document.body) ══════════════════ */}
       <ConfirmDeleteModal state={confirmModal} onClose={() => setConfirmModal(null)} />
+      <InputModal state={inputModal} onClose={() => setInputModal(null)} />
     </div>
   );
 }

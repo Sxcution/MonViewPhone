@@ -1,7 +1,7 @@
 import { clamp, encodeKeycodeMessage, encodeScrollMessage, encodeTouchMessage, KeyEventAction, MotionAction } from './control';
 import type { InputTarget } from '@/context/ActiveContext';
 import { AndroidKeycode } from './keyEvent';
-import { emitAutomationClick } from './automation';
+import { emitAutomationClick, emitAutomationSwipe } from './automation';
 
 type TargetsGetter = () => InputTarget[];
 
@@ -9,10 +9,12 @@ type ActivePointerState = {
   pid: number;
   // Normalized (0..1) coords from the source canvas, later mapped to each target device.
   startClient: { x: number; y: number };
+  startXY: { x01: number; y01: number };
   lastXY: { x01: number; y01: number };
   lastButtons: number;
   dirty: boolean;
   isolated: boolean;
+  downTimestamp: number;
 };
 
 function makePointerIdAllocator() {
@@ -135,10 +137,12 @@ export function attachTouchControls(
     active.set(e.pointerId, {
       pid,
       startClient: { x: e.clientX, y: e.clientY },
+      startXY: { x01, y01 },
       lastXY: { x01, y01 },
       lastButtons: buttons,
       dirty: false,
       isolated,
+      downTimestamp: Date.now(),
     });
 
     sendToTargets((t) => {
@@ -172,7 +176,6 @@ export function attachTouchControls(
     if (!st) return;
     e.preventDefault();
 
-
     const { x01, y01 } = mapClientToNormXY(canvas, e.clientX, e.clientY);
 
     if (st.dirty && canSend()) {
@@ -199,6 +202,24 @@ export function attachTouchControls(
         y,
         width: w,
         height: h,
+        timestamp: Date.now(),
+      });
+    } else if (udid && movedPx > 8) {
+      const startMapped = mapNormToDeviceXY(canvas, st.startXY.x01, st.startXY.y01);
+      const endMapped = mapNormToDeviceXY(canvas, x01, y01);
+      emitAutomationSwipe({
+        udid,
+        startX01: st.startXY.x01,
+        startY01: st.startXY.y01,
+        endX01: x01,
+        endY01: y01,
+        startX: startMapped.x,
+        startY: startMapped.y,
+        endX: endMapped.x,
+        endY: endMapped.y,
+        width: endMapped.w,
+        height: endMapped.h,
+        durationMs: Math.max(50, Date.now() - st.downTimestamp),
         timestamp: Date.now(),
       });
     }
