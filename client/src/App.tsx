@@ -207,7 +207,7 @@ export function App() {
   useDirectKeyboard(true)
   const { t } = useI18n()
   const { deviceParam, wsServer } = useMemo(() => readPageParams(), [])
-  const { androidDevices, pushFile } = useServer()
+  const { androidDevices, androidDeviceMap, pushFile } = useServer()
   const {
     sendKeyTap,
     screenshotActiveCanvas,
@@ -885,8 +885,16 @@ export function App() {
     [orderedRegistered, connectSelection]
   )
   const automationDevices = useMemo<AutomationDeviceOption[]>(
-    () => orderedRegistered.map(udid => ({ udid, number: orderMap.get(udid) ?? 0 })),
-    [orderedRegistered, orderMap]
+    () => orderedRegistered.map(udid => {
+      const meta = androidDeviceMap[udid];
+      return {
+        udid,
+        number: orderMap.get(udid) ?? 0,
+        manufacturer: meta?.['ro.product.manufacturer'] ?? undefined,
+        model: meta?.['ro.product.model'] ?? undefined,
+      };
+    }),
+    [orderedRegistered, orderMap, androidDeviceMap]
   )
   const controlGridDevices = useMemo<DeviceSelectionGridItem[]>(
     () => orderedRegistered.map(udid => ({

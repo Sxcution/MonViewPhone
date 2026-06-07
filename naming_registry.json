@@ -9,7 +9,8 @@
       "device_viewer": "DeviceViewer",
       "tile": "Tile",
       "viewer_side_panel": "ViewerSidePanel",
-      "sidebar_device_grid": "SidebarDeviceGrid"
+      "sidebar_device_grid": "SidebarDeviceGrid",
+      "automation_modal": "AutomationModal"
     },
     "css_classes": {
       "right_config_panel": "rightConfigPanel",
@@ -37,7 +38,8 @@
       "dev_index": "dev-index",
       "dev_status_dot": "dev-status-dot",
       "dev_label": "dev-label",
-      "reset_btn": "resetBtn"
+      "reset_btn": "resetBtn",
+      "automation_context_profile_current": "automationContextProfileCurrent"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -74,7 +76,8 @@
       "draft_config": "draftConfig",
       "draft_viewer_config": "draftViewerConfig",
       "suppress_loading_overlay": "suppressLoadingOverlay",
-      "sub_menu_open": "subMenuOpen"
+      "sub_menu_open": "subMenuOpen",
+      "device_profiles": "deviceProfiles"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
@@ -86,12 +89,34 @@
       "on_pointer_enter_tile": "onPointerEnter",
       "on_pointer_leave_tile": "onPointerLeave",
       "handle_alt_keyup": "handleKeyUp",
-      "handle_click_outside": "handleClickOutside"
+      "handle_click_outside": "handleClickOutside",
+      "assign_devices_to_profile": "assignDevicesToProfile",
+      "create_profile_for_devices": "createProfileForDevices",
+      "assign_macro_to_action": "assignMacroToAction",
+      "play_app_action": "playAppAction",
+      "get_profile_for_udid": "getProfileForUdid",
+      "get_profiles_for_selected_devices": "getProfilesForSelectedDevices"
     },
     "refs": {
       "rubber_band_ref": "rubberBandRef",
       "grid_scroll_ref": "gridScrollRef",
       "rubber_band_just_finished_ref": "rubberBandJustFinishedRef"
+    }
+  },
+  "automation_identifiers": {
+    "types": {
+      "automation_device_option": "AutomationDeviceOption",
+      "automation_macro_row": "AutomationMacroRow",
+      "saved_automation_macro": "SavedAutomationMacro",
+      "automation_app_id": "AutomationAppId",
+      "automation_action_macro_binding": "AutomationActionMacroBinding",
+      "automation_app_action": "AutomationAppAction",
+      "automation_device_profile": "AutomationDeviceProfile"
+    },
+    "local_storage_keys": {
+      "macros": "automationMacrosV1",
+      "app_actions": "automationAppActionsV1",
+      "device_profiles": "automationDeviceProfilesV1"
     }
   },
   "key_codes": {
