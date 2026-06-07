@@ -47,7 +47,7 @@ function clamp(n: number, min: number, max: number): number {
 const BITRATE_MIN = 524_288
 const BITRATE_MAX = 8_388_608
 const BITRATE_WARN_THRESHOLD = Math.floor(BITRATE_MAX * 0.6) // ~60%
-const TILE_WIDTH_MIN = 100
+const TILE_WIDTH_MIN = 105
 const TILE_WIDTH_MAX = 726
 const VIEWER_WIDTH_MIN = 400
 const VIEWER_WIDTH_MAX = 900
@@ -2165,7 +2165,7 @@ export function App() {
                   return (
                     <button
                       key={id}
-                      className={`rcpBtn rcpQuickBtn${draggingQuickAction === id ? ' dragging' : ''
+                      className={`rcpBtn rcpQuickBtn rcpQuickBtn--${id}${draggingQuickAction === id ? ' dragging' : ''
                         }`}
                       draggable
                       title={action.label}

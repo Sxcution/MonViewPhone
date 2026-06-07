@@ -88,9 +88,11 @@ body {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle at 14% 4%, rgba(56, 189, 248, 0.10), transparent 28%),
-    radial-gradient(circle at 86% 8%, rgba(22, 119, 255, 0.08), transparent 30%),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     var(--md-bg);
+  background-size: 100px 100px, 100px 100px, auto;
+  background-position: center top;
   /* Nền xám đen chống chói */
   color: var(--md-text);
   /* Chữ xám nhạt để dịu mắt */
@@ -2396,13 +2398,46 @@ canvas {
 }
 
 .rcpQuickBtn {
-  height: 40px;
+  position: relative;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 0 8px;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: var(--md-radius-sm, 8px);
+  background: #2b2b2d;
+  color: #d4d4d8;
   font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-shadow: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .06),
+    0 8px 18px rgba(0, 0, 0, .28);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.rcpQuickBtn::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .06), transparent 46%);
+  opacity: .55;
+  pointer-events: none;
+}
+
+.rcpQuickBtn svg,
+.rcpQuickBtn span {
+  position: relative;
+  z-index: 1;
+}
+
+.rcpQuickBtn svg {
+  flex: 0 0 auto;
+  filter: none;
 }
 
 .rcpQuickBtn span {
@@ -2412,9 +2447,24 @@ canvas {
   white-space: nowrap;
 }
 
+.rcpQuickBtn:hover {
+  border-color: rgba(255, 255, 255, .16);
+  background: #333335;
+  filter: none;
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .08),
+    0 12px 24px rgba(0, 0, 0, .34);
+}
+
+.rcpQuickBtn:active {
+  transform: translateY(0);
+}
+
 .rcpQuickBtn.dragging {
   opacity: 0.55;
-  border-color: rgba(127, 224, 197, 0.75);
+  border-color: rgba(255, 255, 255, .42);
+  transform: scale(.98);
 }
 
 .pageContextLayer {
@@ -6262,6 +6312,12 @@ button:focus-visible {
 html,
 body {
   background-color: var(--md-bg) !important;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    var(--md-bg) !important;
+  background-size: 100px 100px, 100px 100px, auto !important;
+  background-position: center top !important;
 }
 
 #main,
@@ -6371,6 +6427,13 @@ body {
 .viewerPanelInner,
 .viewerBody.viewMode {
   background: transparent;
+}
+
+.viewerBody.viewMode,
+.viewerBody.viewMode .viewerMain,
+.viewerBody.viewMode .viewerCanvasWrap,
+.viewerBody.viewMode .viewerCanvas {
+  cursor: pointer;
 }
 
 .viewerActions {
