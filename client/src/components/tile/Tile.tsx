@@ -290,6 +290,15 @@ function TileComponent({
             data-udid={udid}
             onPointerEnter={onPointerEnter}
             onPointerLeave={onPointerLeave}
+            onMouseDown={(e) => {
+                if (e.button === 1) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (onViewDevice) {
+                        onViewDevice(udid);
+                    }
+                }
+            }}
         >
             {showTileInfo ? (
                 <TileHeader

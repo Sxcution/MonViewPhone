@@ -13,8 +13,8 @@ Removed legacy layers:
 - Old root launcher scripts.
 
 ## Frontend
-- `client/src/App.tsx`: Main UI, device grid, right control panel, group filtering, stream settings, quick controls, context menus, and global device actions.
-- `client/src/components/DeviceViewer.tsx`: Expanded single-device viewer.
+- `client/src/App.tsx`: Main UI, device grid, right control panel, group filtering, stream settings, quick controls, context menus, global device actions, and Middle Mouse Button (MMB) toggle handler.
+- `client/src/components/DeviceViewer.tsx`: Expanded single-device viewer, supports Middle Mouse Button click to close and return to grid.
 - `client/src/components/ViewerSidePanel.tsx`: Viewer-side controls for profiles, APK install, file import/export, and ADB commands.
 - `client/src/components/SyncPanel.tsx`: Device synchronization UI.
 - `client/src/components/AutomationModal.tsx`: Automation modal with Action + Device Profile + Macro binding system. Manages macro recording/playback, app actions (WeChat/Line/Tantan/Setting), and device profile assignment. Data persisted in localStorage keys: `automationMacrosV1`, `automationAppActionsV1`, `automationDeviceProfilesV1`.

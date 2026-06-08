@@ -233,6 +233,7 @@ export function attachTouchControls(
   function onPointerDown(e: PointerEvent) {
     // Chặn luồng thao tác và nhường lại quyền cho hệ thống Chọn (App.tsx => onClick) nếu đè Ctrl
     if (e.ctrlKey || e.metaKey) return;
+    if (e.button === 1 || (e.buttons & 4) === 4) return;
 
     if (!canSend()) return;
     e.preventDefault();
@@ -277,6 +278,7 @@ export function attachTouchControls(
   }
 
   function onPointerMove(e: PointerEvent) {
+    if ((e.buttons & 4) === 4) return;
     if (!active.has(e.pointerId)) {
       if (((e.buttons ?? 0) & 2) === 2) {
         e.preventDefault();

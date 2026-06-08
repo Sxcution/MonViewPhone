@@ -1859,7 +1859,7 @@ export function App() {
                     onRegisterReload={registerReload}
                     onUnregisterReload={unregisterReload}
                     onViewDevice={id => {
-                      setViewerUdid(id)
+                      setViewerUdid(prev => prev === id ? null : id)
                     }}
                     onMove={moveTile}
                     onChangeOrderNumber={setTileNumber}
@@ -2586,7 +2586,15 @@ export function App() {
                 ['--viewer-width' as any]: `${viewerWidthPx}px`
               } as React.CSSProperties
             }
-            onMouseDown={e => e.stopPropagation()}
+            onMouseDown={e => {
+              if (e.button === 1) {
+                e.preventDefault()
+                e.stopPropagation()
+                setViewerUdid(null)
+              } else {
+                e.stopPropagation()
+              }
+            }}
             onPointerDown={onViewerPointerDown}
           >
             <div className='viewerOverlayPanel device-viewer-container'>

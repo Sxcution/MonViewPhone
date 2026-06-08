@@ -414,7 +414,15 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
     <div
       id="viewerPanel"
       style={{ width: '100%', ['--viewer-aspect' as any]: viewerAspect }}
-      onMouseDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => {
+        if (e.button === 1) {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        } else {
+          e.stopPropagation();
+        }
+      }}
     >
       <div className="viewerHeader">
         <div className="viewerTitle">
