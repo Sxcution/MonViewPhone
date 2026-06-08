@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
+import { createPortal } from 'react-dom'
 import { readPageParams } from '@/lib/params'
 import { useServer } from '@/context/ServerContext'
 import { Tile } from '@/components/Tile'
@@ -30,6 +31,21 @@ import {
 import { useTileOrder } from '@/store/useTileOrder'
 import type { StreamReloadOptions } from '@/components/tile/types'
 import {
+  loadDeviceProfiles,
+  saveDeviceProfiles,
+  loadAppActions,
+  saveAppActions,
+  loadSavedMacros,
+  MACRO_RUNNING_UDIDS_EVENT,
+  loadSeedingContents,
+  saveSeedingContents,
+  AUTOMATION_APPS,
+  type AutomationAppId,
+  type AutomationDeviceProfile,
+  type SavedAutomationMacro,
+  type AutomationAppAction,
+} from '@/lib/automationData'
+import {
   Bot,
   Camera,
   ChevronDown,
@@ -45,7 +61,14 @@ import {
   Upload,
   Volume2,
   VolumeX,
-  X
+  X,
+  ChevronRight,
+  Plus,
+  Pencil,
+  Trash2,
+  Users,
+  Save,
+  FolderOpen
 } from 'lucide-react'
 
 type TileDims = { width: number; height: number }
@@ -535,6 +558,168 @@ export function App() {
   const [connectSelection, setConnectSelection] = useState<Set<string>>(
     () => new Set(syncTargets)
   )
+  const [runningMacroUdids, setRunningMacroUdids] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const handleMacroRunning = (e: Event) => {
+      const customEvent = e as CustomEvent<string[]>
+      setRunningMacroUdids(new Set(customEvent.detail || []))
+    }
+    window.addEventListener(MACRO_RUNNING_UDIDS_EVENT, handleMacroRunning)
+    return () => window.removeEventListener(MACRO_RUNNING_UDIDS_EVENT, handleMacroRunning)
+  }, [])
+
+  type CtxSubState = null | {
+    main: 'profileList' | { appId: AutomationAppId; actionId: string };
+    nested?: { type: 'profileActions'; profileId: string; appId?: AutomationAppId; actionId?: string } | 'macroList';
+  };
+
+  type InputState = {
+    key: string;
+    title: string;
+    label?: string;
+    placeholder?: string;
+    defaultValue?: string;
+    onConfirm: (val: string) => void;
+  } | null;
+
+  const [ctxSub, setCtxSub] = useState<CtxSubState>(null);
+  const [inputState, setInputState] = useState<InputState>(null);
+  const [deviceProfiles, setDeviceProfiles] = useState<AutomationDeviceProfile[]>([]);
+  const [savedMacros, setSavedMacros] = useState<SavedAutomationMacro[]>([]);
+  const [appActions, setAppActions] = useState<Record<AutomationAppId, AutomationAppAction[]>>({ wechat: [], line: [], tantan: [], setting: [] });
+
+  const [seedingSectionOpen, setSeedingSectionOpen] = useState(false);
+  const [seedingContents, setSeedingContents] = useState(loadSeedingContents);
+
+  const handleSeedingContentsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setSeedingContents(val);
+    saveSeedingContents(val);
+  };
+
+  const seedingLineCount = useMemo(() => {
+    if (!seedingContents) return 0;
+    return seedingContents.split('\n').filter(line => line.trim()).length;
+  }, [seedingContents]);
+
+  useEffect(() => {
+    if (contextMenuTarget) {
+      setDeviceProfiles(loadDeviceProfiles());
+      setSavedMacros(loadSavedMacros());
+      setAppActions(loadAppActions());
+      setCtxSub(null);
+    }
+  }, [contextMenuTarget]);
+
+  // /* createProfileForDevices : Tạo Device Profile mới */
+  const createProfileForDevices = useCallback((name: string, targetUdids: string[]) => {
+    const newProfile: AutomationDeviceProfile = {
+      id: `profile-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name,
+      udids: [...targetUdids],
+      updatedAt: Date.now()
+    };
+    setDeviceProfiles(prev => {
+      const cleaned = prev.map(p => ({ ...p, udids: p.udids.filter(u => !targetUdids.includes(u)) }));
+      const next = [...cleaned, newProfile];
+      saveDeviceProfiles(next);
+      return next;
+    });
+  }, []);
+
+  // /* assignDevicesToProfile : Gán các thiết bị vào profile */
+  const assignDevicesToProfile = useCallback((profileId: string, targetUdids: string[]) => {
+    setDeviceProfiles(prev => {
+      const next = prev.map(p => ({
+        ...p,
+        udids: p.id === profileId
+          ? [...new Set([...p.udids, ...targetUdids])]
+          : p.udids.filter(u => !targetUdids.includes(u)),
+        updatedAt: p.id === profileId ? Date.now() : p.updatedAt,
+      }));
+      saveDeviceProfiles(next);
+      return next;
+    });
+  }, []);
+
+  // /* renameProfile : Đổi tên profile */
+  const renameProfile = useCallback((profileId: string, newName: string) => {
+    setDeviceProfiles(prev => {
+      const next = prev.map(p => p.id === profileId ? { ...p, name: newName, updatedAt: Date.now() } : p);
+      saveDeviceProfiles(next);
+      return next;
+    });
+    setAppActions(prev => {
+      const next = { ...prev };
+      for (const appId of Object.keys(next) as AutomationAppId[]) {
+        next[appId] = next[appId].map(action => ({
+          ...action,
+          bindings: action.bindings.map(b => b.profileId === profileId ? { ...b, profileName: newName } : b),
+        }));
+      }
+      saveAppActions(next);
+      return next;
+    });
+  }, []);
+
+  // /* deleteProfileImpl : Xoá profile */
+  const deleteProfileImpl = useCallback((profileId: string) => {
+    setDeviceProfiles(prev => {
+      const next = prev.filter(p => p.id !== profileId);
+      saveDeviceProfiles(next);
+      return next;
+    });
+    setAppActions(prev => {
+      const next = { ...prev };
+      for (const appId of Object.keys(next) as AutomationAppId[]) {
+        next[appId] = next[appId].map(action => ({
+          ...action,
+          bindings: action.bindings.filter(b => b.profileId !== profileId),
+        }));
+      }
+      saveAppActions(next);
+      return next;
+    });
+  }, []);
+
+  // /* assignMacroToAction : Gán macro vào hành động của profile */
+  const assignMacroToAction = useCallback((
+    appId: AutomationAppId, actionId: string, macro: SavedAutomationMacro, profile: AutomationDeviceProfile,
+  ) => {
+    setAppActions(prev => {
+      const nextActions = prev[appId].map(action => {
+        if (action.id !== actionId) return action;
+        const bindings = (action.bindings ?? []).filter(b => b.profileId !== profile.id);
+        bindings.push({
+          id: `binding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          macroId: macro.id,
+          macroName: macro.name,
+          profileId: profile.id,
+          profileName: profile.name,
+          updatedAt: Date.now(),
+        });
+        return { ...action, bindings };
+      });
+      const next = { ...prev, [appId]: nextActions };
+      saveAppActions(next);
+      return next;
+    });
+  }, []);
+
+  // /* removeBindingImpl : Gỡ bỏ gán macro khỏi hành động */
+  const removeBindingImpl = useCallback((appId: AutomationAppId, actionId: string, profileId: string) => {
+    setAppActions(prev => {
+      const nextActions = prev[appId].map(action => {
+        if (action.id !== actionId) return action;
+        return { ...action, bindings: (action.bindings ?? []).filter(b => b.profileId !== profileId) };
+      });
+      const next = { ...prev, [appId]: nextActions };
+      saveAppActions(next);
+      return next;
+    });
+  }, []);
+
   const selectionBadgeRef = useRef<HTMLDivElement | null>(null);
 
   const [allKnownDevices, setAllKnownDevices] = useState<Array<{ udid: string; name?: string }>>(() => {
@@ -1358,11 +1543,13 @@ export function App() {
       if (!el) return
       const rect = el.getBoundingClientRect()
       if (rect.left < x2 && rect.right > x1 && rect.top < y2 && rect.bottom > y1) {
-        newSelected.add(udid)
+        if (!runningMacroUdids.has(udid)) {
+          newSelected.add(udid)
+        }
       }
     })
     setConnectSelection(newSelected)
-  }, [mergedOrder])
+  }, [mergedOrder, runningMacroUdids])
 
   const onGridPointerUp = useCallback((e?: React.PointerEvent<HTMLDivElement>) => {
     if (!rubberBandRef.current.active) return
@@ -1426,7 +1613,7 @@ export function App() {
   // Ctrl + A chon tat ca thiet bi để chọn tất cả thiết bị
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+A chọn tất cả (chỉ chọn các máy đang Online)
+      // Ctrl+A chọn tất cả (chỉ chọn các máy đang Online và không chạy Macro)
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA') {
         const active = document.activeElement?.nodeName.toLowerCase()
         if (
@@ -1435,13 +1622,13 @@ export function App() {
         )
           return
         e.preventDefault()
-        const onlineRegistered = orderedRegistered.filter(id => connectedUdids.has(id))
+        const onlineRegistered = orderedRegistered.filter(id => connectedUdids.has(id) && !runningMacroUdids.has(id))
         setConnectSelection(new Set(onlineRegistered))
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [orderedRegistered, connectedUdids])
+  }, [orderedRegistered, connectedUdids, runningMacroUdids])
 
   const [draftConfig, setDraftConfig] = useState<StreamConfig>(STREAM_CONFIG)
   const [draftViewerConfig, setDraftViewerConfig] = useState<StreamConfig>(viewerStreamConfig)
@@ -2462,7 +2649,11 @@ export function App() {
                         if (allSelected) {
                           filteredRegistered.forEach(id => next.delete(id))
                         } else {
-                          filteredRegistered.forEach(id => next.add(id))
+                          filteredRegistered.forEach(id => {
+                            if (!runningMacroUdids.has(id)) {
+                              next.add(id)
+                            }
+                          })
                         }
                         return next
                       })
@@ -2922,6 +3113,54 @@ export function App() {
               )}
             </div>
 
+            {/* Seeding Content Section */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}>
+              <div 
+                style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => setSeedingSectionOpen(p => !p)}
+              >
+                <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1 }}>
+                  Nội dung Seeding
+                </div>
+                <button
+                  type="button"
+                  className='rcpIconBtn'
+                  style={{ background: 'transparent', border: 'none', color: 'var(--md-muted)', cursor: 'pointer', padding: 0 }}
+                  title={seedingSectionOpen ? 'Thu nhỏ' : 'Mở rộng'}
+                  aria-label={seedingSectionOpen ? 'Thu nhỏ' : 'Mở rộng'}
+                >
+                  {seedingSectionOpen ? <ChevronUp size={15} strokeWidth={2} /> : <ChevronDown size={15} strokeWidth={2} />}
+                </button>
+              </div>
+
+              {seedingSectionOpen && (
+                <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 14 }}>
+                  <textarea
+                    value={seedingContents}
+                    onChange={handleSeedingContentsChange}
+                    placeholder="Nhập từ ngữ seeding, mỗi câu 1 dòng..."
+                    style={{
+                      width: '100%',
+                      height: 120,
+                      background: '#0a0a0a',
+                      color: '#fff',
+                      border: '1px solid #444',
+                      borderRadius: '6px',
+                      padding: '8px 12px',
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      outline: 'none',
+                      resize: 'vertical',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--md-muted)', marginTop: 6, textAlign: 'right' }}>
+                    Số dòng: <strong style={{ color: 'var(--md-info)' }}>{seedingLineCount}</strong>
+                  </div>
+                </div>
+              )}
+            </div>
+
 
             <div className='confirmBtns' style={{ marginTop: 32, justifyContent: 'flex-end', display: 'flex' }}>
               <button
@@ -3151,26 +3390,7 @@ export function App() {
       <AutomationModal
         open={automationOpen}
         devices={automationDevices}
-        savedGroups={savedGroups}
         selectedUdids={selectedVisible}
-        onToggleDevice={(udid, checked) => {
-          setConnectSelection(prev => {
-            const next = new Set(prev)
-            if (checked) next.add(udid)
-            else next.delete(udid)
-            return next
-          })
-        }}
-        onToggleAllDevices={(checked) => {
-          setConnectSelection(prev => {
-            const next = new Set(prev)
-            automationDevices.forEach(device => {
-              if (checked) next.add(device.udid)
-              else next.delete(device.udid)
-            })
-            return next
-          })
-        }}
         onClose={() => setAutomationOpen(false)}
       />
 
@@ -3399,6 +3619,419 @@ export function App() {
               />
             </div>
 
+            {/* === Device Profile section === */}
+            <div style={{ position: 'relative' }} className='ctxAddToGroupWrap' onMouseEnter={() => setCtxSub({ main: 'profileList' })} onMouseLeave={() => setCtxSub(null)}>
+              <button
+                style={{ background: 'transparent', border: 'none', color: '#7aadff', fontSize: '13px', cursor: 'pointer', padding: '7px 8px', textAlign: 'left', width: '100%', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(122,173,255,0.1)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent'
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                  <Users size={14} style={{ flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {(() => {
+                      const clickedUdid = contextMenuTarget!.udid;
+                      const profile = deviceProfiles.find(p => p.udids.includes(clickedUdid));
+                      if (profile) return `Profile: ${profile.name}`;
+                      return 'Device Profile';
+                    })()}
+                  </span>
+                </span>
+                <span style={{ fontSize: 10, color: '#555' }}>▶</span>
+              </button>
+
+              {/* Level 2 Submenu: Profile list */}
+              {ctxSub?.main === 'profileList' && (
+                <div
+                  className='ctxSubMenu'
+                  style={{
+                    display: 'flex',
+                    position: 'absolute',
+                    top: 0,
+                    left: 'calc(100% - 4px)',
+                    background: '#1a1a1a',
+                    border: '1px solid #333',
+                    borderRadius: 8,
+                    padding: '4px',
+                    flexDirection: 'column',
+                    gap: 2,
+                    minWidth: 200,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                    zIndex: 10
+                  }}
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {/* Tạo Profile mới */}
+                  <button
+                    type='button'
+                    style={{
+                      background: 'transparent', border: 'none', color: '#cfcfcf',
+                      fontSize: '13px', cursor: 'pointer', padding: '6px 10px', textAlign: 'left', borderRadius: 4,
+                      display: 'flex', alignItems: 'center', gap: 8, width: '100%'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                    onPointerDown={e => {
+                      e.preventDefault(); e.stopPropagation();
+                      const clickedUdid = contextMenuTarget!.udid;
+                      const ctxTargets = connectSelection.size > 0 && connectSelection.has(clickedUdid)
+                        ? Array.from(connectSelection)
+                        : [clickedUdid];
+
+                      const hints = ctxTargets.map(u => {
+                        const d = androidDeviceMap[u];
+                        return d ? [d.manufacturer, d.model].filter(Boolean).join(' ') : '';
+                      }).filter(Boolean);
+
+                      setContextMenuTarget(null);
+                      setContextMenuOpen(false);
+
+                      setInputState({
+                        key: `new-profile-${Date.now()}`,
+                        title: 'Tạo Device Profile mới',
+                        label: 'Tên Profile',
+                        placeholder: 'Ví dụ: Samsung Note 9 Pixel ROM',
+                        defaultValue: hints[0] || '',
+                        onConfirm: (name) => {
+                          createProfileForDevices(name, ctxTargets);
+                          setInputState(null);
+                        },
+                      });
+                    }}
+                  >
+                    <Plus size={14} /><span>Tạo Profile mới</span>
+                  </button>
+
+                  {deviceProfiles.length > 0 && <div style={{ height: 1, background: '#2a2a2a', margin: '4px 0' }} />}
+
+                  {/* Danh sách profile */}
+                  {deviceProfiles.map(profile => {
+                    const clickedUdid = contextMenuTarget!.udid;
+                    const ctxTargets = connectSelection.size > 0 && connectSelection.has(clickedUdid)
+                      ? Array.from(connectSelection)
+                      : [clickedUdid];
+                    const isCurrentProfile = profile.udids.includes(clickedUdid);
+                    const isL3Open = ctxSub?.nested && typeof ctxSub.nested === 'object' && ctxSub.nested.type === 'profileActions' && ctxSub.nested.profileId === profile.id;
+
+                    return (
+                      <div
+                        key={profile.id}
+                        style={{ position: 'relative' }}
+                        onMouseEnter={() => setCtxSub({ main: 'profileList', nested: { type: 'profileActions', profileId: profile.id } })}
+                        onMouseLeave={() => setCtxSub({ main: 'profileList' })}
+                      >
+                        <button
+                          type='button'
+                          style={{
+                            background: 'transparent', border: 'none',
+                            color: isCurrentProfile ? '#7aadff' : '#cfcfcf',
+                            fontSize: '13px', cursor: 'pointer',
+                            padding: '6px 10px', textAlign: 'left', borderRadius: 4,
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                            width: '100%'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {profile.name}
+                          </span>
+                          <span style={{ fontSize: 10, color: '#555' }}>▶</span>
+                        </button>
+
+                        {/* Level 3 Submenu: Profile actions */}
+                        {isL3Open && (
+                          <div
+                            className='ctxSubMenu'
+                            style={{
+                              display: 'flex',
+                              position: 'absolute',
+                              top: 0,
+                              left: 'calc(100% - 4px)',
+                              background: '#1a1a1a',
+                              border: '1px solid #333',
+                              borderRadius: 8,
+                              padding: '4px',
+                              flexDirection: 'column',
+                              gap: 2,
+                              minWidth: 200,
+                              boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                              zIndex: 11
+                            }}
+                            onMouseDown={e => e.stopPropagation()}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            {/* Gán vào Profile này */}
+                            <button
+                              type='button'
+                              style={{
+                                background: 'transparent', border: 'none', color: isCurrentProfile ? '#555' : '#cfcfcf',
+                                fontSize: '13px', cursor: isCurrentProfile ? 'default' : 'pointer', padding: '6px 10px', textAlign: 'left', borderRadius: 4,
+                                display: 'flex', alignItems: 'center', gap: 8, width: '100%'
+                              }}
+                              disabled={isCurrentProfile}
+                              onMouseEnter={e => { if (!isCurrentProfile) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                              onPointerDown={e => {
+                                e.preventDefault(); e.stopPropagation();
+                                if (isCurrentProfile) return;
+                                assignDevicesToProfile(profile.id, ctxTargets);
+                                setContextMenuTarget(null);
+                                setContextMenuOpen(false);
+                              }}
+                            >
+                              <Users size={14} /><span>{isCurrentProfile ? 'Đang dùng Profile này' : 'Gán vào Profile này'}</span>
+                            </button>
+
+                            <div style={{ height: 1, background: '#2a2a2a', margin: '4px 0' }} />
+
+                            {/* Đổi tên Profile */}
+                            <button
+                              type='button'
+                              style={{
+                                background: 'transparent', border: 'none', color: '#cfcfcf',
+                                fontSize: '13px', cursor: 'pointer', padding: '6px 10px', textAlign: 'left', borderRadius: 4,
+                                display: 'flex', alignItems: 'center', gap: 8, width: '100%'
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                              onPointerDown={e => {
+                                e.preventDefault(); e.stopPropagation();
+                                setContextMenuTarget(null);
+                                setContextMenuOpen(false);
+                                setInputState({
+                                  key: `rename-profile-${profile.id}`,
+                                  title: 'Đổi tên Device Profile',
+                                  label: 'Tên mới',
+                                  defaultValue: profile.name,
+                                  onConfirm: (newName) => {
+                                    renameProfile(profile.id, newName);
+                                    setInputState(null);
+                                  },
+                                });
+                              }}
+                            >
+                              <Pencil size={14} /><span>Đổi tên Profile</span>
+                            </button>
+
+                            {/* Xoá Profile */}
+                            <button
+                              type='button'
+                              style={{
+                                background: 'transparent', border: 'none', color: '#ff6060',
+                                fontSize: '13px', cursor: 'pointer', padding: '6px 10px', textAlign: 'left', borderRadius: 4,
+                                display: 'flex', alignItems: 'center', gap: 8, width: '100%'
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,96,96,0.1)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                              onPointerDown={e => {
+                                e.preventDefault(); e.stopPropagation();
+                                setContextMenuTarget(null);
+                                setContextMenuOpen(false);
+                                const bindingCount = AUTOMATION_APPS.reduce((sum, app) =>
+                                  sum + (appActions[app.id] ?? []).reduce((s, a) => s + (a.bindings ?? []).filter(b => b.profileId === profile.id).length, 0), 0);
+                                setConfirmState({
+                                  title: 'Xoá Device Profile',
+                                  message: `Xoá Device Profile "${profile.name}" sẽ gỡ toàn bộ máy khỏi Profile và xoá ${bindingCount} macro binding đã gán cho Profile này.\n\nFile macro gốc vẫn được giữ.\n\nBạn có chắc muốn xoá không?`,
+                                  danger: true,
+                                  onConfirm: () => {
+                                    deleteProfileImpl(profile.id);
+                                  },
+                                });
+                              }}
+                            >
+                              <Trash2 size={14} /><span>Xoá Profile</span>
+                            </button>
+
+                            {/* Divider cho macro binding */}
+                            <div style={{ height: 1, background: '#2a2a2a', margin: '4px 0' }} />
+
+                            {/* Gán macro cho profile */}
+                            {AUTOMATION_APPS.map(app => {
+                              const actions = appActions[app.id] ?? [];
+                              if (!actions.length) return null;
+                              const isAppOpen = ctxSub?.nested && typeof ctxSub.nested === 'object' && ctxSub.nested.type === 'profileActions' && ctxSub.nested.profileId === profile.id && ctxSub.nested.appId === app.id;
+                              return (
+                                <div
+                                  key={`app-${app.id}`}
+                                  style={{ position: 'relative' }}
+                                  onMouseEnter={() => setCtxSub({
+                                    main: 'profileList',
+                                    nested: { type: 'profileActions', profileId: profile.id, appId: app.id }
+                                  })}
+                                  onMouseLeave={() => setCtxSub({
+                                    main: 'profileList',
+                                    nested: { type: 'profileActions', profileId: profile.id }
+                                  })}
+                                >
+                                  <button
+                                    type='button'
+                                    style={{
+                                      background: 'transparent', border: 'none', color: '#cfcfcf',
+                                      fontSize: '12px', cursor: 'pointer', padding: '5px 10px', textAlign: 'left', borderRadius: 4,
+                                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%'
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                                  >
+                                    <span>{app.label}</span>
+                                    <span style={{ fontSize: 10, color: '#555' }}>▶</span>
+                                  </button>
+
+                                  {isAppOpen && (
+                                    <div
+                                      className='ctxSubMenu'
+                                      style={{
+                                        display: 'flex',
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 'calc(100% - 4px)',
+                                        background: '#1a1a1a',
+                                        border: '1px solid #333',
+                                        borderRadius: 8,
+                                        padding: '4px',
+                                        flexDirection: 'column',
+                                        gap: 2,
+                                        minWidth: 180,
+                                        boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                                        zIndex: 12
+                                      }}
+                                    >
+                                      {actions.map(action => {
+                                        const binding = action.bindings?.find(b => b.profileId === profile.id);
+                                        const isActionOpen = ctxSub?.nested && typeof ctxSub.nested === 'object' && ctxSub.nested.type === 'profileActions' && ctxSub.nested.profileId === profile.id && ctxSub.nested.appId === app.id && ctxSub.nested.actionId === action.id;
+                                        return (
+                                          <div
+                                            key={`act-${action.id}`}
+                                            style={{ position: 'relative' }}
+                                            onMouseEnter={() => setCtxSub({
+                                              main: 'profileList',
+                                              nested: { type: 'profileActions', profileId: profile.id, appId: app.id, actionId: action.id }
+                                            })}
+                                            onMouseLeave={() => setCtxSub({
+                                              main: 'profileList',
+                                              nested: { type: 'profileActions', profileId: profile.id, appId: app.id }
+                                            })}
+                                          >
+                                            <button
+                                              type='button'
+                                              style={{
+                                                background: 'transparent', border: 'none', color: binding ? '#7aadff' : '#cfcfcf',
+                                                fontSize: '12px', cursor: 'pointer', padding: '5px 10px', textAlign: 'left', borderRadius: 4,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%'
+                                              }}
+                                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+                                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                                            >
+                                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {action.name} {binding ? `(${binding.macroName})` : ''}
+                                              </span>
+                                              <span style={{ fontSize: 10, color: '#555' }}>▶</span>
+                                            </button>
+
+                                            {isActionOpen && (
+                                              <div
+                                                className='ctxSubMenu'
+                                                style={{
+                                                  display: 'flex',
+                                                  position: 'absolute',
+                                                  top: 0,
+                                                  left: 'calc(100% - 4px)',
+                                                  background: '#1a1a1a',
+                                                  border: '1px solid #333',
+                                                  borderRadius: 8,
+                                                  padding: '4px',
+                                                  flexDirection: 'column',
+                                                  gap: 2,
+                                                  minWidth: 200,
+                                                  maxHeight: 250,
+                                                  overflowY: 'auto',
+                                                  boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                                                  zIndex: 13
+                                                }}
+                                              >
+                                                {binding && (
+                                                  <>
+                                                    <button
+                                                      type='button'
+                                                      style={{
+                                                        background: 'transparent', border: 'none', color: '#ff6060',
+                                                        fontSize: '12px', cursor: 'pointer', padding: '5px 10px', textAlign: 'left', borderRadius: 4,
+                                                        display: 'flex', alignItems: 'center', gap: 6, width: '100%'
+                                                      }}
+                                                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,96,96,0.1)' }}
+                                                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                                                      onPointerDown={e => {
+                                                        e.preventDefault(); e.stopPropagation();
+                                                        setContextMenuTarget(null);
+                                                        setContextMenuOpen(false);
+                                                        setConfirmState({
+                                                          title: 'Xoá gán macro',
+                                                          message: `Xoá gán macro "${binding.macroName}" khỏi hành động "${action.name}" cho Device Profile "${profile.name}".\n\nFile macro gốc vẫn được giữ.\n\nBạn có chắc muốn xoá không?`,
+                                                          onConfirm: () => {
+                                                            removeBindingImpl(app.id, action.id, profile.id);
+                                                          }
+                                                        });
+                                                      }}
+                                                    >
+                                                      <Trash2 size={12} /><span>Xoá gán macro</span>
+                                                    </button>
+                                                    <div style={{ height: 1, background: '#2a2a2a', margin: '4px 0' }} />
+                                                  </>
+                                                )}
+
+                                                {savedMacros.map(macro => (
+                                                  <button
+                                                    key={macro.id}
+                                                    type='button'
+                                                    style={{
+                                                      background: 'transparent', border: 'none', color: binding?.macroId === macro.id ? '#7aadff' : '#cfcfcf',
+                                                      fontSize: '12px', cursor: binding?.macroId === macro.id ? 'default' : 'pointer', padding: '5px 10px', textAlign: 'left', borderRadius: 4,
+                                                      width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                                    }}
+                                                    disabled={binding?.macroId === macro.id}
+                                                    onMouseEnter={e => { if (binding?.macroId !== macro.id) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                                                    onPointerDown={e => {
+                                                      e.preventDefault(); e.stopPropagation();
+                                                      if (binding?.macroId === macro.id) return;
+                                                      assignMacroToAction(app.id, action.id, macro, profile);
+                                                      setContextMenuTarget(null);
+                                                      setContextMenuOpen(false);
+                                                    }}
+                                                  >
+                                                    {macro.name}
+                                                  </button>
+                                                ))}
+                                                {savedMacros.length === 0 && (
+                                                  <button type='button' style={{ background: 'transparent', border: 'none', color: '#555', fontSize: '12px', padding: '5px 10px', textAlign: 'left' }} disabled>
+                                                    Chưa có File Macro
+                                                  </button>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* === Thêm vào nhóm (submenu) — hiện khi có nhóm đã tạo === */}
             {savedGroups.length > 0 && (
               <div style={{ position: 'relative' }} className='ctxAddToGroupWrap' onMouseEnter={() => setSubMenuOpen(true)} onMouseLeave={() => setSubMenuOpen(false)}>
@@ -3591,6 +4224,9 @@ export function App() {
           </div>
         </div>
       )}
+      {inputState && (
+        <InputModalOverlay state={inputState} onClose={() => setInputState(null)} />
+      )}
       {syncTimeModalOpen ? (
         <SyncTimeSettingsModal
           settings={syncTimeSettings}
@@ -3601,4 +4237,93 @@ export function App() {
       ) : null}
     </>
   )
+}
+
+interface InputModalOverlayProps {
+  state: {
+    key: string;
+    title: string;
+    label?: string;
+    placeholder?: string;
+    defaultValue?: string;
+    onConfirm: (val: string) => void;
+  } | null;
+  onClose: () => void;
+}
+
+function InputModalOverlay({ state, onClose }: InputModalOverlayProps) {
+  if (!state) return null;
+  return <InputModalOverlayInner key={state.key} state={state} onClose={onClose} />;
+}
+
+function InputModalOverlayInner({ state, onClose }: { state: NonNullable<InputModalOverlayProps['state']>; onClose: () => void }) {
+  const [value, setValue] = useState(state.defaultValue ?? '');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 60);
+    return () => clearTimeout(t);
+  }, []);
+
+  const handleSubmit = () => {
+    const v = value.trim();
+    if (!v) return;
+    state.onConfirm(v);
+  };
+
+  return createPortal(
+    <>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.62)', zIndex: 27000 }} onClick={onClose} />
+      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 27001, padding: 24 }} onClick={onClose}>
+        <div style={{ background: '#1f1f1f', color: '#f3f4f6', border: '1px solid #3c3c3c', borderRadius: 6, minWidth: 380, maxWidth: 480, width: '100%', boxShadow: '0 24px 70px rgba(0,0,0,0.58)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderBottom: '1px solid #343434', background: '#242424' }}>
+            <h5 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{state.title}</h5>
+            <button type='button' style={{ display: 'grid', placeItems: 'center', width: 30, height: 30, padding: 0, color: '#d9d9d9', background: '#2b2b2b', border: '1px solid #454545', borderRadius: 4, cursor: 'pointer', fontSize: 14, lineHeight: 1 }} aria-label='Close' onClick={onClose}>✖</button>
+          </div>
+          <div style={{ padding: '16px 14px' }}>
+            {state.label ? <label style={{ display: 'block', marginBottom: 8, fontSize: 13, fontWeight: 600, color: '#c9d4e5' }}>{state.label}</label> : null}
+            <input
+              ref={inputRef}
+              type='text'
+              style={{ width: '100%', padding: '8px 12px', background: '#181818', color: '#f3f4f6', border: '1px solid #3c3c3c', borderRadius: 4, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+              placeholder={state.placeholder ?? ''}
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSubmit();
+                if (e.key === 'Escape') onClose();
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 14px', borderTop: '1px solid #343434', background: '#242424' }}>
+            <button type='button' style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 34, padding: '0 16px', border: '1px solid #3b3b3b', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#f8fafc', background: '#2b2b2b', transition: 'all 0.15s ease' }} onClick={onClose}>Huỷ</button>
+            <button
+              type='button'
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: 34,
+                padding: '0 16px',
+                border: '1px solid rgba(13,110,253,0.75)',
+                borderRadius: 6,
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#8ec5ff',
+                background: 'rgba(13,110,253,0.22)',
+                transition: 'all 0.15s ease',
+                opacity: value.trim() ? 1 : 0.5,
+                cursor: value.trim() ? 'pointer' : 'not-allowed'
+              }}
+              disabled={!value.trim()}
+              onClick={handleSubmit}
+            >
+              Xác Nhận
+            </button>
+          </div>
+        </div>
+      </div>
+    </>,
+    document.body
+  );
 }

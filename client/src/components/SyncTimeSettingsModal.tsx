@@ -8,6 +8,7 @@ type SyncTimeSettingsModalProps = {
   delayRange: { minMs: number; maxMs: number };
   onChange: (patch: Partial<SyncTimeSettings>) => void;
   onClose: () => void;
+  title?: string;
 };
 
 export function SyncTimeSettingsModal({
@@ -15,6 +16,7 @@ export function SyncTimeSettingsModal({
   delayRange,
   onChange,
   onClose,
+  title,
 }: SyncTimeSettingsModalProps) {
   const parseNumberInput = (value: string) => {
     const n = Number(value.replace(',', '.'));
@@ -92,7 +94,7 @@ export function SyncTimeSettingsModal({
         <div className="syncTimeHeader" onPointerDown={startDrag}>
           <div className="syncTimeTitle">
             <Clock3 size={15} style={{ color: 'var(--md-info)' }} />
-            <span>Sync Time</span>
+            <span>{title || 'Sync Time'}</span>
           </div>
           <button
             type="button"
