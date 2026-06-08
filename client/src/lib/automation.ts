@@ -2,6 +2,7 @@ import {
   encodeKeycodeMessage,
   encodeTextMessage,
   encodeTouchMessage,
+  encodeSetClipboardMessage,
   KeyEventAction,
   MotionAction,
 } from '@/lib/control';
@@ -168,13 +169,59 @@ export function parseScriptDsl(dsl: string, keyNameToCode: Record<string, number
   return { steps, errors };
 }
 
+import { loadSyncMacroSettings, syncMacroDelayRangeMs, type SyncMacroSettings } from './syncMacroSettings';
+
+function randomInt(min: number, max: number) {
+  const low = Math.min(min, max);
+  const high = Math.max(min, max);
+  return Math.floor(low + Math.random() * (high - low + 1));
+}
+
+function randomSignedOffset(settings: SyncMacroSettings) {
+  if (!settings.offsetEnabled || settings.offsetMaxPx <= 0) return 0;
+  const magnitude = randomInt(settings.offsetMinPx, settings.offsetMaxPx);
+  if (magnitude === 0) return 0;
+  return Math.random() < 0.5 ? -magnitude : magnitude;
+}
+
+function shuffleTargets<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = out[i];
+    out[i] = out[j];
+    out[j] = temp;
+  }
+  return out;
+}
+
 export async function runScript(
   targets: InputTarget[],
   steps: AutomationStep[],
   opts?: { signal?: AbortSignal; log?: (msg: string) => void },
 ) {
   const log = opts?.log ?? (() => {});
-  if (!targets.length) return;
+  if (!targets.length) {
+    log('Lỗi: không có mục tiêu (targets rỗng)');
+    return;
+  }
+
+  const syncSettings = loadSyncMacroSettings();
+  const orderedTargets = (syncSettings.delayEnabled && syncSettings.randomOrder) 
+    ? shuffleTargets(targets) 
+    : targets;
+  
+  const { minMs, maxMs } = syncMacroDelayRangeMs(syncSettings.intervalSec);
+
+  const applyStaggerDelay = async (i: number) => {
+    if (syncSettings.delayEnabled && i > 0) {
+      if (syncSettings.intervalEnabled) {
+        await sleep(randomInt(minMs, maxMs));
+      } else {
+        await sleep(100);
+      }
+    }
+  };
 
   for (const step of steps) {
     if (opts?.signal?.aborted) {
@@ -189,8 +236,11 @@ export async function runScript(
     }
 
     if (step.type === 'key') {
-      log(`key ${step.keycode}`);
-      for (const t of targets) {
+      log(`key ${step.keycode} -> ${targets.length} target(s)`);
+      for (let i = 0; i < orderedTargets.length; i++) {
+        if (opts?.signal?.aborted) return;
+        await applyStaggerDelay(i);
+        const t = orderedTargets[i];
         sendSafe(t, encodeKeycodeMessage(KeyEventAction.DOWN, step.keycode));
         sendSafe(t, encodeKeycodeMessage(KeyEventAction.UP, step.keycode));
       }
@@ -199,22 +249,33 @@ export async function runScript(
     }
 
     if (step.type === 'text') {
-      log(`text (${step.text.length} chars)`);
+      log(`text (${step.text.length} chars) -> ${targets.length} target(s)`);
       const u8 = encodeTextMessage(step.text);
-      for (const t of targets) sendSafe(t, u8);
+      for (let i = 0; i < orderedTargets.length; i++) {
+        if (opts?.signal?.aborted) return;
+        await applyStaggerDelay(i);
+        const t = orderedTargets[i];
+        sendSafe(t, u8);
+      }
       await sleep(80);
       continue;
     }
 
     if (step.type === 'tap') {
       log(`tap ${step.x01.toFixed(3)} ${step.y01.toFixed(3)}`);
-      for (const t of targets) {
-        const { x, y, w, h } = mapNormToDeviceXY(t.canvas, step.x01, step.y01);
+      for (let i = 0; i < orderedTargets.length; i++) {
+        if (opts?.signal?.aborted) return;
+        await applyStaggerDelay(i);
+        const t = orderedTargets[i];
+        const dxPx = syncSettings.delayEnabled ? randomSignedOffset(syncSettings) : 0;
+        const dyPx = syncSettings.delayEnabled ? randomSignedOffset(syncSettings) : 0;
+        
+        let { x, y, w, h } = mapNormToDeviceXY(t.canvas, step.x01, step.y01);
+        x = Math.max(0, Math.min(w, x + dxPx));
+        y = Math.max(0, Math.min(h, y + dyPx));
+        
         sendSafe(t, encodeTouchMessage(MotionAction.DOWN, 0, x, y, w, h, 1, 1));
-      }
-      await sleep(60);
-      for (const t of targets) {
-        const { x, y, w, h } = mapNormToDeviceXY(t.canvas, step.x01, step.y01);
+        await sleep(60);
         sendSafe(t, encodeTouchMessage(MotionAction.UP, 0, x, y, w, h, 0, 0));
       }
       await sleep(80);
@@ -223,36 +284,41 @@ export async function runScript(
 
     if (step.type === 'swipe') {
       const nMoves = Math.max(5, Math.min(60, Math.round(step.durationMs / 16)));
-      log(
-        `swipe ${step.x1.toFixed(3)} ${step.y1.toFixed(3)} -> ${step.x2.toFixed(3)} ${step.y2.toFixed(3)} (${step.durationMs}ms)`,
-      );
-      for (const t of targets) {
-        const { x, y, w, h } = mapNormToDeviceXY(t.canvas, step.x1, step.y1);
-        sendSafe(t, encodeTouchMessage(MotionAction.DOWN, 0, x, y, w, h, 1, 1));
-      }
-
-      const start = Date.now();
-      // Loop intermediate moves. The very last move will be sent instantly before UP to trigger Android Fling.
-      for (let i = 1; i < nMoves; i++) {
+      log(`swipe ${step.x1.toFixed(3)} ${step.y1.toFixed(3)} -> ${step.x2.toFixed(3)} ${step.y2.toFixed(3)} (${step.durationMs}ms)`);
+      
+      for (let i = 0; i < orderedTargets.length; i++) {
         if (opts?.signal?.aborted) return;
-        const a = i / nMoves;
-        const x01 = step.x1 + (step.x2 - step.x1) * a;
-        const y01 = step.y1 + (step.y2 - step.y1) * a;
-        for (const t of targets) {
-          const { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
-          sendSafe(t, encodeTouchMessage(MotionAction.MOVE, 0, x, y, w, h, 1, 1));
-        }
-        const elapsed = Date.now() - start;
-        const targetElapsed = (step.durationMs * i) / nMoves;
-        const wait = Math.max(0, Math.round(targetElapsed - elapsed));
-        if (wait) await sleep(wait);
-      }
+        await applyStaggerDelay(i);
+        const t = orderedTargets[i];
+        const dxPx = syncSettings.delayEnabled ? randomSignedOffset(syncSettings) : 0;
+        const dyPx = syncSettings.delayEnabled ? randomSignedOffset(syncSettings) : 0;
+        
+        const getXY = (x01: number, y01: number) => {
+          let { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
+          return { x: Math.max(0, Math.min(w, x + dxPx)), y: Math.max(0, Math.min(h, y + dyPx)), w, h };
+        };
 
-      // Send the final MOVE at the exact destination immediately followed by UP to maintain high velocity.
-      for (const t of targets) {
-        const { x, y, w, h } = mapNormToDeviceXY(t.canvas, step.x2, step.y2);
-        sendSafe(t, encodeTouchMessage(MotionAction.MOVE, 0, x, y, w, h, 1, 1));
-        sendSafe(t, encodeTouchMessage(MotionAction.UP, 0, x, y, w, h, 0, 0));
+        const start = getXY(step.x1, step.y1);
+        sendSafe(t, encodeTouchMessage(MotionAction.DOWN, 0, start.x, start.y, start.w, start.h, 1, 1));
+        
+        const startTime = Date.now();
+        for (let j = 1; j < nMoves; j++) {
+          if (opts?.signal?.aborted) return;
+          const a = j / nMoves;
+          const x01 = step.x1 + (step.x2 - step.x1) * a;
+          const y01 = step.y1 + (step.y2 - step.y1) * a;
+          const curr = getXY(x01, y01);
+          sendSafe(t, encodeTouchMessage(MotionAction.MOVE, 0, curr.x, curr.y, curr.w, curr.h, 1, 1));
+          
+          const elapsed = Date.now() - startTime;
+          const targetElapsed = (step.durationMs * j) / nMoves;
+          const wait = Math.max(0, Math.round(targetElapsed - elapsed));
+          if (wait) await sleep(wait);
+        }
+
+        const end = getXY(step.x2, step.y2);
+        sendSafe(t, encodeTouchMessage(MotionAction.MOVE, 0, end.x, end.y, end.w, end.h, 1, 1));
+        sendSafe(t, encodeTouchMessage(MotionAction.UP, 0, end.x, end.y, end.w, end.h, 0, 0));
       }
       await sleep(120);
       continue;

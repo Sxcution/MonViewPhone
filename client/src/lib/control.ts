@@ -113,10 +113,11 @@ export function encodeKeycodeMessage(
 export function encodeTextMessage(text: string): Uint8Array {
   const enc = new TextEncoder();
   const bytes = enc.encode(text ?? '');
-  const u8 = new Uint8Array(1 + bytes.length + 1);
-  u8[0] = ControlMessageType.TEXT;
-  u8.set(bytes, 1);
-  u8[u8.length - 1] = 0;
+  const u8 = new Uint8Array(1 + 4 + bytes.length);
+  const dv = new DataView(u8.buffer);
+  dv.setUint8(0, ControlMessageType.TEXT);
+  dv.setUint32(1, bytes.length, false); // big-endian
+  u8.set(bytes, 5);
   return u8;
 }
 

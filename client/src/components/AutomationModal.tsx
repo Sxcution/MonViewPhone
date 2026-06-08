@@ -8,13 +8,28 @@ import {
   Clock3,
   FolderOpen,
   Info,
+  KeyRound,
+  Layers,
+  ListTree,
+  Maximize2,
+  MousePointer2,
+  MoveRight,
+  Navigation,
   Pencil,
   Play,
   Plus,
+  RefreshCw,
   Save,
+  Server,
   Settings,
+  Smartphone,
   Square,
+  StopCircle,
+  Timer,
+  Touchpad,
   Trash2,
+  Type,
+  UploadCloud,
   Users,
   Video,
   X,
@@ -28,9 +43,18 @@ import {
   type AutomationClickDetail,
   type AutomationSwipeDetail,
   type AutomationStep,
+  emitAutomationClick,
+  emitAutomationSwipe,
 } from '@/lib/automation';
 import { AndroidKeycode } from '@/lib/keyEvent';
-
+import {
+  loadSyncMacroSettings,
+  saveSyncMacroSettings,
+  syncMacroDelayRangeMs,
+  type SyncMacroSettings,
+  SYNC_MACRO_SETTINGS_EVENT,
+} from '@/lib/syncMacroSettings';
+import { SyncTimeSettingsModal } from './SyncTimeSettingsModal';
 
 /* ── types ─────────────────────────────────────────────────────── */
 
@@ -887,6 +911,26 @@ export function AutomationModal({
   const dragRef = useRef({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 });
   const [realtimeRecording, setRealtimeRecording] = useState(() => loadAutomationSettings().realtimeRecording);
   const lastRecordTimestampRef = useRef<number>(0);
+
+
+  // Sync Macro state
+  const [syncMacroOpen, setSyncMacroOpen] = useState(false);
+  const [syncMacroSettings, setSyncMacroSettings] = useState<SyncMacroSettings>(loadSyncMacroSettings);
+  const syncMacroDelayRange = useMemo(() => syncMacroDelayRangeMs(syncMacroSettings.intervalSec), [syncMacroSettings.intervalSec]);
+
+  const updateSyncMacroSettings = useCallback((patch: Partial<SyncMacroSettings>) => {
+    setSyncMacroSettings(prev => saveSyncMacroSettings({ ...prev, ...patch }));
+  }, []);
+
+  useEffect(() => {
+    const handleUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<SyncMacroSettings>;
+      setSyncMacroSettings(customEvent.detail);
+    };
+    window.addEventListener(SYNC_MACRO_SETTINGS_EVENT, handleUpdate);
+    return () => window.removeEventListener(SYNC_MACRO_SETTINGS_EVENT, handleUpdate);
+  }, []);
+
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [seedingPanelOpen, setSeedingPanelOpen] = useState(false);
   const [seedingJobs, setSeedingJobs] = useState<SeedingJob[]>(loadSeedingJobs);
@@ -1484,9 +1528,9 @@ export function AutomationModal({
   const addBlankStep = useCallback(() => {
     setRows(prev => [...prev, {
       id: makeId('step'), action: 'touch', delayMs: DEFAULT_DELAY_MS,
-      targetUdids: selectedList.length === 1 ? [selectedList[0]] : [], note: '',
+      targetUdids: [], note: '',
     }]);
-  }, [selectedList]);
+  }, []);
 
   const updateRow = useCallback((id: string, patch: Partial<AutomationMacroRow>) => {
     setRows(prev => prev.map(row => (row.id === id ? { ...row, ...patch } : row)));
@@ -1709,10 +1753,30 @@ export function AutomationModal({
       await sleepMs(delayMs, controller.signal);
       if (controller.signal.aborted) return;
     }
-    await runScript(targets, rowToSteps(row, {
-      seedingText: row.action === 'seeding' ? pickSeedingContent('macro') : undefined,
-    }), { signal: controller.signal, log: msg => setStatus(msg) });
-  }, [pickSeedingContent]);
+    const seedingText = row.action === 'seeding' ? pickSeedingContent('macro') : undefined;
+    if (row.action === 'seeding') {
+      if (!seedingText) {
+        setStatus('Seeding lỗi: danh sách từ ngữ chung trống');
+        return;
+      }
+      const hasOpenStream = targets.some(t => t.ws && t.ws.readyState === WebSocket.OPEN);
+      if (!hasOpenStream) {
+        setStatus('Seeding lỗi: target chưa online hoặc stream chưa mở');
+        return;
+      }
+      const formattedUdids = targets.map(t => {
+        const no = deviceByUdid.get(t.udid)?.number;
+        return '#' + (no ?? t.udid);
+      }).join(', ');
+      setStatus(`Seeding máy ${formattedUdids}: ${seedingText}`);
+    }
+    await runScript(targets, rowToSteps(row, { seedingText }), {
+      signal: controller.signal,
+      log: msg => {
+        if (row.action !== 'seeding') setStatus(msg);
+      }
+    });
+  }, [pickSeedingContent, deviceByUdid]);
 
   const newMacro = useCallback(() => { setRows([]); setCurrentMacroName(''); setStatus('Đã tạo macro mới'); }, []);
 
@@ -1725,15 +1789,18 @@ export function AutomationModal({
     const controller = new AbortController();
     abortPlaybackRef.current = controller;
     try {
+      let targets = getTargetsByUdids(selectedList.length > 0 ? selectedList : (selectedRecordDevice ? [selectedRecordDevice.udid] : []));
+      if (!targets.length) {
+         setStatus('Lỗi: Chưa chọn máy nào để phát Macro');
+         return;
+      }
       for (const row of runnableRows) {
         if (controller.signal.aborted) break;
-        const targets = getTargetsByUdids(row.targetUdids);
-        if (!targets.length) continue;
         await runMacroRow(targets, row, controller);
       }
       setStatus(controller.signal.aborted ? 'Đã dừng phát' : 'Đã phát xong');
     } finally { setPlaying(false); abortPlaybackRef.current = null; }
-  }, [getTargetsByUdids, playing, rows, runMacroRow]);
+  }, [getTargetsByUdids, playing, rows, runMacroRow, selectedList, selectedRecordDevice]);
 
   /* ── playAppAction ── */
   const playAppAction = useCallback(async (appId: AutomationAppId, actionId: string) => {
