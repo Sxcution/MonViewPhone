@@ -2,7 +2,6 @@ package adb
 
 import (
 	"log"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -35,7 +34,7 @@ func NewTracker() *Tracker {
 func (t *Tracker) GetDevices() map[string]Device {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	
+
 	// Return a copy to avoid race conditions
 	copy := make(map[string]Device)
 	for k, v := range t.devices {
@@ -45,7 +44,7 @@ func (t *Tracker) GetDevices() map[string]Device {
 }
 
 func (t *Tracker) Start() {
-	log.Println("Starting ADB Device Tracker...")
+	log.Printf("Starting ADB Device Tracker using ADB: %s", GetAdbPath())
 	go func() {
 		for {
 			t.pollDevices()
@@ -55,14 +54,13 @@ func (t *Tracker) Start() {
 }
 
 func (t *Tracker) pollDevices() {
-	cmd := exec.Command(GetAdbPath(), "devices")
-	output, err := cmd.Output()
+	output, err := CommandTimeout(5*time.Second, "devices")
 	if err != nil {
-		log.Printf("ADB command failed (is adb installed and in PATH?): %v", err)
+		log.Printf("ADB devices command failed: %v", err)
 		return
 	}
 
-	lines := strings.Split(string(output), "\n")
+	lines := strings.Split(output, "\n")
 	currentDevices := make(map[string]Device)
 
 	// skip first line "List of devices attached"
@@ -76,7 +74,7 @@ func (t *Tracker) pollDevices() {
 		if len(parts) >= 2 {
 			id := parts[0]
 			status := DeviceStatus(parts[1])
-			
+
 			device := Device{ID: id, Status: status}
 			currentDevices[id] = device
 
@@ -103,4 +101,3 @@ func (t *Tracker) pollDevices() {
 	t.devices = currentDevices
 	t.mu.Unlock()
 }
-

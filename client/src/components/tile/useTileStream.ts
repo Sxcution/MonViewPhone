@@ -48,7 +48,10 @@ type Args = {
 const STREAM_CONNECT_BATCH_SIZE = 6;
 const STREAM_CONNECT_BATCH_DELAY_MS = 1000;
 const INITIAL_FRAME_TIMEOUT_MS = 35_000;
+const MAX_INITIAL_FRAME_RESTARTS = 3;
 const RECONNECT_DELAY_MS = 1200;
+const SCRCPY_RESTARTING_STATUS = 'ADB online but scrcpy WS not responding - restarting server on device...';
+const SCRCPY_FAILED_STATUS = 'ADB online but scrcpy WS not responding after retries';
 
 type StreamSessionState = 'queued' | 'connecting' | 'connected';
 
@@ -296,6 +299,7 @@ export function useTileStream(args: Args) {
         let initialLoadTimer: number | null = null;
         let queuedConnectCancel: (() => void) | null = null;
         let connectGeneration = 0;
+        let initialFrameRestartAttempts = 0;
         // Render throttling: keep at most 1 in-flight render per tile, drop older frames.
         let renderBusy = false;
         let pendingFrame: { width: number; height: number; data: ArrayBuffer } | null = null;
@@ -380,7 +384,7 @@ export function useTileStream(args: Args) {
                 setLoading(true);
                 // Small async hop to avoid reentrancy issues.
                 window.setTimeout(() => {
-                    if (!destroyedRef.current) connect();
+                    if (!destroyedRef.current) connect({ restart: !firstFrame });
                 }, 0);
             };
 
@@ -420,6 +424,7 @@ export function useTileStream(args: Args) {
                             return;
                         }
                         firstFrame = true;
+                        initialFrameRestartAttempts = 0;
                         if (initialLoadTimer != null) {
                             clearTimeout(initialLoadTimer);
                             initialLoadTimer = null;
@@ -525,7 +530,7 @@ export function useTileStream(args: Args) {
                 setLoading(true);
                 // Same symptom as "white tile": the decoder worker crashed.
                 window.setTimeout(() => {
-                    if (!destroyedRef.current) connect();
+                    if (!destroyedRef.current) connect({ restart: !firstFrame });
                 }, 0);
             };
 
@@ -713,11 +718,19 @@ export function useTileStream(args: Args) {
             initialLoadTimer = window.setTimeout(() => {
                 if (destroyedRef.current || closingRef.current) return;
                 if (firstFrame) return;
+                if (initialFrameRestartAttempts >= MAX_INITIAL_FRAME_RESTARTS) {
+                    cleanupWs();
+                    silentReconnectRef.current = false;
+                    setStatus(tRef.current(SCRCPY_FAILED_STATUS));
+                    setLoading(false);
+                    return;
+                }
+                initialFrameRestartAttempts++;
                 if (!isSilent()) {
-                    setStatus(tRef.current('Tai >35s - dang reload...'));
+                    setStatus(tRef.current(SCRCPY_RESTARTING_STATUS));
                     setLoading(true);
                 }
-                connect();
+                connect({ restart: true });
             }, INITIAL_FRAME_TIMEOUT_MS);
 
             ws.onopen = () => {
@@ -750,23 +763,35 @@ export function useTileStream(args: Args) {
             ws.onclose = (e) => {
                 releaseStreamSession(udid, owner, ws);
                 if (closingRef.current || destroyedRef.current) return;
+                const restartBeforeFirstFrame = !firstFrame;
                 if (initialLoadTimer != null) {
                     clearTimeout(initialLoadTimer);
                     initialLoadTimer = null;
                 }
                 // When WS closes unexpectedly, fall back to normal non-silent connection state
                 silentReconnectRef.current = false;
-                setStatus(
-                    tRef.current('WS đóng ({code}{reason}) - thử lại…', {
-                        code: e.code,
-                        reason: e.reason ? `: ${e.reason}` : '',
-                    }),
-                );
+                if (restartBeforeFirstFrame) {
+                    if (initialFrameRestartAttempts >= MAX_INITIAL_FRAME_RESTARTS) {
+                        cleanupWs();
+                        setStatus(tRef.current(SCRCPY_FAILED_STATUS));
+                        setLoading(false);
+                        return;
+                    }
+                    initialFrameRestartAttempts++;
+                    setStatus(tRef.current(SCRCPY_RESTARTING_STATUS));
+                } else {
+                    setStatus(
+                        tRef.current('WS đóng ({code}{reason}) - thử lại…', {
+                            code: e.code,
+                            reason: e.reason ? `: ${e.reason}` : '',
+                        }),
+                    );
+                }
                 setLoading(true);
 
                 reconnectTimerRef.current = window.setTimeout(() => {
                     if (destroyedRef.current) return;
-                    connect();
+                    connect({ restart: restartBeforeFirstFrame });
                 }, RECONNECT_DELAY_MS);
             };
         }
@@ -779,6 +804,7 @@ export function useTileStream(args: Args) {
                 setLoading(true);
                 setStatus(tRef.current('Đang reload…'));
             }
+            initialFrameRestartAttempts = 0;
             connect({ restart: Boolean(opts?.restart) });
         };
 

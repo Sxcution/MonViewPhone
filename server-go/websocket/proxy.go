@@ -9,14 +9,21 @@ import (
 	"server-go/adb"
 	"server-go/scrcpy"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
+type deviceWsSession struct {
+	port string
+	ws   *websocket.Conn
+}
+
 // HandleProxyAdb implements the same logic as Node.js WebsocketProxyOverAdb:
 // 1. Client connects via WS with ?action=proxy-adb&udid=XXX&remote=tcp:8886&path=/
-// 2. Server calls `adb forward` to map the device's "remote" to a local TCP port
-// 3. Server opens a *WebSocket client* to ws://127.0.0.1:{port}{path}
+// 2. Server calls adb forward to map the device remote to a local TCP port
+// 3. Server opens a WebSocket client to ws://127.0.0.1:{port}{path}
 // 4. Bidirectional pipe between the two WebSockets
 func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 	udid := r.URL.Query().Get("udid")
@@ -34,7 +41,6 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 		wsPath = "/"
 	}
 
-	// Upgrade the browser connection to WebSocket
 	clientWs, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("[%s] Failed to upgrade proxy connection: %v", udid, err)
@@ -44,108 +50,206 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[%s] Proxy WS connected (remote=%s, path=%s)", udid, remote, wsPath)
 
-	if remote == "tcp:8886" {
-		if err := scrcpy.EnsureServer(udid); err != nil {
-			log.Printf("[%s] scrcpy server start failed: %v", udid, err)
-			clientWs.WriteMessage(websocket.CloseMessage,
-				websocket.FormatCloseMessage(4005, fmt.Sprintf("scrcpy server start failed: %v", err)))
+	session, err := connectDeviceWsWithRecovery(udid, remote, wsPath, pathRequestsRestart(wsPath))
+	if err != nil {
+		if remote == "tcp:8886" {
+			log.Printf("[%s] ADB online but scrcpy WS not responding: %v", udid, err)
+			writeProxyClose(clientWs, "ADB online but scrcpy WS not responding")
 			return
 		}
-	}
-
-	// Step 1: adb forward tcp:0 <remote>  →  get local port
-	portStr, err := adb.Forward(udid, "tcp:0", remote)
-	if err != nil {
-		log.Printf("[%s] adb forward failed: %v", udid, err)
-		clientWs.WriteMessage(websocket.CloseMessage,
-			websocket.FormatCloseMessage(4005, fmt.Sprintf("adb forward failed: %v", err)))
+		log.Printf("[%s] device WS proxy failed: %v", udid, err)
+		writeProxyClose(clientWs, fmt.Sprintf("device WS proxy failed: %v", err))
 		return
 	}
-	// portStr may already be just the number, or "tcp:NNNNN"
-	port := strings.TrimPrefix(portStr, "tcp:")
-	log.Printf("[%s] Forwarded %s → localhost:%s", udid, remote, port)
 
-	// Ensure the forward is removed when this session ends
-	defer func() {
-		log.Printf("[%s] Removing adb forward on port %s", udid, port)
-		adb.RemoveForward(udid, "tcp:"+port)
-	}()
-
-	// Step 2: Open a WebSocket client to the forwarded port (same as Node.js WebsocketProxy.init)
-	targetPath := wsPath
-	targetQuery := ""
-	if queryStart := strings.Index(targetPath, "?"); queryStart >= 0 {
-		targetQuery = targetPath[queryStart+1:]
-		targetPath = targetPath[:queryStart]
-		if targetPath == "" {
-			targetPath = "/"
-		}
-	}
-	targetUrl := url.URL{
-		Scheme:   "ws",
-		Host:     "127.0.0.1:" + port,
-		Path:     targetPath,
-		RawQuery: targetQuery,
-	}
-	log.Printf("[%s] Connecting to device WS: %s", udid, targetUrl.String())
-
-	dialer := websocket.Dialer{}
-	deviceWs, _, err := dialer.Dial(targetUrl.String(), nil)
-	if err != nil {
-		log.Printf("[%s] Failed to dial device WS %s: %v", udid, targetUrl.String(), err)
-		clientWs.WriteMessage(websocket.CloseMessage,
-			websocket.FormatCloseMessage(4005, fmt.Sprintf("device WS dial failed: %v", err)))
-		return
-	}
+	deviceWs := session.ws
 	defer deviceWs.Close()
+	defer func() {
+		log.Printf("[%s] Removing adb forward on port %s", udid, session.port)
+		if err := adb.RemoveForward(udid, "tcp:"+session.port); err != nil {
+			log.Printf("[%s] Failed to remove adb forward on port %s: %v", udid, session.port, err)
+		}
+	}()
 
 	log.Printf("[%s] Device WS connected, starting bidirectional pipe", udid)
 
 	done := make(chan struct{}, 2)
+	var closeOnce sync.Once
+	closeBoth := func() {
+		closeOnce.Do(func() {
+			_ = deviceWs.Close()
+			_ = clientWs.Close()
+		})
+	}
 
-	// Pipe: Browser → Device
 	go func() {
-		defer func() { done <- struct{}{} }()
+		defer func() {
+			closeBoth()
+			done <- struct{}{}
+		}()
 		for {
 			msgType, msg, err := clientWs.ReadMessage()
 			if err != nil {
 				if !isExpectedCloseError(err) {
-					log.Printf("[%s] Browser→Device read error: %v", udid, err)
+					log.Printf("[%s] Browser->Device read error: %v", udid, err)
 				}
 				return
 			}
 			if err := deviceWs.WriteMessage(msgType, msg); err != nil {
 				if !isExpectedCloseError(err) {
-					log.Printf("[%s] Browser→Device write error: %v", udid, err)
+					log.Printf("[%s] Browser->Device write error: %v", udid, err)
 				}
 				return
 			}
 		}
 	}()
 
-	// Pipe: Device → Browser
 	go func() {
-		defer func() { done <- struct{}{} }()
+		defer func() {
+			closeBoth()
+			done <- struct{}{}
+		}()
 		for {
 			msgType, msg, err := deviceWs.ReadMessage()
 			if err != nil {
 				if !isExpectedCloseError(err) {
-					log.Printf("[%s] Device→Browser read error: %v", udid, err)
+					log.Printf("[%s] Device->Browser read error: %v", udid, err)
 				}
 				return
 			}
 			if err := clientWs.WriteMessage(msgType, msg); err != nil {
 				if !isExpectedCloseError(err) {
-					log.Printf("[%s] Device→Browser write error: %v", udid, err)
+					log.Printf("[%s] Device->Browser write error: %v", udid, err)
 				}
 				return
 			}
 		}
 	}()
 
-	// Wait for either direction to finish
 	<-done
+	closeBoth()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		log.Printf("[%s] Proxy session cleanup timed out waiting for peer pipe", udid)
+	}
 	log.Printf("[%s] Proxy session ended", udid)
+}
+
+func writeProxyClose(ws *websocket.Conn, message string) {
+	_ = ws.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(4005, message))
+}
+
+func connectDeviceWsWithRecovery(udid, remote, wsPath string, restartRequested bool) (*deviceWsSession, error) {
+	maxAttempts := 1
+	if remote == "tcp:8886" {
+		maxAttempts = 3
+	}
+
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if remote == "tcp:8886" {
+			if err := prepareScrcpyServerForAttempt(udid, attempt, restartRequested); err != nil {
+				lastErr = err
+				log.Printf("[%s] scrcpy server prepare failed (attempt %d/%d): %v", udid, attempt, maxAttempts, err)
+				if attempt < maxAttempts {
+					log.Printf("[%s] ADB online but scrcpy WS not responding, restarting device scrcpy server", udid)
+				}
+				continue
+			}
+		}
+
+		session, err := dialForwardedDeviceWs(udid, remote, wsPath, attempt, maxAttempts)
+		if err == nil {
+			return session, nil
+		}
+		lastErr = err
+		if remote == "tcp:8886" && attempt < maxAttempts {
+			log.Printf("[%s] ADB online but scrcpy WS not responding, restarting device scrcpy server", udid)
+		}
+	}
+
+	if lastErr == nil {
+		lastErr = fmt.Errorf("device WS dial failed")
+	}
+	return nil, lastErr
+}
+
+func prepareScrcpyServerForAttempt(udid string, attempt int, restartRequested bool) error {
+	if attempt == 1 && !restartRequested {
+		return scrcpy.EnsureServer(udid)
+	}
+	if attempt == 1 {
+		log.Printf("[%s] restart=1 requested, restarting device scrcpy server before dial", udid)
+	}
+	return scrcpy.ForceRestartServer(udid)
+}
+
+func dialForwardedDeviceWs(udid, remote, wsPath string, attempt, maxAttempts int) (*deviceWsSession, error) {
+	portStr, err := adb.Forward(udid, "tcp:0", remote)
+	if err != nil {
+		return nil, fmt.Errorf("adb forward failed (attempt %d/%d): %w", attempt, maxAttempts, err)
+	}
+
+	port := strings.TrimPrefix(strings.TrimSpace(portStr), "tcp:")
+	if port == "" {
+		return nil, fmt.Errorf("adb forward returned an empty local port (attempt %d/%d)", attempt, maxAttempts)
+	}
+
+	log.Printf("[%s] Forwarded %s -> localhost:%s (attempt %d/%d)", udid, remote, port, attempt, maxAttempts)
+
+	targetURL := buildTargetURL(port, wsPath)
+	log.Printf("[%s] Connecting to device WS: %s (attempt %d/%d)", udid, targetURL, attempt, maxAttempts)
+
+	dialer := websocket.Dialer{HandshakeTimeout: 5 * time.Second}
+	deviceWs, _, err := dialer.Dial(targetURL, nil)
+	if err != nil {
+		log.Printf("[%s] Failed to dial device WS on attempt %d/%d (local port %s): %v", udid, attempt, maxAttempts, port, err)
+		removeForwardForAttempt(udid, port)
+		return nil, fmt.Errorf("device WS dial failed (attempt %d/%d, local port %s): %w", attempt, maxAttempts, port, err)
+	}
+
+	return &deviceWsSession{port: port, ws: deviceWs}, nil
+}
+
+func removeForwardForAttempt(udid, port string) {
+	log.Printf("[%s] Removing failed adb forward on port %s", udid, port)
+	if err := adb.RemoveForward(udid, "tcp:"+port); err != nil {
+		log.Printf("[%s] Failed to remove failed adb forward on port %s: %v", udid, port, err)
+	}
+}
+
+func buildTargetURL(port, wsPath string) string {
+	targetPath := wsPath
+	targetQuery := ""
+	if queryStart := strings.Index(targetPath, "?"); queryStart >= 0 {
+		targetQuery = targetPath[queryStart+1:]
+		targetPath = targetPath[:queryStart]
+	}
+	if targetPath == "" {
+		targetPath = "/"
+	}
+
+	targetURL := url.URL{
+		Scheme:   "ws",
+		Host:     "127.0.0.1:" + port,
+		Path:     targetPath,
+		RawQuery: targetQuery,
+	}
+	return targetURL.String()
+}
+
+func pathRequestsRestart(wsPath string) bool {
+	queryStart := strings.Index(wsPath, "?")
+	if queryStart < 0 || queryStart+1 >= len(wsPath) {
+		return false
+	}
+	values, err := url.ParseQuery(wsPath[queryStart+1:])
+	if err != nil {
+		return strings.Contains(wsPath[queryStart+1:], "restart=1")
+	}
+	restart := values.Get("restart")
+	return restart == "1" || strings.EqualFold(restart, "true")
 }
 
 func isExpectedCloseError(err error) bool {

@@ -154,6 +154,9 @@ const legacyViToEn: Record<string, string> = {
   'Thiết bị đang mở trong viewer — tránh điều khiển trùng lặp': 'Device is open in viewer — avoid duplicate control',
   'Đang hiển thị trên viewer': 'Showing in viewer',
   'Đang chờ phản hồi': 'Waiting for response',
+  'ADB online nhưng scrcpy WS không phản hồi, đang khởi động lại server trên máy...':
+    'ADB online but scrcpy WS not responding - restarting server on device...',
+  'ADB online nhưng scrcpy WS không phản hồi sau nhiều lần thử': 'ADB online but scrcpy WS not responding after retries',
   '❌ Thất bại': '❌ Failed',
   'Đã kết nối {count} thiết bị': 'Connected {count} device(s)',
   'Kết nối {type} thất bại với {count} thiết bị': 'Connect failed for {count} {type} device(s)',

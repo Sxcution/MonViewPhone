@@ -32,11 +32,22 @@ type serverProcess struct {
 	cmdline string
 }
 
-var deviceLocks sync.Map
+var (
+	deviceLocks sync.Map
+	serverOps   = make(chan struct{}, 6)
+)
 
 func lockForDevice(udid string) *sync.Mutex {
 	value, _ := deviceLocks.LoadOrStore(udid, &sync.Mutex{})
 	return value.(*sync.Mutex)
+}
+
+func withServerOpSlot(fn func() error) error {
+	serverOps <- struct{}{}
+	defer func() {
+		<-serverOps
+	}()
+	return fn()
 }
 
 func serverJarPath() string {
@@ -105,6 +116,18 @@ func killStaleServers(udid string, processes []serverProcess) {
 	}
 }
 
+func killAllScrcpyServers(udid string) error {
+	for _, proc := range listServerProcesses(udid) {
+		if proc.pid == "" {
+			continue
+		}
+		log.Printf("[%s] Killing scrcpy server PID %s (%s)", udid, proc.pid, proc.cmdline)
+	}
+	cmd := fmt.Sprintf(`for p in $(pidof %s 2>/dev/null); do cat /proc/$p/cmdline 2>/dev/null | grep -q %s && kill -9 $p 2>/dev/null || true; done`, ProcessName, ServerPackage)
+	_, err := adb.Shell(udid, cmd)
+	return err
+}
+
 func hasExpectedServer(udid string) bool {
 	for _, proc := range listServerProcesses(udid) {
 		if isExpectedServer(proc) {
@@ -130,24 +153,52 @@ func waitForServer(udid string) error {
 }
 
 func EnsureServer(udid string) error {
-	lock := lockForDevice(udid)
-	lock.Lock()
-	defer lock.Unlock()
+	return withServerOpSlot(func() error {
+		lock := lockForDevice(udid)
+		lock.Lock()
+		defer lock.Unlock()
 
-	processes := listServerProcesses(udid)
-	for _, proc := range processes {
-		if isExpectedServer(proc) && isPortListening(udid) {
-			return nil
+		processes := listServerProcesses(udid)
+		for _, proc := range processes {
+			if isExpectedServer(proc) && isPortListening(udid) {
+				return nil
+			}
 		}
-	}
 
-	killStaleServers(udid, processes)
-	_ = shellSafe(udid, "rm -f "+PidFilePath+" "+LogFilePath)
-	time.Sleep(300 * time.Millisecond)
-	return StartServer(udid)
+		killStaleServers(udid, processes)
+		_ = shellSafe(udid, "rm -f "+PidFilePath+" "+LogFilePath)
+		time.Sleep(300 * time.Millisecond)
+		return startServerUnlocked(udid)
+	})
+}
+
+func ForceRestartServer(udid string) error {
+	return withServerOpSlot(func() error {
+		lock := lockForDevice(udid)
+		lock.Lock()
+		defer lock.Unlock()
+
+		if err := killAllScrcpyServers(udid); err != nil {
+			return fmt.Errorf("failed to kill scrcpy server: %w", err)
+		}
+		if _, err := adb.Shell(udid, "rm -f "+PidFilePath+" "+LogFilePath); err != nil {
+			return fmt.Errorf("failed to remove scrcpy temp files: %w", err)
+		}
+		time.Sleep(500 * time.Millisecond)
+		return startServerUnlocked(udid)
+	})
 }
 
 func StartServer(udid string) error {
+	return withServerOpSlot(func() error {
+		lock := lockForDevice(udid)
+		lock.Lock()
+		defer lock.Unlock()
+		return startServerUnlocked(udid)
+	})
+}
+
+func startServerUnlocked(udid string) error {
 	// Push scrcpy-server.jar
 	log.Printf("[%s] Pushing scrcpy-server.jar...", udid)
 	err := adb.Push(udid, serverJarPath(), TempPath+FileName)
