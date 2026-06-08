@@ -28,6 +28,8 @@ Removed legacy layers:
 - `client/src/lib/serverApi.ts`: HTTP API client for the Go backend.
 - `client/src/store/useTileOrder.ts`: Persistent device numbering and ordering.
 - `client/src/styles.css`: Main application styling.
+- `client/public/audio/`: Directory containing static audio assets, including `notification_new.mp3` for the default alert sound.
+
 
 ## Go Backend
 - `server-go/main.go`: HTTP/WebSocket entry point and CORS setup.

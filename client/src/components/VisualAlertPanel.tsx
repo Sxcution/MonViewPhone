@@ -51,26 +51,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
   const [expanded, setExpanded] = useState(false);
   const [roiModalOpen, setRoiModalOpen] = useState(false);
 
-  // Toast state
-  const [toasts, setToasts] = useState<Array<{ id: number; message: string }>>([]);
-  const toastIdRef = useRef(0);
-
-  // Listen for alert events from the engine
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (!detail?.message) return;
-      const id = ++toastIdRef.current;
-      setToasts(prev => [...prev.slice(-4), { id, message: detail.message }]);
-      // Auto-remove toast after 5 seconds
-      setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== id));
-      }, 5000);
-    };
-    window.addEventListener('visualAlertDetected', handler);
-    return () => window.removeEventListener('visualAlertDetected', handler);
-  }, []);
-
   // Hook for scan loop
   const { scanning, lastAlert, testScanDevice, testSound } = useVisualAlert({
     config,
@@ -355,23 +335,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
         />
       )}
 
-      {/* Toast notifications */}
-      {toasts.length > 0 && (
-        <div className="visualAlertToastContainer">
-          {toasts.map(t => (
-            <div key={t.id} className="visualAlertToast">
-              <Bell size={14} />
-              <span>{t.message}</span>
-              <button
-                className="visualAlertToastClose"
-                onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
-              >
-                <X size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </>
   );
 }

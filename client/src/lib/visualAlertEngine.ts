@@ -280,46 +280,18 @@ export function scanCanvasROIs(
 
 /* ── Audio Alert ────────────────────────────────────────────────── */
 
-let _audioCtx: AudioContext | null = null;
-
-function getAudioContext(): AudioContext | null {
-  try {
-    if (!_audioCtx) {
-      _audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    return _audioCtx;
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Play a short beep sound (880Hz, 300ms) using AudioContext oscillator.
- * No external audio file required.
+ * Play the default alert sound (notification_new.mp3).
  */
 export function playAlertSound(): void {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  // Resume context if suspended (browser autoplay policy)
-  if (ctx.state === 'suspended') {
-    ctx.resume().catch(() => {});
+  try {
+    const audio = new Audio('/audio/notification_new.mp3');
+    audio.play().catch(err => {
+      console.warn('Failed to play alert sound:', err);
+    });
+  } catch (err) {
+    console.warn('Failed to initialize Audio player:', err);
   }
-
-  const oscillator = ctx.createOscillator();
-  const gain = ctx.createGain();
-
-  oscillator.type = 'sine';
-  oscillator.frequency.setValueAtTime(880, ctx.currentTime);
-  gain.gain.setValueAtTime(0.35, ctx.currentTime);
-  // Fade out for smoother sound
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-
-  oscillator.connect(gain);
-  gain.connect(ctx.destination);
-
-  oscillator.start(ctx.currentTime);
-  oscillator.stop(ctx.currentTime + 0.3);
 }
 
 /* ── Desktop / Toast Notification ───────────────────────────────── */
@@ -328,7 +300,7 @@ export function playAlertSound(): void {
  * Show a notification when red dot detected.
  * Includes ROI name(s) that triggered the alert.
  */
-export function showAlertNotification(deviceNumber: number, roiNames?: string[]): void {
+export function showAlertNotification(udid: string, deviceNumber: number, roiNames?: string[]): void {
   const roiSuffix = roiNames?.length ? `: ${roiNames.slice(0, 2).join(', ')}` : '';
   const body = `Máy ${String(deviceNumber).padStart(2, '0')} phát hiện chấm đỏ${roiSuffix}`;
   const title = 'Visual Alert';
@@ -342,10 +314,10 @@ export function showAlertNotification(deviceNumber: number, roiNames?: string[])
     }
   }
 
-  // Always dispatch a custom event so the React toast can pick it up
+  // Always dispatch a custom event so the React app can pick it up
   window.dispatchEvent(
     new CustomEvent('visualAlertDetected', {
-      detail: { deviceNumber, message: body, timestamp: Date.now() },
+      detail: { udid, deviceNumber, message: body, timestamp: Date.now() },
     }),
   );
 }

@@ -279,6 +279,55 @@ export function App() {
       localStorage.setItem(VIEWER_STREAM_CONFIG_KEY, JSON.stringify(viewerStreamConfig))
     } catch {}
   }, [viewerStreamConfig])
+
+  // ===== VISUAL TILE ALERTS =====
+  type VisualTileAlert = {
+    udid: string;
+    timestamp: number;
+  };
+  const [visualTileAlerts, setVisualTileAlerts] = useState<Record<string, VisualTileAlert>>({});
+
+  useEffect(() => {
+    const handleVisualAlert = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.udid) return;
+      const now = Date.now();
+      setVisualTileAlerts(prev => ({
+        ...prev,
+        [detail.udid]: {
+          udid: detail.udid,
+          timestamp: now,
+        }
+      }));
+    };
+
+    const handleVisualAlertCleared = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.udid) return;
+      setVisualTileAlerts(prev => {
+        const next = { ...prev };
+        delete next[detail.udid];
+        return next;
+      });
+    };
+
+    window.addEventListener('visualAlertDetected', handleVisualAlert);
+    window.addEventListener('visualAlertCleared', handleVisualAlertCleared);
+    
+    return () => {
+      window.removeEventListener('visualAlertDetected', handleVisualAlert);
+      window.removeEventListener('visualAlertCleared', handleVisualAlertCleared);
+    };
+  }, []);
+
+  const clearVisualAlert = useCallback((udid: string) => {
+    setVisualTileAlerts(prev => {
+      const next = { ...prev };
+      delete next[udid];
+      return next;
+    });
+  }, []);
+
   const [viewerUdid, setViewerUdid] = useState<string | null>(null)
   const apkInputRef = useRef<HTMLInputElement | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
@@ -1767,6 +1816,8 @@ export function App() {
                     selected={connectSelection.has(udid)}
                     showTileInfo={showTileInfo}
                     isDisconnected={!isConnected}   // <-- THÊM DÒNG NÀY
+                    visualAlertActive={Boolean(visualTileAlerts[udid])}
+                    onClearVisualAlert={() => clearVisualAlert(udid)}
                     streamConfig={
                       viewerUdid === udid ? viewerStreamConfig : streamConfig
                     }

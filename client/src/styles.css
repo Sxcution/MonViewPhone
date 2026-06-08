@@ -7751,3 +7751,51 @@ textarea:focus,
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* Visual Alert Tile Overlay Badge */
+.tileVisualAlertBadge {
+  position: absolute;
+  top: 3.5%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255, 59, 48, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  font-size: clamp(10px, 1.6vw, 13px);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 22px rgba(255, 59, 48, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.tileVisualAlertBadge:hover {
+  background: rgba(255, 59, 48, 1);
+  transform: translateX(-50%) scale(1.05);
+}
+
+.visualAlertBadgeIcon {
+  animation: visualAlertRing 2s infinite ease-in-out;
+  transform-origin: top center;
+}
+
+@keyframes visualAlertRing {
+  0% { transform: rotate(0); }
+  5% { transform: rotate(15deg); }
+  10% { transform: rotate(-10deg); }
+  15% { transform: rotate(15deg); }
+  20% { transform: rotate(-10deg); }
+  25% { transform: rotate(15deg); }
+  30% { transform: rotate(-10deg); }
+  35% { transform: rotate(0); }
+  100% { transform: rotate(0); }
+}

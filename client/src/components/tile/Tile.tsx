@@ -7,7 +7,7 @@ import { useServer } from '@/context/ServerContext';
 import type { TileProps } from './types';
 import { TileHeader } from './TileHeader';
 import { useTileStream } from './useTileStream';
-import { AlertTriangle, Info, MousePointer2, XCircle } from 'lucide-react';
+import { AlertTriangle, Info, MousePointer2, XCircle, Bell } from 'lucide-react';
 
 /**
  * Device tile.
@@ -26,6 +26,8 @@ function TileComponent({
     selected = false,
     showTileInfo = true,
     isDisconnected = false,
+    visualAlertActive = false,
+    onClearVisualAlert,
     onRegisterReload,
     onUnregisterReload,
     onViewDevice,
@@ -324,6 +326,19 @@ function TileComponent({
                         ) : null}
 
                         {videoFrame}
+
+                        {visualAlertActive ? (
+                            <div 
+                                className="tileVisualAlertBadge" 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onClearVisualAlert?.();
+                                }}
+                            >
+                                <Bell size={14} className="visualAlertBadgeIcon" />
+                                <span>Thông Báo Mới</span>
+                            </div>
+                        ) : null}
 
                         {isViewing ? (
                             <div className="tileViewingOverlay">

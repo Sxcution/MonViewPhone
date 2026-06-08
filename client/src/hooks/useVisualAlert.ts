@@ -18,6 +18,7 @@ import {
 type DeviceScanState = {
   consecutiveHits: number;
   lastAlertAt: number;
+  currentlyAlerting: boolean;
 };
 
 type AlertEvent = {
@@ -80,44 +81,46 @@ export function useVisualAlert({
       const result: MultiROIResult = scanCanvasROIs(canvas, cfg.rois, cfg.redThreshold);
       if (!result.scanned) return { detected: false, totalPixelCount: 0 };
 
-      const state = deviceStateRef.current.get(udid) ?? { consecutiveHits: 0, lastAlertAt: 0 };
-
-      // Check cooldown
-      const now = Date.now();
-      if (now - state.lastAlertAt < cfg.cooldownSec * 1000) {
-        return { detected: false, totalPixelCount: result.totalRedPixelCount };
-      }
+      const state = deviceStateRef.current.get(udid) ?? { consecutiveHits: 0, lastAlertAt: 0, currentlyAlerting: false };
 
       if (result.detected) {
         state.consecutiveHits++;
       } else {
         state.consecutiveHits = 0;
+        if (state.currentlyAlerting) {
+          state.currentlyAlerting = false;
+          window.dispatchEvent(new CustomEvent('visualAlertCleared', { detail: { udid } }));
+        }
       }
 
       deviceStateRef.current.set(udid, state);
 
       if (state.consecutiveHits >= cfg.confirmCount) {
-        // Alert triggered
-        state.consecutiveHits = 0;
-        state.lastAlertAt = now;
-        deviceStateRef.current.set(udid, state);
-
+        const now = Date.now();
         const deviceNumber = orderMapRef.current.get(udid) ?? 0;
-
-        // Collect names of ROIs that triggered
-        const hitNames = result.hits
-          .filter(h => h.detected)
-          .map(h => h.roiName);
-
-        playAlertSound();
-        showAlertNotification(deviceNumber, hitNames);
-
+        const hitNames = result.hits.filter(h => h.detected).map(h => h.roiName);
         const roiSuffix = hitNames.length ? `: ${hitNames.slice(0, 2).join(', ')}` : '';
-        setLastAlert({
-          deviceNumber,
-          message: `Máy ${String(deviceNumber).padStart(2, '0')} phát hiện chấm đỏ${roiSuffix}`,
-          timestamp: now,
-        });
+
+        if (!state.currentlyAlerting) {
+          state.currentlyAlerting = true;
+          state.lastAlertAt = now;
+
+          playAlertSound();
+          showAlertNotification(udid, deviceNumber, hitNames);
+
+          setLastAlert({
+            deviceNumber,
+            message: `Máy ${String(deviceNumber).padStart(2, '0')} phát hiện chấm đỏ${roiSuffix}`,
+            timestamp: now,
+          });
+        } else {
+          // Already alerting, check cooldown for repeated sound/OS notification
+          if (now - state.lastAlertAt >= cfg.cooldownSec * 1000) {
+            state.lastAlertAt = now;
+            playAlertSound();
+            showAlertNotification(udid, deviceNumber, hitNames);
+          }
+        }
 
         return { detected: true, totalPixelCount: result.totalRedPixelCount };
       }
