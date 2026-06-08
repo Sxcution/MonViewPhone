@@ -3,13 +3,32 @@ package adb
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"sync"
 )
+
+var (
+	adbPath string
+	once    sync.Once
+)
+
+func GetAdbPath() string {
+	once.Do(func() {
+		xiaoweiAdb := `C:\Program Files (x86)\xiaowei\tools\adb.exe`
+		if _, err := os.Stat(xiaoweiAdb); err == nil {
+			adbPath = xiaoweiAdb
+			return
+		}
+		adbPath = "adb"
+	})
+	return adbPath
+}
 
 // Command executes an adb command
 func Command(args ...string) (string, error) {
-	cmd := exec.Command("adb", args...)
+	cmd := exec.Command(GetAdbPath(), args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -50,7 +69,7 @@ func Shell(udid string, cmd string) (string, error) {
 
 // RunShellAsync runs a shell command asynchronously and returns the exec.Cmd
 func RunShellAsync(udid string, shellCmd string) (*exec.Cmd, error) {
-	cmd := exec.Command("adb", "-s", udid, "shell", shellCmd)
+	cmd := exec.Command(GetAdbPath(), "-s", udid, "shell", shellCmd)
 	err := cmd.Start()
 	return cmd, err
 }

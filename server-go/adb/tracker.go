@@ -55,7 +55,7 @@ func (t *Tracker) Start() {
 }
 
 func (t *Tracker) pollDevices() {
-	cmd := exec.Command("adb", "devices")
+	cmd := exec.Command(GetAdbPath(), "devices")
 	output, err := cmd.Output()
 	if err != nil {
 		log.Printf("ADB command failed (is adb installed and in PATH?): %v", err)

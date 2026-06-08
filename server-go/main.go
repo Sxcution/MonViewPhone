@@ -14,7 +14,7 @@ import (
 func warmUpAdb() {
 	log.Println("[ADB] Warming up adb server...")
 	for i := 0; i < 5; i++ {
-		cmd := exec.Command("adb", "start-server")
+		cmd := exec.Command(adb.GetAdbPath(), "start-server")
 		err := cmd.Run()
 		if err == nil {
 			log.Println("[ADB] adb server ready.")
