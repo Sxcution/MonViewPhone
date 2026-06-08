@@ -115,7 +115,7 @@ func hasExpectedServer(udid string) bool {
 }
 
 func waitForServer(udid string) error {
-	deadline := time.Now().Add(8 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		if hasExpectedServer(udid) {
 			return nil

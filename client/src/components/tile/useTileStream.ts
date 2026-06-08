@@ -4,6 +4,7 @@ import { AnnexBSplitter, buildConfigBinary, makeWsUrl } from '@/lib/video';
 import { useI18n } from '@/context/I18nContext';
 import type { StreamConfig } from '@/lib/config';
 import type { InputTarget } from '@/context/ActiveContext';
+import type { StreamReloadOptions } from './types';
 
 type Args = {
     udid: string;
@@ -38,11 +39,88 @@ type Args = {
     setLoading: (b: boolean) => void;
 
     // Exposed reload ref (used by header/menu + parent App for reload-all)
-    reloadRef: MutableRefObject<((opts?: { silent?: boolean }) => void) | null>;
+    reloadRef: MutableRefObject<((opts?: StreamReloadOptions) => void) | null>;
 
     // Notify caller about current video dimensions (per-tile aspect ratio)
     onVideoDims?: (w: number, h: number) => void;
 };
+
+const STREAM_CONNECT_BATCH_SIZE = 6;
+const STREAM_CONNECT_BATCH_DELAY_MS = 1000;
+const INITIAL_FRAME_TIMEOUT_MS = 35_000;
+const RECONNECT_DELAY_MS = 1200;
+
+type StreamSessionState = 'queued' | 'connecting' | 'connected';
+
+type StreamSession = {
+    owner: symbol;
+    state: StreamSessionState;
+    ws?: WebSocket;
+};
+
+type QueuedConnect = {
+    udid: string;
+    owner: symbol;
+    cancelled: boolean;
+    run: () => void;
+};
+
+const activeStreamSessions = new Map<string, StreamSession>();
+const connectQueue: QueuedConnect[] = [];
+let connectQueueTimer: number | null = null;
+
+function flushConnectQueue() {
+    connectQueueTimer = null;
+    let started = 0;
+    while (connectQueue.length && started < STREAM_CONNECT_BATCH_SIZE) {
+        const item = connectQueue.shift();
+        if (!item || item.cancelled) continue;
+        started++;
+        item.run();
+    }
+    if (connectQueue.some(item => !item.cancelled)) {
+        connectQueueTimer = window.setTimeout(flushConnectQueue, STREAM_CONNECT_BATCH_DELAY_MS);
+    } else {
+        connectQueue.length = 0;
+    }
+}
+
+function scheduleBatchedConnect(udid: string, owner: symbol, run: () => void): () => void {
+    const item: QueuedConnect = { udid, owner, cancelled: false, run };
+    connectQueue.push(item);
+    if (connectQueueTimer == null) {
+        connectQueueTimer = window.setTimeout(flushConnectQueue, 0);
+    }
+    return () => {
+        item.cancelled = true;
+        const session = activeStreamSessions.get(udid);
+        if (session?.owner === owner && session.state === 'queued') {
+            activeStreamSessions.delete(udid);
+        }
+    };
+}
+
+function claimStreamSession(udid: string, owner: symbol, state: StreamSessionState): boolean {
+    const existing = activeStreamSessions.get(udid);
+    if (existing && existing.owner !== owner) {
+        return false;
+    }
+    activeStreamSessions.set(udid, { owner, state });
+    return true;
+}
+
+function updateStreamSession(udid: string, owner: symbol, state: StreamSessionState, ws?: WebSocket) {
+    const existing = activeStreamSessions.get(udid);
+    if (existing && existing.owner !== owner) return;
+    activeStreamSessions.set(udid, { owner, state, ws });
+}
+
+function releaseStreamSession(udid: string, owner: symbol, ws?: WebSocket) {
+    const existing = activeStreamSessions.get(udid);
+    if (!existing || existing.owner !== owner) return;
+    if (ws && existing.ws && existing.ws !== ws) return;
+    activeStreamSessions.delete(udid);
+}
 
 /**
  * Handles the *streaming pipeline* for a tile:
@@ -81,6 +159,10 @@ export function useTileStream(args: Args) {
     } = args;
     const { t } = useI18n();
     const tRef = useRef(t);
+    const ownerRef = useRef<symbol | null>(null);
+    if (ownerRef.current == null) {
+        ownerRef.current = Symbol(udid);
+    }
     useEffect(() => {
         tRef.current = t;
     }, [t]);
@@ -111,6 +193,7 @@ export function useTileStream(args: Args) {
     const isSilent = () => suppressLoadingOverlayRef.current || silentReconnectRef.current;
 
     useEffect(() => {
+        const owner = ownerRef.current!;
         destroyedRef.current = false;
         closingRef.current = false;
         if (!enabled) {
@@ -189,7 +272,6 @@ export function useTileStream(args: Args) {
         }
 
         let firstFrame = false;
-        let firstConnect = true;
         let worker: Worker | null = null; // tinyh264 decoder
         let renderWorker: Worker | null = null; // YUV->ImageBitmap renderer
         let decoderReady = false;
@@ -212,6 +294,8 @@ export function useTileStream(args: Args) {
         const reconnectOnStreamParamChange = false;
         let watchdogTimer: number | null = null;
         let initialLoadTimer: number | null = null;
+        let queuedConnectCancel: (() => void) | null = null;
+        let connectGeneration = 0;
         // Render throttling: keep at most 1 in-flight render per tile, drop older frames.
         let renderBusy = false;
         let pendingFrame: { width: number; height: number; data: ArrayBuffer } | null = null;
@@ -294,8 +378,6 @@ export function useTileStream(args: Args) {
                 console.error('[yuv render worker error]', udid, e);
                 setStatus(tRef.current('❌ lỗi worker render YUV'));
                 setLoading(true);
-                // Force fresh GOP on reconnect.
-                firstConnect = true;
                 // Small async hop to avoid reentrancy issues.
                 window.setTimeout(() => {
                     if (!destroyedRef.current) connect();
@@ -396,8 +478,8 @@ export function useTileStream(args: Args) {
 
                     // Some devices switch resolution on rotation (portrait<->landscape).
                     // A subset of devices/decoders can get stuck (white screen) after that.
-                    // When we detect a dimension change after the first frame, force a fresh
-                    // WS connection (restart=1) to recover.
+                    // When enabled, reconnect after a dimension change without forcing
+                    // server-side restart.
                     if (reconnectOnStreamParamChange && firstFrame && (width !== lastVideoW || height !== lastVideoH)) {
                         const now = Date.now();
                         // Throttle: avoid loops if device toggles frequently.
@@ -407,7 +489,6 @@ export function useTileStream(args: Args) {
                             lastVideoH = height;
                             setStatus(tRef.current('Thay đổi xoay/kích thước - khởi động lại…'));
                             setLoading(true);
-                            firstConnect = true;
                             // reconnect (recreate workers + fresh GOP)
                             connect();
                             return;
@@ -443,8 +524,6 @@ export function useTileStream(args: Args) {
                 setStatus(tRef.current('❌ lỗi worker tinyh264'));
                 setLoading(true);
                 // Same symptom as "white tile": the decoder worker crashed.
-                // Reconnect with restart=1 so we get SPS/PPS + IDR again.
-                firstConnect = true;
                 window.setTimeout(() => {
                     if (!destroyedRef.current) connect();
                 }, 0);
@@ -458,7 +537,7 @@ export function useTileStream(args: Args) {
                 if (payload.length < 5) return;
 
                 // Detect SPS/PPS changes mid-stream (common on some devices when rotating).
-                // When tinyh264 gets stuck after such change, reconnect with restart=1.
+                // When enabled, reconnect after such changes without forcing server-side restart.
                 let startLen = 0;
                 if (payload[2] === 0x01) startLen = 3;
                 else if (payload[2] === 0x00 && payload[3] === 0x01) startLen = 4;
@@ -473,7 +552,6 @@ export function useTileStream(args: Args) {
                                 lastSpsHash = h;
                                 setStatus(tRef.current('SPS đổi - khởi động lại…'));
                                 setLoading(true);
-                                firstConnect = true;
                                 connect();
                                 return;
                             }
@@ -484,7 +562,6 @@ export function useTileStream(args: Args) {
                                 lastPpsHash = h;
                                 setStatus(tRef.current('PPS đổi - khởi động lại…'));
                                 setLoading(true);
-                                firstConnect = true;
                                 connect();
                                 return;
                             }
@@ -512,6 +589,11 @@ export function useTileStream(args: Args) {
 
         function cleanupWs() {
             closingRef.current = true;
+            connectGeneration++;
+            if (queuedConnectCancel) {
+                queuedConnectCancel();
+                queuedConnectCancel = null;
+            }
             const prev = wsRef.current;
             if (prev) {
                 // prevent onclose from scheduling a reconnect when we intentionally close
@@ -526,6 +608,7 @@ export function useTileStream(args: Args) {
                 }
             }
             wsRef.current = null;
+            releaseStreamSession(udid, owner);
 
             // Stop decoder worker + reset stream state
             if (worker) {
@@ -571,30 +654,57 @@ export function useTileStream(args: Args) {
             }
         }
 
-        function connect() {
-            cleanupWs();
+        function connect(opts?: { restart?: boolean; immediate?: boolean }) {
+            if (!opts?.immediate) {
+                cleanupWs();
+                if (!claimStreamSession(udid, owner, 'queued')) {
+                    if (!isSilent()) {
+                        setStatus(tRef.current('Dang co phien stream dang mo'));
+                        setLoading(false);
+                    }
+                    return;
+                }
+                if (!isSilent()) {
+                    setLoading(true);
+                    setStatus(tRef.current('Dang doi luot ket noi...'));
+                }
+                const generation = ++connectGeneration;
+                const restart = Boolean(opts?.restart);
+                queuedConnectCancel = scheduleBatchedConnect(udid, owner, () => {
+                    queuedConnectCancel = null;
+                    if (destroyedRef.current || generation !== connectGeneration) {
+                        releaseStreamSession(udid, owner);
+                        return;
+                    }
+                    connect({ restart, immediate: true });
+                });
+                return;
+            }
+
+            updateStreamSession(udid, owner, 'connecting');
             makeDecoder();
 
             let url: string;
             try {
-                url = makeWsUrl({ wsServer, deviceParam, udid, restart: firstConnect });
+                url = makeWsUrl({ wsServer, deviceParam, udid, restart: Boolean(opts?.restart) });
             } catch (err) {
+                releaseStreamSession(udid, owner);
                 setStatus(tRef.current('❌ thiếu tham số thiết bị'));
                 setLoading(false);
                 return;
             }
-            firstConnect = false;
 
             const ws = new WebSocket(url);
             ws.binaryType = 'arraybuffer';
             closingRef.current = false;
             wsRef.current = ws;
+            updateStreamSession(udid, owner, 'connecting', ws);
 
             if (!isSilent()) {
                 setStatus(tRef.current('Đang kết nối…'));
             }
 
-            // If we don't get the first decoded frame within 10 seconds,
+            // If we don't get the first decoded frame within 35 seconds,
             // auto-reload this tile (same device) to recover from the stuck 'loading' state.
             if (initialLoadTimer != null) {
                 clearTimeout(initialLoadTimer);
@@ -604,14 +714,14 @@ export function useTileStream(args: Args) {
                 if (destroyedRef.current || closingRef.current) return;
                 if (firstFrame) return;
                 if (!isSilent()) {
-                    setStatus(tRef.current('⏱️ tải >10s - đang reload…'));
+                    setStatus(tRef.current('Tai >35s - dang reload...'));
                     setLoading(true);
                 }
-                firstConnect = true; // force fresh GOP (SPS/PPS + IDR)
                 connect();
-            }, 10_000);
+            }, INITIAL_FRAME_TIMEOUT_MS);
 
             ws.onopen = () => {
+                updateStreamSession(udid, owner, 'connected', ws);
                 if (!isSilent()) {
                     setStatus(tRef.current('WS mở → gửi config BINARY…'));
                 }
@@ -638,6 +748,7 @@ export function useTileStream(args: Args) {
             ws.onerror = () => setStatus(tRef.current('❌ lỗi WS'));
 
             ws.onclose = (e) => {
+                releaseStreamSession(udid, owner, ws);
                 if (closingRef.current || destroyedRef.current) return;
                 if (initialLoadTimer != null) {
                     clearTimeout(initialLoadTimer);
@@ -653,29 +764,22 @@ export function useTileStream(args: Args) {
                 );
                 setLoading(true);
 
-                // Important for stability:
-                // When reconnecting after a disconnect, force "restart=1" so the server starts a fresh GOP
-                // (SPS/PPS + IDR). Otherwise the decoder may receive only P-frames and crash the tinyh264 worker.
-                firstConnect = true;
-
                 reconnectTimerRef.current = window.setTimeout(() => {
                     if (destroyedRef.current) return;
                     connect();
-                }, 1200);
+                }, RECONNECT_DELAY_MS);
             };
         }
 
         // Allow user to manually reload this tile (recreate workers + reconnect WS).
-        reloadRef.current = (opts?: { silent?: boolean }) => {
+        reloadRef.current = (opts?: StreamReloadOptions) => {
             if (destroyedRef.current) return;
             silentReconnectRef.current = Boolean(opts?.silent);
             if (!silentReconnectRef.current) {
                 setLoading(true);
                 setStatus(tRef.current('Đang reload…'));
             }
-            // Force server-side restart on next connect (same behavior as first connect).
-            firstConnect = true;
-            connect();
+            connect({ restart: Boolean(opts?.restart) });
         };
 
         connect();
@@ -701,7 +805,6 @@ export function useTileStream(args: Args) {
             if (packetsStillArriving && outputStalled) {
                 setStatus(tRef.current('⚠️ decode đứng - kết nối lại…'));
                 setLoading(true);
-                firstConnect = true;
                 connect();
                 return;
             }
@@ -711,7 +814,6 @@ export function useTileStream(args: Args) {
             if (packetAge > 300000 && bitmapAge > 300000) {
                 setStatus(tRef.current('⚠️ idle lâu - kết nối lại…'));
                 setLoading(true);
-                firstConnect = true;
                 connect();
             }
         }, 3000);

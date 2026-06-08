@@ -4,7 +4,7 @@ import type { StreamConfig } from '@/lib/config';
 import { useI18n } from '@/context/I18nContext';
 import { useServer } from '@/context/ServerContext';
 
-import type { TileProps } from './types';
+import type { StreamReloadOptions, TileProps } from './types';
 import { TileHeader } from './TileHeader';
 import { useTileStream } from './useTileStream';
 import { AlertTriangle, Info, MousePointer2, XCircle, Bell } from 'lucide-react';
@@ -105,7 +105,7 @@ function TileComponent({
 
     // Expose a per-tile reload handler to the UI (header/menu buttons)
     // and to parent App ("reload all tiles").
-    const reloadRef = useRef<((opts?: { silent?: boolean }) => void) | null>(null);
+    const reloadRef = useRef<((opts?: StreamReloadOptions) => void) | null>(null);
 
     // Keep latest streamConfig in a ref so ws.onopen/reload always send newest config
     // without forcing the heavy streaming effect to re-run on every slider tick.
@@ -312,7 +312,7 @@ function TileComponent({
                     onReloadClick={(e) => {
                         e.stopPropagation();
                         focusThisTile();
-                        reloadRef.current?.();
+                        reloadRef.current?.({ restart: true });
                     }}
                     onViewClick={() => {
                         if (onViewDevice) onViewDevice(udid);

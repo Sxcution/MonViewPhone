@@ -28,6 +28,7 @@ import {
   matchesHotkey,
 } from '@/lib/syncTimeSettings'
 import { useTileOrder } from '@/store/useTileOrder'
+import type { StreamReloadOptions } from '@/components/tile/types'
 import {
   Bot,
   Camera,
@@ -65,12 +66,14 @@ const STREAM_WIDTH_MIN = 100
 const STREAM_WIDTH_MAX = 726
 const VIEWER_STREAM_WIDTH = STREAM_WIDTH_MAX
 const VIEWER_STREAM_WIDTH_MAX = 1200
+const DEVICE_LIST_OFFLINE_GRACE_MS = 15_000
 
 type ConnectRequestPayload = {
   device: string
   connect: 'usb' | 'wifi'
   port?: number
 }
+type RemoteDevice = { udid: string; type: 'usb' | 'wifi' | 'unknown' }
 
 const CONNECT_CHECK_DEVICE_MESSAGE =
   'Please check that the device is properly plugged into the host'
@@ -271,7 +274,7 @@ export function App() {
     } catch { }
     return STREAM_CONFIG
   })
-  const reloadMap = useRef<Map<string, (opts?: { silent?: boolean }) => void>>(new Map())
+  const reloadMap = useRef<Map<string, (opts?: StreamReloadOptions) => void>>(new Map())
 
   const [viewerStreamConfig, setViewerStreamConfig] = useState<StreamConfig>(() => {
     try {
@@ -526,9 +529,8 @@ export function App() {
       localStorage.setItem('showTileInfo', String(showTileInfo))
     } catch { }
   }, [showTileInfo])
-  const [remoteDevices, setRemoteDevices] = useState<
-    Array<{ udid: string; type: 'usb' | 'wifi' | 'unknown' }>
-  >([])
+  const [remoteDevices, setRemoteDevices] = useState<RemoteDevice[]>([])
+  const remoteDeviceLastSeenRef = useRef<Map<string, number>>(new Map())
   const wsDevicesRef = useRef<WebSocket | null>(null)
   const [connectSelection, setConnectSelection] = useState<Set<string>>(
     () => new Set(syncTargets)
@@ -808,7 +810,7 @@ export function App() {
     }
   }, [isSidebarPinned])
 
-  const registerReload = useCallback((udid: string, fn: () => void) => {
+  const registerReload = useCallback((udid: string, fn: (opts?: StreamReloadOptions) => void) => {
     reloadMap.current.set(udid, fn)
   }, [])
 
@@ -912,7 +914,7 @@ export function App() {
           try {
             const payload = JSON.parse(ev.data as string)
             if (Array.isArray(payload)) {
-              const dedup = new Map<string, { udid: string; type: 'usb' | 'wifi' | 'unknown' }>()
+              const dedup = new Map<string, RemoteDevice>()
               payload.forEach((d: any) => {
                 const device = String(d?.device || '').trim()
                 const key = String(d?.uuid || device).trim()
@@ -925,8 +927,27 @@ export function App() {
                 dedup.set(key, { udid: device, type })
               })
               const mapped = Array.from(dedup.values())
+              const now = Date.now()
+              const lastSeen = remoteDeviceLastSeenRef.current
+              mapped.forEach(d => lastSeen.set(d.udid, now))
               startTransition(() => {
-                setRemoteDevices(mapped)
+                setRemoteDevices(prev => {
+                  const next = new Map<string, RemoteDevice>()
+                  mapped.forEach(d => next.set(d.udid, d))
+                  prev.forEach(d => {
+                    if (next.has(d.udid)) return
+                    const seenAt = lastSeen.get(d.udid) || 0
+                    if (now - seenAt <= DEVICE_LIST_OFFLINE_GRACE_MS) {
+                      next.set(d.udid, d)
+                    }
+                  })
+                  Array.from(lastSeen.entries()).forEach(([udid, seenAt]) => {
+                    if (now - seenAt > DEVICE_LIST_OFFLINE_GRACE_MS) {
+                      lastSeen.delete(udid)
+                    }
+                  })
+                  return Array.from(next.values())
+                })
                 setAllKnownDevices(prev => {
                   let changed = false
                   const next = [...prev]
