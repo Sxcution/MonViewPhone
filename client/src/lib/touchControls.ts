@@ -2,8 +2,15 @@ import { clamp, encodeKeycodeMessage, encodeScrollMessage, encodeTouchMessage, K
 import type { InputTarget } from '@/context/ActiveContext';
 import { AndroidKeycode } from './keyEvent';
 import { emitAutomationClick, emitAutomationSwipe } from './automation';
+import { loadSyncTimeSettings, syncTimeDelayRangeMs, type SyncTimeSettings } from './syncTimeSettings';
 
 type TargetsGetter = () => InputTarget[];
+
+type TouchTarget = {
+  target: InputTarget;
+  dxPx: number;
+  dyPx: number;
+};
 
 type ActivePointerState = {
   pid: number;
@@ -15,6 +22,9 @@ type ActivePointerState = {
   dirty: boolean;
   isolated: boolean;
   downTimestamp: number;
+  touchTargets: TouchTarget[];
+  delayedFollowers: TouchTarget[];
+  syncSettings: SyncTimeSettings;
 };
 
 function makePointerIdAllocator() {
@@ -56,6 +66,45 @@ function mapNormToDeviceXY(targetCanvas: HTMLCanvasElement, x01: number, y01: nu
   return { x, y, w, h };
 }
 
+function mapNormToDeviceXYWithOffset(targetCanvas: HTMLCanvasElement, x01: number, y01: number, dxPx: number, dyPx: number) {
+  const base = mapNormToDeviceXY(targetCanvas, x01, y01);
+  return {
+    ...base,
+    x: clamp(base.x + dxPx, 0, base.w),
+    y: clamp(base.y + dyPx, 0, base.h),
+  };
+}
+
+function isOpenTarget(t: InputTarget) {
+  return Boolean(t.ws && t.ws.readyState === WebSocket.OPEN && t.canvas);
+}
+
+function sleep(ms: number) {
+  return new Promise<void>(resolve => window.setTimeout(resolve, Math.max(0, ms)));
+}
+
+function randomInt(min: number, max: number) {
+  const low = Math.min(min, max);
+  const high = Math.max(min, max);
+  return Math.floor(low + Math.random() * (high - low + 1));
+}
+
+function randomSignedOffset(settings: SyncTimeSettings) {
+  if (!settings.offsetEnabled || settings.offsetMaxPx <= 0) return 0;
+  const magnitude = randomInt(settings.offsetMinPx, settings.offsetMaxPx);
+  if (magnitude === 0) return 0;
+  return Math.random() < 0.5 ? -magnitude : magnitude;
+}
+
+function shuffleTargets<T>(items: T[]) {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = randomInt(0, i);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 export function attachTouchControls(
   canvas: HTMLCanvasElement,
   getTargets: TargetsGetter,
@@ -69,6 +118,36 @@ export function attachTouchControls(
   function canSend() {
     const targets = getTargets();
     return targets.some((t) => t.ws && t.ws.readyState === WebSocket.OPEN);
+  }
+
+  function prepareTouchTargets(isolated: boolean, settings: SyncTimeSettings) {
+    const targets = getTargets().filter(isOpenTarget);
+    const sourceIndex = targets.findIndex((t) => (udid ? t.udid === udid : false) || t.canvas === canvas);
+    const source = sourceIndex >= 0 ? targets[sourceIndex] : targets[0];
+    if (!source) return { source: null as TouchTarget | null, followers: [] as TouchTarget[] };
+
+    const makeTouchTarget = (target: InputTarget, isSource: boolean): TouchTarget => ({
+      target,
+      dxPx: isSource ? 0 : randomSignedOffset(settings),
+      dyPx: isSource ? 0 : randomSignedOffset(settings),
+    });
+
+    if (isolated) return { source: makeTouchTarget(source, true), followers: [] };
+
+    const rawFollowers = targets.filter((_, index) => index !== (sourceIndex >= 0 ? sourceIndex : 0));
+    const followers = (settings.randomOrder ? shuffleTargets(rawFollowers) : rawFollowers)
+      .map(target => makeTouchTarget(target, false));
+    return { source: makeTouchTarget(source, true), followers };
+  }
+
+  function sendTouch(tt: TouchTarget, action: MotionAction, pid: number, x01: number, y01: number, pressure: number, buttons: number) {
+    if (!isOpenTarget(tt.target)) return;
+    const { x, y, w, h } = mapNormToDeviceXYWithOffset(tt.target.canvas, x01, y01, tt.dxPx, tt.dyPx);
+    try {
+      tt.target.ws.send(encodeTouchMessage(action, pid, x, y, w, h, pressure, buttons));
+    } catch {
+      // ignore
+    }
   }
 
   function sendToTargets(makeMsg: (t: InputTarget) => Uint8Array, isolated: boolean = false) {
@@ -95,6 +174,46 @@ export function attachTouchControls(
     }, 30);
   }
 
+  async function replayDelayedTap(tt: TouchTarget, pid: number, x01: number, y01: number) {
+    sendTouch(tt, MotionAction.DOWN, pid, x01, y01, 1, 1);
+    await sleep(60);
+    sendTouch(tt, MotionAction.UP, pid, x01, y01, 0, 0);
+    await sleep(80);
+  }
+
+  async function replayDelayedSwipe(tt: TouchTarget, pid: number, startXY: { x01: number; y01: number }, endXY: { x01: number; y01: number }, durationMs: number) {
+    const cleanDuration = Math.max(50, durationMs);
+    const nMoves = Math.max(5, Math.min(60, Math.round(cleanDuration / 16)));
+    sendTouch(tt, MotionAction.DOWN, pid, startXY.x01, startXY.y01, 1, 1);
+    const start = Date.now();
+    for (let i = 1; i < nMoves; i++) {
+      const a = i / nMoves;
+      const x01 = startXY.x01 + (endXY.x01 - startXY.x01) * a;
+      const y01 = startXY.y01 + (endXY.y01 - startXY.y01) * a;
+      sendTouch(tt, MotionAction.MOVE, pid, x01, y01, 1, 1);
+      const elapsed = Date.now() - start;
+      const targetElapsed = (cleanDuration * i) / nMoves;
+      const wait = Math.max(0, Math.round(targetElapsed - elapsed));
+      if (wait) await sleep(wait);
+    }
+    sendTouch(tt, MotionAction.MOVE, pid, endXY.x01, endXY.y01, 1, 1);
+    sendTouch(tt, MotionAction.UP, pid, endXY.x01, endXY.y01, 0, 0);
+    await sleep(120);
+  }
+
+  async function replayDelayedFollowers(st: ActivePointerState, endXY: { x01: number; y01: number }, movedPx: number, durationMs: number) {
+    if (!st.delayedFollowers.length) return;
+    const { minMs, maxMs } = syncTimeDelayRangeMs(st.syncSettings.intervalSec);
+    for (const follower of st.delayedFollowers) {
+      await sleep(randomInt(minMs, maxMs));
+      if (movedPx <= 8) {
+        await replayDelayedTap(follower, st.pid, endXY.x01, endXY.y01);
+      } else {
+        await replayDelayedSwipe(follower, st.pid, st.startXY, endXY, durationMs);
+      }
+    }
+  }
+
   function scheduleMoveFlush() {
     if (raf) return;
     raf = requestAnimationFrame(() => {
@@ -104,10 +223,9 @@ export function attachTouchControls(
         if (!st.dirty) continue;
         st.dirty = false;
         const { x01, y01 } = st.lastXY;
-        sendToTargets((t) => {
-          const { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
-          return encodeTouchMessage(MotionAction.MOVE, st.pid, x, y, w, h, 1, st.lastButtons);
-        }, st.isolated);
+        for (const tt of st.touchTargets) {
+          sendTouch(tt, MotionAction.MOVE, st.pid, x01, y01, 1, st.lastButtons);
+        }
       }
     });
   }
@@ -133,6 +251,11 @@ export function attachTouchControls(
     const pid = ptr.alloc(e.pointerId);
     const { x01, y01 } = mapClientToNormXY(canvas, e.clientX, e.clientY);
     const buttons = e.buttons ?? 0;
+    const syncSettings = loadSyncTimeSettings();
+    const prepared = prepareTouchTargets(isolated, syncSettings);
+    if (!prepared.source) return;
+    const slowSync = syncSettings.delayEnabled && prepared.followers.length > 0;
+    const touchTargets = slowSync ? [prepared.source] : [prepared.source, ...prepared.followers];
 
     active.set(e.pointerId, {
       pid,
@@ -143,12 +266,14 @@ export function attachTouchControls(
       dirty: false,
       isolated,
       downTimestamp: Date.now(),
+      touchTargets,
+      delayedFollowers: slowSync ? prepared.followers : [],
+      syncSettings,
     });
 
-    sendToTargets((t) => {
-      const { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
-      return encodeTouchMessage(MotionAction.DOWN, pid, x, y, w, h, 1, buttons);
-    }, isolated);
+    for (const tt of touchTargets) {
+      sendTouch(tt, MotionAction.DOWN, pid, x01, y01, 1, buttons);
+    }
   }
 
   function onPointerMove(e: PointerEvent) {
@@ -180,18 +305,17 @@ export function attachTouchControls(
 
     if (st.dirty && canSend()) {
       st.dirty = false;
-      sendToTargets((t) => {
-        const { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
-        return encodeTouchMessage(MotionAction.MOVE, st.pid, x, y, w, h, 1, st.lastButtons);
-      }, st.isolated);
+      for (const tt of st.touchTargets) {
+        sendTouch(tt, MotionAction.MOVE, st.pid, x01, y01, 1, st.lastButtons);
+      }
     }
 
-    sendToTargets((t) => {
-      const { x, y, w, h } = mapNormToDeviceXY(t.canvas, x01, y01);
-      return encodeTouchMessage(MotionAction.UP, st.pid, x, y, w, h, 0, 0);
-    }, st.isolated);
+    for (const tt of st.touchTargets) {
+      sendTouch(tt, MotionAction.UP, st.pid, x01, y01, 0, 0);
+    }
 
     const movedPx = Math.hypot(e.clientX - st.startClient.x, e.clientY - st.startClient.y);
+    const durationMs = Math.max(50, Date.now() - st.downTimestamp);
     if (udid && movedPx <= 8) {
       const { x, y, w, h } = mapNormToDeviceXY(canvas, x01, y01);
       emitAutomationClick({
@@ -219,10 +343,12 @@ export function attachTouchControls(
         endY: endMapped.y,
         width: endMapped.w,
         height: endMapped.h,
-        durationMs: Math.max(50, Date.now() - st.downTimestamp),
+        durationMs,
         timestamp: Date.now(),
       });
     }
+
+    void replayDelayedFollowers(st, { x01, y01 }, movedPx, durationMs);
 
     active.delete(e.pointerId);
     ptr.free(e.pointerId);

@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ChevronUp,
   CirclePlus,
+  Clock3,
   FolderOpen,
   Info,
   Pencil,
@@ -29,6 +30,12 @@ import {
   type AutomationStep,
 } from '@/lib/automation';
 import { AndroidKeycode } from '@/lib/keyEvent';
+import {
+  loadSyncTimeSettings,
+  saveSyncTimeSettings,
+  syncTimeDelayRangeMs,
+  type SyncTimeSettings,
+} from '@/lib/syncTimeSettings';
 
 /* ── types ─────────────────────────────────────────────────────── */
 
@@ -66,6 +73,7 @@ type SavedAutomationMacro = {
   id: string;
   name: string;
   rows: AutomationMacroRow[];
+  createdAt?: number;
   updatedAt: number;
 };
 
@@ -181,6 +189,8 @@ type RowDelayCtxMenuState = {
   y: number;
 } | null;
 
+type MacroSortMode = 'name' | 'createdAt';
+
 type AutomationModalProps = {
   open: boolean;
   devices: AutomationDeviceOption[];
@@ -198,6 +208,7 @@ const AUTOMATION_APP_ACTIONS_KEY = 'automationAppActionsV1';
 const AUTOMATION_DEVICE_PROFILES_KEY = 'automationDeviceProfilesV1';
 const AUTOMATION_SEEDING_JOBS_KEY = 'automationSeedingJobsV1';
 const AUTOMATION_SEEDING_CONTENTS_KEY = 'automationSeedingContentsV1';
+const AUTOMATION_MACRO_SORT_KEY = 'automationMacroSortModeV1';
 const DEFAULT_DELAY_MS = 1000;
 const AUTOMATION_SETTINGS_KEY = 'automationSettingsV1';
 
@@ -206,6 +217,32 @@ function loadAutomationSettings(): { realtimeRecording: boolean } {
 }
 function saveAutomationSettings(s: { realtimeRecording: boolean }) {
   try { localStorage.setItem(AUTOMATION_SETTINGS_KEY, JSON.stringify(s)); } catch { /* */ }
+}
+
+function compareByName(a: { name: string }, b: { name: string }) {
+  return a.name.localeCompare(b.name, 'vi', { sensitivity: 'base', numeric: true });
+}
+
+function sortDeviceProfilesByName(profiles: AutomationDeviceProfile[]) {
+  return [...profiles].sort(compareByName);
+}
+
+function sortMacros(macros: SavedAutomationMacro[], mode: MacroSortMode) {
+  const next = [...macros];
+  if (mode === 'name') return next.sort(compareByName);
+  return next.sort((a, b) => (b.createdAt ?? b.updatedAt ?? 0) - (a.createdAt ?? a.updatedAt ?? 0));
+}
+
+function loadMacroSortMode(): MacroSortMode {
+  try {
+    return localStorage.getItem(AUTOMATION_MACRO_SORT_KEY) === 'createdAt' ? 'createdAt' : 'name';
+  } catch {
+    return 'name';
+  }
+}
+
+function saveMacroSortMode(mode: MacroSortMode) {
+  try { localStorage.setItem(AUTOMATION_MACRO_SORT_KEY, mode); } catch { /* ignore */ }
 }
 
 function macroRandomDelayRangeMs(baseSec: number) {
@@ -238,7 +275,7 @@ function isRunnableMacroRow(row: AutomationMacroRow) {
 }
 
 /* Convert a macro row to automation steps */
-function rowToSteps(row: AutomationMacroRow, opts?: { seedingText?: string; delayMs?: number }): AutomationStep[] {
+function rowToSteps(row: AutomationMacroRow, opts?: { seedingText?: string }): AutomationStep[] {
   const steps: AutomationStep[] = [];
   if (row.action === 'swipe' && row.x01 != null && row.y01 != null && row.endX01 != null && row.endY01 != null) {
     steps.push({ type: 'swipe', x1: row.x01, y1: row.y01, x2: row.endX01, y2: row.endY01, durationMs: row.durationMs ?? 300 });
@@ -247,8 +284,6 @@ function rowToSteps(row: AutomationMacroRow, opts?: { seedingText?: string; dela
   } else if (row.action === 'seeding' && opts?.seedingText) {
     steps.push({ type: 'text', text: opts.seedingText }, { type: 'key', keycode: AndroidKeycode.KEYCODE_ENTER });
   }
-  const delayMs = opts?.delayMs ?? row.delayMs;
-  if (delayMs > 0) steps.push({ type: 'wait', ms: delayMs });
   return steps;
 }
 const ONLY_ONE_DEVICE_MSG = 'Chỉ chọn 1 thiết bị';
@@ -276,7 +311,13 @@ function loadSavedMacros(): SavedAutomationMacro[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(AUTOMATION_MACROS_KEY) || '[]');
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is SavedAutomationMacro => Boolean(item?.id && item?.name && Array.isArray(item?.rows)));
+    return parsed
+      .filter((item): item is SavedAutomationMacro => Boolean(item?.id && item?.name && Array.isArray(item?.rows)))
+      .map(item => ({
+        ...item,
+        createdAt: Number(item.createdAt) || Number(item.updatedAt) || Date.now(),
+        updatedAt: Number(item.updatedAt) || Number(item.createdAt) || Date.now(),
+      }));
   } catch { return []; }
 }
 function saveSavedMacros(macros: SavedAutomationMacro[]) {
@@ -317,11 +358,11 @@ function loadDeviceProfiles(): AutomationDeviceProfile[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(AUTOMATION_DEVICE_PROFILES_KEY) || '[]');
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is AutomationDeviceProfile => Boolean(item?.id && item?.name && Array.isArray(item?.udids)));
+    return sortDeviceProfilesByName(parsed.filter((item): item is AutomationDeviceProfile => Boolean(item?.id && item?.name && Array.isArray(item?.udids))));
   } catch { return []; }
 }
 function saveDeviceProfiles(profiles: AutomationDeviceProfile[]) {
-  try { localStorage.setItem(AUTOMATION_DEVICE_PROFILES_KEY, JSON.stringify(profiles)); } catch { /* ignore */ }
+  try { localStorage.setItem(AUTOMATION_DEVICE_PROFILES_KEY, JSON.stringify(sortDeviceProfilesByName(profiles))); } catch { /* ignore */ }
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
@@ -705,7 +746,20 @@ function makeActionPatch(row: AutomationMacroRow, action: AutomationMacroAction)
   };
 }
 function clampPosition(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
-function sleepMs(ms: number) { return new Promise<void>(resolve => window.setTimeout(resolve, ms)); }
+function sleepMs(ms: number, signal?: AbortSignal) {
+  return new Promise<void>(resolve => {
+    if (signal?.aborted) { resolve(); return; }
+    const timeout = window.setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, Math.max(0, ms));
+    const onAbort = () => {
+      window.clearTimeout(timeout);
+      resolve();
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
 function randomInt(min: number, max: number) {
   const low = Math.min(min, max);
   const high = Math.max(min, max);
@@ -800,6 +854,99 @@ function InputModal({ state, onClose }: { state: InputModalState; onClose: () =>
   return <InputModalInner key={state.key} state={state} onClose={onClose} />;
 }
 
+function SyncTimeSettingsModal({
+  settings,
+  delayRange,
+  onChange,
+  onClose,
+}: {
+  settings: SyncTimeSettings;
+  delayRange: { minMs: number; maxMs: number };
+  onChange: (patch: Partial<SyncTimeSettings>) => void;
+  onClose: () => void;
+}) {
+  const parseNumberInput = (value: string) => {
+    const n = Number(value.replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const handleNumberChange = (value: string, key: 'intervalSec' | 'offsetMinPx' | 'offsetMaxPx') => {
+    const n = parseNumberInput(value);
+    if (n == null) return;
+    onChange({ [key]: n } as Partial<SyncTimeSettings>);
+  };
+
+  return createPortal(
+    <div className='automationSyncTimeOverlay'>
+      <div className='automationSyncTimeCard' role='dialog' aria-modal='false' onMouseDown={e => e.stopPropagation()}>
+        <div className='automationSyncTimeHeader'>
+          <div className='automationSyncTimeTitle'><Clock3 size={16} /><span>Sync Time</span></div>
+          <button type='button' className='visualAlertModalCloseBtn' aria-label='Close Sync Time' onClick={onClose}><X size={15} /></button>
+        </div>
+        <div className='automationSyncTimeBody'>
+          <div className='automationSyncTimeRow'>
+            <span>Độ Trễ</span>
+            <button type='button' className={`visualAlertToggle${settings.delayEnabled ? ' on' : ''}`} onClick={() => onChange({ delayEnabled: !settings.delayEnabled })}>
+              <span className='visualAlertToggleKnob' />
+            </button>
+          </div>
+          <div className='automationSyncTimeRow'>
+            <span>Loại</span>
+            <div className='automationSyncTimeToggleGroup'>
+              <button type='button' className={`automationSyncTimeModeBtn${settings.randomOrder ? ' active' : ''}`} onClick={() => onChange({ randomOrder: !settings.randomOrder })}>Ngẫu Nhiên</button>
+              <button type='button' className={`visualAlertToggle${settings.randomOrder ? ' on' : ''}`} onClick={() => onChange({ randomOrder: !settings.randomOrder })}>
+                <span className='visualAlertToggleKnob' />
+              </button>
+            </div>
+          </div>
+          <label className='automationSyncTimeField'>
+            <span>Khoảng thời gian</span>
+            <div className='automationSyncTimeInputWrap'>
+              <input
+                className='automationSyncTimeInput'
+                type='text'
+                inputMode='decimal'
+                value={String(settings.intervalSec)}
+                onChange={e => handleNumberChange(e.target.value, 'intervalSec')}
+              />
+              <small>giây · {Math.round(delayRange.minMs / 1000)}-{Math.round(delayRange.maxMs / 1000)}s</small>
+            </div>
+          </label>
+          <div className='automationSyncTimeRow'>
+            <span>Độ Lệch</span>
+            <button type='button' className={`visualAlertToggle${settings.offsetEnabled ? ' on' : ''}`} onClick={() => onChange({ offsetEnabled: !settings.offsetEnabled })}>
+              <span className='visualAlertToggleKnob' />
+            </button>
+          </div>
+          <div className='automationSyncTimePixelGrid'>
+            <label className='automationSyncTimeField'>
+              <span>Pixel</span>
+              <input
+                className='automationSyncTimeInput'
+                type='text'
+                inputMode='numeric'
+                value={String(settings.offsetMinPx)}
+                onChange={e => handleNumberChange(e.target.value, 'offsetMinPx')}
+              />
+            </label>
+            <label className='automationSyncTimeField'>
+              <span>Pixel</span>
+              <input
+                className='automationSyncTimeInput'
+                type='text'
+                inputMode='numeric'
+                value={String(settings.offsetMaxPx)}
+                onChange={e => handleNumberChange(e.target.value, 'offsetMaxPx')}
+              />
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 /* ── component ─────────────────────────────────────────────────── */
 
 export function AutomationModal({
@@ -826,6 +973,10 @@ export function AutomationModal({
   const [inputModal, setInputModal] = useState<InputModalState>(null);
   const [macroCtxMenu, setMacroCtxMenu] = useState<MacroCtxMenuState>(null);
   const [rowDelayCtxMenu, setRowDelayCtxMenu] = useState<RowDelayCtxMenuState>(null);
+  const [macroSortMode, setMacroSortMode] = useState<MacroSortMode>(loadMacroSortMode);
+  const [macroSortMenuOpen, setMacroSortMenuOpen] = useState(false);
+  const [syncTimeModalOpen, setSyncTimeModalOpen] = useState(false);
+  const [syncTimeSettings, setSyncTimeSettings] = useState<SyncTimeSettings>(loadSyncTimeSettings);
   const [currentMacroName, setCurrentMacroName] = useState('');
   const [position, setPosition] = useState({ x: 120, y: 80 });
   const recordingRef = useRef(false);
@@ -1053,6 +1204,19 @@ export function AutomationModal({
 
   const statusIsError = status === ONLY_ONE_DEVICE_MSG || status === SELECT_ONE_DEVICE_MSG;
   const allAutomationDevicesSelected = devices.length > 0 && devices.every(d => selectedSet.has(d.udid));
+  const sortedDeviceProfiles = useMemo(() => sortDeviceProfilesByName(deviceProfiles), [deviceProfiles]);
+  const sortedSavedMacros = useMemo(() => sortMacros(savedMacros, macroSortMode), [savedMacros, macroSortMode]);
+  const syncDelayRange = useMemo(() => syncTimeDelayRangeMs(syncTimeSettings.intervalSec), [syncTimeSettings.intervalSec]);
+
+  const updateMacroSortMode = useCallback((mode: MacroSortMode) => {
+    setMacroSortMode(mode);
+    saveMacroSortMode(mode);
+    setMacroSortMenuOpen(false);
+  }, []);
+
+  const updateSyncTimeSettings = useCallback((patch: Partial<SyncTimeSettings>) => {
+    setSyncTimeSettings(prev => saveSyncTimeSettings({ ...prev, ...patch }));
+  }, []);
 
   /* ── context menu computed values ── */
 
@@ -1080,7 +1244,7 @@ export function AutomationModal({
       else unassignedList.push(udid);
     }
     return {
-      currentProfiles: [...profileSet.values()],
+      currentProfiles: sortDeviceProfilesByName([...profileSet.values()]),
       unassigned: unassignedList,
       singleProfile: profileSet.size === 1 && unassignedList.length === 0 ? [...profileSet.values()][0] : null,
       profileCount: profileSet.size,
@@ -1104,7 +1268,7 @@ export function AutomationModal({
     const singleProfile = profileCount === 1 && unassigned.length === 0 ? [...profileMap.values()][0] : null;
     const binding = singleProfile ? (action.bindings ?? []).find(b => b.profileId === singleProfile.id) ?? null : null;
     const macroExists = binding ? savedMacros.some(m => m.id === binding.macroId) : false;
-    return { action, profiles: [...profileMap.values()], profileCount, singleProfile, unassigned, binding, macroExists };
+    return { action, profiles: sortDeviceProfilesByName([...profileMap.values()]), profileCount, singleProfile, unassigned, binding, macroExists };
   }, [ctxSub, automationContextMenu, automationContextDeviceTargets, appActions, deviceProfiles, savedMacros]);
 
   /* ── effects ── */
@@ -1181,7 +1345,7 @@ export function AutomationModal({
 
   useEffect(() => {
     if (open) return;
-    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null); setMacroCtxMenu(null); setRowDelayCtxMenu(null);
+    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null); setMacroCtxMenu(null); setRowDelayCtxMenu(null); setMacroSortMenuOpen(false); setSyncTimeModalOpen(false);
     abortPlaybackRef.current?.abort();
   }, [open]);
 
@@ -1243,6 +1407,21 @@ export function AutomationModal({
     };
   }, [rowDelayCtxMenu]);
 
+  useEffect(() => {
+    if (!macroSortMenuOpen) return;
+    const close = (e: Event) => {
+      if ((e.target as HTMLElement | null)?.closest('.automationSavedHeaderCell')) return;
+      setMacroSortMenuOpen(false);
+    };
+    const closeKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMacroSortMenuOpen(false); };
+    window.addEventListener('mousedown', close, true);
+    window.addEventListener('keydown', closeKey);
+    return () => {
+      window.removeEventListener('mousedown', close, true);
+      window.removeEventListener('keydown', closeKey);
+    };
+  }, [macroSortMenuOpen]);
+
   /* automation click + swipe recording */
   useEffect(() => {
     const onAutomationClick = (event: Event) => {
@@ -1253,7 +1432,7 @@ export function AutomationModal({
       const sourceNo = deviceByUdid.get(detail.udid)?.number;
       const now = Date.now();
       const elapsed = lastRecordTimestampRef.current > 0 ? now - lastRecordTimestampRef.current : 0;
-      const delayMs = realtimeRecording && elapsed > 0 ? elapsed : DEFAULT_DELAY_MS;
+      const delayMs = realtimeRecording ? elapsed : DEFAULT_DELAY_MS;
       lastRecordTimestampRef.current = now;
       setRows(prev => [...prev, {
         id: makeId('step'), action: 'touch', delayMs,
@@ -1271,7 +1450,7 @@ export function AutomationModal({
       const sourceNo = deviceByUdid.get(detail.udid)?.number;
       const now = Date.now();
       const elapsed = lastRecordTimestampRef.current > 0 ? now - lastRecordTimestampRef.current : 0;
-      const delayMs = realtimeRecording && elapsed > 0 ? elapsed : DEFAULT_DELAY_MS;
+      const delayMs = realtimeRecording ? elapsed : DEFAULT_DELAY_MS;
       lastRecordTimestampRef.current = now;
       setRows(prev => [...prev, {
         id: makeId('step'), action: 'swipe', delayMs,
@@ -1320,7 +1499,7 @@ export function AutomationModal({
   /* ── callbacks ── */
 
   const closeModal = useCallback(() => {
-    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null); setMacroCtxMenu(null); setRowDelayCtxMenu(null); setSeedingPanelOpen(false);
+    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null); setMacroCtxMenu(null); setRowDelayCtxMenu(null); setMacroSortMenuOpen(false); setSyncTimeModalOpen(false); setSeedingPanelOpen(false);
     abortPlaybackRef.current?.abort(); onClose();
   }, [onClose]);
 
@@ -1479,8 +1658,16 @@ export function AutomationModal({
       defaultValue: currentMacroName || `Macro ${new Date().toLocaleTimeString('vi-VN')}`,
       confirmText: 'Lưu',
       onConfirm: (cleanName) => {
-        const nextMacro: SavedAutomationMacro = { id: makeId('macro'), name: cleanName, rows: cloneRows(rows), updatedAt: Date.now() };
         setSavedMacros(prev => {
+          const existing = prev.find(m => m.name === cleanName);
+          const now = Date.now();
+          const nextMacro: SavedAutomationMacro = {
+            id: makeId('macro'),
+            name: cleanName,
+            rows: cloneRows(rows),
+            createdAt: existing?.createdAt ?? existing?.updatedAt ?? now,
+            updatedAt: now,
+          };
           const next = [nextMacro, ...prev.filter(m => m.name !== cleanName)].slice(0, 50);
           saveSavedMacros(next); return next;
         });
@@ -1570,7 +1757,8 @@ export function AutomationModal({
           : p.udids.filter(u => !targetUdids.includes(u)),
         updatedAt: p.id === profileId ? Date.now() : p.updatedAt,
       }));
-      saveDeviceProfiles(next); return next;
+      const sorted = sortDeviceProfilesByName(next);
+      saveDeviceProfiles(sorted); return sorted;
     });
     const profileName = deviceProfiles.find(p => p.id === profileId)?.name ?? 'profile';
     setStatus(`Đã gán ${targetUdids.length} máy vào profile "${profileName}"`);
@@ -1580,7 +1768,7 @@ export function AutomationModal({
     const newProfile: AutomationDeviceProfile = { id: makeId('profile'), name, udids: [...targetUdids], updatedAt: Date.now() };
     setDeviceProfiles(prev => {
       const cleaned = prev.map(p => ({ ...p, udids: p.udids.filter(u => !targetUdids.includes(u)) }));
-      const next = [...cleaned, newProfile];
+      const next = sortDeviceProfilesByName([...cleaned, newProfile]);
       saveDeviceProfiles(next); return next;
     });
     setStatus(`Đã tạo profile "${name}" với ${targetUdids.length} máy`);
@@ -1588,7 +1776,7 @@ export function AutomationModal({
 
   const renameProfile = useCallback((profileId: string, newName: string) => {
     setDeviceProfiles(prev => {
-      const next = prev.map(p => p.id === profileId ? { ...p, name: newName, updatedAt: Date.now() } : p);
+      const next = sortDeviceProfilesByName(prev.map(p => p.id === profileId ? { ...p, name: newName, updatedAt: Date.now() } : p));
       saveDeviceProfiles(next); return next;
     });
     setAppActions(prev => {
@@ -1605,7 +1793,7 @@ export function AutomationModal({
 
   const deleteProfileImpl = useCallback((profileId: string) => {
     const profileName = deviceProfiles.find(p => p.id === profileId)?.name ?? 'profile';
-    setDeviceProfiles(prev => { const next = prev.filter(p => p.id !== profileId); saveDeviceProfiles(next); return next; });
+    setDeviceProfiles(prev => { const next = sortDeviceProfilesByName(prev.filter(p => p.id !== profileId)); saveDeviceProfiles(next); return next; });
     setAppActions(prev => {
       const next = { ...prev };
       for (const appId of Object.keys(next) as AutomationAppId[]) {
@@ -1618,10 +1806,17 @@ export function AutomationModal({
     setStatus(`Đã xoá profile "${profileName}"`);
   }, [deviceProfiles]);
 
-  const buildMacroRowSteps = useCallback((row: AutomationMacroRow) => rowToSteps(row, {
-    seedingText: row.action === 'seeding' ? pickSeedingContent('macro') : undefined,
-    delayMs: resolveMacroDelayMs(row),
-  }), [pickSeedingContent]);
+  const runMacroRow = useCallback(async (targets: ReturnType<typeof getTargetsByUdids>, row: AutomationMacroRow, controller: AbortController) => {
+    const delayMs = resolveMacroDelayMs(row);
+    if (delayMs > 0) {
+      setStatus(`wait ${delayMs}`);
+      await sleepMs(delayMs, controller.signal);
+      if (controller.signal.aborted) return;
+    }
+    await runScript(targets, rowToSteps(row, {
+      seedingText: row.action === 'seeding' ? pickSeedingContent('macro') : undefined,
+    }), { signal: controller.signal, log: msg => setStatus(msg) });
+  }, [pickSeedingContent]);
 
   const newMacro = useCallback(() => { setRows([]); setCurrentMacroName(''); setStatus('Đã tạo macro mới'); }, []);
 
@@ -1638,11 +1833,11 @@ export function AutomationModal({
         if (controller.signal.aborted) break;
         const targets = getTargetsByUdids(row.targetUdids);
         if (!targets.length) continue;
-        await runScript(targets, buildMacroRowSteps(row), { signal: controller.signal, log: msg => setStatus(msg) });
+        await runMacroRow(targets, row, controller);
       }
       setStatus(controller.signal.aborted ? 'Đã dừng phát' : 'Đã phát xong');
     } finally { setPlaying(false); abortPlaybackRef.current = null; }
-  }, [buildMacroRowSteps, getTargetsByUdids, playing, rows]);
+  }, [getTargetsByUdids, playing, rows, runMacroRow]);
 
   /* ── playAppAction ── */
   const playAppAction = useCallback(async (appId: AutomationAppId, actionId: string) => {
@@ -1692,7 +1887,7 @@ export function AutomationModal({
           for (const row of macro.rows) {
             if (controller.signal.aborted) break;
             if (!isRunnableMacroRow(row)) continue;
-            await runScript(targets, buildMacroRowSteps(row), { signal: controller.signal, log: msg => setStatus(msg) });
+            await runMacroRow(targets, row, controller);
           }
         })());
       }
@@ -1705,7 +1900,7 @@ export function AutomationModal({
           for (const row of macro.rows) {
             if (controller.signal.aborted) break;
             if (!isRunnableMacroRow(row)) continue;
-            await runScript(targets, buildMacroRowSteps(row), { signal: controller.signal, log: msg => setStatus(msg) });
+            await runMacroRow(targets, row, controller);
           }
         })());
       }
@@ -1731,7 +1926,7 @@ export function AutomationModal({
         setStatus(parts.join(' | '));
       }
     } finally { setPlaying(false); abortPlaybackRef.current = null; }
-  }, [appActions, buildMacroRowSteps, deviceProfiles, getTargetsByUdids, playing, savedMacros, selectedList]);
+  }, [appActions, deviceProfiles, getTargetsByUdids, playing, runMacroRow, savedMacros, selectedList]);
 
   if (!open) return null;
 
@@ -1767,6 +1962,10 @@ export function AutomationModal({
                     <button className={`automationArrowBtn${seedingPanelOpen ? ' active' : ''}`} onClick={() => setSeedingPanelOpen(p => !p)} title='Setting'>
                       <Settings size={16} />
                       <span>Setting</span>
+                    </button>
+                    <button className={`automationArrowBtn automationSyncTimeBtn${syncTimeSettings.delayEnabled || syncTimeSettings.offsetEnabled ? ' active' : ''}`} onClick={() => setSyncTimeModalOpen(true)} title='Sync Time'>
+                      <Clock3 size={16} />
+                      <span>Sync Time</span>
                     </button>
                     <button className='automationArrowBtn' onClick={() => setActionRunnerOpen(p => !p)} title={actionRunnerOpen ? 'Ẩn' : 'Hiện'}>
                       {actionRunnerOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -1970,9 +2169,20 @@ export function AutomationModal({
                   </div>
                   <div className='automationSavedTableWrap'>
                     <table className='table table-dark table-sm automationSavedTable'>
-                      <thead><tr><th>File Macro</th></tr></thead>
+                      <thead><tr><th className='automationSavedHeaderCell'>
+                        <button type='button' className='automationSavedHeaderBtn' onClick={() => setMacroSortMenuOpen(v => !v)} title='Sắp xếp File Macro'>
+                          <span>File Macro</span>
+                          <small>{macroSortMode === 'name' ? 'Name' : 'Ngày tạo'}</small>
+                        </button>
+                        {macroSortMenuOpen ? (
+                          <div className='automationMacroSortMenu' onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                            <button type='button' className={`automationMacroSortItem${macroSortMode === 'name' ? ' active' : ''}`} onClick={() => updateMacroSortMode('name')}>Name</button>
+                            <button type='button' className={`automationMacroSortItem${macroSortMode === 'createdAt' ? ' active' : ''}`} onClick={() => updateMacroSortMode('createdAt')}>Ngày tạo</button>
+                          </div>
+                        ) : null}
+                      </th></tr></thead>
                       <tbody>
-                        {savedMacros.map(m => (
+                        {sortedSavedMacros.map(m => (
                           <tr key={m.id}><td>
                             <button className='automationSavedMacroBtn' onClick={() => loadMacro(m)} title={m.name}
                               onContextMenu={e => {
@@ -2230,10 +2440,10 @@ export function AutomationModal({
                       <Plus size={14} /><span>Tạo Profile mới</span>
                     </button>
 
-                    {deviceProfiles.length > 0 ? <div className='automationContextMenuDivider' /> : null}
+                    {sortedDeviceProfiles.length > 0 ? <div className='automationContextMenuDivider' /> : null}
 
                     {/* Each profile → Level 3 actions */}
-                    {deviceProfiles.map(profile => {
+                    {sortedDeviceProfiles.map(profile => {
                       const isCurrentProfile = profile.id === currentProfileId;
                       const nested = ctxSub?.nested;
                       const isL3Open = typeof nested === 'object' && nested !== null && nested.type === 'profileActions' && nested.profileId === profile.id;
@@ -2399,7 +2609,7 @@ export function AutomationModal({
                                         style={{ position: 'absolute', left: 'calc(100% - 4px)', top: '-4px', minWidth: 280, maxWidth: 400, zIndex: 11, maxHeight: 400, overflowY: 'auto', overflowX: 'hidden' }}
                                         onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
                                       >
-                                        {savedMacros.map(macro => (
+                                        {sortedSavedMacros.map(macro => (
                                           <button key={macro.id} type='button'
                                             className='automationContextMenuItem dropdown-item'
                                             disabled={actionSubmenuInfo.binding?.macroId === macro.id}
@@ -2550,6 +2760,14 @@ export function AutomationModal({
       })() : null}
 
       {/* ══════════════════ MODALS (Portal → document.body) ══════════════════ */}
+      {syncTimeModalOpen ? (
+        <SyncTimeSettingsModal
+          settings={syncTimeSettings}
+          delayRange={syncDelayRange}
+          onChange={updateSyncTimeSettings}
+          onClose={() => setSyncTimeModalOpen(false)}
+        />
+      ) : null}
       <ConfirmDeleteModal state={confirmModal} onClose={() => setConfirmModal(null)} />
       <InputModal state={inputModal} onClose={() => setInputModal(null)} />
     </div>
