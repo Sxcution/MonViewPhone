@@ -217,7 +217,9 @@ export function App() {
     selectOnly,
     getTargetsByUdids,
     syncTargets,
-    setSyncTargetsList
+    setSyncTargetsList,
+    selectedGridUdid,
+    clickDevice,
   } = useActive()
 
   const [streamConfig, setStreamConfig] = useState<StreamConfig>(() => {
@@ -1684,6 +1686,7 @@ export function App() {
               !target.closest('.pageContextLayer')
             ) {
               selectOnly(null);
+              clickDevice(null);
               setConnectSelection(new Set());
             }
           }}
@@ -1742,6 +1745,9 @@ export function App() {
                     // Nhường thao tác UI cho các nút riêng
                     if (target.closest('button') || target.tagName.toLowerCase() === 'input') return;
 
+                    // Click registers this device selection
+                    clickDevice(udid);
+
                     // CHỈ CÓ TÁC DỤNG nếu đang đè phím Ctrl/Meta
                     if (!e.ctrlKey && !e.metaKey) return;
 
@@ -1758,6 +1764,7 @@ export function App() {
                   onContextMenu={e => {
                     e.preventDefault()
                     e.stopPropagation()
+                    clickDevice(udid)
                     if (e.ctrlKey || e.metaKey) {
                       selectOnly(udid)
                       setViewerUdid(udid)

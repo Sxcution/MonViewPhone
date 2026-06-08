@@ -95,9 +95,9 @@
       "viewer_stream_config_key": "viewerStreamConfig",
       "draft_config": "draftConfig",
       "draft_viewer_config": "draftViewerConfig",
-      "suppress_loading_overlay": "suppressLoadingOverlay",
       "sub_menu_open": "subMenuOpen",
-      "device_profiles": "deviceProfiles"
+      "device_profiles": "deviceProfiles",
+      "selected_grid_udid": "selectedGridUdid"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
@@ -118,7 +118,8 @@
       "rename_profile": "renameProfile",
       "delete_profile_impl": "deleteProfileImpl",
       "rename_app_action": "renameAppAction",
-      "delete_app_action_impl": "deleteAppActionImpl"
+      "delete_app_action_impl": "deleteAppActionImpl",
+      "click_device": "clickDevice"
     },
     "refs": {
       "rubber_band_ref": "rubberBandRef",

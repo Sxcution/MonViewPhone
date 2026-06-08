@@ -41,12 +41,13 @@ type VisualAlertPanelProps = {
 /* ── Component ──────────────────────────────────────────────────── */
 
 export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanelProps) {
-  const { getCanvasForUdid } = useActive();
+  const { getCanvasForUdid, selectedGridUdid } = useActive();
 
   // Config state
   const [config, setConfig] = useState<VisualAlertConfig>(loadVisualAlertConfig);
   const [expanded, setExpanded] = useState(false);
   const [roiModalOpen, setRoiModalOpen] = useState(false);
+  const [roiSetupUdid, setRoiSetupUdid] = useState<string | null>(null);
 
   // Hook for scan loop
   const { scanning, lastAlert, testScanDevice, testSound } = useVisualAlert({
@@ -148,7 +149,10 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
             <div className="visualAlertActions">
               <button
                 className="visualAlertBtn"
-                onClick={() => setRoiModalOpen(true)}
+                onClick={() => {
+                  setRoiSetupUdid(selectedGridUdid);
+                  setRoiModalOpen(true);
+                }}
                 title="Thiết lập vùng nhận diện"
               >
                 <Crosshair size={13} />
@@ -178,7 +182,7 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
             {/* Settings */}
             <div className="visualAlertSettingsGrid">
               <label className="visualAlertSettingItem">
-                <span>Scan interval</span>
+                <span>Chu kỳ (s)</span>
                 <div className="visualAlertInputWrap">
                   <input
                     type="number"
@@ -191,11 +195,10 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
                       })
                     }
                   />
-                  <span className="visualAlertUnit">giây</span>
                 </div>
               </label>
               <label className="visualAlertSettingItem">
-                <span>Confirm count</span>
+                <span>Lần check</span>
                 <div className="visualAlertInputWrap">
                   <input
                     type="number"
@@ -208,11 +211,10 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
                       })
                     }
                   />
-                  <span className="visualAlertUnit">lần</span>
                 </div>
               </label>
               <label className="visualAlertSettingItem">
-                <span>Cooldown</span>
+                <span>Chờ (s)</span>
                 <div className="visualAlertInputWrap">
                   <input
                     type="number"
@@ -225,7 +227,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
                       })
                     }
                   />
-                  <span className="visualAlertUnit">giây</span>
                 </div>
               </label>
             </div>
@@ -242,6 +243,7 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
       {/* ROI Setup Modal */}
       {roiModalOpen && (
         <MultiROISetupModal
+          setupUdid={roiSetupUdid}
           currentROIs={config.rois}
           redThreshold={config.redThreshold}
           onSave={handleROISave}
@@ -255,6 +257,7 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
 /* ── Multi-ROI Setup Modal ──────────────────────────────────────── */
 
 type MultiROISetupModalProps = {
+  setupUdid: string | null;
   currentROIs: VisualAlertROI[];
   redThreshold: VisualAlertConfig['redThreshold'];
   onSave: (rois: VisualAlertROI[]) => void;
@@ -262,15 +265,16 @@ type MultiROISetupModalProps = {
 };
 
 function MultiROISetupModal({
+  setupUdid,
   currentROIs,
   redThreshold,
   onSave,
   onClose,
 }: MultiROISetupModalProps) {
-  const { getCanvasForUdid, activeUdid } = useActive();
+  const { getCanvasForUdid } = useActive();
 
-  // Dynamic selectedUdid synced with active device grid selection
-  const selectedUdid = activeUdid;
+  // Selected device is fixed at the time of opening the modal
+  const selectedUdid = setupUdid;
   const activeCanvas = selectedUdid ? getCanvasForUdid(selectedUdid) : null;
 
   const [draftROIs, setDraftROIs] = useState<VisualAlertROI[]>(
@@ -515,7 +519,7 @@ function MultiROISetupModal({
           <div className="visualAlertModalBody">
             {!selectedUdid || !activeCanvas ? (
               <div className="visualAlertPickerEmpty">
-                Chọn một máy đang stream ở Grid trước
+                Hãy Chọn 1 Device
               </div>
             ) : (
               <>

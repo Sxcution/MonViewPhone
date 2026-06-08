@@ -77,6 +77,8 @@ type ActiveContextValue = {
   altSoloUdid: string | null;
   setAltSoloUdid: (udid: string | null) => void;
   getIsAltHeld: () => boolean;
+  selectedGridUdid: string | null;
+  clickDevice: (udid: string | null) => void;
 };
 
 const Ctx = createContext<ActiveContextValue | null>(null);
@@ -85,7 +87,12 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
   const devicesRef = useRef<Map<string, DeviceRef>>(new Map());
 
   const [activeUdid, setActiveUdid] = useState<string | null>(null);
+  const [selectedGridUdid, setSelectedGridUdid] = useState<string | null>(null);
   const [registeredUdids, setRegisteredUdids] = useState<string[]>([]);
+
+  const clickDevice = useCallback((udid: string | null) => {
+    setSelectedGridUdid(udid);
+  }, []);
   const [syncAll, setSyncAll] = useState<boolean>(() => {
     try {
       return localStorage.getItem('syncAll') === '1';
@@ -200,6 +207,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
   const unregisterDevice = useCallback((udid: string) => {
     devicesRef.current.delete(udid);
     setActiveUdid((prev) => (prev === udid ? null : prev));
+    setSelectedGridUdid((prev) => (prev === udid ? null : prev));
     setRegisteredUdids(Array.from(devicesRef.current.keys()));
   }, []);
 
@@ -393,6 +401,8 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       altSoloUdid,
       setAltSoloUdid,
       getIsAltHeld,
+      selectedGridUdid,
+      clickDevice,
     }),
     [
       activeUdid,
@@ -415,6 +425,8 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       altSoloUdid,
       setAltSoloUdid,
       getIsAltHeld,
+      selectedGridUdid,
+      clickDevice,
     ],
   );
 

@@ -50,6 +50,7 @@ function TileComponent({
         toggleSyncTarget,
         setAltSoloUdid,
         getIsAltHeld,   // <-- thay isAltHeld bằng getIsAltHeld
+        clickDevice,
     } = useActive();
     const { androidDeviceMap } = useServer();
 
@@ -197,15 +198,17 @@ function TileComponent({
     const onHeaderClick = useCallback(
         (e: React.MouseEvent) => {
             selectOnly(udid);
+            clickDevice(udid);
             canvasRef.current?.focus?.();
         },
-        [selectOnly, udid],
+        [selectOnly, clickDevice, udid],
     );
 
     // When user triggers any tile-specific action, keep focus on this tile.
     const focusThisTile = useCallback(() => {
         selectOnly(udid);
-    }, [selectOnly, udid]);
+        clickDevice(udid);
+    }, [selectOnly, clickDevice, udid]);
 
     const onPointerEnter = useCallback(() => {
         if (isDisconnected || isViewing) return;
@@ -267,7 +270,14 @@ function TileComponent({
                     // Ctrl + Click phải = phóng to device (mở DeviceViewer)
                     if (e.ctrlKey && onViewDevice) {
                         selectOnly(udid);
+                        clickDevice(udid);
                         onViewDevice(udid);
+                    }
+                }}
+                onPointerDown={(e) => {
+                    // Click/pointer down on video frame registers this device selection
+                    if (e.button === 0) {
+                        clickDevice(udid);
                     }
                 }}
             />
