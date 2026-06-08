@@ -5579,6 +5579,7 @@ button:focus-visible {
   margin: 0;
 }
 
+
 .automationFloatingLayer.withCoordinatePanel .automationDialog {
   width: min(420px, calc(100vw - 36px));
 }
@@ -7229,10 +7230,7 @@ textarea:focus,
 /* ── Visual Alert Modal ─────────────────────────────────────────── */
 
 .visualAlertModalBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 27000;
-  background: rgba(0, 0, 0, 0.62);
+  display: none;
 }
 
 .visualAlertModalOverlay {
@@ -7243,6 +7241,7 @@ textarea:focus,
   align-items: center;
   justify-content: center;
   padding: 24px;
+  pointer-events: none; /* Allow click-through to background */
 }
 
 .visualAlertModalCard {
@@ -7258,6 +7257,7 @@ textarea:focus,
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  pointer-events: auto; /* Catch pointer events for the card */
 }
 
 .visualAlertModalCard.visualAlertModalCardWide {

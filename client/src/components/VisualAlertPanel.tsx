@@ -14,7 +14,6 @@ import {
   Crosshair,
   Eye,
   Plus,
-  RotateCcw,
   Trash2,
   Volume2,
   X,
@@ -24,10 +23,8 @@ import {
   type VisualAlertConfig,
   type VisualAlertROI,
   type MultiROIResult,
-  DEFAULT_VISUAL_ALERT_CONFIG,
   loadVisualAlertConfig,
   saveVisualAlertConfig,
-  scanCanvasROI,
   scanCanvasROIs,
   generateROIId,
   playAlertSound,
@@ -68,20 +65,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
     });
   }, []);
 
-  const updateThreshold = useCallback(
-    (patch: Partial<VisualAlertConfig['redThreshold']>) => {
-      setConfig(prev => {
-        const next = {
-          ...prev,
-          redThreshold: { ...prev.redThreshold, ...patch },
-        };
-        saveVisualAlertConfig(next);
-        return next;
-      });
-    },
-    [],
-  );
-
   // Test scan (multi-ROI)
   const [testResult, setTestResult] = useState<string | null>(null);
   const handleTestScan = useCallback(() => {
@@ -110,10 +93,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
   const handleTestSound = useCallback(() => {
     testSound();
   }, [testSound]);
-
-  const handleResetROIs = useCallback(() => {
-    updateConfig({ rois: [] });
-  }, [updateConfig]);
 
   const handleROISave = useCallback(
     (rois: VisualAlertROI[]) => {
@@ -174,14 +153,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
               >
                 <Crosshair size={13} />
                 <span>Thiết lập ROI</span>
-              </button>
-              <button
-                className="visualAlertBtn"
-                onClick={handleResetROIs}
-                title="Xoá tất cả ROI"
-              >
-                <RotateCcw size={13} />
-                <span>Reset</span>
               </button>
               <button
                 className="visualAlertBtn"
@@ -259,61 +230,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
               </label>
             </div>
 
-            {/* Red threshold */}
-            <div className="visualAlertThresholdTitle">Ngưỡng màu đỏ</div>
-            <div className="visualAlertThresholdGrid">
-              <label className="visualAlertThresholdItem">
-                <span>R min</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={255}
-                  value={config.redThreshold.rMin}
-                  onChange={e =>
-                    updateThreshold({ rMin: Math.max(0, Math.min(255, Number(e.target.value) || 180)) })
-                  }
-                />
-              </label>
-              <label className="visualAlertThresholdItem">
-                <span>G max</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={255}
-                  value={config.redThreshold.gMax}
-                  onChange={e =>
-                    updateThreshold({ gMax: Math.max(0, Math.min(255, Number(e.target.value) || 100)) })
-                  }
-                />
-              </label>
-              <label className="visualAlertThresholdItem">
-                <span>B max</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={255}
-                  value={config.redThreshold.bMax}
-                  onChange={e =>
-                    updateThreshold({ bMax: Math.max(0, Math.min(255, Number(e.target.value) || 100)) })
-                  }
-                />
-              </label>
-              <label className="visualAlertThresholdItem">
-                <span>Min px</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={10000}
-                  value={config.redThreshold.minPixels}
-                  onChange={e =>
-                    updateThreshold({
-                      minPixels: Math.max(1, Math.min(10000, Number(e.target.value) || 12)),
-                    })
-                  }
-                />
-              </label>
-            </div>
-
             {lastAlert && (
               <div className="visualAlertLastAlert">
                 Lần cuối: {lastAlert.message} ({new Date(lastAlert.timestamp).toLocaleTimeString()})
@@ -326,15 +242,12 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
       {/* ROI Setup Modal */}
       {roiModalOpen && (
         <MultiROISetupModal
-          registeredUdids={registeredUdids}
-          orderMap={orderMap}
           currentROIs={config.rois}
           redThreshold={config.redThreshold}
           onSave={handleROISave}
           onClose={() => setRoiModalOpen(false)}
         />
       )}
-
     </>
   );
 }
@@ -342,8 +255,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
 /* ── Multi-ROI Setup Modal ──────────────────────────────────────── */
 
 type MultiROISetupModalProps = {
-  registeredUdids: string[];
-  orderMap: Map<string, number>;
   currentROIs: VisualAlertROI[];
   redThreshold: VisualAlertConfig['redThreshold'];
   onSave: (rois: VisualAlertROI[]) => void;
@@ -351,16 +262,17 @@ type MultiROISetupModalProps = {
 };
 
 function MultiROISetupModal({
-  registeredUdids,
-  orderMap,
   currentROIs,
   redThreshold,
   onSave,
   onClose,
 }: MultiROISetupModalProps) {
-  const { getCanvasForUdid } = useActive();
+  const { getCanvasForUdid, activeUdid } = useActive();
 
-  const [selectedUdid, setSelectedUdid] = useState<string | null>(null);
+  // Dynamic selectedUdid synced with active device grid selection
+  const selectedUdid = activeUdid;
+  const activeCanvas = selectedUdid ? getCanvasForUdid(selectedUdid) : null;
+
   const [draftROIs, setDraftROIs] = useState<VisualAlertROI[]>(
     currentROIs.map(r => ({ ...r })),
   );
@@ -370,16 +282,50 @@ function MultiROISetupModal({
   const [testResults, setTestResults] = useState<MultiROIResult | null>(null);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
 
+  // Offset position for dragging
+  const [modalPos, setModalPos] = useState({ x: 0, y: 0 });
+  const modalDragRef = useRef<{ startX: number; startY: number; startOffsetX: number; startOffsetY: number } | null>(null);
+
+  const handleHeaderPointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    const target = e.currentTarget as HTMLElement;
+    target.setPointerCapture(e.pointerId);
+    modalDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startOffsetX: modalPos.x,
+      startOffsetY: modalPos.y,
+    };
+  }, [modalPos]);
+
+  const handleHeaderPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!modalDragRef.current) return;
+    const dx = e.clientX - modalDragRef.current.startX;
+    const dy = e.clientY - modalDragRef.current.startY;
+    setModalPos({
+      x: modalDragRef.current.startOffsetX + dx,
+      y: modalDragRef.current.startOffsetY + dy,
+    });
+  }, []);
+
+  const handleHeaderPointerUp = useCallback((e: React.PointerEvent) => {
+    if (!modalDragRef.current) return;
+    const target = e.currentTarget as HTMLElement;
+    try {
+      target.releasePointerCapture(e.pointerId);
+    } catch {}
+    modalDragRef.current = null;
+  }, []);
+
   // Canvas preview ref
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Draw device canvas snapshot to preview
   const drawPreview = useCallback(() => {
-    if (!selectedUdid) return;
-    const srcCanvas = getCanvasForUdid(selectedUdid);
+    if (!selectedUdid || !activeCanvas) return;
     const dst = previewCanvasRef.current;
-    if (!srcCanvas || !dst) return;
+    if (!dst) return;
 
     const ctx = dst.getContext('2d');
     if (!ctx) return;
@@ -388,7 +334,7 @@ function MultiROISetupModal({
     // Use parent width as base (modal body), not container itself (which may auto-size)
     const parentW = container?.parentElement?.clientWidth ?? 500;
     const maxW = parentW - 2; // account for border
-    const aspect = srcCanvas.height / srcCanvas.width;
+    const aspect = activeCanvas.height / activeCanvas.width;
 
     // Cap preview height to ~48vh so the phone screen is fully visible
     const maxH = Math.round(window.innerHeight * 0.48);
@@ -402,21 +348,21 @@ function MultiROISetupModal({
 
     dst.width = previewW;
     dst.height = previewH;
-    ctx.drawImage(srcCanvas, 0, 0, previewW, previewH);
+    ctx.drawImage(activeCanvas, 0, 0, previewW, previewH);
 
     // Sync container size so ROI overlay percentages align with canvas
     if (container) {
       container.style.width = `${previewW}px`;
     }
-  }, [selectedUdid, getCanvasForUdid]);
+  }, [selectedUdid, activeCanvas]);
 
   // Draw preview when device selected, and refresh periodically
   useEffect(() => {
-    if (!selectedUdid) return;
+    if (!selectedUdid || !activeCanvas) return;
     drawPreview();
     const timer = setInterval(drawPreview, 1000);
     return () => clearInterval(timer);
-  }, [selectedUdid, drawPreview]);
+  }, [selectedUdid, activeCanvas, drawPreview]);
 
   // ROI drag state
   const dragRef = useRef<{
@@ -522,38 +468,32 @@ function MultiROISetupModal({
 
   // Test scan inside modal (multi-ROI)
   const handleTestInModal = useCallback(() => {
-    if (!selectedUdid || !draftROIs.length) return;
-    const canvas = getCanvasForUdid(selectedUdid);
-    if (!canvas) {
-      setTestResults(null);
-      return;
-    }
-    const result = scanCanvasROIs(canvas, draftROIs, redThreshold);
+    if (!selectedUdid || !activeCanvas || !draftROIs.length) return;
+    const result = scanCanvasROIs(activeCanvas, draftROIs, redThreshold);
     setTestResults(result);
     setTimeout(() => setTestResults(null), 8000);
-  }, [selectedUdid, getCanvasForUdid, draftROIs, redThreshold]);
-
-  // Sort devices by number
-  const sortedDevices = useMemo(() => {
-    return registeredUdids
-      .map(udid => ({
-        udid,
-        number: orderMap.get(udid) ?? 0,
-      }))
-      .sort((a, b) => a.number - b.number);
-  }, [registeredUdids, orderMap]);
+  }, [selectedUdid, activeCanvas, draftROIs, redThreshold]);
 
   // Active ROI object
   const activeROI = draftROIs.find(r => r.id === activeROIId) ?? null;
 
   return createPortal(
     <>
-      {/* visualAlertModal : Modal thiết lập Multi-ROI */}
-      <div className="visualAlertModalBackdrop" onClick={onClose} />
-      <div className="visualAlertModalOverlay" onClick={onClose}>
-        <div className="visualAlertModalCard visualAlertModalCardWide" onClick={e => e.stopPropagation()}>
+      <div className="visualAlertModalOverlay">
+        <div
+          className="visualAlertModalCard visualAlertModalCardWide"
+          style={{
+            transform: `translate(${modalPos.x}px, ${modalPos.y}px)`,
+          }}
+        >
           {/* Header */}
-          <div className="visualAlertModalHeader">
+          <div
+            className="visualAlertModalHeader"
+            style={{ cursor: 'move', userSelect: 'none' }}
+            onPointerDown={handleHeaderPointerDown}
+            onPointerMove={handleHeaderPointerMove}
+            onPointerUp={handleHeaderPointerUp}
+          >
             <h5 className="visualAlertModalTitle">
               <Crosshair size={16} />
               <span>Thiết lập vùng nhận diện</span>
@@ -573,38 +513,12 @@ function MultiROISetupModal({
 
           {/* Body */}
           <div className="visualAlertModalBody">
-            {!selectedUdid ? (
-              <>
-                {/* Device picker */}
-                <div className="visualAlertPickerTitle">
-                  Chọn 1 máy mẫu đang online
-                </div>
-                {sortedDevices.length === 0 ? (
-                  <div className="visualAlertPickerEmpty">
-                    Không có máy online
-                  </div>
-                ) : (
-                  <div className="visualAlertPickerGrid">
-                    {sortedDevices.map(d => (
-                      <button
-                        key={d.udid}
-                        className="visualAlertPickerDevice"
-                        onClick={() => setSelectedUdid(d.udid)}
-                        title={d.udid}
-                      >
-                        {String(d.number).padStart(2, '0')}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
+            {!selectedUdid || !activeCanvas ? (
+              <div className="visualAlertPickerEmpty">
+                Chọn một máy đang stream ở Grid trước
+              </div>
             ) : (
               <>
-                {/* Guide text */}
-                <div className="visualAlertGuideText">
-                  Chỉ khoanh đúng ô badge đỏ, không khoanh vùng avatar để tránh nhận nhầm ảnh màu đỏ
-                </div>
-
                 {/* Canvas preview + ROI overlays */}
                 <div className="visualAlertPreviewWrap" ref={containerRef}>
                   <canvas
@@ -616,7 +530,6 @@ function MultiROISetupModal({
                   {/* Render all ROI overlays */}
                   {draftROIs.map(roi => {
                     const isActive = roi.id === activeROIId;
-                    const isLarge = roi.w * roi.h > 0.05;
                     return (
                       <div
                         key={roi.id}
@@ -633,10 +546,6 @@ function MultiROISetupModal({
                       >
                         {/* ROI label */}
                         <span className="visualAlertROILabel">{roi.name}</span>
-                        {/* Large ROI warning */}
-                        {isLarge && isActive && (
-                          <span className="visualAlertROILargeWarn">⚠</span>
-                        )}
                         {/* Resize handle only for active ROI */}
                         {isActive && (
                           <div
@@ -656,9 +565,6 @@ function MultiROISetupModal({
                     <span>y: {activeROI.y.toFixed(3)}</span>
                     <span>w: {activeROI.w.toFixed(3)}</span>
                     <span>h: {activeROI.h.toFixed(3)}</span>
-                    {activeROI.w * activeROI.h > 0.05 && (
-                      <span className="visualAlertROIWarning" style={{ marginLeft: 4 }}>⚠ Vùng quá lớn</span>
-                    )}
                   </div>
                 )}
 
@@ -752,12 +658,6 @@ function MultiROISetupModal({
                 <div className="visualAlertModalActions">
                   <button
                     className="visualAlertModalBtn secondary"
-                    onClick={() => setSelectedUdid(null)}
-                  >
-                    ← Chọn máy khác
-                  </button>
-                  <button
-                    className="visualAlertModalBtn secondary"
                     onClick={handleTestInModal}
                     disabled={!draftROIs.length}
                   >
@@ -773,10 +673,9 @@ function MultiROISetupModal({
                   </button>
                   <button
                     className="visualAlertModalBtn secondary"
-                    onClick={() => { setDraftROIs([]); setActiveROIId(null); }}
+                    onClick={onClose}
                   >
-                    <RotateCcw size={13} />
-                    Reset
+                    Đóng
                   </button>
                   <button
                     className="visualAlertModalBtn primary"
