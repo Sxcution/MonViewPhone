@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { encodeKeycodeMessage, encodeTextMessage, encodeSetClipboardMessage, KeyEventAction } from '@/lib/control';
 import { AndroidKeycode, KeyToCodeMap } from '@/lib/keyEvent';
 import { useActive } from '@/context/ActiveContext';
+import { matchesHotkey } from '@/lib/syncTimeSettings';
 
 type GlobalWithToggle = typeof window & { __disableDirectKeyboard?: boolean };
 const PASTE_SINK_ID = '__scrcpy_paste_sink';
@@ -119,6 +120,15 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
+      // Don't block F12 key (allow browser dev tools)
+      if (e.code === 'F12') return;
+
+      // Don't block the assigned Sync Time hotkey
+      const syncTimeHotkey = localStorage.getItem('monviewphone:sync-time-hotkey') || '';
+      if (syncTimeHotkey && matchesHotkey(e, syncTimeHotkey)) {
+        return;
+      }
+
       if (!enabled || (window as GlobalWithToggle).__disableDirectKeyboard) return;
 
       // Skip when user is typing in any input/textarea/select
@@ -186,6 +196,13 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'F12') return;
+
+      const syncTimeHotkey = localStorage.getItem('monviewphone:sync-time-hotkey') || '';
+      if (syncTimeHotkey && matchesHotkey(e, syncTimeHotkey)) {
+        return;
+      }
+
       if (!enabled || (window as GlobalWithToggle).__disableDirectKeyboard) return;
 
       const ae = document.activeElement;

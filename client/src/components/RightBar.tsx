@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import { useActive } from '@/context/ActiveContext';
 import { AndroidKeycode } from '@/lib/keyEvent';
 import { useDirectKeyboard } from '@/hooks/useDirectKeyboard';
@@ -19,7 +19,16 @@ import {
   Volume1,
   Volume2,
   VolumeX,
+  Clock3,
 } from 'lucide-react';
+import {
+  loadSyncTimeSettings,
+  saveSyncTimeSettings,
+  syncTimeDelayRangeMs,
+  type SyncTimeSettings,
+  SYNC_TIME_SETTINGS_EVENT,
+} from '@/lib/syncTimeSettings';
+import { SyncTimeSettingsModal } from './SyncTimeSettingsModal';
 
 type RightBarProps = {
   hidden?: boolean;
@@ -43,6 +52,23 @@ export function RightBar({ hidden, showExpand, onExpand, hideSyncButtons }: Righ
   const { t } = useI18n();
   const { wsServer } = useServer();
   const [installStatus, setInstallStatus] = useState<string | null>(null);
+
+  const [syncTimeOpen, setSyncTimeOpen] = useState(false);
+  const [syncTimeSettings, setSyncTimeSettings] = useState<SyncTimeSettings>(loadSyncTimeSettings);
+  const syncDelayRange = useMemo(() => syncTimeDelayRangeMs(syncTimeSettings.intervalSec), [syncTimeSettings.intervalSec]);
+
+  const updateSyncTimeSettings = useCallback((patch: Partial<SyncTimeSettings>) => {
+    setSyncTimeSettings(prev => saveSyncTimeSettings({ ...prev, ...patch }));
+  }, []);
+
+  useEffect(() => {
+    const handleUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<SyncTimeSettings>;
+      setSyncTimeSettings(customEvent.detail);
+    };
+    window.addEventListener(SYNC_TIME_SETTINGS_EVENT, handleUpdate);
+    return () => window.removeEventListener(SYNC_TIME_SETTINGS_EVENT, handleUpdate);
+  }, []);
 
   const kbBarRef = useRef<HTMLDivElement | null>(null);
   const { manualPaste } = useDirectKeyboard(true, kbBarRef.current);
@@ -179,9 +205,9 @@ export function RightBar({ hidden, showExpand, onExpand, hideSyncButtons }: Righ
 
         <div className="rb-sep" />
 
-        <button className="rb-btn" title={t('Chụp màn hình (tile active)')} onClick={() => screenshotActiveCanvas()}>
+        <button className="rb-btn" title={t('Sync Time')} onClick={() => setSyncTimeOpen(true)}>
           <span className="rb-icon">
-            <Camera size={16} strokeWidth={1.8} />
+            <Clock3 size={16} strokeWidth={1.8} />
           </span>
         </button>
         <button className="rb-btn" title={t('Cài APK (device active)')} onClick={triggerApkPicker}>
@@ -208,7 +234,14 @@ export function RightBar({ hidden, showExpand, onExpand, hideSyncButtons }: Righ
         {/* Locale switch moved to header */}
       </div>
 
-      {/* Sync modal removed; sync handled via right config panel */}
+      {syncTimeOpen ? (
+        <SyncTimeSettingsModal
+          settings={syncTimeSettings}
+          delayRange={syncDelayRange}
+          onChange={updateSyncTimeSettings}
+          onClose={() => setSyncTimeOpen(false)}
+        />
+      ) : null}
     </>
   );
 }

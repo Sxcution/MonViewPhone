@@ -96,11 +96,13 @@ function randomSignedOffset(settings: SyncTimeSettings) {
   return Math.random() < 0.5 ? -magnitude : magnitude;
 }
 
-function shuffleTargets<T>(items: T[]) {
+function shuffleTargets<T>(items: T[]): T[] {
   const out = [...items];
   for (let i = out.length - 1; i > 0; i--) {
-    const j = randomInt(0, i);
-    [out[i], out[j]] = [out[j], out[i]];
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = out[i];
+    out[i] = out[j];
+    out[j] = temp;
   }
   return out;
 }
@@ -135,8 +137,12 @@ export function attachTouchControls(
     if (isolated) return { source: makeTouchTarget(source, true), followers: [] };
 
     const rawFollowers = targets.filter((_, index) => index !== (sourceIndex >= 0 ? sourceIndex : 0));
-    const followers = (settings.randomOrder ? shuffleTargets(rawFollowers) : rawFollowers)
-      .map(target => makeTouchTarget(target, false));
+    console.log('[SyncTime] settings:', settings);
+    console.log('[SyncTime] rawFollowers:', rawFollowers.map(f => f.udid));
+    const shuffledRaw = settings.randomOrder ? shuffleTargets(rawFollowers) : rawFollowers;
+    console.log('[SyncTime] final queue:', shuffledRaw.map(f => f.udid));
+    
+    const followers = shuffledRaw.map(target => makeTouchTarget(target, false));
     return { source: makeTouchTarget(source, true), followers };
   }
 
@@ -204,8 +210,14 @@ export function attachTouchControls(
   async function replayDelayedFollowers(st: ActivePointerState, endXY: { x01: number; y01: number }, movedPx: number, durationMs: number) {
     if (!st.delayedFollowers.length) return;
     const { minMs, maxMs } = syncTimeDelayRangeMs(st.syncSettings.intervalSec);
+    
     for (const follower of st.delayedFollowers) {
-      await sleep(randomInt(minMs, maxMs));
+      if (st.syncSettings.intervalEnabled) {
+        await sleep(randomInt(minMs, maxMs));
+      } else {
+        // Run sequentially with a tiny 100ms gap when interval delay is disabled
+        await sleep(100);
+      }
       if (movedPx <= 8) {
         await replayDelayedTap(follower, st.pid, endXY.x01, endXY.y01);
       } else {

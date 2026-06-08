@@ -110,8 +110,18 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
     setNewOrderViewer('');
   };
 
-  const viewerAspectRef = useRef<number>(9 / 16);
-  const [viewerAspect, setViewerAspect] = useState<number>(9 / 16);
+  const initialAspect = useMemo(() => {
+    try {
+      const src = getCanvasForUdid(udid);
+      if (src && src.width > 0 && src.height > 0) {
+        return src.width / src.height;
+      }
+    } catch {}
+    return 9 / 16;
+  }, [udid, getCanvasForUdid]);
+
+  const viewerAspectRef = useRef<number>(initialAspect);
+  const [viewerAspect, setViewerAspect] = useState<number>(initialAspect);
   const bodyRef = useRef<HTMLDivElement | null>(null);
 
   const sendKeyToThis = (keycode: number) => {
@@ -207,7 +217,7 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
           dst.height = src.height;
         }
         const ratio = src.width / src.height;
-        if (Number.isFinite(ratio) && Math.abs(ratio - viewerAspectRef.current) > 0.001) {
+        if (Number.isFinite(ratio) && Math.abs(ratio - viewerAspectRef.current) > 0.05) {
           viewerAspectRef.current = ratio;
           setViewerAspect(ratio);
         }

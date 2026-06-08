@@ -30,12 +30,7 @@ import {
   type AutomationStep,
 } from '@/lib/automation';
 import { AndroidKeycode } from '@/lib/keyEvent';
-import {
-  loadSyncTimeSettings,
-  saveSyncTimeSettings,
-  syncTimeDelayRangeMs,
-  type SyncTimeSettings,
-} from '@/lib/syncTimeSettings';
+
 
 /* ── types ─────────────────────────────────────────────────────── */
 
@@ -854,98 +849,7 @@ function InputModal({ state, onClose }: { state: InputModalState; onClose: () =>
   return <InputModalInner key={state.key} state={state} onClose={onClose} />;
 }
 
-function SyncTimeSettingsModal({
-  settings,
-  delayRange,
-  onChange,
-  onClose,
-}: {
-  settings: SyncTimeSettings;
-  delayRange: { minMs: number; maxMs: number };
-  onChange: (patch: Partial<SyncTimeSettings>) => void;
-  onClose: () => void;
-}) {
-  const parseNumberInput = (value: string) => {
-    const n = Number(value.replace(',', '.'));
-    return Number.isFinite(n) ? n : null;
-  };
 
-  const handleNumberChange = (value: string, key: 'intervalSec' | 'offsetMinPx' | 'offsetMaxPx') => {
-    const n = parseNumberInput(value);
-    if (n == null) return;
-    onChange({ [key]: n } as Partial<SyncTimeSettings>);
-  };
-
-  return createPortal(
-    <div className='automationSyncTimeOverlay'>
-      <div className='automationSyncTimeCard' role='dialog' aria-modal='false' onMouseDown={e => e.stopPropagation()}>
-        <div className='automationSyncTimeHeader'>
-          <div className='automationSyncTimeTitle'><Clock3 size={16} /><span>Sync Time</span></div>
-          <button type='button' className='visualAlertModalCloseBtn' aria-label='Close Sync Time' onClick={onClose}><X size={15} /></button>
-        </div>
-        <div className='automationSyncTimeBody'>
-          <div className='automationSyncTimeRow'>
-            <span>Độ Trễ</span>
-            <button type='button' className={`visualAlertToggle${settings.delayEnabled ? ' on' : ''}`} onClick={() => onChange({ delayEnabled: !settings.delayEnabled })}>
-              <span className='visualAlertToggleKnob' />
-            </button>
-          </div>
-          <div className='automationSyncTimeRow'>
-            <span>Loại</span>
-            <div className='automationSyncTimeToggleGroup'>
-              <button type='button' className={`automationSyncTimeModeBtn${settings.randomOrder ? ' active' : ''}`} onClick={() => onChange({ randomOrder: !settings.randomOrder })}>Ngẫu Nhiên</button>
-              <button type='button' className={`visualAlertToggle${settings.randomOrder ? ' on' : ''}`} onClick={() => onChange({ randomOrder: !settings.randomOrder })}>
-                <span className='visualAlertToggleKnob' />
-              </button>
-            </div>
-          </div>
-          <label className='automationSyncTimeField'>
-            <span>Khoảng thời gian</span>
-            <div className='automationSyncTimeInputWrap'>
-              <input
-                className='automationSyncTimeInput'
-                type='text'
-                inputMode='decimal'
-                value={String(settings.intervalSec)}
-                onChange={e => handleNumberChange(e.target.value, 'intervalSec')}
-              />
-              <small>giây · {Math.round(delayRange.minMs / 1000)}-{Math.round(delayRange.maxMs / 1000)}s</small>
-            </div>
-          </label>
-          <div className='automationSyncTimeRow'>
-            <span>Độ Lệch</span>
-            <button type='button' className={`visualAlertToggle${settings.offsetEnabled ? ' on' : ''}`} onClick={() => onChange({ offsetEnabled: !settings.offsetEnabled })}>
-              <span className='visualAlertToggleKnob' />
-            </button>
-          </div>
-          <div className='automationSyncTimePixelGrid'>
-            <label className='automationSyncTimeField'>
-              <span>Pixel</span>
-              <input
-                className='automationSyncTimeInput'
-                type='text'
-                inputMode='numeric'
-                value={String(settings.offsetMinPx)}
-                onChange={e => handleNumberChange(e.target.value, 'offsetMinPx')}
-              />
-            </label>
-            <label className='automationSyncTimeField'>
-              <span>Pixel</span>
-              <input
-                className='automationSyncTimeInput'
-                type='text'
-                inputMode='numeric'
-                value={String(settings.offsetMaxPx)}
-                onChange={e => handleNumberChange(e.target.value, 'offsetMaxPx')}
-              />
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
 
 /* ── component ─────────────────────────────────────────────────── */
 
@@ -975,8 +879,6 @@ export function AutomationModal({
   const [rowDelayCtxMenu, setRowDelayCtxMenu] = useState<RowDelayCtxMenuState>(null);
   const [macroSortMode, setMacroSortMode] = useState<MacroSortMode>(loadMacroSortMode);
   const [macroSortMenuOpen, setMacroSortMenuOpen] = useState(false);
-  const [syncTimeModalOpen, setSyncTimeModalOpen] = useState(false);
-  const [syncTimeSettings, setSyncTimeSettings] = useState<SyncTimeSettings>(loadSyncTimeSettings);
   const [currentMacroName, setCurrentMacroName] = useState('');
   const [position, setPosition] = useState({ x: 120, y: 80 });
   const recordingRef = useRef(false);
@@ -1206,16 +1108,10 @@ export function AutomationModal({
   const allAutomationDevicesSelected = devices.length > 0 && devices.every(d => selectedSet.has(d.udid));
   const sortedDeviceProfiles = useMemo(() => sortDeviceProfilesByName(deviceProfiles), [deviceProfiles]);
   const sortedSavedMacros = useMemo(() => sortMacros(savedMacros, macroSortMode), [savedMacros, macroSortMode]);
-  const syncDelayRange = useMemo(() => syncTimeDelayRangeMs(syncTimeSettings.intervalSec), [syncTimeSettings.intervalSec]);
-
   const updateMacroSortMode = useCallback((mode: MacroSortMode) => {
     setMacroSortMode(mode);
     saveMacroSortMode(mode);
     setMacroSortMenuOpen(false);
-  }, []);
-
-  const updateSyncTimeSettings = useCallback((patch: Partial<SyncTimeSettings>) => {
-    setSyncTimeSettings(prev => saveSyncTimeSettings({ ...prev, ...patch }));
   }, []);
 
   /* ── context menu computed values ── */
@@ -1345,7 +1241,7 @@ export function AutomationModal({
 
   useEffect(() => {
     if (open) return;
-    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null); setMacroCtxMenu(null); setRowDelayCtxMenu(null); setMacroSortMenuOpen(false); setSyncTimeModalOpen(false);
+    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null); setMacroCtxMenu(null); setRowDelayCtxMenu(null); setMacroSortMenuOpen(false);
     abortPlaybackRef.current?.abort();
   }, [open]);
 
@@ -1499,7 +1395,7 @@ export function AutomationModal({
   /* ── callbacks ── */
 
   const closeModal = useCallback(() => {
-    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null); setMacroCtxMenu(null); setRowDelayCtxMenu(null); setMacroSortMenuOpen(false); setSyncTimeModalOpen(false); setSeedingPanelOpen(false);
+    setRecording(false); setActionOverlayOpen(null); setAutomationContextMenu(null); setMacroCtxMenu(null); setRowDelayCtxMenu(null); setMacroSortMenuOpen(false); setSeedingPanelOpen(false);
     abortPlaybackRef.current?.abort(); onClose();
   }, [onClose]);
 
@@ -1962,10 +1858,6 @@ export function AutomationModal({
                     <button className={`automationArrowBtn${seedingPanelOpen ? ' active' : ''}`} onClick={() => setSeedingPanelOpen(p => !p)} title='Setting'>
                       <Settings size={16} />
                       <span>Setting</span>
-                    </button>
-                    <button className={`automationArrowBtn automationSyncTimeBtn${syncTimeSettings.delayEnabled || syncTimeSettings.offsetEnabled ? ' active' : ''}`} onClick={() => setSyncTimeModalOpen(true)} title='Sync Time'>
-                      <Clock3 size={16} />
-                      <span>Sync Time</span>
                     </button>
                     <button className='automationArrowBtn' onClick={() => setActionRunnerOpen(p => !p)} title={actionRunnerOpen ? 'Ẩn' : 'Hiện'}>
                       {actionRunnerOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -2759,15 +2651,6 @@ export function AutomationModal({
         );
       })() : null}
 
-      {/* ══════════════════ MODALS (Portal → document.body) ══════════════════ */}
-      {syncTimeModalOpen ? (
-        <SyncTimeSettingsModal
-          settings={syncTimeSettings}
-          delayRange={syncDelayRange}
-          onChange={updateSyncTimeSettings}
-          onClose={() => setSyncTimeModalOpen(false)}
-        />
-      ) : null}
       <ConfirmDeleteModal state={confirmModal} onClose={() => setConfirmModal(null)} />
       <InputModal state={inputModal} onClose={() => setInputModal(null)} />
     </div>

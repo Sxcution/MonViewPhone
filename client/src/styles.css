@@ -2251,9 +2251,9 @@ canvas {
   padding: 10px;
 }
 
-.rcpDropdownStatic > .rcpToggleRow,
-.rcpDropdownStatic > .rcpSliderRow,
-.rcpDropdownStatic > .modalActions {
+.rcpDropdownStatic>.rcpToggleRow,
+.rcpDropdownStatic>.rcpSliderRow,
+.rcpDropdownStatic>.modalActions {
   margin-left: 2px;
   margin-right: 2px;
 }
@@ -4900,7 +4900,8 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 8px;
+  height: 28px;
+  padding: 0 8px;
   background: #1a1a2e;
   border: 1px solid #2a2a4a;
   border-radius: 6px;
@@ -4909,6 +4910,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   font-size: 12px;
   transition: background 0.15s, border-color 0.15s;
   text-align: left;
+  box-sizing: border-box;
 }
 
 .rcpSavedGroupBtn:hover {
@@ -4936,7 +4938,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 
 .rcpSavedGroupDel {
   width: 24px;
-  height: 24px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4948,6 +4950,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   font-size: 10px;
   flex-shrink: 0;
   transition: background 0.15s;
+  box-sizing: border-box;
 }
 
 .rcpSavedGroupDel:hover {
@@ -4994,8 +4997,8 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 
 /* Nút dropdown ▾ */
 .rcpSavedGroupExpand {
-  width: 22px;
-  height: 26px;
+  width: 24px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5004,9 +5007,10 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   border-radius: 4px;
   cursor: pointer;
   color: #666;
-  font-size: 11px;
+  font-size: 25px;
   flex-shrink: 0;
   transition: all 0.15s;
+  box-sizing: border-box;
 }
 
 .rcpSavedGroupExpand:hover {
@@ -8154,4 +8158,179 @@ textarea:focus,
 
 .viewerBody.viewMode .viewerCanvas {
   border-radius: 28px !important;
+}
+
+/* ======= Sync Time Settings Modal ======= */
+.syncTimeOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  pointer-events: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.syncTimeCard {
+  position: fixed;
+  pointer-events: auto;
+  width: 340px;
+  background: var(--md-card);
+  border: 1px solid var(--md-border);
+  border-radius: 8px;
+  box-shadow: var(--md-shadow-panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.syncTimeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--md-border);
+  padding: 10px 14px;
+  cursor: move;
+}
+
+.syncTimeTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--md-text);
+  font-size: 13px;
+}
+
+.syncTimeBody {
+  position: relative;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* The vertical gray line separator */
+.syncTimeLine {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 125px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.syncTimeRow {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  position: relative;
+}
+
+.syncTimeLabel {
+  width: 125px;
+  font-size: 12px;
+  color: var(--md-text);
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 12px;
+  box-sizing: border-box;
+}
+
+.syncTimeControls {
+  padding-left: 8px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.syncTimeInput {
+  width: 45px;
+  height: 24px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--md-border);
+  border-radius: 4px;
+  color: var(--md-text);
+  font-size: 12px;
+  outline: none;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.syncTimeInput.offsetInput {
+  width: 26px !important;
+}
+
+.syncTimeInput:focus {
+  border-color: var(--md-blue);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.syncTimeInput:disabled {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.03) !important;
+  color: var(--md-muted-2) !important;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.syncTimeUnit {
+  font-size: 12px;
+  color: var(--md-muted);
+}
+
+.syncTimeRangeDash {
+  font-size: 12px;
+  color: var(--md-muted);
+}
+
+/* Active buttons and offline device grid items */
+.rcpQuickBtn.active-sync {
+  background: linear-gradient(135deg, #1677ff, #0958d9) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.35) !important;
+}
+
+.rb-btn.active-sync {
+  background: rgba(22, 119, 255, 0.2) !important;
+  color: #38bdf8 !important;
+  border-color: rgba(22, 119, 255, 0.4) !important;
+}
+
+.rcpGridItem.offline {
+  opacity: 0.65;
+  background: rgba(40, 40, 45, 0.4) !important;
+  color: #999 !important;
+  border-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.rcpGridItem.offline.on {
+  border-color: rgba(140, 140, 140, 0.5) !important;
+  background: rgba(60, 60, 65, 0.6) !important;
+  color: #ccc !important;
+  box-shadow: 0 8px 20px rgba(100, 100, 100, 0.12), 0 0 0 1px rgba(140, 140, 140, 0.25) inset !important;
+}
+
+/* Sidebar 12 Columns Device Grid layout */
+.rcpGrid12 {
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  gap: 2px !important;
+}
+
+.rcpGrid12 .rcpGridItem {
+  padding: 2px 0 !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  border-radius: 4px !important;
+  height: 18px !important;
+  min-width: 0 !important;
+  gap: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }

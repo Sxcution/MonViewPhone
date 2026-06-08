@@ -18,12 +18,22 @@ import {
   runAdbCommandApi
 } from '@/lib/serverApi'
 import { SyncPanel } from '@/components/SyncPanel'
+import { SyncTimeSettingsModal } from '@/components/SyncTimeSettingsModal'
+import {
+  loadSyncTimeSettings,
+  saveSyncTimeSettings,
+  syncTimeDelayRangeMs,
+  type SyncTimeSettings,
+  SYNC_TIME_SETTINGS_EVENT,
+  matchesHotkey,
+} from '@/lib/syncTimeSettings'
 import { useTileOrder } from '@/store/useTileOrder'
 import {
   Bot,
   Camera,
   ChevronDown,
   ChevronUp,
+  Clock3,
   MonitorOff,
   Pin,
   PinOff,
@@ -161,7 +171,7 @@ type QuickActionId =
   | 'mute'
   | 'soundOn'
   | 'maxVolume'
-  | 'screenshot'
+  | 'syncTime'
   | 'automation'
 
 const DEFAULT_QUICK_ACTION_ORDER: QuickActionId[] = [
@@ -169,7 +179,7 @@ const DEFAULT_QUICK_ACTION_ORDER: QuickActionId[] = [
   'mute',
   'soundOn',
   'maxVolume',
-  'screenshot',
+  'syncTime',
   'automation'
 ]
 
@@ -346,6 +356,102 @@ export function App() {
       return next;
     });
   }, []);
+
+  // ===== SYNC TIME SETTINGS STATE AND EVENT HANDLERS =====
+  const [syncTimeModalOpen, setSyncTimeModalOpen] = useState(false);
+  const [syncTimeSettings, setSyncTimeSettings] = useState<SyncTimeSettings>(loadSyncTimeSettings);
+  const syncDelayRange = useMemo(() => syncTimeDelayRangeMs(syncTimeSettings.intervalSec), [syncTimeSettings.intervalSec]);
+
+  const updateSyncTimeSettings = useCallback((patch: Partial<SyncTimeSettings>) => {
+    setSyncTimeSettings(prev => saveSyncTimeSettings({ ...prev, ...patch }));
+  }, []);
+
+  useEffect(() => {
+    const handleUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<SyncTimeSettings>;
+      setSyncTimeSettings(customEvent.detail);
+    };
+    window.addEventListener(SYNC_TIME_SETTINGS_EVENT, handleUpdate);
+    return () => window.removeEventListener(SYNC_TIME_SETTINGS_EVENT, handleUpdate);
+  }, []);
+
+  // ===== SYNC TIME HOTKEY STATES & GLOBAL LISTENER =====
+  const [syncTimeHotkey, setSyncTimeHotkey] = useState(() => localStorage.getItem('monviewphone:sync-time-hotkey') || '');
+  const [hotkeySectionOpen, setHotkeySectionOpen] = useState(false);
+
+  useEffect(() => {
+    const handleGlobalHotkey = (e: KeyboardEvent) => {
+      const active = document.activeElement?.nodeName.toLowerCase();
+      if (
+        ['input', 'textarea', 'select'].includes(active || '') ||
+        (document.activeElement as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+
+      const hotkeyStr = localStorage.getItem('monviewphone:sync-time-hotkey') || '';
+      if (hotkeyStr && matchesHotkey(e, hotkeyStr)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setSyncTimeSettings(prev => saveSyncTimeSettings({ ...prev, delayEnabled: !prev.delayEnabled }));
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalHotkey, { capture: true });
+    return () => window.removeEventListener('keydown', handleGlobalHotkey, { capture: true });
+  }, []);
+
+  const handleHotkeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const lowerKey = e.key.toLowerCase();
+    if (['control', 'alt', 'shift', 'meta'].includes(lowerKey)) {
+      return;
+    }
+
+    const parts: string[] = [];
+    if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
+    if (e.altKey) parts.push('Alt');
+    if (e.shiftKey) parts.push('Shift');
+
+    let keyName = e.key;
+    if (keyName === ' ') {
+      keyName = 'Space';
+    } else if (keyName.length === 1) {
+      keyName = keyName.toUpperCase();
+    } else {
+      keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
+    }
+    parts.push(keyName);
+
+    const newHotkey = parts.join('+');
+    setSyncTimeHotkey(newHotkey);
+    localStorage.setItem('monviewphone:sync-time-hotkey', newHotkey);
+  }, []);
+
+  // ===== GRID DISPLAY FILTER STATES =====
+  const [displayFilter, setDisplayFilter] = useState<'online' | 'all'>(() => {
+    return (localStorage.getItem('monviewphone:display-filter') as 'online' | 'all') || 'all';
+  });
+  const [displayFilterOpen, setDisplayFilterOpen] = useState(false);
+
+  const updateDisplayFilter = useCallback((val: 'online' | 'all') => {
+    setDisplayFilter(val);
+    localStorage.setItem('monviewphone:display-filter', val);
+  }, []);
+
+  useEffect(() => {
+    if (!displayFilterOpen) return;
+    const close = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.rcpDeviceToolbar')) {
+        setDisplayFilterOpen(false);
+      }
+    };
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [displayFilterOpen]);
 
   const [viewerUdid, setViewerUdid] = useState<string | null>(null)
   const apkInputRef = useRef<HTMLInputElement | null>(null)
@@ -933,7 +1039,8 @@ export function App() {
     useTileOrder(allGridUdids)
   const filteredRegistered = useMemo(() => {
     return registeredUdids.filter(id => {
-      if (!connectedUdids.has(id)) return false
+      if (displayFilter === 'online' && !connectedUdids.has(id)) return false;
+
       if (deviceFilter !== 'all') {
         const type = getDeviceConnectionType(id)
         if (type !== deviceFilter) return false
@@ -944,7 +1051,7 @@ export function App() {
       }
       return true
     })
-  }, [registeredUdids, connectedUdids, deviceFilter, getDeviceConnectionType, focusGroupIdx, savedGroups])
+  }, [registeredUdids, connectedUdids, deviceFilter, getDeviceConnectionType, focusGroupIdx, savedGroups, displayFilter])
   const orderMap = useMemo(() => {
     const m = new Map<string, number>()
     mergedOrder.forEach((id, idx) => m.set(id, getTileNumber(id, idx + 1)))
@@ -986,9 +1093,10 @@ export function App() {
     () => orderedRegistered.map(udid => ({
       udid,
       label: String(orderMap.get(udid) ?? 0).padStart(2, '0'),
-      title: udid
+      title: udid,
+      className: !connectedUdids.has(udid) ? 'offline' : ''
     })),
-    [orderedRegistered, orderMap]
+    [orderedRegistered, orderMap, connectedUdids]
   )
   const [quickActionOrder, setQuickActionOrder] = useState<QuickActionId[]>(
     loadQuickActionOrder
@@ -1297,7 +1405,7 @@ export function App() {
   // Ctrl + A chon tat ca thiet bi để chọn tất cả thiết bị
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+A chọn tất cả (chỉ chọn nhóm online vì đã lọc ở filteredRegistered)
+      // Ctrl+A chọn tất cả (chỉ chọn các máy đang Online)
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA') {
         const active = document.activeElement?.nodeName.toLowerCase()
         if (
@@ -1306,12 +1414,13 @@ export function App() {
         )
           return
         e.preventDefault()
-        setConnectSelection(new Set(orderedRegistered))
+        const onlineRegistered = orderedRegistered.filter(id => connectedUdids.has(id))
+        setConnectSelection(new Set(onlineRegistered))
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [orderedRegistered])
+  }, [orderedRegistered, connectedUdids])
 
   const [draftConfig, setDraftConfig] = useState<StreamConfig>(STREAM_CONFIG)
   const [draftViewerConfig, setDraftViewerConfig] = useState<StreamConfig>(viewerStreamConfig)
@@ -1627,10 +1736,10 @@ export function App() {
             'adb shell cmd media_session volume --stream 5 --set 15'
           ])
       },
-      screenshot: {
-        label: 'Chụp màn hình',
-        icon: <Camera size={15} strokeWidth={1.8} />,
-        run: () => screenshotActiveCanvas()
+      syncTime: {
+        label: 'Sync Time',
+        icon: <Clock3 size={15} strokeWidth={1.8} />,
+        run: () => setSyncTimeModalOpen(true)
       },
       automation: {
         label: 'Automation',
@@ -1638,7 +1747,7 @@ export function App() {
         run: () => setAutomationOpen(true)
       }
     }),
-    [runQuickAdbCommands, screenshotActiveCanvas, quickCommandTargets]
+    [runQuickAdbCommands, quickCommandTargets]
   )
 
   {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */ }
@@ -1737,9 +1846,9 @@ export function App() {
           >
             {mergedOrder.map((udid, idx) => {
               const isConnected = connectedUdids.has(udid)
-              // isVisible: kiểm tra bộ lọc loại kết nối và nhóm
+              // isVisible: kiểm tra bộ lọc loại kết nối và nhóm (khi focus vào nhóm chỉ hiện máy online)
               const isVisible = (deviceFilter === 'all' || getDeviceConnectionType(udid) === deviceFilter) &&
-                (!currentFocusGroupSet || currentFocusGroupSet.has(udid));
+                (!currentFocusGroupSet || (currentFocusGroupSet.has(udid) && isConnected));
 
               return (
                 <div
@@ -2265,8 +2374,9 @@ export function App() {
                   return (
                     <button
                       key={id}
-                      className={`rcpBtn rcpQuickBtn rcpQuickBtn--${id}${draggingQuickAction === id ? ' dragging' : ''
-                        }`}
+                      className={`rcpBtn rcpQuickBtn rcpQuickBtn--${id}${draggingQuickAction === id ? ' dragging' : ''}${
+                        id === 'syncTime' && syncTimeSettings.delayEnabled ? ' active-sync' : ''
+                      }`}
                       draggable
                       title={action.label}
                       onClick={action.run}
@@ -2385,6 +2495,75 @@ export function App() {
                     {t('Thêm Nhóm')}
                     {connectSelection.size > 0 ? ` (${connectSelection.size})` : ''}
                   </button>
+
+                  <div style={{ position: 'relative', marginLeft: 'auto' }}>
+                    <button
+                      type="button"
+                      className="rcpAdd ghost"
+                      onClick={() => setDisplayFilterOpen(p => !p)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <span>Hiển thị: {displayFilter === 'online' ? 'Online only' : 'Tất cả'}</span>
+                      <ChevronDown size={14} />
+                    </button>
+                    {displayFilterOpen && (
+                      <div
+                        className="rcpDropdown"
+                        style={{
+                          position: 'absolute',
+                          right: 0,
+                          top: '100%',
+                          marginTop: '4px',
+                          background: 'var(--md-card)',
+                          border: '1px solid var(--md-border)',
+                          borderRadius: '8px',
+                          boxShadow: 'var(--md-shadow-panel)',
+                          zIndex: 10,
+                          width: '120px',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        <div
+                          className={`rcpDropdownItem${displayFilter === 'online' ? ' active' : ''}`}
+                          onClick={() => {
+                            setDisplayFilter('online');
+                            setDisplayFilterOpen(false);
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            fontSize: '12px',
+                            color: 'var(--md-text)',
+                            cursor: 'pointer',
+                            background: displayFilter === 'online' ? 'rgba(255,255,255,0.08)' : 'transparent',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => { if (displayFilter !== 'online') e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                          onMouseLeave={(e) => { if (displayFilter !== 'online') e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          Online only
+                        </div>
+                        <div
+                          className={`rcpDropdownItem${displayFilter === 'all' ? ' active' : ''}`}
+                          onClick={() => {
+                            setDisplayFilter('all');
+                            setDisplayFilterOpen(false);
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            fontSize: '12px',
+                            color: 'var(--md-text)',
+                            cursor: 'pointer',
+                            background: displayFilter === 'all' ? 'rgba(255,255,255,0.08)' : 'transparent',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => { if (displayFilter !== 'all') e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                          onMouseLeave={(e) => { if (displayFilter !== 'all') e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          Tất cả
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {connectNotification ? (
                   <div className={`rcpConnectNotification ${connectNotification.type}`}>
@@ -2393,6 +2572,7 @@ export function App() {
                 ) : null}
                 <div className='rcpGridWrap' style={{ marginTop: '12px' }}>
                   <DeviceSelectionGrid
+                    className='rcpGrid12'
                     devices={controlGridDevices}
                     selectedUdids={connectSelection}
                     onToggleDevice={(id, checked) => {
@@ -2511,7 +2691,9 @@ export function App() {
                             ) : (
                               <span className='rcpSavedGroupName'>{group.name}</span>
                             )}
-                            <span className='rcpSavedGroupCount'>{group.udids.length}</span>
+                            <span className='rcpSavedGroupCount'>
+                              {group.udids.filter(uid => displayFilter === 'all' || connectedUdids.has(uid)).length}
+                            </span>
                             {focusGroupIdx === idx && <span className='rcpGroupFocusDot' title='Đang lọc nhóm này'>●</span>}
                           </button>
 
@@ -2537,11 +2719,11 @@ export function App() {
                         {/* Dropdown: grid device trong nhóm */}
                         {expandedGroupIdx === idx && (
                           <div className='rcpSavedGroupDevices'>
-                            <div className='rcpGrid rcpGridCompact' style={{ marginTop: 4 }}>
-                              {group.udids.filter(uid => connectedUdids.has(uid)).map(uid => (
+                            <div className='rcpGrid rcpGridCompact rcpGrid12' style={{ marginTop: 4 }}>
+                              {group.udids.filter(uid => displayFilter === 'all' || connectedUdids.has(uid)).map(uid => (
                                 <div
                                   key={uid}
-                                  className={`rcpGridItem${connectSelection.has(uid) ? ' on' : ''} rcpGroupDeviceItem`}
+                                  className={`rcpGridItem${connectSelection.has(uid) ? ' on' : ''}${!connectedUdids.has(uid) ? ' offline' : ''} rcpGroupDeviceItem`}
                                   title={uid}
                                   onContextMenu={e => {
                                     e.preventDefault()
@@ -2644,6 +2826,79 @@ export function App() {
                   <option value="OMX.google.h264.encoder">H.264 (OMX.google)</option>
                 </select>
               </div>
+            </div>
+
+            {/* Hotkey Configuration Section */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}>
+              <div 
+                style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+                onClick={() => setHotkeySectionOpen(p => !p)}
+              >
+                <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1 }}>
+                  Hotkey
+                </div>
+                <button
+                  type="button"
+                  className='rcpIconBtn'
+                  style={{ background: 'transparent', border: 'none', color: 'var(--md-muted)', cursor: 'pointer', padding: 0 }}
+                  title={hotkeySectionOpen ? 'Thu nhỏ' : 'Mở rộng'}
+                  aria-label={hotkeySectionOpen ? 'Thu nhỏ' : 'Mở rộng'}
+                >
+                  {hotkeySectionOpen ? <ChevronUp size={15} strokeWidth={2} /> : <ChevronDown size={15} strokeWidth={2} />}
+                </button>
+              </div>
+
+              {hotkeySectionOpen && (
+                <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
+                      Bật/Tắt Sync Time (Delay):
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="text"
+                        placeholder="Nhấn tổ hợp phím..."
+                        readOnly
+                        value={syncTimeHotkey}
+                        onKeyDown={handleHotkeyInputKeyDown}
+                        style={{
+                          background: '#0a0a0a',
+                          color: 'var(--md-info)',
+                          border: '1px solid #444',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          fontSize: 12,
+                          width: 160,
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          outline: 'none',
+                        }}
+                      />
+                      {syncTimeHotkey && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSyncTimeHotkey('');
+                            localStorage.removeItem('monviewphone:sync-time-hotkey');
+                          }}
+                          style={{
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '6px',
+                            color: '#ff8080',
+                            padding: '6px 10px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Xoá
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
 
@@ -3315,6 +3570,14 @@ export function App() {
           </div>
         </div>
       )}
+      {syncTimeModalOpen ? (
+        <SyncTimeSettingsModal
+          settings={syncTimeSettings}
+          delayRange={syncDelayRange}
+          onChange={updateSyncTimeSettings}
+          onClose={() => setSyncTimeModalOpen(false)}
+        />
+      ) : null}
     </>
   )
 }

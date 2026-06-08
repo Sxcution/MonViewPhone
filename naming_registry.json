@@ -10,7 +10,8 @@
       "tile": "Tile",
       "viewer_side_panel": "ViewerSidePanel",
       "sidebar_device_grid": "SidebarDeviceGrid",
-      "automation_modal": "AutomationModal"
+      "automation_modal": "AutomationModal",
+      "sync_time_settings_modal": "SyncTimeSettingsModal"
     },
     "css_classes": {
       "right_config_panel": "rightConfigPanel",
@@ -59,7 +60,22 @@
       "visual_alert_modal_wide": "visualAlertModalCardWide",
       "visual_alert_modal": "visualAlertModalOverlay",
       "visual_alert_toast": "visualAlertToast",
-      "visual_alert_toast_container": "visualAlertToastContainer"
+      "visual_alert_toast_container": "visualAlertToastContainer",
+      "sync_time_overlay": "syncTimeOverlay",
+      "sync_time_card": "syncTimeCard",
+      "sync_time_header": "syncTimeHeader",
+      "sync_time_title": "syncTimeTitle",
+      "sync_time_body": "syncTimeBody",
+      "sync_time_line": "syncTimeLine",
+      "sync_time_row": "syncTimeRow",
+      "sync_time_label": "syncTimeLabel",
+      "sync_time_controls": "syncTimeControls",
+      "sync_time_input": "syncTimeInput",
+      "sync_time_unit": "syncTimeUnit",
+      "sync_time_range_dash": "syncTimeRangeDash",
+      "active_sync": "active-sync",
+      "offline_grid_item": "rcpGridItem.offline",
+      "sidebar_grid_12_cols": "rcpGrid12"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -102,7 +118,12 @@
       "right_panel_quick_controls_open_key": "rightPanel.quickControlsOpen",
       "right_panel_visual_alert_open_key": "rightPanel.visualAlertOpen",
       "confirm_state": "confirmState",
-      "pending_delete_roi": "pendingDeleteROI"
+      "pending_delete_roi": "pendingDeleteROI",
+      "sync_time_settings_interval_enabled": "intervalEnabled",
+      "sync_time_hotkey": "syncTimeHotkey",
+      "hotkey_section_open": "hotkeySectionOpen",
+      "display_filter": "displayFilter",
+      "display_filter_open": "displayFilterOpen"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

@@ -2,6 +2,7 @@ export type SyncTimeSettings = {
   delayEnabled: boolean;
   randomOrder: boolean;
   intervalSec: number;
+  intervalEnabled: boolean;
   offsetEnabled: boolean;
   offsetMinPx: number;
   offsetMaxPx: number;
@@ -14,6 +15,7 @@ export const DEFAULT_SYNC_TIME_SETTINGS: SyncTimeSettings = {
   delayEnabled: false,
   randomOrder: false,
   intervalSec: 5,
+  intervalEnabled: true,
   offsetEnabled: false,
   offsetMinPx: 2,
   offsetMaxPx: 6,
@@ -32,6 +34,7 @@ export function normalizeSyncTimeSettings(value: Partial<SyncTimeSettings> | nul
     delayEnabled: value?.delayEnabled === true,
     randomOrder: value?.randomOrder === true,
     intervalSec: clampNumber(value?.intervalSec, 0.1, 86400, DEFAULT_SYNC_TIME_SETTINGS.intervalSec),
+    intervalEnabled: value?.intervalEnabled !== false,
     offsetEnabled: value?.offsetEnabled === true,
     offsetMinPx: Math.min(rawMinPx, rawMaxPx),
     offsetMaxPx: Math.max(rawMinPx, rawMaxPx),
@@ -65,4 +68,27 @@ export function syncTimeDelayRangeMs(intervalSec: number) {
   const minMs = Math.max(0, Math.round(sec * lowRatio * 1000));
   const maxMs = Math.max(minMs, Math.round(sec * highRatio * 1000));
   return { minMs, maxMs };
+}
+
+export function matchesHotkey(e: KeyboardEvent, hotkeyStr: string): boolean {
+  if (!hotkeyStr) return false;
+  const parts = hotkeyStr.split('+').map(p => p.trim().toLowerCase());
+  const hasCtrl = parts.includes('ctrl');
+  const hasAlt = parts.includes('alt');
+  const hasShift = parts.includes('shift');
+  const targetKeyName = parts[parts.length - 1];
+  
+  if (hasCtrl !== (e.ctrlKey || e.metaKey)) return false;
+  if (hasAlt !== e.altKey) return false;
+  if (hasShift !== e.shiftKey) return false;
+  
+  let eventKey = e.key.toLowerCase();
+  if (eventKey === ' ') eventKey = 'space';
+  const eventCode = e.code.toLowerCase();
+  
+  return (
+    eventKey === targetKeyName ||
+    eventCode === `key${targetKeyName}` ||
+    eventCode === targetKeyName
+  );
 }
