@@ -108,24 +108,31 @@ func isPortListening(udid string) bool {
 
 func killStaleServers(udid string, processes []serverProcess) {
 	for _, proc := range processes {
-		if proc.pid == "" || isExpectedServer(proc) {
+		if proc.pid == "" {
 			continue
 		}
-		log.Printf("[%s] Killing stale scrcpy server PID %s (%s)", udid, proc.pid, proc.cmdline)
+		if !isExpectedServer(proc) {
+			log.Printf("[%s] Skip foreign scrcpy server PID %s (%s)", udid, proc.pid, proc.cmdline)
+			continue
+		}
+		log.Printf("[%s] Killing stale MonViewPhone scrcpy server PID %s (%s)", udid, proc.pid, proc.cmdline)
 		_ = shellSafe(udid, "kill "+proc.pid+" 2>/dev/null || true")
 	}
 }
 
-func killAllScrcpyServers(udid string) error {
+func killMonViewPhoneScrcpyServers(udid string) error {
 	for _, proc := range listServerProcesses(udid) {
 		if proc.pid == "" {
 			continue
 		}
-		log.Printf("[%s] Killing scrcpy server PID %s (%s)", udid, proc.pid, proc.cmdline)
+		if isExpectedServer(proc) {
+			log.Printf("[%s] Killing MonViewPhone scrcpy server PID %s (%s)", udid, proc.pid, proc.cmdline)
+			_ = shellSafe(udid, "kill -9 "+proc.pid+" 2>/dev/null || true")
+		} else {
+			log.Printf("[%s] Skip foreign scrcpy server PID %s (%s)", udid, proc.pid, proc.cmdline)
+		}
 	}
-	cmd := fmt.Sprintf(`for p in $(pidof %s 2>/dev/null); do cat /proc/$p/cmdline 2>/dev/null | grep -q %s && kill -9 $p 2>/dev/null || true; done`, ProcessName, ServerPackage)
-	_, err := adb.Shell(udid, cmd)
-	return err
+	return nil
 }
 
 func hasExpectedServer(udid string) bool {
@@ -172,13 +179,30 @@ func EnsureServer(udid string) error {
 	})
 }
 
+var (
+	restartInFlight sync.Map
+	restartMutex    sync.Mutex
+)
+
 func ForceRestartServer(udid string) error {
-	return withServerOpSlot(func() error {
+	restartMutex.Lock()
+	if chIntf, ok := restartInFlight.Load(udid); ok {
+		restartMutex.Unlock()
+		log.Printf("[%s] ForceRestartServer already in flight, waiting for result...", udid)
+		err := <-chIntf.(chan error)
+		return err
+	}
+
+	ch := make(chan error, 1)
+	restartInFlight.Store(udid, ch)
+	restartMutex.Unlock()
+
+	err := withServerOpSlot(func() error {
 		lock := lockForDevice(udid)
 		lock.Lock()
 		defer lock.Unlock()
 
-		if err := killAllScrcpyServers(udid); err != nil {
+		if err := killMonViewPhoneScrcpyServers(udid); err != nil {
 			return fmt.Errorf("failed to kill scrcpy server: %w", err)
 		}
 		if _, err := adb.Shell(udid, "rm -f "+PidFilePath+" "+LogFilePath); err != nil {
@@ -187,6 +211,11 @@ func ForceRestartServer(udid string) error {
 		time.Sleep(500 * time.Millisecond)
 		return startServerUnlocked(udid)
 	})
+
+	ch <- err
+	close(ch)
+	restartInFlight.Delete(udid)
+	return err
 }
 
 func StartServer(udid string) error {

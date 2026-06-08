@@ -779,6 +779,17 @@ export function useTileStream(args: Args) {
                     }
                     initialFrameRestartAttempts++;
                     setStatus(tRef.current(SCRCPY_RESTARTING_STATUS));
+
+                    let delay = RECONNECT_DELAY_MS;
+                    if (initialFrameRestartAttempts === 1) delay = 5000;
+                    else if (initialFrameRestartAttempts === 2) delay = 10000;
+                    else delay = 20000;
+
+                    setLoading(true);
+                    reconnectTimerRef.current = window.setTimeout(() => {
+                        if (destroyedRef.current) return;
+                        connect({ restart: true });
+                    }, delay);
                 } else {
                     setStatus(
                         tRef.current('WS đóng ({code}{reason}) - thử lại…', {
@@ -786,13 +797,12 @@ export function useTileStream(args: Args) {
                             reason: e.reason ? `: ${e.reason}` : '',
                         }),
                     );
+                    setLoading(true);
+                    reconnectTimerRef.current = window.setTimeout(() => {
+                        if (destroyedRef.current) return;
+                        connect({ restart: false });
+                    }, RECONNECT_DELAY_MS);
                 }
-                setLoading(true);
-
-                reconnectTimerRef.current = window.setTimeout(() => {
-                    if (destroyedRef.current) return;
-                    connect({ restart: restartBeforeFirstFrame });
-                }, RECONNECT_DELAY_MS);
             };
         }
 
