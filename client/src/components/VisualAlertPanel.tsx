@@ -4,7 +4,7 @@
  * Rendered inside the right config panel in App.tsx.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Bell,
@@ -12,10 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
   Crosshair,
-  Eye,
-  Plus,
   Trash2,
-  Volume2,
   X,
 } from 'lucide-react';
 import { useActive } from '@/context/ActiveContext';
@@ -29,6 +26,17 @@ import {
   generateROIId,
   playAlertSound,
 } from '@/lib/visualAlertEngine';
+
+function loadBoolKey(key: string, fallback: boolean): boolean {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
 import { useVisualAlert } from '@/hooks/useVisualAlert';
 
 /* ── Props ──────────────────────────────────────────────────────── */
@@ -41,13 +49,20 @@ type VisualAlertPanelProps = {
 /* ── Component ──────────────────────────────────────────────────── */
 
 export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanelProps) {
-  const { getCanvasForUdid, selectedGridUdid } = useActive();
+  const { getCanvasForUdid } = useActive();
 
   // Config state
   const [config, setConfig] = useState<VisualAlertConfig>(loadVisualAlertConfig);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(() =>
+    loadBoolKey('rightPanel.visualAlertOpen', false)
+  );
   const [roiModalOpen, setRoiModalOpen] = useState(false);
-  const [roiSetupUdid, setRoiSetupUdid] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('rightPanel.visualAlertOpen', String(expanded));
+    } catch {}
+  }, [expanded]);
 
   // Hook for scan loop
   const { scanning, lastAlert, testScanDevice, testSound } = useVisualAlert({
@@ -103,8 +118,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
     [updateConfig],
   );
 
-  const roiCountText = `${config.rois.length} điểm quét`;
-
   return (
     <>
       {/* visualAlertSection : Section Visual Alert trong right panel */}
@@ -139,10 +152,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
 
         {expanded && (
           <div className="visualAlertBody">
-            {/* ROI info + setup */}
-            <div className="visualAlertRow">
-              <span className="visualAlertLabel">Vùng nhận diện: {roiCountText}</span>
-            </div>
             {config.rois.length > 10 && (
               <div className="visualAlertROIWarning">⚠ Nhiều ROI có thể ảnh hưởng hiệu năng</div>
             )}
@@ -150,12 +159,10 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
               <button
                 className="visualAlertBtn"
                 onClick={() => {
-                  setRoiSetupUdid(selectedGridUdid);
                   setRoiModalOpen(true);
                 }}
                 title="Thiết lập vùng nhận diện"
               >
-                <Crosshair size={13} />
                 <span>Thiết lập ROI</span>
               </button>
               <button
@@ -163,7 +170,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
                 onClick={handleTestScan}
                 title="Test quét trên 1 máy"
               >
-                <Eye size={13} />
                 <span>Test quét</span>
               </button>
               <button
@@ -171,7 +177,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
                 onClick={handleTestSound}
                 title="Test âm thanh"
               >
-                <Volume2 size={13} />
                 <span>Test âm thanh</span>
               </button>
             </div>
@@ -243,7 +248,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
       {/* ROI Setup Modal */}
       {roiModalOpen && (
         <MultiROISetupModal
-          setupUdid={roiSetupUdid}
           currentROIs={config.rois}
           redThreshold={config.redThreshold}
           onSave={handleROISave}
@@ -257,7 +261,6 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
 /* ── Multi-ROI Setup Modal ──────────────────────────────────────── */
 
 type MultiROISetupModalProps = {
-  setupUdid: string | null;
   currentROIs: VisualAlertROI[];
   redThreshold: VisualAlertConfig['redThreshold'];
   onSave: (rois: VisualAlertROI[]) => void;
@@ -265,16 +268,15 @@ type MultiROISetupModalProps = {
 };
 
 function MultiROISetupModal({
-  setupUdid,
   currentROIs,
   redThreshold,
   onSave,
   onClose,
 }: MultiROISetupModalProps) {
-  const { getCanvasForUdid } = useActive();
+  const { getCanvasForUdid, activeUdid } = useActive();
 
-  // Selected device is fixed at the time of opening the modal
-  const selectedUdid = setupUdid;
+  // Selected device uses the active device in Grid dynamically
+  const selectedUdid = activeUdid;
   const activeCanvas = selectedUdid ? getCanvasForUdid(selectedUdid) : null;
 
   const [draftROIs, setDraftROIs] = useState<VisualAlertROI[]>(
@@ -285,6 +287,7 @@ function MultiROISetupModal({
   );
   const [testResults, setTestResults] = useState<MultiROIResult | null>(null);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [pendingDeleteROI, setPendingDeleteROI] = useState<string | null>(null);
 
   // Offset position for dragging
   const [modalPos, setModalPos] = useState({ x: 0, y: 0 });
@@ -292,8 +295,11 @@ function MultiROISetupModal({
 
   const handleHeaderPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
-    const target = e.currentTarget as HTMLElement;
-    target.setPointerCapture(e.pointerId);
+    const el = e.target as HTMLElement | null;
+    if (el?.closest('button,input,select,textarea,.visualAlertModalCloseBtn')) return;
+
+    const header = e.currentTarget as HTMLElement;
+    header.setPointerCapture(e.pointerId);
     modalDragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -509,7 +515,11 @@ function MultiROISetupModal({
               type="button"
               className="visualAlertModalCloseBtn"
               aria-label="Close"
-              onClick={onClose}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
             >
               <X size={14} />
             </button>
@@ -519,7 +529,7 @@ function MultiROISetupModal({
           <div className="visualAlertModalBody">
             {!selectedUdid || !activeCanvas ? (
               <div className="visualAlertPickerEmpty">
-                Hãy Chọn 1 Device
+                Chọn một máy đang stream ở Grid trước
               </div>
             ) : (
               <>
@@ -581,7 +591,6 @@ function MultiROISetupModal({
                       onClick={handleAddROI}
                       title="Thêm điểm quét mới"
                     >
-                      <Plus size={13} />
                       Thêm
                     </button>
                   </div>
@@ -635,7 +644,7 @@ function MultiROISetupModal({
                         className="visualAlertROIDeleteBtn"
                         onClick={e => {
                           e.stopPropagation();
-                          handleDeleteROI(roi.id);
+                          setPendingDeleteROI(roi.id);
                         }}
                         title="Xoá điểm quét"
                       >
@@ -665,21 +674,13 @@ function MultiROISetupModal({
                     onClick={handleTestInModal}
                     disabled={!draftROIs.length}
                   >
-                    <Eye size={13} />
                     Test quét
                   </button>
                   <button
                     className="visualAlertModalBtn secondary"
                     onClick={() => playAlertSound()}
                   >
-                    <Volume2 size={13} />
                     Test âm thanh
-                  </button>
-                  <button
-                    className="visualAlertModalBtn secondary"
-                    onClick={onClose}
-                  >
-                    Đóng
                   </button>
                   <button
                     className="visualAlertModalBtn primary"
@@ -693,6 +694,30 @@ function MultiROISetupModal({
           </div>
         </div>
       </div>
+
+      {pendingDeleteROI && (
+        <div className="confirmOverlay" style={{ zIndex: 28000 }} onMouseDown={() => setPendingDeleteROI(null)}>
+          <div className="confirmPanel" style={{ maxWidth: 320, textAlign: 'center' }} onMouseDown={e => e.stopPropagation()}>
+            <div className="confirmTitle" style={{ color: '#ff6b6b', fontSize: 16, fontWeight: 800 }}>Xoá điểm quét?</div>
+            <div className="confirmText" style={{ margin: '10px 0 20px', color: '#e6dcdc', fontSize: 13, lineHeight: 1.35 }}>
+              Bạn có chắc muốn xoá điểm quét này không?
+            </div>
+            <div className="confirmActions" style={{ justifyContent: 'center', gap: 12 }}>
+              <button className="modalBtn" onClick={() => setPendingDeleteROI(null)}>Huỷ</button>
+              <button
+                className="modalBtnPrimary"
+                style={{ background: '#e94560', borderColor: '#e94560' }}
+                onClick={() => {
+                  handleDeleteROI(pendingDeleteROI);
+                  setPendingDeleteROI(null);
+                }}
+              >
+                Xác Nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>,
     document.body,
   );

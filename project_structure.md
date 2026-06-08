@@ -18,7 +18,7 @@ Removed legacy layers:
 - `client/src/components/ViewerSidePanel.tsx`: Viewer-side controls for profiles, APK install, file import/export, and ADB commands.
 - `client/src/components/SyncPanel.tsx`: Device synchronization UI.
 - `client/src/components/AutomationModal.tsx`: Automation modal with Action + Device Profile + Macro binding system. Manages macro recording/playback, app actions (WeChat/Line/Tantan/Setting), and device profile assignment. Data persisted in localStorage keys: `automationMacrosV1`, `automationAppActionsV1`, `automationDeviceProfilesV1`.
-- `client/src/components/VisualAlertPanel.tsx`: Visual Alert UI panel for multi-ROI red-dot notification detection. Settings, Multi-ROI setup modal with canvas preview and multiple draggable ROI overlays, per-ROI test results, inline rename, toast notifications. Rendered in right config panel.
+- [MODIFY] [VisualAlertPanel.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/VisualAlertPanel.tsx): Visual Alert UI panel for multi-ROI red-dot notification detection. Settings, Multi-ROI setup modal with canvas preview and multiple draggable ROI overlays, per-ROI test results, inline rename, toast notifications, and confirm delete ROI overlay modal. Rendered in right config panel.
 - `client/src/components/tile/`: Tile-specific helpers, headers, stream hook, and phone controls.
 - `client/src/context/ActiveContext.tsx`: Active device, multi-control, and focus state.
 - `client/src/context/I18nContext.tsx`: Translation helper.

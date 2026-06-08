@@ -20,7 +20,6 @@ import {
 import { SyncPanel } from '@/components/SyncPanel'
 import { useTileOrder } from '@/store/useTileOrder'
 import {
-  ArrowLeft,
   Bot,
   Camera,
   ChevronDown,
@@ -162,7 +161,6 @@ type QuickActionId =
   | 'mute'
   | 'soundOn'
   | 'maxVolume'
-  | 'back'
   | 'screenshot'
   | 'automation'
 
@@ -171,7 +169,6 @@ const DEFAULT_QUICK_ACTION_ORDER: QuickActionId[] = [
   'mute',
   'soundOn',
   'maxVolume',
-  'back',
   'screenshot',
   'automation'
 ]
@@ -203,6 +200,26 @@ function sameStreamConfig(a: StreamConfig, b: StreamConfig): boolean {
     a.displayId === b.displayId
   )
 }
+
+function loadBoolKey(key: string, fallback: boolean): boolean {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+type ConfirmState = {
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+} | null;
 
 export function App() {
   useDirectKeyboard(true)
@@ -436,8 +453,25 @@ export function App() {
   const rubberBandJustFinishedRef = useRef(false)
 
   const [appSettingsVisible, setAppSettingsVisible] = useState(false)
-  const [streamControlsOpen, setStreamControlsOpen] = useState(true)
-  const [quickControlsOpen, setQuickControlsOpen] = useState(true)
+  const [streamControlsOpen, setStreamControlsOpen] = useState(() =>
+    loadBoolKey('rightPanel.streamControlsOpen', true)
+  )
+  const [quickControlsOpen, setQuickControlsOpen] = useState(() =>
+    loadBoolKey('rightPanel.quickControlsOpen', true)
+  )
+  const [confirmState, setConfirmState] = useState<ConfirmState>(null)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('rightPanel.streamControlsOpen', String(streamControlsOpen));
+    } catch {}
+  }, [streamControlsOpen]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('rightPanel.quickControlsOpen', String(quickControlsOpen));
+    } catch {}
+  }, [quickControlsOpen]);
 
   useEffect(() => {
     try {
@@ -1593,21 +1627,6 @@ export function App() {
             'adb shell cmd media_session volume --stream 5 --set 15'
           ])
       },
-      back: {
-        label: 'Quay lại',
-        icon: <ArrowLeft size={15} strokeWidth={1.8} />,
-        run: () => {
-          const targets = quickCommandTargets()
-          const keyTargets = getTargetsByUdids(targets)
-          if (keyTargets.length) {
-            const down = encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_BACK)
-            const up = encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_BACK)
-            for (const t of keyTargets) { try { t.ws.send(down); t.ws.send(up) } catch { } }
-          } else {
-            sendKeyTap(AndroidKeycode.KEYCODE_BACK)
-          }
-        }
-      },
       screenshot: {
         label: 'Chụp màn hình',
         icon: <Camera size={15} strokeWidth={1.8} />,
@@ -1619,7 +1638,7 @@ export function App() {
         run: () => setAutomationOpen(true)
       }
     }),
-    [runQuickAdbCommands, screenshotActiveCanvas, sendKeyTap, quickCommandTargets, getTargetsByUdids]
+    [runQuickAdbCommands, screenshotActiveCanvas, quickCommandTargets]
   )
 
   {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */ }
@@ -1731,11 +1750,15 @@ export function App() {
                     }${dropTarget === udid ? ' dropTarget' : ''}`}
                   onPointerDownCapture={e => {
                     if (e.button !== 2) return
+                    const target = e.target as HTMLElement
+                    if (target.tagName.toLowerCase() === 'canvas') return // Allow right click down to canvas for Back key
                     e.preventDefault()
                     e.stopPropagation()
                   }}
                   onMouseDownCapture={e => {
                     if (e.button !== 2) return
+                    const target = e.target as HTMLElement
+                    if (target.tagName.toLowerCase() === 'canvas') return // Allow right click down to canvas for Back key
                     e.preventDefault()
                     e.stopPropagation()
                   }}
@@ -1768,6 +1791,11 @@ export function App() {
                     if (e.ctrlKey || e.metaKey) {
                       selectOnly(udid)
                       setViewerUdid(udid)
+                      return
+                    }
+                    const target = e.target as HTMLElement
+                    if (target.tagName.toLowerCase() === 'canvas') {
+                      // Right-clicked the stream screen -> Back key sent, skip context menu
                       return
                     }
                     // Mở context menu nhóm cho tile này
@@ -1895,35 +1923,42 @@ export function App() {
                     title={t('Reset stream config to default')}
                     aria-label={t('Reset stream config to default')}
                     onClick={() => {
-                      if (viewerUdid) {
-                        const defaultViewerCfg = {
-                          ...STREAM_CONFIG,
-                          bitrate: 8_388_608,
-                          maxFps: 60,
-                          bounds: {
-                            width: 1000,
-                            height: Math.round(1000 * (boundsAspectRef.current || 16 / 9))
+                      setConfirmState({
+                        title: 'Reset cấu hình?',
+                        message: 'Bạn có chắc chắn muốn khôi phục cấu hình stream về mặc định không?',
+                        danger: true,
+                        onConfirm: () => {
+                          if (viewerUdid) {
+                            const defaultViewerCfg = {
+                              ...STREAM_CONFIG,
+                              bitrate: 8_388_608,
+                              maxFps: 60,
+                              bounds: {
+                                width: 1000,
+                                height: Math.round(1000 * (boundsAspectRef.current || 16 / 9))
+                              }
+                            }
+                            setViewerStreamConfig(defaultViewerCfg)
+                            setDraftViewerConfig(defaultViewerCfg)
+                            updateViewerWidthPx(900)
+                            const fn = reloadMap.current.get(viewerUdid)
+                            try {
+                              fn?.({ silent: true })
+                            } catch {}
+                          } else {
+                            setStreamConfig(STREAM_CONFIG)
+                            setDraftConfig(STREAM_CONFIG)
+                            updateWidth(350)
+                            updateViewerWidthPx(900)
+                            setBitrateWarnAccepted(false)
+                            setBitrateConfirmVisible(false)
+                            setBitratePending(null)
+                            setBitrateNeedsConfirm(false)
+                            setBitrateLastSafe(STREAM_CONFIG.bitrate)
+                            reloadAllTiles()
                           }
                         }
-                        setViewerStreamConfig(defaultViewerCfg)
-                        setDraftViewerConfig(defaultViewerCfg)
-                        updateViewerWidthPx(900)
-                        const fn = reloadMap.current.get(viewerUdid)
-                        try {
-                          fn?.({ silent: true })
-                        } catch {}
-                      } else {
-                        setStreamConfig(STREAM_CONFIG)
-                        setDraftConfig(STREAM_CONFIG)
-                        updateWidth(350)
-                        updateViewerWidthPx(900)
-                        setBitrateWarnAccepted(false)
-                        setBitrateConfirmVisible(false)
-                        setBitratePending(null)
-                        setBitrateNeedsConfirm(false)
-                        setBitrateLastSafe(STREAM_CONFIG.bitrate)
-                        reloadAllTiles()
-                      }
+                      });
                     }}
                   >
                     <RotateCcw size={12} strokeWidth={2} />
@@ -2206,6 +2241,12 @@ export function App() {
               </div>
             </div>
 
+            {/* visualAlertPanel : Section Visual Alert - quét chấm đỏ notification */}
+            <VisualAlertPanel
+              registeredUdids={registeredUdids}
+              orderMap={orderMap}
+            />
+
             <div className='rcpSection'>
               <div className='rcpTitleBar'>
                 <div className='rcpTitle'>{t('Điều khiển nhanh')}</div>
@@ -2253,12 +2294,6 @@ export function App() {
                 })}
               </div>
             </div>
-
-            {/* visualAlertPanel : Section Visual Alert - quét chấm đỏ notification */}
-            <VisualAlertPanel
-              registeredUdids={registeredUdids}
-              orderMap={orderMap}
-            />
 
             <div className='rcpSection rcpDevicePanel'>
 
@@ -3189,22 +3224,30 @@ export function App() {
 
                     const { udid, groupIdx } = contextMenuTarget!;
                     if (groupIdx === undefined) return;
+                    const groupName = savedGroups[groupIdx]?.name || '';
 
-                    setSavedGroups(prev =>
-                      prev.map((g, i) =>
-                        i === groupIdx
-                          ? { ...g, udids: g.udids.filter(u => u !== udid) }
-                          : g
-                      )
-                    );
+                    setConfirmState({
+                      title: 'Xoá khỏi nhóm?',
+                      message: `Bạn có chắc chắn muốn xoá device này khỏi nhóm "${groupName}" không?`,
+                      danger: true,
+                      onConfirm: () => {
+                        setSavedGroups(prev =>
+                          prev.map((g, i) =>
+                            i === groupIdx
+                              ? { ...g, udids: g.udids.filter(u => u !== udid) }
+                              : g
+                          )
+                        );
 
-                    if (activeGroupIdx === groupIdx || focusGroupIdx === groupIdx) {
-                      setConnectSelection(prev => {
-                        const next = new Set(prev);
-                        next.delete(udid);
-                        return next;
-                      });
-                    }
+                        if (activeGroupIdx === groupIdx || focusGroupIdx === groupIdx) {
+                          setConnectSelection(prev => {
+                            const next = new Set(prev);
+                            next.delete(udid);
+                            return next;
+                          });
+                        }
+                      }
+                    });
 
                     setContextMenuTarget(null);
                     setContextMenuOpen(false);
@@ -3235,6 +3278,35 @@ export function App() {
       >
         {selectedVisible.length}
       </div>
+
+      {confirmState && (
+        <div className="confirmOverlay" style={{ zIndex: 28000 }} onMouseDown={() => setConfirmState(null)}>
+          <div className="confirmPanel" style={{ maxWidth: 360 }} onMouseDown={e => e.stopPropagation()}>
+            <div className="confirmTitle" style={{ color: confirmState.danger ? '#ff6b6b' : '#ffb0b0' }}>
+              {confirmState.title}
+            </div>
+            <div className="confirmText" style={{ margin: '10px 0 20px', color: '#e6dcdc', fontSize: 13, lineHeight: 1.35 }}>
+              {confirmState.message}
+            </div>
+            <div className="confirmActions">
+              <button className="modalBtn" onClick={() => setConfirmState(null)}>
+                {confirmState.cancelText || 'Huỷ'}
+              </button>
+              <button
+                className="modalBtnPrimary"
+                style={confirmState.danger ? { background: '#e94560', borderColor: '#e94560' } : undefined}
+                onClick={() => {
+                  const fn = confirmState.onConfirm;
+                  setConfirmState(null);
+                  fn();
+                }}
+              >
+                {confirmState.confirmText || 'Xác Nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

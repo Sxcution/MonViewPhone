@@ -97,7 +97,12 @@
       "draft_viewer_config": "draftViewerConfig",
       "sub_menu_open": "subMenuOpen",
       "device_profiles": "deviceProfiles",
-      "selected_grid_udid": "selectedGridUdid"
+      "selected_grid_udid": "selectedGridUdid",
+      "right_panel_stream_controls_open_key": "rightPanel.streamControlsOpen",
+      "right_panel_quick_controls_open_key": "rightPanel.quickControlsOpen",
+      "right_panel_visual_alert_open_key": "rightPanel.visualAlertOpen",
+      "confirm_state": "confirmState",
+      "pending_delete_roi": "pendingDeleteROI"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

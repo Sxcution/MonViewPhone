@@ -356,7 +356,6 @@ function TileComponent({
                                     <MousePointer2 size={44} strokeWidth={1.8} />
                                 </div>
                                 <div className="tileViewingTitle">{viewingLabel}</div>
-                                <div className="tileViewingHint">{viewingHint}</div>
                             </div>
                         ) : statusTrimmed ? (
                             <div className={`tileStatusOverlay ${statusTone}`}>
@@ -369,10 +368,6 @@ function TileComponent({
                     </>
                 )}
             </div>
-
-            {isViewing ? (
-                <div className="tileViewingFooter">{t('Dang hien thi tren viewer')}</div>
-            ) : null}
         </div>
     );
 }
