@@ -4,8 +4,9 @@
 - `client/`: React + Vite frontend. This is the only frontend source used by `server-go/Start_PhoneFarm.bat`.
 - `server-go/`: Go backend. This is the only backend kept in the main project.
 - `APK Build/`: Android helper APK source.
+- [NEW] [assets/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/assets): Project assets directory. Contains `IconMonViewPhone.png` (original image) and `IconMonViewPhone.ico` (multi-size Windows icon file).
 - `rule.md`: Local development rules and UI interaction notes.
-- [NEW] [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw): Windows tray launcher and process manager for starting backend and frontend in the background. Handles standalone browser app window launch.
+- [NEW] [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw): Windows tray launcher and process manager for starting backend and frontend in the background. Handles standalone browser app window launch and loads the custom tray icon from `assets/IconMonViewPhone.png`.
 
 Removed legacy layers:
 - Root Electron wrapper.
@@ -19,7 +20,8 @@ Removed legacy layers:
 - `client/src/components/ViewerSidePanel.tsx`: Viewer-side controls for profiles, APK install, file import/export, and ADB commands.
 - `client/src/components/SyncPanel.tsx`: Device synchronization UI.
 - [NEW] [SyncTimeSettingsModal.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/SyncTimeSettingsModal.tsx): Standalone non-blocking Sync Time settings component. Features draggable headers, vertical line separator, and toggle buttons positioned before the input fields. Handles input locking/disabling when settings are off. Decoupled from Automation namespace.
-- `client/src/components/AutomationModal.tsx`: Refactored Automation modal focusing only on WeChat/Line/Tantan/Setting App Actions execution and coordinates recorder/playback Macro setting. Obsolete nested device selection list and Seeding jobs removed. Sync Macro settings integrated with custom SyncTimeSettingsModal overlay.
+- `client/src/components/AutomationModal.tsx`: Refactored Automation modal focusing only on WeChat/Line/Tantan/Setting App Actions execution and coordinates recorder/playback Macro setting. Obsolete nested device selection list and Seeding jobs removed. Sync Macro settings integrated with custom SyncTimeSettingsModal overlay. Exposes playAppAction and playing state via forwardRef useImperativeHandle.
+- [NEW] [AutomationPanel.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/AutomationPanel.tsx): Quick action slots sidebar panel. Features grid of empty slot buttons (`+`), action selection popovers, context menus to trigger/remove action bindings, settings gear shortcut to show the main modal, and panel toggle state.
 - [NEW] [automationData.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/automationData.ts): Shared data types, constants, default seeding list, and local storage read/write functions for the Automation subsystem.
 - [NEW] [syncMacroSettings.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/syncMacroSettings.ts): Local storage persistence, normalization, and delay helpers for Sync Macro.
 - [MODIFY] [VisualAlertPanel.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/VisualAlertPanel.tsx): Visual Alert UI panel for multi-ROI red-dot notification detection. Settings, Multi-ROI setup modal with canvas preview and multiple draggable ROI overlays, per-ROI test results, inline rename, toast notifications, and confirm delete ROI overlay modal. Rendered in right config panel.
@@ -31,7 +33,7 @@ Removed legacy layers:
 - `client/src/lib/visualAlertEngine.ts`: Pure logic engine for Visual Alert — supports Multi-ROI scanning via `scanCanvasROIs` (iterates each ROI, getImageData per region, counts red pixels per ROI), single-ROI `scanCanvasROI` for modal testing, AudioContext beep sound, browser Notification API. Includes migration from old single-ROI `roi` to new `rois[]` format. Settings persisted in localStorage key: `visualAlertGlobalSettingsV1`.
 - `client/src/lib/serverApi.ts`: HTTP API client for the Go backend.
 - `client/src/store/useTileOrder.ts`: Persistent device numbering and ordering.
-- `client/src/styles.css`: Main application styling.
+- `client/src/styles.css`: Main application styling. Defines design tokens, layout styles, and the standardized, unified CSS overlay confirm modal styling system.
 - `client/public/audio/`: Directory containing static audio assets, including `notification_new.mp3` for the default alert sound.
 
 

@@ -596,7 +596,7 @@ export const KeyToCodeMap = new Map([
     [UIEventsCode.NumpadComma, AndroidKeycode.KEYCODE_NUMPAD_COMMA],
     [UIEventsCode.NumpadDecimal, AndroidKeycode.KEYCODE_NUMPAD_DOT],
     [UIEventsCode.NumpadDivide, AndroidKeycode.KEYCODE_NUMPAD_DIVIDE],
-    [UIEventsCode.NumpadEnter, AndroidKeycode.KEYCODE_NUMPAD_ENTER],
+    [UIEventsCode.NumpadEnter, AndroidKeycode.KEYCODE_ENTER],
     [UIEventsCode.NumpadEqual, AndroidKeycode.KEYCODE_NUMPAD_EQUALS],
     [UIEventsCode.NumpadMultiply, AndroidKeycode.KEYCODE_NUMPAD_MULTIPLY],
     [UIEventsCode.NumpadParenLeft, AndroidKeycode.KEYCODE_NUMPAD_LEFT_PAREN],

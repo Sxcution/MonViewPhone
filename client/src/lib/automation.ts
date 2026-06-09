@@ -2,7 +2,6 @@ import {
   encodeKeycodeMessage,
   encodeTextMessage,
   encodeTouchMessage,
-  encodeSetClipboardMessage,
   KeyEventAction,
   MotionAction,
 } from '@/lib/control';
@@ -10,6 +9,8 @@ import type { InputTarget } from '@/context/ActiveContext';
 
 export const AUTOMATION_CLICK_EVENT = 'monviewphone:automation-click';
 export const AUTOMATION_SWIPE_EVENT = 'monviewphone:automation-swipe';
+export const AUTOMATION_KEY_EVENT = 'monviewphone:automation-key';
+export const AUTOMATION_TEXT_EVENT = 'monviewphone:automation-text';
 
 export type AutomationClickDetail = {
   udid: string;
@@ -38,6 +39,18 @@ export type AutomationSwipeDetail = {
   timestamp: number;
 };
 
+export type AutomationKeyDetail = {
+  udid: string;
+  keycode: number;
+  timestamp: number;
+};
+
+export type AutomationTextDetail = {
+  udid: string;
+  text: string;
+  timestamp: number;
+};
+
 export function emitAutomationClick(detail: AutomationClickDetail) {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent<AutomationClickDetail>(AUTOMATION_CLICK_EVENT, { detail }));
@@ -46,6 +59,16 @@ export function emitAutomationClick(detail: AutomationClickDetail) {
 export function emitAutomationSwipe(detail: AutomationSwipeDetail) {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent<AutomationSwipeDetail>(AUTOMATION_SWIPE_EVENT, { detail }));
+}
+
+export function emitAutomationKey(detail: AutomationKeyDetail) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent<AutomationKeyDetail>(AUTOMATION_KEY_EVENT, { detail }));
+}
+
+export function emitAutomationText(detail: AutomationTextDetail) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent<AutomationTextDetail>(AUTOMATION_TEXT_EVENT, { detail }));
 }
 
 export type AutomationStep =

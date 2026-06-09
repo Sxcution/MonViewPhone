@@ -221,6 +221,8 @@ function TileComponent({
         // Việc này ngăn ngừa kẹt trạng thái focus ở máy Follower khi rê chuột ra ngoài grid
         if (syncAll && syncMain) {
             selectOnly(syncMain);
+        } else {
+            selectOnly(null);
         }
     }, [syncAll, syncMain, selectOnly]);
 

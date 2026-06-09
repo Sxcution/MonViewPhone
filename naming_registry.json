@@ -11,7 +11,8 @@
       "viewer_side_panel": "ViewerSidePanel",
       "sidebar_device_grid": "SidebarDeviceGrid",
       "automation_modal": "AutomationModal",
-      "sync_time_settings_modal": "SyncTimeSettingsModal"
+      "sync_time_settings_modal": "SyncTimeSettingsModal",
+      "automation_panel": "AutomationPanel"
     },
     "css_classes": {
       "right_config_panel": "rightConfigPanel",
@@ -75,7 +76,22 @@
       "sync_time_range_dash": "syncTimeRangeDash",
       "active_sync": "active-sync",
       "offline_grid_item": "rcpGridItem.offline",
-      "sidebar_grid_12_cols": "rcpGrid12"
+      "sidebar_grid_12_cols": "rcpGrid12",
+      "modal_btn": "modalBtn",
+      "modal_btn_primary": "modalBtnPrimary",
+      "modal_btn_danger": "modalBtnDanger",
+      "modal_input": "modalInput",
+      "confirm_overlay": "confirmOverlay",
+      "confirm_panel": "confirmPanel",
+      "confirm_panel_compact": "confirmPanel compact",
+      "confirm_title": "confirmTitle",
+      "confirm_text": "confirmText",
+      "confirm_actions": "confirmActions",
+      "confirm_actions_center": "confirmActions center",
+      "rcp_automation_grid": "rcpAutomationGrid",
+      "rcp_automation_btn": "rcpAutomationBtn",
+      "automation_context_menu_panel": "automationContextMenuPanel",
+      "automation_context_menu_item": "automationContextMenuItem"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -84,7 +100,11 @@
       "text_main": "--text-main",
       "text_muted": "--text-muted",
       "border_color": "--border-color",
-      "accent_color": "--accent-color"
+      "accent_color": "--accent-color",
+      "modal_danger_bg": "--modal-danger-bg",
+      "modal_danger_bg_hover": "--modal-danger-bg-hover",
+      "modal_danger_bg_active": "--modal-danger-bg-active",
+      "modal_danger_border": "--modal-danger-border"
     },
     "state_variables": {
       "sidebar_collapsed": "sidebarCollapsed",
@@ -123,7 +143,9 @@
       "sync_time_hotkey": "syncTimeHotkey",
       "hotkey_section_open": "hotkeySectionOpen",
       "display_filter": "displayFilter",
-      "display_filter_open": "displayFilterOpen"
+      "display_filter_open": "displayFilterOpen",
+      "right_panel_automation_open_key": "rightPanel.automationOpen",
+      "automation_quick_slots_v1": "automationQuickSlotsV1"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
@@ -180,7 +202,8 @@
       "app_actions": "automationAppActionsV1",
       "device_profiles": "automationDeviceProfilesV1",
       "settings": "automationSettingsV1",
-      "sync_macro_settings": "manualSyncMacroSettingsV1"
+      "sync_macro_settings": "manualSyncMacroSettingsV1",
+      "automation_quick_slots": "automationQuickSlotsV1"
     },
     "components": {
       "confirm_delete_modal": "ConfirmDeleteModal",
@@ -202,5 +225,11 @@
     "power": 26,
     "volume_up": 24,
     "volume_down": 25
+  },
+  "project_assets": {
+    "app_icon_png": "assets/IconMonViewPhone.png",
+    "app_icon_ico": "assets/IconMonViewPhone.ico",
+    "favicon_ico": "client/public/favicon.ico",
+    "favicon_png": "client/public/favicon.png"
   }
 }

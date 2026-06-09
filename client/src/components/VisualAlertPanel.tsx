@@ -44,11 +44,12 @@ import { useVisualAlert } from '@/hooks/useVisualAlert';
 type VisualAlertPanelProps = {
   registeredUdids: string[];
   orderMap: Map<string, number>;
+  viewerUdid?: string | null;
 };
 
 /* ── Component ──────────────────────────────────────────────────── */
 
-export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanelProps) {
+export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: VisualAlertPanelProps) {
   const { getCanvasForUdid } = useActive();
 
   // Config state
@@ -252,6 +253,7 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
           redThreshold={config.redThreshold}
           onSave={handleROISave}
           onClose={() => setRoiModalOpen(false)}
+          viewerUdid={viewerUdid}
         />
       )}
     </>
@@ -265,6 +267,7 @@ type MultiROISetupModalProps = {
   redThreshold: VisualAlertConfig['redThreshold'];
   onSave: (rois: VisualAlertROI[]) => void;
   onClose: () => void;
+  viewerUdid?: string | null;
 };
 
 function MultiROISetupModal({
@@ -272,11 +275,12 @@ function MultiROISetupModal({
   redThreshold,
   onSave,
   onClose,
+  viewerUdid,
 }: MultiROISetupModalProps) {
-  const { getCanvasForUdid, activeUdid } = useActive();
+  const { getCanvasForUdid, activeUdid, selectedGridUdid } = useActive();
 
-  // Selected device uses the active device in Grid dynamically
-  const selectedUdid = activeUdid;
+  // Target device priority: viewerUdid > selectedGridUdid > activeUdid
+  const selectedUdid = viewerUdid || selectedGridUdid || activeUdid;
   const activeCanvas = selectedUdid ? getCanvasForUdid(selectedUdid) : null;
 
   const [draftROIs, setDraftROIs] = useState<VisualAlertROI[]>(
@@ -696,17 +700,16 @@ function MultiROISetupModal({
       </div>
 
       {pendingDeleteROI && (
-        <div className="confirmOverlay" style={{ zIndex: 28000 }} onMouseDown={() => setPendingDeleteROI(null)}>
-          <div className="confirmPanel" style={{ maxWidth: 320, textAlign: 'center' }} onMouseDown={e => e.stopPropagation()}>
-            <div className="confirmTitle" style={{ color: '#ff6b6b', fontSize: 16, fontWeight: 800 }}>Xoá điểm quét?</div>
-            <div className="confirmText" style={{ margin: '10px 0 20px', color: '#e6dcdc', fontSize: 13, lineHeight: 1.35 }}>
+        <div className="confirmOverlay" onMouseDown={() => setPendingDeleteROI(null)}>
+          <div className="confirmPanel compact" onMouseDown={e => e.stopPropagation()}>
+            <div className="confirmTitle">Xoá điểm quét?</div>
+            <div className="confirmText">
               Bạn có chắc muốn xoá điểm quét này không?
             </div>
-            <div className="confirmActions" style={{ justifyContent: 'center', gap: 12 }}>
+            <div className="confirmActions center">
               <button className="modalBtn" onClick={() => setPendingDeleteROI(null)}>Huỷ</button>
               <button
-                className="modalBtnPrimary"
-                style={{ background: '#e94560', borderColor: '#e94560' }}
+                className="modalBtnDanger"
                 onClick={() => {
                   handleDeleteROI(pendingDeleteROI);
                   setPendingDeleteROI(null);

@@ -8,7 +8,8 @@ import { useI18n } from '@/context/I18nContext'
 import { useDirectKeyboard } from '@/hooks/useDirectKeyboard'
 import { DeviceViewer } from '@/components/DeviceViewer'
 import { DeviceSelectionGrid, type DeviceSelectionGridItem } from '@/components/DeviceSelectionGrid'
-import { AutomationModal, type AutomationDeviceOption } from '@/components/AutomationModal'
+import { AutomationModal, type AutomationDeviceOption, type AutomationModalRef } from '@/components/AutomationModal'
+import { AutomationPanel } from '@/components/AutomationPanel'
 import { VisualAlertPanel } from '@/components/VisualAlertPanel'
 import { useActive } from '@/context/ActiveContext'
 import { AndroidKeycode } from '@/lib/keyEvent'
@@ -38,6 +39,10 @@ import {
   saveAppActions,
   loadSavedMacros,
   MACRO_RUNNING_UDIDS_EVENT,
+  MACRO_PLAYBACK_PROGRESS_EVENT,
+  MACRO_PLAYBACK_STOP_EVENT,
+  type MacroPlaybackProgressDetail,
+  type MacroPlaybackStopDetail,
   loadSeedingContents,
   saveSeedingContents,
   AUTOMATION_APPS,
@@ -199,15 +204,13 @@ type QuickActionId =
   | 'soundOn'
   | 'maxVolume'
   | 'syncTime'
-  | 'automation'
 
 const DEFAULT_QUICK_ACTION_ORDER: QuickActionId[] = [
   'screenOff',
   'mute',
   'soundOn',
   'maxVolume',
-  'syncTime',
-  'automation'
+  'syncTime'
 ]
 
 function loadQuickActionOrder(): QuickActionId[] {
@@ -274,6 +277,8 @@ export function App() {
     setSyncTargetsList,
     selectedGridUdid,
     clickDevice,
+    syncAll,
+    syncMain,
   } = useActive()
 
   const [streamConfig, setStreamConfig] = useState<StreamConfig>(() => {
@@ -560,15 +565,47 @@ export function App() {
     () => new Set(syncTargets)
   )
   const [runningMacroUdids, setRunningMacroUdids] = useState<Set<string>>(new Set())
+  const [macroPlaybackItems, setMacroPlaybackItems] = useState<MacroPlaybackProgressDetail[]>([])
+  const [macroPlaybackExpanded, setMacroPlaybackExpanded] = useState(true)
+  const [macroPlaybackNow, setMacroPlaybackNow] = useState(Date.now())
 
   useEffect(() => {
     const handleMacroRunning = (e: Event) => {
       const customEvent = e as CustomEvent<string[]>
-      setRunningMacroUdids(new Set(customEvent.detail || []))
+      const running = new Set(customEvent.detail || [])
+      setRunningMacroUdids(running)
+      if (running.size) {
+        setConnectSelection(prev => {
+          const next = new Set(prev)
+          running.forEach(udid => next.delete(udid))
+          return next
+        })
+      }
     }
     window.addEventListener(MACRO_RUNNING_UDIDS_EVENT, handleMacroRunning)
     return () => window.removeEventListener(MACRO_RUNNING_UDIDS_EVENT, handleMacroRunning)
   }, [])
+
+  useEffect(() => {
+    const handleProgress = (e: Event) => {
+      const detail = (e as CustomEvent<MacroPlaybackProgressDetail>).detail
+      if (!detail?.id) return
+      setMacroPlaybackItems(prev => {
+        if (!detail.running) return prev.filter(item => item.id !== detail.id)
+        const next = prev.filter(item => item.id !== detail.id)
+        return [...next, detail]
+      })
+      setMacroPlaybackNow(Date.now())
+    }
+    window.addEventListener(MACRO_PLAYBACK_PROGRESS_EVENT, handleProgress)
+    return () => window.removeEventListener(MACRO_PLAYBACK_PROGRESS_EVENT, handleProgress)
+  }, [])
+
+  useEffect(() => {
+    if (!macroPlaybackItems.length) return
+    const id = window.setInterval(() => setMacroPlaybackNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [macroPlaybackItems.length])
 
   type CtxSubState = null | {
     main: 'profileList' | { appId: AutomationAppId; actionId: string };
@@ -588,6 +625,7 @@ export function App() {
   const [inputState, setInputState] = useState<InputState>(null);
   const [deviceProfiles, setDeviceProfiles] = useState<AutomationDeviceProfile[]>([]);
   const [savedMacros, setSavedMacros] = useState<SavedAutomationMacro[]>([]);
+  const automationModalRef = useRef<AutomationModalRef>(null);
   const [appActions, setAppActions] = useState<Record<AutomationAppId, AutomationAppAction[]>>({ wechat: [], line: [], tantan: [], setting: [] });
 
   const [seedingSectionOpen, setSeedingSectionOpen] = useState(false);
@@ -601,7 +639,7 @@ export function App() {
 
   const seedingLineCount = useMemo(() => {
     if (!seedingContents) return 0;
-    return seedingContents.split('\n').filter(line => line.trim()).length;
+    return seedingContents.split(/[,\s]+/).filter(word => word.trim()).length;
   }, [seedingContents]);
 
   useEffect(() => {
@@ -1264,6 +1302,10 @@ export function App() {
     mergedOrder.forEach((id, idx) => m.set(id, getTileNumber(id, idx + 1)))
     return m
   }, [mergedOrder, getTileNumber])
+  const formatPlaybackElapsed = useCallback((startedAt: number) => {
+    const elapsedSec = Math.max(0, Math.floor((macroPlaybackNow - startedAt) / 1000))
+    return `${String(Math.floor(elapsedSec / 60)).padStart(2, '0')}:${String(elapsedSec % 60).padStart(2, '0')}`
+  }, [macroPlaybackNow])
   const orderedRegistered = useMemo(() => {
     const arr = [...filteredRegistered]
     arr.sort((a, b) => {
@@ -1310,9 +1352,13 @@ export function App() {
   )
   const [draggingQuickAction, setDraggingQuickAction] =
     useState<QuickActionId | null>(null)
+  const selectableRegistered = useMemo(
+    () => filteredRegistered.filter(id => !runningMacroUdids.has(id)),
+    [filteredRegistered, runningMacroUdids]
+  )
   const allSelected =
-    orderedRegistered.length > 0 &&
-    orderedRegistered.every(id => connectSelection.has(id))
+    selectableRegistered.length > 0 &&
+    selectableRegistered.every(id => connectSelection.has(id))
   const isSingleDevice = gridDevices.length === 1
 
   useEffect(() => {
@@ -1985,11 +2031,6 @@ export function App() {
         label: 'Sync Time',
         icon: <Clock3 size={15} strokeWidth={1.8} />,
         run: () => setSyncTimeModalOpen(true)
-      },
-      automation: {
-        label: 'Automation',
-        icon: <Bot size={15} strokeWidth={1.8} />,
-        run: () => setAutomationOpen(true)
       }
     }),
     [runQuickAdbCommands, quickCommandTargets]
@@ -2045,6 +2086,13 @@ export function App() {
           onPointerMove={onGridPointerMove}
           onPointerUp={onGridPointerUp}
           onPointerCancel={onGridPointerUp}
+          onPointerLeave={() => {
+            if (syncAll && syncMain) {
+              selectOnly(syncMain)
+            } else {
+              selectOnly(null)
+            }
+          }}
           onClick={(e) => {
             // Nếu vừa kéo rubber band xong, bỏ qua onClick để không reset selection
             if (rubberBandJustFinishedRef.current) return;
@@ -2101,7 +2149,7 @@ export function App() {
                   data-udid={udid}
                   className={`tileDraggableWrapper${isSingleDevice ? ' single' : ''
                     }${dragging ? ' dragging' : ''}${viewerUdid === udid ? ' hiddenByViewer' : ''
-                    }${dropTarget === udid ? ' dropTarget' : ''}`}
+                    }${dropTarget === udid ? ' dropTarget' : ''}${runningMacroUdids.has(udid) ? ' macroRunning' : ''}`}
                   onPointerDownCapture={e => {
                     if (e.button !== 2) return
                     const target = e.target as HTMLElement
@@ -2127,6 +2175,7 @@ export function App() {
 
                     // CHỈ CÓ TÁC DỤNG nếu đang đè phím Ctrl/Meta
                     if (!e.ctrlKey && !e.metaKey) return;
+                    if (runningMacroUdids.has(udid)) return;
 
                     // Chọn/Bỏ chọn đa nhiệm (viền xanh)
                     setConnectSelection(prev => {
@@ -2599,6 +2648,15 @@ export function App() {
             <VisualAlertPanel
               registeredUdids={registeredUdids}
               orderMap={orderMap}
+              viewerUdid={viewerUdid}
+            />
+
+            <AutomationPanel
+              key={automationOpen ? 'open' : 'closed'}
+              onOpenSettings={() => setAutomationOpen(true)}
+              playAppAction={(appId, actionId) => {
+                automationModalRef.current?.playAppAction(appId as any, actionId)
+              }}
             />
 
             <div className='rcpSection'>
@@ -2684,13 +2742,9 @@ export function App() {
                       setConnectSelection(prev => {
                         const next = new Set(prev)
                         if (allSelected) {
-                          filteredRegistered.forEach(id => next.delete(id))
+                          selectableRegistered.forEach(id => next.delete(id))
                         } else {
-                          filteredRegistered.forEach(id => {
-                            if (!runningMacroUdids.has(id)) {
-                              next.add(id)
-                            }
-                          })
+                          selectableRegistered.forEach(id => next.add(id))
                         }
                         return next
                       })
@@ -2700,7 +2754,7 @@ export function App() {
                     <span className='rcpSelectText'>
                       {allSelected ? t('Deselect all') : t('Select all')}
                     </span>
-                    <span className='rcpSelectCount'>({filteredRegistered.length})</span>
+                    <span className='rcpSelectCount'>({selectableRegistered.length})</span>
                   </button>
                 </div>
                 <div className='rcpDeviceToolbar'>
@@ -3425,12 +3479,55 @@ export function App() {
       ) : null}
 
       <AutomationModal
+        ref={automationModalRef}
         open={automationOpen}
         devices={automationDevices}
         selectedUdids={selectedVisible}
         viewerUdid={viewerUdid}
         onClose={() => setAutomationOpen(false)}
       />
+      {macroPlaybackItems.length ? createPortal(
+        <section className={`macroPlaybackPanel${macroPlaybackExpanded ? ' expanded' : ' collapsed'}`} aria-label='Automation Playback'>
+          <header className='macroPlaybackHeader'>
+            <div className='macroPlaybackHeading'>
+              <span>Automation Playback</span>
+              <small>{macroPlaybackItems.length} đang chạy</small>
+            </div>
+            <button
+              type='button'
+              className='modalBtn macroPlaybackToggleBtn'
+              onClick={() => setMacroPlaybackExpanded(prev => !prev)}
+            >
+              {macroPlaybackExpanded ? 'Thu gọn' : 'Mở rộng'}
+            </button>
+          </header>
+          {macroPlaybackExpanded ? (
+            <div className='macroPlaybackList'>
+              {macroPlaybackItems.map(item => (
+                <div key={item.id} className='macroPlaybackItem'>
+                  <div className='macroPlaybackItemText'>
+                    <span>Đang chạy:</span>
+                    <strong>{item.title}</strong>
+                    <small>{formatPlaybackElapsed(item.startedAt)}</small>
+                  </div>
+                  <button
+                    type='button'
+                    className='modalBtnDanger macroPlaybackStopBtn'
+                    onClick={() => {
+                      const detail: MacroPlaybackStopDetail = { id: item.id }
+                      window.dispatchEvent(new CustomEvent(MACRO_PLAYBACK_STOP_EVENT, { detail }))
+                      setMacroPlaybackItems(prev => prev.filter(progress => progress.id !== item.id))
+                    }}
+                  >
+                    Stop
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>,
+        document.body,
+      ) : null}
 
       {/* Modal Thêm Nhóm */}
       {groupModalOpen && (
@@ -3492,27 +3589,19 @@ export function App() {
 
       {/* Modal xác nhận xoá nhóm */}
       {deleteGroupConfirm !== null && (
-        <div
-          className='confirmOverlay'
-          onMouseDown={() => setDeleteGroupConfirm(null)}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <div
-            className='confirmPanel'
-            style={{ maxWidth: 320, textAlign: 'center' }}
-            onMouseDown={e => e.stopPropagation()}
-          >
-            <div className='confirmText' style={{ marginBottom: 20 }}>
+        <div className='confirmOverlay' onMouseDown={() => setDeleteGroupConfirm(null)}>
+          <div className='confirmPanel compact' onMouseDown={e => e.stopPropagation()}>
+            <div className='confirmTitle'>Xoá nhóm</div>
+            <div className='confirmText'>
               Bạn có chắc muốn xoá nhóm{' '}
               <strong>"{savedGroups[deleteGroupConfirm]?.name}"</strong>?
             </div>
-            <div className='confirmBtns' style={{ marginTop: 0, justifyContent: 'center', display: 'flex', gap: 12 }}>
+            <div className='confirmActions center'>
               <button className='modalBtn' onClick={() => setDeleteGroupConfirm(null)}>
                 Huỷ
               </button>
               <button
-                className='modalBtnPrimary'
-                style={{ background: '#e94560', borderColor: '#e94560' }}
+                className='modalBtnDanger'
                 onClick={() => {
                   const idx = deleteGroupConfirm
                   setSavedGroups(prev => {
@@ -4294,21 +4383,20 @@ export function App() {
       </div>
 
       {confirmState && (
-        <div className="confirmOverlay" style={{ zIndex: 28000 }} onMouseDown={() => setConfirmState(null)}>
-          <div className="confirmPanel" style={{ maxWidth: 360 }} onMouseDown={e => e.stopPropagation()}>
-            <div className="confirmTitle" style={{ color: confirmState.danger ? '#ff6b6b' : '#ffb0b0' }}>
+        <div className="confirmOverlay" onMouseDown={() => setConfirmState(null)}>
+          <div className={`confirmPanel${confirmState.danger ? ' compact' : ''}`} onMouseDown={e => e.stopPropagation()}>
+            <div className="confirmTitle">
               {confirmState.title}
             </div>
-            <div className="confirmText" style={{ margin: '10px 0 20px', color: '#e6dcdc', fontSize: 13, lineHeight: 1.35 }}>
+            <div className="confirmText">
               {confirmState.message}
             </div>
-            <div className="confirmActions">
+            <div className={`confirmActions${confirmState.danger ? ' center' : ''}`}>
               <button className="modalBtn" onClick={() => setConfirmState(null)}>
                 {confirmState.cancelText || 'Huỷ'}
               </button>
               <button
-                className="modalBtnPrimary"
-                style={confirmState.danger ? { background: '#e94560', borderColor: '#e94560' } : undefined}
+                className={confirmState.danger ? 'modalBtnDanger' : 'modalBtnPrimary'}
                 onClick={() => {
                   const fn = confirmState.onConfirm;
                   setConfirmState(null);
@@ -4370,19 +4458,15 @@ function InputModalOverlayInner({ state, onClose }: { state: NonNullable<InputMo
 
   return createPortal(
     <>
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.62)', zIndex: 27000 }} onClick={onClose} />
-      <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 27001, padding: 24 }} onClick={onClose}>
-        <div style={{ background: '#1f1f1f', color: '#f3f4f6', border: '1px solid #3c3c3c', borderRadius: 6, minWidth: 380, maxWidth: 480, width: '100%', boxShadow: '0 24px 70px rgba(0,0,0,0.58)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderBottom: '1px solid #343434', background: '#242424' }}>
-            <h5 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{state.title}</h5>
-            <button type='button' style={{ display: 'grid', placeItems: 'center', width: 30, height: 30, padding: 0, color: '#d9d9d9', background: '#2b2b2b', border: '1px solid #454545', borderRadius: 4, cursor: 'pointer', fontSize: 14, lineHeight: 1 }} aria-label='Close' onClick={onClose}>✖</button>
-          </div>
-          <div style={{ padding: '16px 14px' }}>
-            {state.label ? <label style={{ display: 'block', marginBottom: 8, fontSize: 13, fontWeight: 600, color: '#c9d4e5' }}>{state.label}</label> : null}
+      <div className="confirmOverlay" onMouseDown={onClose}>
+        <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480 }} onMouseDown={e => e.stopPropagation()}>
+          <div className="confirmTitle">{state.title}</div>
+          <div className="confirmText">
+            {state.label ? <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>{state.label}</label> : null}
             <input
               ref={inputRef}
               type='text'
-              style={{ width: '100%', padding: '8px 12px', background: '#181818', color: '#f3f4f6', border: '1px solid #3c3c3c', borderRadius: 4, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+              className="modalInput"
               placeholder={state.placeholder ?? ''}
               value={value}
               onChange={e => setValue(e.target.value)}
@@ -4392,23 +4476,12 @@ function InputModalOverlayInner({ state, onClose }: { state: NonNullable<InputMo
               }}
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 14px', borderTop: '1px solid #343434', background: '#242424' }}>
-            <button type='button' style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 34, padding: '0 16px', border: '1px solid #3b3b3b', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#f8fafc', background: '#2b2b2b', transition: 'all 0.15s ease' }} onClick={onClose}>Huỷ</button>
+          <div className="confirmActions">
+            <button type='button' className="modalBtn" onClick={onClose}>Huỷ</button>
             <button
               type='button'
+              className="modalBtnPrimary"
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: 34,
-                padding: '0 16px',
-                border: '1px solid rgba(13,110,253,0.75)',
-                borderRadius: 6,
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#8ec5ff',
-                background: 'rgba(13,110,253,0.22)',
-                transition: 'all 0.15s ease',
                 opacity: value.trim() ? 1 : 0.5,
                 cursor: value.trim() ? 'pointer' : 'not-allowed'
               }}

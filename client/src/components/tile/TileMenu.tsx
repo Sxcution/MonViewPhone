@@ -83,12 +83,7 @@ export function TileMenu({
                     className="tileMenuBtn"
                     title="Set order index"
                     onClick={() => {
-                        const cur = typeof orderIndex === 'number' ? String(orderIndex) : '';
-                        const s = window.prompt('Order index (1..N):', cur);
-                        if (!s) return;
-                        const n = Number(s);
-                        if (!Number.isFinite(n) || n <= 0) return;
-                        onSetOrderIndex(udid, Math.floor(n));
+                        console.warn('Native prompt disabled to comply with UI rules.');
                     }}
                 >
                     <Hash size={18} strokeWidth={1.8} />

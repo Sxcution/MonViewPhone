@@ -92,18 +92,39 @@ def exit_application(icon, item):
     icon.stop()
     clean_up()
 
+def restart_application(icon, item):
+    icon.stop()
+    clean_up()
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    subprocess.Popen(
+        [sys.executable] + sys.argv,
+        cwd=script_dir,
+        creationflags=subprocess.CREATE_NO_WINDOW
+    )
+    sys.exit(0)
+
 def create_tray_icon():
-    width, height = 64, 64
-    image = Image.new('RGB', (width, height), color='#2596be')
-    draw = ImageDraw.Draw(image)
-    try:
-        font = ImageFont.truetype("arial.ttf", 40)
-        draw.text((15, 8), "P", fill="#ffffff", font=font)
-    except Exception:
-        draw.text((15, 10), "P", fill="#ffffff")
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "IconMonViewPhone.png")
+    image = None
+    if os.path.exists(icon_path):
+        try:
+            image = Image.open(icon_path)
+        except Exception as e:
+            print(f"Failed to load tray icon image: {e}")
+
+    if image is None:
+        width, height = 64, 64
+        image = Image.new('RGB', (width, height), color='#2596be')
+        draw = ImageDraw.Draw(image)
+        try:
+            font = ImageFont.truetype("arial.ttf", 40)
+            draw.text((15, 8), "P", fill="#ffffff", font=font)
+        except Exception:
+            draw.text((15, 10), "P", fill="#ffffff")
 
     menu = TrayMenu(
-        TrayMenuItem("Open MonViewPhone", open_app, default=True),
+        TrayMenuItem("Open", open_app, default=True),
+        TrayMenuItem("Restart", restart_application),
         TrayMenuItem("Exit", exit_application)
     )
 

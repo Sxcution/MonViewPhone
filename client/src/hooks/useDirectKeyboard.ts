@@ -3,6 +3,7 @@ import { encodeKeycodeMessage, encodeTextMessage, encodeSetClipboardMessage, Key
 import { AndroidKeycode, KeyToCodeMap } from '@/lib/keyEvent';
 import { useActive } from '@/context/ActiveContext';
 import { matchesHotkey } from '@/lib/syncTimeSettings';
+import { emitAutomationKey, emitAutomationText } from '@/lib/automation';
 
 type GlobalWithToggle = typeof window & { __disableDirectKeyboard?: boolean };
 const PASTE_SINK_ID = '__scrcpy_paste_sink';
@@ -56,6 +57,9 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
   function flushText() {
     const buf = kbBufRef.current;
     if (!buf) return;
+    if (activeUdid) {
+      emitAutomationText({ udid: activeUdid, text: buf, timestamp: Date.now() });
+    }
     sendToActive(encodeTextMessage(buf));
     kbBufRef.current = '';
     flushTimerRef.current = null;
@@ -72,12 +76,15 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
+        if (activeUdid) {
+          emitAutomationText({ udid: activeUdid, text, timestamp: Date.now() });
+        }
         sendToActive(encodeSetClipboardMessage(text, true));
       }
     } catch (err) {
       console.warn('[manualPaste] clipboard.readText failed:', err);
     }
-  }, [sendToActive]);
+  }, [activeUdid, sendToActive]);
 
   // Giữ hidden textarea luôn focus khi có device active
   useEffect(() => {
@@ -191,6 +198,9 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
         (e.getModifierState('ScrollLock') ? AndroidKeycode.META_SCROLL_LOCK_ON : 0) |
         (e.getModifierState('NumLock') ? AndroidKeycode.META_NUM_LOCK_ON : 0);
 
+      if (!e.repeat && activeUdid) {
+        emitAutomationKey({ udid: activeUdid, keycode: keyCode, timestamp: Date.now() });
+      }
       sendToActive(encodeKeycodeMessage(KeyEventAction.DOWN, keyCode, repeatCount, metaState));
       e.preventDefault();
     };
@@ -259,6 +269,9 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       }
       const text = e.clipboardData?.getData('text/plain');
       if (text) {
+        if (activeUdid) {
+          emitAutomationText({ udid: activeUdid, text, timestamp: Date.now() });
+        }
         sendToActive(encodeSetClipboardMessage(text, true));
         e.preventDefault();
         // Xóa nội dung textarea ẩn để không lưu rác
@@ -273,7 +286,7 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       window.removeEventListener('keyup', onKeyUp, { capture: true } as any);
       window.removeEventListener('paste', onPaste, { capture: true } as any);
     };
-  }, [enabled, allowedContainer, sendToActive]);
+  }, [enabled, allowedContainer, activeUdid, sendToActive]);
 
   return { queueText, flushText, manualPaste };
 }

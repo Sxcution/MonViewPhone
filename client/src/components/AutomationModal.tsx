@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ChevronDown,
@@ -21,10 +21,14 @@ import {
 import { useActive } from '@/context/ActiveContext';
 import {
   AUTOMATION_CLICK_EVENT,
+  AUTOMATION_KEY_EVENT,
   AUTOMATION_SWIPE_EVENT,
+  AUTOMATION_TEXT_EVENT,
   runScript,
   type AutomationClickDetail,
+  type AutomationKeyDetail,
   type AutomationSwipeDetail,
+  type AutomationTextDetail,
   type AutomationStep,
 } from '@/lib/automation';
 import { AndroidKeycode } from '@/lib/keyEvent';
@@ -51,8 +55,13 @@ import {
   saveAppActions,
   loadDeviceProfiles,
   saveDeviceProfiles,
+  loadSeedingContents,
   AUTOMATION_DATA_CHANGED_EVENT,
   MACRO_RUNNING_UDIDS_EVENT,
+  MACRO_PLAYBACK_PROGRESS_EVENT,
+  MACRO_PLAYBACK_STOP_EVENT,
+  type MacroPlaybackProgressDetail,
+  type MacroPlaybackStopDetail,
 } from '@/lib/automationData';
 
 /* ── types ── */
@@ -62,6 +71,11 @@ export type AutomationDeviceOption = {
   number: number;
   manufacturer?: string;
   model?: string;
+};
+
+export type AutomationModalRef = {
+  playAppAction: (appId: AutomationAppId, actionId: string) => Promise<void>;
+  playing: boolean;
 };
 
 type AutomationContextMenuTarget =
@@ -201,6 +215,8 @@ function formatMacroDelay(row: AutomationMacroRow) {
 
 function isRunnableMacroRow(row: AutomationMacroRow) {
   if (row.action === 'seeding') return true;
+  if (row.action === 'key') return Number.isFinite(row.keycode);
+  if (row.action === 'text') return Boolean(row.text?.length);
   if (row.action === 'swipe') {
     return row.x01 != null && row.y01 != null && row.endX01 != null && row.endY01 != null;
   }
@@ -222,6 +238,10 @@ function rowToSteps(row: AutomationMacroRow, opts?: { seedingText?: string }): A
     steps.push({ type: 'tap', x01: row.x01, y01: row.y01 });
   } else if (row.action === 'seeding' && opts?.seedingText) {
     steps.push({ type: 'text', text: opts.seedingText }, { type: 'key', keycode: AndroidKeycode.KEYCODE_ENTER });
+  } else if (row.action === 'key' && Number.isFinite(row.keycode)) {
+    steps.push({ type: 'key', keycode: Math.floor(row.keycode ?? 0) });
+  } else if (row.action === 'text' && row.text) {
+    steps.push({ type: 'text', text: row.text });
   }
   return steps;
 }
@@ -242,9 +262,11 @@ function clamp01Value(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
-function formatMacroAction(action: 'touch' | 'swipe' | 'seeding') {
+function formatMacroAction(action: AutomationMacroRow['action']) {
   if (action === 'swipe') return 'Vuốt';
   if (action === 'seeding') return 'Seeding';
+  if (action === 'key') return 'Key';
+  if (action === 'text') return 'Text';
   return 'Touch';
 }
 
@@ -253,10 +275,14 @@ function formatStepDetails(row: AutomationMacroRow) {
     return `(${row.x ?? ''},${row.y ?? ''}) → (${row.endX ?? ''},${row.endY ?? ''}) ${row.durationMs ?? 0}ms`;
   }
   if (row.action === 'seeding') return 'Random từ ngữ chung + Enter';
+  if (row.action === 'key') return `Keycode=${row.keycode ?? ''}`;
+  if (row.action === 'text') return row.text ? `Text="${row.text}"` : 'Text=""';
   return `X=${row.x == null ? '' : row.x}, Y=${row.y == null ? '' : row.y}`;
 }
 
-function makeActionPatch(row: AutomationMacroRow, action: 'touch' | 'swipe' | 'seeding'): Partial<AutomationMacroRow> {
+function makeActionPatch(row: AutomationMacroRow, action: AutomationMacroRow['action']): Partial<AutomationMacroRow> {
+  if (action === 'key') return { action, keycode: row.keycode ?? AndroidKeycode.KEYCODE_ENTER };
+  if (action === 'text') return { action, text: row.text ?? '' };
   if (action !== 'swipe') return { action };
   const width = row.width || 1;
   const height = row.height || 1;
@@ -307,46 +333,50 @@ function randomInt(min: number, max: number) {
 }
 
 function pickSeedingContent() {
-  const raw = localStorage.getItem('automationSeedingContentsV1') || '';
-  const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  if (!lines.length) return '';
-  return lines[Math.floor(Math.random() * lines.length)];
+  const raw = loadSeedingContents();
+  const words = raw.split(/[,\s]+/).map(word => word.trim()).filter(Boolean);
+  if (!words.length) return '';
+  const count = randomInt(1, 8);
+  const out: string[] = [];
+  const used = new Set<number>();
+  while (out.length < count && used.size < words.length) {
+    const index = randomInt(0, words.length - 1);
+    if (used.has(index)) continue;
+    used.add(index);
+    out.push(words[index]);
+  }
+  return out.join(' ');
 }
 
-/* ── Modal Styles ── */
-
-const MODAL_BACKDROP: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.62)', zIndex: 27000 };
-const MODAL_OVERLAY: React.CSSProperties = { position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 27001, padding: 24 };
-const MODAL_CARD: React.CSSProperties = { background: '#1f1f1f', color: '#f3f4f6', border: '1px solid #3c3c3c', borderRadius: 6, minWidth: 380, maxWidth: 480, width: '100%', boxShadow: '0 24px 70px rgba(0,0,0,0.58)', overflow: 'hidden' };
-const MODAL_HEADER: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderBottom: '1px solid #343434', background: '#242424' };
-const MODAL_BODY: React.CSSProperties = { padding: '16px 14px' };
-const MODAL_FOOTER: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 14px', borderTop: '1px solid #343434', background: '#242424' };
-const MODAL_TITLE: React.CSSProperties = { margin: 0, fontSize: 16, fontWeight: 700 };
-const MODAL_CLOSE_BTN: React.CSSProperties = { display: 'grid', placeItems: 'center', width: 30, height: 30, padding: 0, color: '#d9d9d9', background: '#2b2b2b', border: '1px solid #454545', borderRadius: 4, cursor: 'pointer', fontSize: 14, lineHeight: 1 };
-const BTN_BASE: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 34, padding: '0 16px', border: '1px solid #3b3b3b', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#f8fafc', background: '#2b2b2b', transition: 'all 0.15s ease' };
-const BTN_CANCEL: React.CSSProperties = { ...BTN_BASE };
-const BTN_DANGER: React.CSSProperties = { ...BTN_BASE, background: '#c0392b', borderColor: 'rgba(192,57,43,0.6)', color: '#fff' };
-const BTN_PRIMARY: React.CSSProperties = { ...BTN_BASE, background: 'rgba(13,110,253,0.22)', borderColor: 'rgba(13,110,253,0.75)', color: '#8ec5ff' };
-const INPUT_STYLE: React.CSSProperties = { width: '100%', padding: '8px 12px', background: '#181818', color: '#f3f4f6', border: '1px solid #3c3c3c', borderRadius: 4, fontSize: 14, outline: 'none', boxSizing: 'border-box' };
-const LABEL_STYLE: React.CSSProperties = { display: 'block', marginBottom: 8, fontSize: 13, fontWeight: 600, color: '#c9d4e5' };
+function pickSeedingContents(count: number) {
+  const raw = loadSeedingContents();
+  const words = raw.split(/[,\s]+/).map(word => word.trim()).filter(Boolean);
+  if (!words.length || count <= 0) return [];
+  const seen = new Set<string>();
+  return Array.from({ length: count }, () => {
+    let phrase = '';
+    for (let tries = 0; tries < 24; tries++) {
+      phrase = pickSeedingContent();
+      if (phrase && !seen.has(phrase)) break;
+    }
+    if (phrase) seen.add(phrase);
+    return phrase;
+  }).filter(Boolean);
+}
 
 function ConfirmDeleteModal({ state, onClose }: { state: ConfirmModalState; onClose: () => void }) {
   if (!state) return null;
   return createPortal(
     <>
-      <div style={MODAL_BACKDROP} onClick={onClose} />
-      <div style={MODAL_OVERLAY} onClick={onClose}>
-        <div style={MODAL_CARD} onClick={e => e.stopPropagation()}>
-          <div style={MODAL_HEADER}>
-            <h5 style={MODAL_TITLE}>{state.title}</h5>
-            <button type='button' style={MODAL_CLOSE_BTN} aria-label='Close' onClick={onClose}>✕</button>
+      <div className="confirmOverlay" onMouseDown={onClose}>
+        <div className="confirmPanel compact" onMouseDown={e => e.stopPropagation()}>
+          <div className="confirmTitle">{state.title}</div>
+          <div className="confirmText" style={{ whiteSpace: 'pre-wrap' }}>
+            {state.message}
           </div>
-          <div style={MODAL_BODY}>
-            <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: 14 }}>{state.message}</p>
-          </div>
-          <div style={MODAL_FOOTER}>
-            <button type='button' style={BTN_CANCEL} onClick={onClose}>Huỷ</button>
-            <button type='button' style={BTN_DANGER} onClick={state.onConfirm}>Xác Nhận</button>
+          <div className="confirmActions center">
+            <button type='button' className="modalBtn" onClick={onClose}>Huỷ</button>
+            <button type='button' className="modalBtnDanger" onClick={state.onConfirm}>Xác Nhận</button>
           </div>
         </div>
       </div>
@@ -372,19 +402,15 @@ function InputModalInner({ state, onClose }: { state: NonNullable<InputModalStat
 
   return createPortal(
     <>
-      <div style={MODAL_BACKDROP} onClick={onClose} />
-      <div style={MODAL_OVERLAY} onClick={onClose}>
-        <div style={MODAL_CARD} onClick={e => e.stopPropagation()}>
-          <div style={MODAL_HEADER}>
-            <h5 style={MODAL_TITLE}>{state.title}</h5>
-            <button type='button' style={MODAL_CLOSE_BTN} aria-label='Close' onClick={onClose}>✕</button>
-          </div>
-          <div style={MODAL_BODY}>
-            {state.label ? <label style={LABEL_STYLE}>{state.label}</label> : null}
+      <div className="confirmOverlay" onMouseDown={onClose}>
+        <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480 }} onMouseDown={e => e.stopPropagation()}>
+          <div className="confirmTitle">{state.title}</div>
+          <div className="confirmText">
+            {state.label ? <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>{state.label}</label> : null}
             <input
               ref={inputRef}
               type='text'
-              style={INPUT_STYLE}
+              className="modalInput"
               placeholder={state.placeholder ?? ''}
               value={value}
               onChange={e => setValue(e.target.value)}
@@ -394,12 +420,12 @@ function InputModalInner({ state, onClose }: { state: NonNullable<InputModalStat
               }}
             />
           </div>
-          <div style={MODAL_FOOTER}>
-            <button type='button' style={BTN_CANCEL} onClick={onClose}>Huỷ</button>
+          <div className="confirmActions">
+            <button type='button' className="modalBtn" onClick={onClose}>Huỷ</button>
             <button
               type='button'
+              className="modalBtnPrimary"
               style={{
-                ...BTN_PRIMARY,
                 opacity: value.trim() ? 1 : 0.5,
                 cursor: value.trim() ? 'pointer' : 'not-allowed',
               }}
@@ -421,15 +447,88 @@ function InputModal({ state, onClose }: { state: InputModalState; onClose: () =>
   return <InputModalInner key={state.key} state={state} onClose={onClose} />;
 }
 
+function DeviceAssignModal({
+  profileId,
+  devices,
+  deviceProfiles,
+  onSave,
+  onClose,
+}: {
+  profileId: string;
+  devices: AutomationDeviceOption[];
+  deviceProfiles: AutomationDeviceProfile[];
+  onSave: (udids: string[]) => void;
+  onClose: () => void;
+}) {
+  const profile = deviceProfiles.find(p => p.id === profileId);
+  if (!profile) return null;
+
+  const [checkedUdids, setCheckedUdids] = useState<string[]>(() => [...profile.udids]);
+
+  const toggleUdid = (udid: string) => {
+    setCheckedUdids(prev => {
+      if (prev.includes(udid)) {
+        return prev.filter(u => u !== udid);
+      } else {
+        return [...prev, udid];
+      }
+    });
+  };
+
+  return createPortal(
+    <div className='confirmOverlay' onMouseDown={onClose}>
+      <div className='confirmPanel' onMouseDown={e => e.stopPropagation()} style={{ width: '400px' }}>
+        <div className='confirmTitle'>Gán thiết bị</div>
+        <div className='confirmText' style={{ marginBottom: 12 }}>
+          Chọn các thiết bị gán cho profile <strong>"{profile.name}"</strong>:
+        </div>
+        <div className='automationDeviceSelectList'>
+          {devices.map(device => {
+            const isChecked = checkedUdids.includes(device.udid);
+            const otherProfile = deviceProfiles.find(p => p.id !== profileId && p.udids.includes(device.udid));
+            return (
+              <label key={device.udid} className='automationDeviceSelectRow'>
+                <input
+                  type='checkbox'
+                  checked={isChecked}
+                  onChange={() => toggleUdid(device.udid)}
+                />
+                <span className='automationDeviceSelectLabel'>
+                  No. {device.number} - {[device.manufacturer, device.model].filter(Boolean).join(' ') || 'Device'} ({device.udid}) {otherProfile ? `[Profile: ${otherProfile.name}]` : ''}
+                </span>
+              </label>
+            );
+          })}
+          {!devices.length ? <div style={{ padding: 12, textAlign: 'center', color: '#888' }}>Không có máy online</div> : null}
+        </div>
+        <div className='confirmActions center'>
+          <button type='button' className='modalBtn' onClick={onClose}>
+            Huỷ
+          </button>
+          <button
+            type='button'
+            className='modalBtnPrimary'
+            onClick={() => onSave(checkedUdids)}
+          >
+            Lưu
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 /* ── main component ── */
 
-export function AutomationModal({
-  open,
-  devices,
-  selectedUdids,
-  viewerUdid = null,
-  onClose,
-}: AutomationModalProps) {
+export const AutomationModal = forwardRef<any, AutomationModalProps>(
+  function AutomationModalComponent({
+    open,
+    devices,
+    selectedUdids,
+    viewerUdid = null,
+    onClose,
+  }, ref) {
   const { getTargetsByUdids } = useActive();
 
   /* ── state ── */
@@ -438,6 +537,8 @@ export function AutomationModal({
   const [rows, setRows] = useState<AutomationMacroRow[]>([]);
   const [recording, setRecording] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [showProfileSection, setShowProfileSection] = useState(true);
+  const [deviceAssigningProfileId, setDeviceAssigningProfileId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [savedMacros, setSavedMacros] = useState<SavedAutomationMacro[]>(loadSavedMacros);
   const [appActions, setAppActions] = useState<Record<AutomationAppId, AutomationAppAction[]>>(loadAppActions);
@@ -456,6 +557,7 @@ export function AutomationModal({
   const [currentMacroName, setCurrentMacroName] = useState('');
   const [position, setPosition] = useState({ x: 120, y: 80 });
   const [draggingRowId, setDraggingRowId] = useState<string | null>(null);
+  const [editingTouchRowId, setEditingTouchRowId] = useState<string | null>(null);
   const [realtimeRecording, setRealtimeRecording] = useState(() => loadAutomationSettings().realtimeRecording);
 
   // Sync Macro state
@@ -468,7 +570,9 @@ export function AutomationModal({
 
   const recordingRef = useRef(false);
   const recordTargetRef = useRef<string | null>(null);
-  const abortPlaybackRef = useRef<AbortController | null>(null);
+  const editingTouchRowIdRef = useRef<string | null>(null);
+  const playbackControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const manualPlaybackIdRef = useRef<string | null>(null);
   const dragRef = useRef({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 });
   const lastRecordTimestampRef = useRef<number>(0);
   const macroRunningCounterRef = useRef<Map<string, number>>(new Map());
@@ -537,6 +641,10 @@ export function AutomationModal({
     window.dispatchEvent(new CustomEvent(MACRO_RUNNING_UDIDS_EVENT, { detail: running }));
   }, []);
 
+  const updatePlaybackProgress = useCallback((detail: MacroPlaybackProgressDetail) => {
+    window.dispatchEvent(new CustomEvent(MACRO_PLAYBACK_PROGRESS_EVENT, { detail }));
+  }, []);
+
   const updateMacroSortMode = useCallback((mode: MacroSortMode) => {
     setMacroSortMode(mode);
     saveMacroSortMode(mode);
@@ -545,12 +653,12 @@ export function AutomationModal({
 
   const closeModal = useCallback(() => {
     setRecording(false);
+    setEditingTouchRowId(null);
     setActionOverlayOpen(null);
     setAutomationContextMenu(null);
     setMacroCtxMenu(null);
     setRowDelayCtxMenu(null);
     setMacroSortMenuOpen(false);
-    abortPlaybackRef.current?.abort();
     onClose();
   }, [onClose]);
 
@@ -799,6 +907,16 @@ export function AutomationModal({
     setRows(prev => prev.map(row => (row.id === id ? { ...row, ...patch } : row)));
   }, []);
 
+  const startEditTouchDetails = useCallback((row: AutomationMacroRow, index: number) => {
+    if (row.action !== 'touch') return;
+    if (!recordTargetUdid) {
+      setStatus(SELECT_ONE_DEVICE_MSG);
+      return;
+    }
+    setEditingTouchRowId(row.id);
+    setStatus(`Chọn tọa độ mới cho step ${index + 1}`);
+  }, [recordTargetUdid]);
+
   const deleteRow = useCallback((rowId: string) => {
     setRows(prev => {
       const index = prev.findIndex(row => row.id === rowId);
@@ -806,6 +924,7 @@ export function AutomationModal({
       setStatus(index >= 0 ? `Đã xoá step ${index + 1}` : 'Đã xoá step');
       return next;
     });
+    if (editingTouchRowIdRef.current === rowId) setEditingTouchRowId(null);
     setRowDelayCtxMenu(null);
   }, []);
 
@@ -825,7 +944,7 @@ export function AutomationModal({
     });
   }, []);
 
-  const changeRowAction = useCallback((row: AutomationMacroRow, action: 'touch' | 'swipe' | 'seeding') => {
+  const changeRowAction = useCallback((row: AutomationMacroRow, action: AutomationMacroRow['action']) => {
     updateRow(row.id, makeActionPatch(row, action));
   }, [updateRow]);
 
@@ -971,8 +1090,9 @@ export function AutomationModal({
       if (controller.signal.aborted) return;
     }
     const seedingText = row.action === 'seeding' ? pickSeedingContent() : undefined;
+    const seedingTexts = row.action === 'seeding' ? pickSeedingContents(targets.length) : [];
     if (row.action === 'seeding') {
-      if (!seedingText) {
+      if (!seedingTexts.length) {
         setStatus('Seeding lỗi: danh sách từ ngữ chung trống');
         return;
       }
@@ -985,6 +1105,28 @@ export function AutomationModal({
         const no = deviceByUdid.get(t.udid)?.number;
         return '#' + (no ?? t.udid);
       }).join(', ');
+      setStatus(`Seeding ${formattedUdids}: random rieng tung may`);
+      for (let i = 0; i < targets.length; i++) {
+        if (controller.signal.aborted) return;
+        if (i > 0 && macroSyncSettings.delayEnabled) {
+          if (macroSyncSettings.intervalEnabled) {
+            const { minMs, maxMs } = syncMacroDelayRangeMs(macroSyncSettings.intervalSec);
+            await sleepMs(randomInt(minMs, maxMs), controller.signal);
+          } else {
+            await sleepMs(100, controller.signal);
+          }
+          if (controller.signal.aborted) return;
+        }
+        const target = targets[i];
+        const text = seedingTexts[i] ?? pickSeedingContent();
+        const no = deviceByUdid.get(target.udid)?.number;
+        setStatus(`Seeding #${no ?? target.udid}: ${text}`);
+        await runScript([target], rowToSteps(row, { seedingText: text }), {
+          signal: controller.signal,
+          syncSettings: macroSyncSettings,
+        });
+      }
+      return;
       setStatus(`Seeding máy ${formattedUdids}: ${seedingText}`);
     }
     await runScript(targets, rowToSteps(row, { seedingText }), {
@@ -1004,7 +1146,8 @@ export function AutomationModal({
 
   const playMacro = useCallback(async () => {
     if (playing) {
-      abortPlaybackRef.current?.abort();
+      const activeManualId = manualPlaybackIdRef.current;
+      if (activeManualId) playbackControllersRef.current.get(activeManualId)?.abort();
       setStatus('Đang dừng phát');
       return;
     }
@@ -1016,8 +1159,12 @@ export function AutomationModal({
     setRecording(false);
     setPlaying(true);
     const controller = new AbortController();
-    abortPlaybackRef.current = controller;
+    const playbackId = makeId('macro-playback');
+    manualPlaybackIdRef.current = playbackId;
+    playbackControllersRef.current.set(playbackId, controller);
     const targetUdidsList = selectedUdids.length > 0 ? selectedUdids : (selectedRecordDevice ? [selectedRecordDevice.udid] : []);
+    const startedAt = Date.now();
+    const playbackTitle = currentMacroName || 'Thiết Lập Macro';
     try {
       const targets = getTargetsByUdids(targetUdidsList);
       if (!targets.length) {
@@ -1025,6 +1172,7 @@ export function AutomationModal({
         return;
       }
       updateRunningMacroUdids(targetUdidsList, true);
+      updatePlaybackProgress({ id: playbackId, running: true, title: playbackTitle, udids: targetUdidsList, startedAt });
       const currentMacroSyncSettings = normalizeSyncMacroSettings(syncMacroSettings);
       for (const row of runnableRows) {
         if (controller.signal.aborted) break;
@@ -1033,17 +1181,14 @@ export function AutomationModal({
       setStatus(controller.signal.aborted ? 'Đã dừng phát' : 'Đã phát xong');
     } finally {
       setPlaying(false);
-      abortPlaybackRef.current = null;
+      if (manualPlaybackIdRef.current === playbackId) manualPlaybackIdRef.current = null;
+      playbackControllersRef.current.delete(playbackId);
       updateRunningMacroUdids(targetUdidsList, false);
+      updatePlaybackProgress({ id: playbackId, running: false, title: playbackTitle, udids: targetUdidsList, startedAt });
     }
-  }, [getTargetsByUdids, playing, rows, runMacroRow, selectedUdids, selectedRecordDevice, syncMacroSettings, updateRunningMacroUdids]);
+  }, [currentMacroName, getTargetsByUdids, playing, rows, runMacroRow, selectedUdids, selectedRecordDevice, syncMacroSettings, updatePlaybackProgress, updateRunningMacroUdids]);
 
   const playAppAction = useCallback(async (appId: AutomationAppId, actionId: string) => {
-    if (playing) {
-      abortPlaybackRef.current?.abort();
-      setStatus('Đang dừng phát');
-      return;
-    }
     const latestAppActions = loadAppActions();
     const latestDeviceProfiles = loadDeviceProfiles();
     const latestSavedMacros = loadSavedMacros();
@@ -1086,9 +1231,11 @@ export function AutomationModal({
     const macroNotFoundProfiles: string[] = [];
 
     setRecording(false);
-    setPlaying(true);
     const controller = new AbortController();
-    abortPlaybackRef.current = controller;
+    const playbackId = makeId('action-playback');
+    playbackControllersRef.current.set(playbackId, controller);
+    const startedAt = Date.now();
+    let progressStarted = false;
 
     try {
       const tasks: Promise<void>[] = [];
@@ -1149,6 +1296,8 @@ export function AutomationModal({
         setStatus(parts.length ? `Không có macro hợp lệ | ${parts.join(' | ')}` : `Không có macro hợp lệ để chạy cho ${action.name}`);
         return;
       }
+      progressStarted = true;
+      updatePlaybackProgress({ id: playbackId, running: true, title: action.name, udids: targetUdidsList, startedAt });
       await Promise.all(tasks);
       if (controller.signal.aborted) {
         setStatus('Đã dừng phát');
@@ -1163,10 +1312,17 @@ export function AutomationModal({
         setStatus(parts.join(' | '));
       }
     } finally {
-      setPlaying(false);
-      abortPlaybackRef.current = null;
+      playbackControllersRef.current.delete(playbackId);
+      if (progressStarted) {
+        updatePlaybackProgress({ id: playbackId, running: false, title: action.name, udids: targetUdidsList, startedAt });
+      }
     }
-  }, [getTargetsByUdids, playing, recordTargetUdid, runMacroRow, selectedUdids, updateRunningMacroUdids]);
+  }, [getTargetsByUdids, recordTargetUdid, runMacroRow, selectedUdids, updatePlaybackProgress, updateRunningMacroUdids]);
+
+  useImperativeHandle(ref, () => ({
+    playAppAction,
+    playing,
+  }), [playAppAction, playing]);
 
   /* ── drag window ── */
   const onDragMove = useCallback((e: PointerEvent) => {
@@ -1249,6 +1405,7 @@ export function AutomationModal({
 
   useEffect(() => { recordingRef.current = recording; }, [recording]);
   useEffect(() => { recordTargetRef.current = recordTargetUdid; }, [recordTargetUdid]);
+  useEffect(() => { editingTouchRowIdRef.current = editingTouchRowId; }, [editingTouchRowId]);
 
   useEffect(() => {
     if (status === ONLY_ONE_DEVICE_MSG && (selectedUdids.length <= 1 || viewerUdid)) setStatus(null);
@@ -1258,13 +1415,23 @@ export function AutomationModal({
   useEffect(() => {
     if (open) return;
     setRecording(false);
+    setEditingTouchRowId(null);
     setActionOverlayOpen(null);
     setAutomationContextMenu(null);
     setMacroCtxMenu(null);
     setRowDelayCtxMenu(null);
     setMacroSortMenuOpen(false);
-    abortPlaybackRef.current?.abort();
   }, [open]);
+
+  useEffect(() => {
+    const stopPlayback = (event: Event) => {
+      const id = (event as CustomEvent<MacroPlaybackStopDetail>).detail?.id;
+      if (!id) return;
+      playbackControllersRef.current.get(id)?.abort();
+    };
+    window.addEventListener(MACRO_PLAYBACK_STOP_EVENT, stopPlayback);
+    return () => window.removeEventListener(MACRO_PLAYBACK_STOP_EVENT, stopPlayback);
+  }, []);
 
   useEffect(() => {
     if (!automationContextMenu) return;
@@ -1337,11 +1504,29 @@ export function AutomationModal({
   /* automation click + swipe recording */
   useEffect(() => {
     const onAutomationClick = (event: Event) => {
-      if (!recordingRef.current) return;
       const detail = (event as CustomEvent<AutomationClickDetail>).detail;
       const recordTarget = recordTargetRef.current;
       if (!detail?.udid || !recordTarget || detail.udid !== recordTarget) return;
       const sourceNo = deviceByUdid.get(detail.udid)?.number;
+      const editingRowId = editingTouchRowIdRef.current;
+      if (editingRowId) {
+        setRows(prev => prev.map(row => (row.id === editingRowId ? {
+          ...row,
+          action: 'touch',
+          x01: detail.x01,
+          y01: detail.y01,
+          x: detail.x,
+          y: detail.y,
+          width: detail.width,
+          height: detail.height,
+          sourceUdid: detail.udid,
+          targetUdids: [detail.udid],
+        } : row)));
+        setEditingTouchRowId(null);
+        setStatus(`Đã cập nhật tọa độ${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: X=${detail.x}, Y=${detail.y}`);
+        return;
+      }
+      if (!recordingRef.current) return;
       const now = Date.now();
       const elapsed = lastRecordTimestampRef.current > 0 ? now - lastRecordTimestampRef.current : 0;
       const delayMs = realtimeRecording ? elapsed : DEFAULT_DELAY_MS;
@@ -1373,11 +1558,49 @@ export function AutomationModal({
       }]);
       setStatus(`Swipe${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: (${detail.startX},${detail.startY}) → (${detail.endX},${detail.endY}) ${detail.durationMs}ms${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
     };
+    const onAutomationKey = (event: Event) => {
+      if (!recordingRef.current) return;
+      const detail = (event as CustomEvent<AutomationKeyDetail>).detail;
+      const recordTarget = recordTargetRef.current;
+      if (!detail?.udid || !recordTarget || detail.udid !== recordTarget) return;
+      const sourceNo = deviceByUdid.get(detail.udid)?.number;
+      const now = Date.now();
+      const elapsed = lastRecordTimestampRef.current > 0 ? now - lastRecordTimestampRef.current : 0;
+      const delayMs = realtimeRecording ? elapsed : DEFAULT_DELAY_MS;
+      lastRecordTimestampRef.current = now;
+      setRows(prev => [...prev, {
+        id: makeId('step'), action: 'key', delayMs,
+        keycode: detail.keycode,
+        sourceUdid: detail.udid, targetUdids: [detail.udid], note: '',
+      }]);
+      setStatus(`Key${sourceNo ? ` mÃ¡y #${formatDeviceNo(sourceNo)}` : ''}: ${detail.keycode}${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
+    };
+    const onAutomationText = (event: Event) => {
+      if (!recordingRef.current) return;
+      const detail = (event as CustomEvent<AutomationTextDetail>).detail;
+      const recordTarget = recordTargetRef.current;
+      if (!detail?.udid || !recordTarget || detail.udid !== recordTarget || !detail.text) return;
+      const sourceNo = deviceByUdid.get(detail.udid)?.number;
+      const now = Date.now();
+      const elapsed = lastRecordTimestampRef.current > 0 ? now - lastRecordTimestampRef.current : 0;
+      const delayMs = realtimeRecording ? elapsed : DEFAULT_DELAY_MS;
+      lastRecordTimestampRef.current = now;
+      setRows(prev => [...prev, {
+        id: makeId('step'), action: 'text', delayMs,
+        text: detail.text,
+        sourceUdid: detail.udid, targetUdids: [detail.udid], note: '',
+      }]);
+      setStatus(`Text${sourceNo ? ` mÃ¡y #${formatDeviceNo(sourceNo)}` : ''}: ${detail.text.length} ky tu${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
+    };
     window.addEventListener(AUTOMATION_CLICK_EVENT, onAutomationClick as EventListener);
     window.addEventListener(AUTOMATION_SWIPE_EVENT, onAutomationSwipe as EventListener);
+    window.addEventListener(AUTOMATION_KEY_EVENT, onAutomationKey as EventListener);
+    window.addEventListener(AUTOMATION_TEXT_EVENT, onAutomationText as EventListener);
     return () => {
       window.removeEventListener(AUTOMATION_CLICK_EVENT, onAutomationClick as EventListener);
       window.removeEventListener(AUTOMATION_SWIPE_EVENT, onAutomationSwipe as EventListener);
+      window.removeEventListener(AUTOMATION_KEY_EVENT, onAutomationKey as EventListener);
+      window.removeEventListener(AUTOMATION_TEXT_EVENT, onAutomationText as EventListener);
     };
   }, [deviceByUdid, realtimeRecording]);
 
@@ -1457,11 +1680,6 @@ export function AutomationModal({
                                   >
                                     <span className='automationChildActionLabel'>{action.name}</span>
                                     <img src={app.icon} alt='' className='automationChildActionIcon' />
-                                    {(() => {
-                                      const profileBindings = (action.bindings ?? []).filter(b => b.profileId);
-                                      if (!profileBindings.length) return null;
-                                      return <span className='automationBindingBadge'>{profileBindings.length}</span>;
-                                    })()}
                                   </button>
                                 ))}
                                 {!appActions[app.id].length ? <div className='automationEmpty automationActionEmpty'>Trống</div> : null}
@@ -1480,102 +1698,122 @@ export function AutomationModal({
                 <div className='automationSectionTitle'>
                   <span>Profile</span>
                   <div className='automationSectionActions'>
+                    <button
+                      type='button'
+                      className='automationArrowBtn'
+                      onClick={() => setShowProfileSection(prev => !prev)}
+                      style={{ minWidth: 64 }}
+                    >
+                      {showProfileSection ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                      <span>{showProfileSection ? 'Ẩn' : 'Hiện'}</span>
+                    </button>
                     <button type='button' className='automationArrowBtn automationProfileCreateBtn' onClick={createProfile} title='Tạo profile'>
                       <Plus size={15} />
                       <span>Tạo profile</span>
                     </button>
                   </div>
                 </div>
-                <div className='automationProfileManagerGrid'>
-                  <div className='automationProfileColumn'>
-                    <div className='automationProfileColumnTitle'>Tên profile</div>
-                    <div className='automationProfileList'>
-                      {deviceProfiles.map(profile => {
-                        const isActive = profile.id === activeProfileId;
-                        return (
-                          <div key={profile.id} className={`automationProfileRow${isActive ? ' active' : ''}`}>
-                            <button type='button' className='automationProfileNameBtn' onClick={() => setActiveProfileId(profile.id)} title={profile.name}>
-                              <span>{profile.name}</span>
-                              <small>{profile.udids.length} máy</small>
-                            </button>
-                            <button type='button' className='automationProfileIconBtn' onClick={() => renameProfile(profile)} title='Đổi tên profile'>
-                              <Pencil size={13} />
-                            </button>
-                            <button type='button' className='automationProfileIconBtn danger' onClick={() => deleteProfile(profile)} title='Xoá profile'>
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                      {!deviceProfiles.length ? <div className='automationProfileEmpty'>Chưa có profile</div> : null}
-                    </div>
-                  </div>
-
-                  <div className='automationProfileColumn'>
-                    <div className='automationProfileColumnTitle'>Hành Động</div>
-                    <div className='automationProfileList'>
-                      {profileActionItems.map(item => {
-                        const binding = selectedProfile
-                          ? (item.action.bindings ?? []).find(b => b.profileId === selectedProfile.id)
-                          : null;
-                        const isActive = activeProfileAction?.appId === item.app.id && activeProfileAction?.actionId === item.action.id;
-                        return (
-                          <button
-                            key={`${item.app.id}-${item.action.id}`}
-                            type='button'
-                            className={`automationProfileActionBtn${isActive ? ' active' : ''}`}
-                            onClick={() => setActiveProfileAction({ appId: item.app.id, actionId: item.action.id })}
-                            title={binding ? `${item.action.name} -> ${binding.macroName}` : item.action.name}
-                          >
-                            <img src={item.app.icon} alt='' />
-                            <span>{item.action.name}</span>
-                            <small>{binding ? binding.macroName : 'Chưa gán'}</small>
-                          </button>
-                        );
-                      })}
-                      {!profileActionItems.length ? <div className='automationProfileEmpty'>Chưa có hành động</div> : null}
-                    </div>
-                  </div>
-
-                  <div className='automationProfileColumn last'>
-                    <div className='automationProfileColumnTitle'>File Macro</div>
-                    {selectedProfile && selectedProfileActionItem && selectedProfileBinding ? (
-                      <div className='automationProfileCurrentBinding'>
-                        <span>Đang gán: {selectedProfileBinding.macroName}</span>
-                        <button
-                          type='button'
-                          className='automationProfileUnbindBtn'
-                          onClick={() => removeProfileActionBinding(selectedProfile, selectedProfileActionItem.app.id, selectedProfileActionItem.action)}
-                        >
-                          Xoá gán
-                        </button>
+                {showProfileSection && (
+                  <div className='automationProfileManagerGrid'>
+                    <div className='automationProfileColumn'>
+                      <div className='automationProfileColumnTitle'>Tên profile</div>
+                      <div className='automationProfileList'>
+                        {deviceProfiles.map(profile => {
+                          const isActive = profile.id === activeProfileId;
+                          return (
+                            <div key={profile.id} className={`automationProfileRow${isActive ? ' active' : ''}`}>
+                              <button type='button' className='automationProfileNameBtn' onClick={() => setActiveProfileId(profile.id)} title={profile.name}>
+                                <span>{profile.name}</span>
+                                <small>{profile.udids.length} máy</small>
+                              </button>
+                              <button
+                                type='button'
+                                className='automationProfileIconBtn'
+                                style={{ width: 'auto', padding: '0 6px', fontSize: 11, color: '#9bc1ff' }}
+                                onClick={() => setDeviceAssigningProfileId(profile.id)}
+                                title='Gán thiết bị'
+                              >
+                                Device
+                              </button>
+                              <button type='button' className='automationProfileIconBtn' onClick={() => renameProfile(profile)} title='Đổi tên profile'>
+                                <Pencil size={13} />
+                              </button>
+                              <button type='button' className='automationProfileIconBtn danger' onClick={() => deleteProfile(profile)} title='Xoá profile'>
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                        {!deviceProfiles.length ? <div className='automationProfileEmpty'>Chưa có profile</div> : null}
                       </div>
-                    ) : null}
-                    <div className='automationProfileList'>
-                      {sortedSavedMacros.map(macro => {
-                        const isActive = selectedProfileBinding?.macroId === macro.id;
-                        const disabled = !selectedProfile || !selectedProfileActionItem;
-                        return (
+                    </div>
+
+                    <div className='automationProfileColumn'>
+                      <div className='automationProfileColumnTitle'>Hành Động</div>
+                      <div className='automationProfileList'>
+                        {profileActionItems.map(item => {
+                          const binding = selectedProfile
+                            ? (item.action.bindings ?? []).find(b => b.profileId === selectedProfile.id)
+                            : null;
+                          const isActive = activeProfileAction?.appId === item.app.id && activeProfileAction?.actionId === item.action.id;
+                          return (
+                            <button
+                              key={`${item.app.id}-${item.action.id}`}
+                              type='button'
+                              className={`automationProfileActionBtn${isActive ? ' active' : ''}`}
+                              onClick={() => setActiveProfileAction({ appId: item.app.id, actionId: item.action.id })}
+                              title={binding ? `${item.action.name} -> ${binding.macroName}` : item.action.name}
+                            >
+                              <img src={item.app.icon} alt='' />
+                              <span>{item.action.name}</span>
+                              <small>{binding ? binding.macroName : 'Chưa gán'}</small>
+                            </button>
+                          );
+                        })}
+                        {!profileActionItems.length ? <div className='automationProfileEmpty'>Chưa có hành động</div> : null}
+                      </div>
+                    </div>
+
+                    <div className='automationProfileColumn last'>
+                      <div className='automationProfileColumnTitle'>File Macro</div>
+                      {selectedProfile && selectedProfileActionItem && selectedProfileBinding ? (
+                        <div className='automationProfileCurrentBinding'>
+                          <span>Đang gán: {selectedProfileBinding.macroName}</span>
                           <button
-                            key={macro.id}
                             type='button'
-                            className={`automationProfileMacroBtn${isActive ? ' active' : ''}`}
-                            disabled={disabled}
-                            onClick={() => {
-                              if (!selectedProfile || !selectedProfileActionItem) return;
-                              assignMacroToProfileAction(selectedProfile, selectedProfileActionItem.app.id, selectedProfileActionItem.action, macro);
-                            }}
-                            title={macro.name}
+                            className='automationProfileUnbindBtn'
+                            onClick={() => removeProfileActionBinding(selectedProfile, selectedProfileActionItem.app.id, selectedProfileActionItem.action)}
                           >
-                            <FolderOpen size={14} />
-                            <span>{macro.name}</span>
+                            Xoá gán
                           </button>
-                        );
-                      })}
-                      {!sortedSavedMacros.length ? <div className='automationProfileEmpty'>Chưa có File Macro</div> : null}
+                        </div>
+                      ) : null}
+                      <div className='automationProfileList'>
+                        {sortedSavedMacros.map(macro => {
+                          const isActive = selectedProfileBinding?.macroId === macro.id;
+                          const disabled = !selectedProfile || !selectedProfileActionItem;
+                          return (
+                            <button
+                              key={macro.id}
+                              type='button'
+                              className={`automationProfileMacroBtn${isActive ? ' active' : ''}`}
+                              disabled={disabled}
+                              onClick={() => {
+                                if (!selectedProfile || !selectedProfileActionItem) return;
+                                assignMacroToProfileAction(selectedProfile, selectedProfileActionItem.app.id, selectedProfileActionItem.action, macro);
+                              }}
+                              title={macro.name}
+                            >
+                              <FolderOpen size={14} />
+                              <span>{macro.name}</span>
+                            </button>
+                          );
+                        })}
+                        {!sortedSavedMacros.length ? <div className='automationProfileEmpty'>Chưa có File Macro</div> : null}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               <button className={`automationCoordinateRow${coordinatePanelOpen ? ' open' : ''}`} onClick={openCoordinatePanel}>
@@ -1702,6 +1940,8 @@ export function AutomationModal({
                                 <option value='touch'>Touch</option>
                                 <option value='swipe'>Vuốt</option>
                                 <option value='seeding'>Seeding</option>
+                                <option value='key'>Key</option>
+                                <option value='text'>Text</option>
                               </select>
                             </td>
                             <td onContextMenu={e => openRowDelayMenu(e, row.id)} title='Chuột phải để đặt random delay'>
@@ -1717,7 +1957,18 @@ export function AutomationModal({
                                 {row.delayRandomBaseSec ? <span className='automationDelayRandomBadge'>{formatMacroDelay(row)}</span> : null}
                               </div>
                             </td>
-                            <td className='automationDetailsCell'>{formatStepDetails(row)}</td>
+                            <td className='automationDetailsCell'>
+                              {row.action === 'touch' ? (
+                                <button
+                                  type='button'
+                                  className={`automationDetailsBtn${editingTouchRowId === row.id ? ' active' : ''}`}
+                                  onClick={() => startEditTouchDetails(row, i)}
+                                  title='Click để chọn lại tọa độ trên điện thoại đang chọn'
+                                >
+                                  {formatStepDetails(row)}
+                                </button>
+                              ) : formatStepDetails(row)}
+                            </td>
                             <td><input className='automationNoteInput' type='text' value={row.note ?? ''} onChange={e => updateRow(row.id, { note: e.target.value })} /></td>
                           </tr>
                         ))}
@@ -1916,8 +2167,30 @@ export function AutomationModal({
         />
       )}
 
+      {deviceAssigningProfileId && (
+        <DeviceAssignModal
+          profileId={deviceAssigningProfileId}
+          devices={devices}
+          deviceProfiles={deviceProfiles}
+          onSave={(updatedUdids) => {
+            setDeviceProfiles(prev => {
+              const cleaned = prev.map(p => ({
+                ...p,
+                udids: p.id === deviceAssigningProfileId
+                  ? updatedUdids
+                  : p.udids.filter(u => !updatedUdids.includes(u))
+              }));
+              saveDeviceProfiles(cleaned);
+              return cleaned;
+            });
+            setDeviceAssigningProfileId(null);
+          }}
+          onClose={() => setDeviceAssigningProfileId(null)}
+        />
+      )}
+
       <ConfirmDeleteModal state={confirmModal} onClose={() => setConfirmModal(null)} />
       <InputModal state={inputModal} onClose={() => setInputModal(null)} />
     </div>
   );
-}
+});
