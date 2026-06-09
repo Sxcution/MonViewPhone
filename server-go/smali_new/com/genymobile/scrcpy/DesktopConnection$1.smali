@@ -1,0 +1,97 @@
+.class Lcom/genymobile/scrcpy/DesktopConnection$1;
+.super Ljava/lang/Object;
+.source "DesktopConnection.java"
+
+# interfaces
+.implements Ljava/lang/Runnable;
+
+
+# annotations
+.annotation system Ldalvik/annotation/EnclosingMethod;
+    value = Lcom/genymobile/scrcpy/DesktopConnection;->startEventController()V
+.end annotation
+
+.annotation system Ldalvik/annotation/InnerClass;
+    accessFlags = 0x0
+    name = null
+.end annotation
+
+
+# instance fields
+.field final synthetic this$0:Lcom/genymobile/scrcpy/DesktopConnection;
+
+
+# direct methods
+.method constructor <init>(Lcom/genymobile/scrcpy/DesktopConnection;)V
+    .registers 2
+
+    .line 111
+    iput-object p1, p0, Lcom/genymobile/scrcpy/DesktopConnection$1;->this$0:Lcom/genymobile/scrcpy/DesktopConnection;
+
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public run()V
+    .registers 3
+
+    .line 115
+    :try_start_0
+    invoke-static {}, Lcom/genymobile/scrcpy/Device;->isScreenOn()Z
+
+    move-result v0
+
+    if-nez v0, :cond_12
+
+    .line 116
+    iget-object v0, p0, Lcom/genymobile/scrcpy/DesktopConnection$1;->this$0:Lcom/genymobile/scrcpy/DesktopConnection;
+
+    iget-object v0, v0, Lcom/genymobile/scrcpy/DesktopConnection;->controller:Lcom/genymobile/scrcpy/Controller;
+
+    invoke-virtual {v0}, Lcom/genymobile/scrcpy/Controller;->turnScreenOn()V
+
+    .line 117
+    const-wide/16 v0, 0x1f4
+
+    invoke-static {v0, v1}, Landroid/os/SystemClock;->sleep(J)V
+
+    .line 120
+    :cond_12
+    :goto_12
+    iget-object v0, p0, Lcom/genymobile/scrcpy/DesktopConnection$1;->this$0:Lcom/genymobile/scrcpy/DesktopConnection;
+
+    invoke-virtual {v0}, Lcom/genymobile/scrcpy/DesktopConnection;->receiveControlMessage()Lcom/genymobile/scrcpy/ControlMessage;
+
+    move-result-object v0
+
+    .line 121
+    if-eqz v0, :cond_21
+
+    .line 122
+    iget-object v1, p0, Lcom/genymobile/scrcpy/DesktopConnection$1;->this$0:Lcom/genymobile/scrcpy/DesktopConnection;
+
+    iget-object v1, v1, Lcom/genymobile/scrcpy/DesktopConnection;->controller:Lcom/genymobile/scrcpy/Controller;
+
+    invoke-virtual {v1, v0}, Lcom/genymobile/scrcpy/Controller;->handleEvent(Lcom/genymobile/scrcpy/ControlMessage;)V
+    :try_end_21
+    .catch Ljava/io/IOException; {:try_start_0 .. :try_end_21} :catch_22
+
+    .line 124
+    :cond_21
+    goto :goto_12
+
+    .line 125
+    :catch_22
+    move-exception v0
+
+    .line 126
+    const-string v0, "Event controller stopped"
+
+    invoke-static {v0}, Lcom/genymobile/scrcpy/Ln;->d(Ljava/lang/String;)V
+
+    .line 128
+    return-void
+.end method
