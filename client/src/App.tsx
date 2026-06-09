@@ -568,6 +568,8 @@ export function App() {
   const [macroPlaybackItems, setMacroPlaybackItems] = useState<MacroPlaybackProgressDetail[]>([])
   const [macroPlaybackExpanded, setMacroPlaybackExpanded] = useState(true)
   const [macroPlaybackNow, setMacroPlaybackNow] = useState(Date.now())
+  const [macroPlaybackPosition, setMacroPlaybackPosition] = useState<{ x: number; y: number } | null>(null)
+  const macroPlaybackDragRef = useRef({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 })
 
   useEffect(() => {
     const handleMacroRunning = (e: Event) => {
@@ -606,6 +608,42 @@ export function App() {
     const id = window.setInterval(() => setMacroPlaybackNow(Date.now()), 1000)
     return () => window.clearInterval(id)
   }, [macroPlaybackItems.length])
+
+  const onMacroPlaybackPointerMove = useCallback((event: PointerEvent) => {
+    if (!macroPlaybackDragRef.current.active) return
+    event.preventDefault()
+    const nextX = macroPlaybackDragRef.current.originX + event.clientX - macroPlaybackDragRef.current.startX
+    const nextY = macroPlaybackDragRef.current.originY + event.clientY - macroPlaybackDragRef.current.startY
+    setMacroPlaybackPosition({
+      x: Math.max(8, Math.min(window.innerWidth - 180, nextX)),
+      y: Math.max(8, Math.min(window.innerHeight - 48, nextY)),
+    })
+  }, [])
+
+  const onMacroPlaybackPointerUp = useCallback(() => {
+    if (!macroPlaybackDragRef.current.active) return
+    macroPlaybackDragRef.current.active = false
+    window.removeEventListener('pointermove', onMacroPlaybackPointerMove)
+    window.removeEventListener('pointerup', onMacroPlaybackPointerUp)
+  }, [onMacroPlaybackPointerMove])
+
+  const startMacroPlaybackDrag = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return
+    if ((event.target as HTMLElement).closest('button')) return
+    const panel = event.currentTarget.closest('.macroPlaybackPanel') as HTMLElement | null
+    if (!panel) return
+    const rect = panel.getBoundingClientRect()
+    macroPlaybackDragRef.current = {
+      active: true,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: rect.left,
+      originY: rect.top,
+    }
+    setMacroPlaybackPosition({ x: rect.left, y: rect.top })
+    window.addEventListener('pointermove', onMacroPlaybackPointerMove, { passive: false })
+    window.addEventListener('pointerup', onMacroPlaybackPointerUp)
+  }, [onMacroPlaybackPointerMove, onMacroPlaybackPointerUp])
 
   type CtxSubState = null | {
     main: 'profileList' | { appId: AutomationAppId; actionId: string };
@@ -1297,6 +1335,16 @@ export function App() {
       return true
     })
   }, [registeredUdids, connectedUdids, deviceFilter, getDeviceConnectionType, focusGroupIdx, savedGroups, displayFilter])
+  const sidebarRegistered = useMemo(() => {
+    return registeredUdids.filter(id => {
+      if (displayFilter === 'online' && !connectedUdids.has(id)) return false
+      if (deviceFilter !== 'all') {
+        const type = getDeviceConnectionType(id)
+        if (type !== deviceFilter) return false
+      }
+      return true
+    })
+  }, [registeredUdids, connectedUdids, deviceFilter, getDeviceConnectionType, displayFilter])
   const orderMap = useMemo(() => {
     const m = new Map<string, number>()
     mergedOrder.forEach((id, idx) => m.set(id, getTileNumber(id, idx + 1)))
@@ -1315,6 +1363,15 @@ export function App() {
     })
     return arr
   }, [filteredRegistered, orderMap])
+  const orderedSidebarRegistered = useMemo(() => {
+    const arr = [...sidebarRegistered]
+    arr.sort((a, b) => {
+      const oa = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER
+      const ob = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER
+      return oa - ob
+    })
+    return arr
+  }, [sidebarRegistered, orderMap])
   const currentFocusGroupSet = useMemo(() => {
     if (focusGroupIdx !== null && savedGroups[focusGroupIdx]) {
       return new Set(savedGroups[focusGroupIdx].udids);
@@ -1339,13 +1396,13 @@ export function App() {
     [orderedRegistered, orderMap, androidDeviceMap]
   )
   const controlGridDevices = useMemo<DeviceSelectionGridItem[]>(
-    () => orderedRegistered.map(udid => ({
+    () => orderedSidebarRegistered.map(udid => ({
       udid,
       label: String(orderMap.get(udid) ?? 0).padStart(2, '0'),
       title: udid,
       className: !connectedUdids.has(udid) ? 'offline' : ''
     })),
-    [orderedRegistered, orderMap, connectedUdids]
+    [orderedSidebarRegistered, orderMap, connectedUdids]
   )
   const [quickActionOrder, setQuickActionOrder] = useState<QuickActionId[]>(
     loadQuickActionOrder
@@ -1353,8 +1410,8 @@ export function App() {
   const [draggingQuickAction, setDraggingQuickAction] =
     useState<QuickActionId | null>(null)
   const selectableRegistered = useMemo(
-    () => filteredRegistered.filter(id => !runningMacroUdids.has(id)),
-    [filteredRegistered, runningMacroUdids]
+    () => sidebarRegistered.filter(id => !runningMacroUdids.has(id)),
+    [sidebarRegistered, runningMacroUdids]
   )
   const allSelected =
     selectableRegistered.length > 0 &&
@@ -3487,8 +3544,17 @@ export function App() {
         onClose={() => setAutomationOpen(false)}
       />
       {macroPlaybackItems.length ? createPortal(
-        <section className={`macroPlaybackPanel${macroPlaybackExpanded ? ' expanded' : ' collapsed'}`} aria-label='Automation Playback'>
-          <header className='macroPlaybackHeader'>
+        <section
+          className={`macroPlaybackPanel${macroPlaybackExpanded ? ' expanded' : ' collapsed'}`}
+          aria-label='Automation Playback'
+          style={macroPlaybackPosition ? {
+            left: macroPlaybackPosition.x,
+            top: macroPlaybackPosition.y,
+            right: 'auto',
+            bottom: 'auto',
+          } : undefined}
+        >
+          <header className='macroPlaybackHeader' onPointerDown={startMacroPlaybackDrag}>
             <div className='macroPlaybackHeading'>
               <span>Automation Playback</span>
               <small>{macroPlaybackItems.length} đang chạy</small>

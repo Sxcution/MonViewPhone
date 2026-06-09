@@ -78,14 +78,6 @@ export type AutomationModalRef = {
   playing: boolean;
 };
 
-type AutomationContextMenuTarget =
-  | { type: 'app'; appId: AutomationAppId; x: number; y: number }
-  | { type: 'action'; appId: AutomationAppId; actionId: string; x: number; y: number };
-
-type AutomationContextMenuInput =
-  | { type: 'app'; appId: AutomationAppId }
-  | { type: 'action'; appId: AutomationAppId; actionId: string };
-
 type ConfirmModalState = {
   title: string;
   message: string;
@@ -532,7 +524,6 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   const { getTargetsByUdids } = useActive();
 
   /* ── state ── */
-  const [actionRunnerOpen, setActionRunnerOpen] = useState(true);
   const [coordinatePanelOpen, setCoordinatePanelOpen] = useState(false);
   const [rows, setRows] = useState<AutomationMacroRow[]>([]);
   const [recording, setRecording] = useState(false);
@@ -546,8 +537,6 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [activeProfileAction, setActiveProfileAction] = useState<{ appId: AutomationAppId; actionId: string } | null>(null);
   const [activeActionApp, setActiveActionApp] = useState<AutomationAppId>('wechat');
-  const [actionOverlayOpen, setActionOverlayOpen] = useState<AutomationAppId | null>(null);
-  const [automationContextMenu, setAutomationContextMenu] = useState<AutomationContextMenuTarget | null>(null);
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(null);
   const [inputModal, setInputModal] = useState<InputModalState>(null);
   const [macroCtxMenu, setMacroCtxMenu] = useState<MacroCtxMenuState>(null);
@@ -600,9 +589,13 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     () => deviceProfiles.find(profile => profile.id === activeProfileId) ?? null,
     [activeProfileId, deviceProfiles],
   );
+  const activeActionAppMeta = useMemo(
+    () => AUTOMATION_APPS.find(app => app.id === activeActionApp) ?? AUTOMATION_APPS[0],
+    [activeActionApp],
+  );
   const profileActionItems = useMemo(() => (
-    AUTOMATION_APPS.flatMap(app => (appActions[app.id] ?? []).map(action => ({ app, action })))
-  ), [appActions]);
+    (appActions[activeActionApp] ?? []).map(action => ({ app: activeActionAppMeta, action }))
+  ), [activeActionApp, activeActionAppMeta, appActions]);
   const selectedProfileActionItem = useMemo(() => {
     if (!activeProfileAction) return null;
     return profileActionItems.find(item => item.app.id === activeProfileAction.appId && item.action.id === activeProfileAction.actionId) ?? null;
@@ -654,8 +647,6 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   const closeModal = useCallback(() => {
     setRecording(false);
     setEditingTouchRowId(null);
-    setActionOverlayOpen(null);
-    setAutomationContextMenu(null);
     setMacroCtxMenu(null);
     setRowDelayCtxMenu(null);
     setMacroSortMenuOpen(false);
@@ -665,7 +656,6 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   /* ── app action helpers ── */
   const addAppAction = useCallback((appId: AutomationAppId) => {
     const app = AUTOMATION_APPS.find(a => a.id === appId);
-    setAutomationContextMenu(null);
     setInputModal({
       key: makeId('input'),
       title: `Thêm hành động ${app?.label ?? appId}`,
@@ -678,56 +668,11 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
           return next;
         });
         setActiveActionApp(appId);
-        setActionOverlayOpen(appId);
         setStatus(`Đã thêm hành động: ${name}`);
         setInputModal(null);
       },
     });
   }, []);
-
-  const deleteAppActionImpl = useCallback((appId: AutomationAppId, actionId: string) => {
-    const actionName = appActions[appId].find(a => a.id === actionId)?.name;
-    setAppActions(prev => {
-      const next = { ...prev, [appId]: prev[appId].filter(a => a.id !== actionId) };
-      saveAppActions(next);
-      return next;
-    });
-    setStatus(actionName ? `Đã xoá hành động: ${actionName}` : 'Đã xoá hành động');
-  }, [appActions]);
-
-  const openRenameAction = useCallback((appId: AutomationAppId, actionId: string) => {
-    const current = appActions[appId].find(a => a.id === actionId);
-    setAutomationContextMenu(null);
-    setInputModal({
-      key: makeId('input'),
-      title: 'Đổi tên hành động',
-      label: 'Tên mới',
-      defaultValue: current?.name ?? '',
-      onConfirm: (name) => {
-        setAppActions(prev => {
-          const next = { ...prev, [appId]: prev[appId].map(a => a.id === actionId ? { ...a, name } : a) };
-          saveAppActions(next);
-          return next;
-        });
-        setStatus(`Đã đổi tên thành "${name}"`);
-        setInputModal(null);
-      },
-    });
-  }, [appActions]);
-
-  const openAutomationContextMenu = useCallback((event: React.MouseEvent<HTMLElement>, target: AutomationContextMenuInput) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setActiveActionApp(target.appId);
-    const x = clampPosition(event.clientX, 8, Math.max(8, window.innerWidth - 230));
-    const y = clampPosition(event.clientY, 8, Math.max(8, window.innerHeight - 112));
-    if (target.type === 'app') {
-      setAutomationContextMenu({ type: 'app', appId: target.appId, x, y });
-    } else {
-      setAutomationContextMenu({ type: 'action', appId: target.appId, actionId: target.actionId, x, y });
-    }
-  }, []);
-
   const createProfile = useCallback(() => {
     setInputModal({
       key: makeId('input'),
@@ -1416,8 +1361,6 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     if (open) return;
     setRecording(false);
     setEditingTouchRowId(null);
-    setActionOverlayOpen(null);
-    setAutomationContextMenu(null);
     setMacroCtxMenu(null);
     setRowDelayCtxMenu(null);
     setMacroSortMenuOpen(false);
@@ -1432,25 +1375,6 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     window.addEventListener(MACRO_PLAYBACK_STOP_EVENT, stopPlayback);
     return () => window.removeEventListener(MACRO_PLAYBACK_STOP_EVENT, stopPlayback);
   }, []);
-
-  useEffect(() => {
-    if (!automationContextMenu) return;
-    const close = (e: Event) => {
-      if ((e.target as HTMLElement | null)?.closest('.automationContextMenuPanel')) return;
-      setAutomationContextMenu(null);
-    };
-    const closeKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAutomationContextMenu(null); };
-    window.addEventListener('mousedown', close, true);
-    window.addEventListener('contextmenu', close, true);
-    window.addEventListener('keydown', closeKey);
-    window.addEventListener('resize', close);
-    return () => {
-      window.removeEventListener('mousedown', close, true);
-      window.removeEventListener('contextmenu', close, true);
-      window.removeEventListener('keydown', closeKey);
-      window.removeEventListener('resize', close);
-    };
-  }, [automationContextMenu]);
 
   useEffect(() => {
     if (!macroCtxMenu) return;
@@ -1614,12 +1538,6 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   }, []);
 
   if (!open) return null;
-
-  const automationContextApp = automationContextMenu && automationContextMenu.type !== 'action'
-    ? AUTOMATION_APPS.find(app => app.id === automationContextMenu.appId) ?? null : null;
-  const automationContextAction = automationContextMenu?.type === 'action'
-    ? appActions[automationContextMenu.appId].find(a => a.id === automationContextMenu.actionId) ?? null : null;
-
   /* ══════════════════ RENDER ══════════════════ */
   return (
     <div className={`automationFloatingLayer${coordinatePanelOpen ? ' withCoordinatePanel' : ''}`} style={{ left: position.x, top: position.y }}>
@@ -1637,67 +1555,28 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
             </div>
 
             <div className='modal-body automationBody'>
-
-              {/* ── SECTION: Hành Động ── */}
-              <div className='automationActionBlock'>
-                <div className='automationSectionTitle'>
-                  <span>Hành Động</span>
-                  <div className='automationSectionActions'>
-                    <button className='automationArrowBtn' onClick={() => setActionRunnerOpen(p => !p)} title={actionRunnerOpen ? 'Ẩn' : 'Hiện'}>
-                      {actionRunnerOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                      <span>{actionRunnerOpen ? 'Ẩn' : 'Hiện'}</span>
-                    </button>
-                  </div>
-                </div>
-                {actionRunnerOpen ? (
-                  <div className='automationActionIconArea'>
-                    <div className='automationAppIconRow'>
-                      {AUTOMATION_APPS.map(app => (
-                        <div key={app.id} className='automationAppIconSlot'>
-                          <button
-                            className={`automationAppIconButton${activeActionApp === app.id ? ' active' : ''}`}
-                            title={app.label}
-                            onClick={() => { setActiveActionApp(app.id); setActionOverlayOpen(p => (p === app.id ? null : app.id)); }}
-                            onContextMenu={e => openAutomationContextMenu(e, { type: 'app', appId: app.id })}
-                          >
-                            <img src={app.icon} alt='' className='automationAppIconOnly' />
-                          </button>
-                          {actionOverlayOpen === app.id ? (
-                            <div className='automationChildActionOverlay' role='dialog' aria-label={`${app.label} actions`}
-                              onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
-                              onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
-                            >
-                              <div className='automationActionChildrenPanel'>
-                                {appActions[app.id].map(action => (
-                                  <button key={action.id}
-                                    className='automationChildActionBtn automationPanelChildActionBtn'
-                                    title={
-                                      (action.bindings ?? []).filter(b => b.profileId)
-                                        .map(b => `${b.profileName} → ${b.macroName}`).join('\n') || `${app.label}: ${action.name}`
-                                    }
-                                    onClick={() => playAppAction(app.id, action.id)}
-                                    onContextMenu={e => openAutomationContextMenu(e, { type: 'action', appId: app.id, actionId: action.id })}
-                                  >
-                                    <span className='automationChildActionLabel'>{action.name}</span>
-                                    <img src={app.icon} alt='' className='automationChildActionIcon' />
-                                  </button>
-                                ))}
-                                {!appActions[app.id].length ? <div className='automationEmpty automationActionEmpty'>Trống</div> : null}
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              {/* ── Thiết Lập Macro ── */}
+              {/* Profile */}
               <div className='automationProfileBlock'>
                 <div className='automationSectionTitle'>
                   <span>Profile</span>
+                  <div className='automationProfileAppTabs' aria-label='Chọn ứng dụng'>
+                    {AUTOMATION_APPS.map(app => (
+                      <button
+                        key={app.id}
+                        type='button'
+                        className={`automationAppIconButton${activeActionApp === app.id ? ' active' : ''}`}
+                        title={app.label}
+                        onClick={() => setActiveActionApp(app.id)}
+                      >
+                        <img src={app.icon} alt='' className='automationAppIconOnly' />
+                      </button>
+                    ))}
+                  </div>
                   <div className='automationSectionActions'>
+                    <button type='button' className='automationArrowBtn' onClick={() => addAppAction(activeActionApp)} title='Tạo hành động'>
+                      <Plus size={15} />
+                      <span>Hành động</span>
+                    </button>
                     <button
                       type='button'
                       className='automationArrowBtn'
@@ -2013,59 +1892,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
       ) : null}
 
       {/* ── CONTEXT MENUS ── */}
-      {automationContextMenu && automationContextApp ? (
-        <div className='automationContextMenuPanel contextMenuPanel dropdown-menu show'
-          style={{ left: automationContextMenu.x, top: automationContextMenu.y }}
-          onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
-          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
-        >
-
-          {/* ── Context: app cha → Thêm hành động ── */}
-          {automationContextMenu.type === 'app' ? (
-            <button type='button' className='automationContextMenuItem dropdown-item'
-              onPointerDown={e => { e.preventDefault(); e.stopPropagation(); addAppAction(automationContextMenu.appId); }}
-            >
-              <Plus size={14} /><span>Thêm hành động {automationContextApp.label}</span>
-            </button>
-          ) : null}
-
-          {/* ── Context: action con → Đổi tên / Xoá ── */}
-          {automationContextMenu.type === 'action' ? (
-            <>
-              <button type='button' className='automationContextMenuItem dropdown-item'
-                onPointerDown={e => {
-                  e.preventDefault(); e.stopPropagation();
-                  openRenameAction(automationContextMenu.appId, automationContextMenu.actionId);
-                }}
-              >
-                <Pencil size={14} /><span>Đổi tên hành động</span>
-              </button>
-              <div className='automationContextMenuDivider' />
-              <button type='button' className='automationContextMenuItem automationContextMenuDanger dropdown-item'
-                disabled={!automationContextAction}
-                onPointerDown={e => {
-                  e.preventDefault(); e.stopPropagation();
-                  if (!automationContextAction) return;
-                  const appId = automationContextMenu.appId;
-                  const actionId = automationContextMenu.actionId;
-                  const actionName = automationContextAction.name;
-                  const bindingCount = (automationContextAction.bindings ?? []).filter(b => b.profileId).length;
-                  setAutomationContextMenu(null);
-                  setConfirmModal({
-                    title: 'Xoá hành động',
-                    message: `Xoá hành động "${actionName}" sẽ xoá toàn bộ macro binding đã gán (${bindingCount} profile). File macro gốc vẫn được giữ.\n\nBạn có chắc muốn xoá không?`,
-                    onConfirm: () => { deleteAppActionImpl(appId, actionId); setConfirmModal(null); },
-                  });
-                }}
-              >
-                <Trash2 size={14} /><span>Xoá hành động</span>
-              </button>
-            </>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* ── MACRO CONTEXT MENU ── */}
+      {/* MACRO CONTEXT MENU */}
       {rowDelayCtxMenu ? (() => {
         const row = rows.find(r => r.id === rowDelayCtxMenu.rowId);
         if (!row) return null;

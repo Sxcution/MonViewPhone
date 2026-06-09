@@ -2269,9 +2269,18 @@ canvas {
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
   color: #dbeafe;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
   cursor: pointer;
+}
+
+.appSettingsClose svg,
+.vsp-header-close svg,
+.vsp-modal-close svg {
+  display: block;
 }
 
 .appSettingsClose:hover {
@@ -3822,8 +3831,11 @@ body.alignRight .rightConfigPanel.collapsed {
   border: 1px solid #3a3a3a;
   background: #202020;
   color: #999;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
   cursor: pointer;
   transition: all 0.12s ease;
 }
@@ -4147,8 +4159,11 @@ body.alignRight .rightConfigPanel.collapsed {
   border: 1px solid #3a3a3a;
   background: #202020;
   color: #ccc;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -5890,18 +5905,11 @@ button:focus-visible {
 }
 
 .automationDeviceBlock,
-.automationActionBlock,
 .automationProfileBlock,
 .automationCoordinateRow {
   border: 1px solid #343434;
   border-radius: 6px;
   background: #202020;
-}
-
-.automationActionBlock {
-  position: relative;
-  z-index: 5;
-  overflow: visible;
 }
 
 .automationProfileBlock {
@@ -5917,6 +5925,30 @@ button:focus-visible {
   border-bottom: 1px solid #343434;
   font-size: 14px;
   font-weight: 700;
+}
+
+.automationProfileBlock > .automationSectionTitle {
+  justify-content: center;
+}
+
+.automationProfileAppTabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.automationProfileAppTabs .automationAppIconButton {
+  width: 34px;
+  height: 30px;
+}
+
+.automationProfileAppTabs .automationAppIconOnly {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
 }
 
 .automationSectionActions {
@@ -5976,6 +6008,7 @@ button:focus-visible {
   border-bottom: 1px solid #343434;
   font-size: 12px;
   font-weight: 800;
+  text-align: center;
 }
 
 .automationProfileList {
@@ -6151,10 +6184,10 @@ button:focus-visible {
   z-index: 27010;
   display: flex;
   flex-direction: column;
-  width: min(440px, calc(100vw - 36px));
-  max-height: min(420px, calc(100dvh - 36px));
+  width: min(360px, calc(100vw - 28px));
+  max-height: min(320px, calc(100dvh - 28px));
   color: var(--md-text);
-  background: var(--md-card);
+  background: color-mix(in srgb, var(--md-card) 76%, transparent);
   border: 1px solid var(--md-border);
   border-radius: var(--md-radius-sm);
   box-shadow: var(--md-shadow-panel);
@@ -6165,10 +6198,16 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  background: var(--md-surface-2);
+  gap: 8px;
+  padding: 7px 9px;
+  background: color-mix(in srgb, var(--md-surface-2) 72%, transparent);
   border-bottom: 1px solid var(--md-border);
+  cursor: grab;
+  user-select: none;
+}
+
+.macroPlaybackHeader:active {
+  cursor: grabbing;
 }
 
 .macroPlaybackPanel.collapsed .macroPlaybackHeader {
@@ -6184,16 +6223,20 @@ button:focus-visible {
 }
 
 .macroPlaybackHeading span {
+  font-size: 12px;
   font-weight: 800;
 }
 
 .macroPlaybackHeading small {
   color: var(--md-muted);
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .macroPlaybackToggleBtn {
   flex-shrink: 0;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11px;
 }
 
 .macroPlaybackList {
@@ -6201,18 +6244,18 @@ button:focus-visible {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  max-height: 340px;
-  gap: 8px;
-  padding: 10px;
+  max-height: 250px;
+  gap: 6px;
+  padding: 7px;
   overflow-y: auto;
 }
 
 .macroPlaybackItem {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px;
-  background: var(--md-surface-2);
+  gap: 8px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--md-surface-2) 70%, transparent);
   border: 1px solid var(--md-border);
   border-radius: var(--md-radius-sm);
 }
@@ -6223,13 +6266,13 @@ button:focus-visible {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   min-width: 0;
-  gap: 8px;
+  gap: 6px;
 }
 
 .macroPlaybackItemText span,
 .macroPlaybackItemText small {
   color: var(--md-muted);
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .macroPlaybackItemText strong {
@@ -6237,6 +6280,7 @@ button:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 11px;
 }
 
 .macroPlaybackItemText small {
@@ -6246,7 +6290,10 @@ button:focus-visible {
 
 .macroPlaybackStopBtn {
   flex-shrink: 0;
-  min-width: 64px;
+  min-width: 52px;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11px;
 }
 
 .automationGridWrap {
@@ -6599,26 +6646,6 @@ button:focus-visible {
   overflow: hidden;
 }
 
-.automationActionIconArea {
-  padding: 10px;
-  overflow: visible;
-}
-
-.automationAppIconRow {
-  display: grid;
-  grid-template-columns: repeat(4, 44px);
-  justify-content: center;
-  gap: 8px;
-  overflow: visible;
-}
-
-.automationAppIconSlot {
-  position: relative;
-  display: grid;
-  place-items: center;
-  overflow: visible;
-}
-
 .automationAppIconButton {
   display: grid;
   place-items: center;
@@ -6642,83 +6669,6 @@ button:focus-visible {
   height: 32px;
   border-radius: 7px;
   object-fit: cover;
-}
-
-.automationActionChildrenPanel {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-content: flex-start;
-  gap: 10px;
-  min-width: 0;
-  max-height: 230px;
-  overflow-y: auto;
-}
-
-.automationChildActionOverlay {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  z-index: 26010;
-  width: max-content;
-  min-width: 190px;
-  max-width: 260px;
-  padding: 10px;
-  color: #f8fafc;
-  background: #242424;
-  border: 1px solid #424242;
-  border-radius: 6px;
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.52);
-  transform: translateX(-50%);
-}
-
-.automationChildActionOverlay::before {
-  position: absolute;
-  top: -6px;
-  left: 50%;
-  width: 10px;
-  height: 10px;
-  content: '';
-  background: #242424;
-  border-top: 1px solid #424242;
-  border-left: 1px solid #424242;
-  transform: translateX(-50%) rotate(45deg);
-}
-
-.automationChildActionBtn {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: 4px;
-  width: 58px;
-  padding: 0;
-  color: #e5edff;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.automationChildActionLabel {
-  max-width: 58px;
-  min-height: 26px;
-  color: #e5edff;
-  font-size: 10px;
-  line-height: 1.15;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.automationChildActionIcon {
-  width: 38px;
-  height: 38px;
-  border-radius: 9px;
-  object-fit: cover;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-}
-
-.automationPanelChildActionBtn:hover .automationChildActionIcon {
-  outline: 2px solid rgba(13, 110, 253, 0.72);
 }
 
 .automationBindingBadge {
@@ -7299,8 +7249,7 @@ body {
 .tileMenu,
 .contextMenuPanel,
 .pageContextMenu,
-.automationContextMenuPanel,
-.automationChildActionOverlay {
+.automationContextMenuPanel {
   color: var(--md-text);
   background: var(--md-card);
   border-color: var(--md-border);
@@ -7585,7 +7534,6 @@ textarea:focus,
 .rcpHeader,
 .rcpPill,
 .automationDeviceBlock,
-.automationActionBlock,
 .automationCoordinateRow,
 .automationCoordinateContext,
 .automationSelectedDeviceBox {
@@ -7624,23 +7572,6 @@ textarea:focus,
   background: rgba(255, 255, 255, .025);
   border-color: var(--md-border);
   color: var(--md-text);
-}
-
-.automationChildActionOverlay::before {
-  background: var(--md-card);
-  border-color: var(--md-border);
-}
-
-.automationChildActionBtn {
-  height: auto;
-  background: transparent;
-  border: 0;
-  color: var(--md-text);
-}
-
-.automationChildActionIcon {
-  border-radius: var(--md-radius-sm);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, .34);
 }
 
 .automationContextMenuPanel,
