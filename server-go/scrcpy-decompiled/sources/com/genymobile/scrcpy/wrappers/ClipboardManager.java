@@ -1,16 +1,35 @@
 package com.genymobile.scrcpy.wrappers;
 
 import android.content.ClipData;
+import android.content.Context;
 import android.content.IOnPrimaryClipChangedListener;
 import android.os.IInterface;
+import android.os.Looper;
 import com.genymobile.scrcpy.Ln;
 import java.lang.reflect.Method;
 
 public class ClipboardManager {
     private final IInterface manager;
+    private static Context fakeContext;
 
     public ClipboardManager(IInterface iInterface) {
         this.manager = iInterface;
+    }
+
+    private static Context getFakeContext() {
+        if (fakeContext == null) {
+            try {
+                if (Looper.getMainLooper() == null) {
+                    Looper.prepareMainLooper();
+                }
+                Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+                Object activityThread = activityThreadClass.getDeclaredMethod("systemMain").invoke(null);
+                fakeContext = (Context) activityThreadClass.getDeclaredMethod("getSystemContext").invoke(activityThread);
+            } catch (Throwable t) {
+                Ln.e("Failed to create FakeContext", t);
+            }
+        }
+        return fakeContext;
     }
 
     private ClipData getPrimaryClip() {
@@ -37,7 +56,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 2 && params[0] == String.class && (params[1] == int.class || params[1] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard getPrimaryClip signature: package+user");
+                        Ln.i("Clipboard fallback signature: package+user");
                         return (ClipData) m.invoke(this.manager, ServiceManager.PACKAGE_NAME, ServiceManager.USER_ID);
                     } catch (Throwable t) {
                         Ln.e("Failed invoking getPrimaryClip(2)", t);
@@ -52,13 +71,27 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 1 && params[0] == String.class) {
                     try {
-                        Ln.i("Clipboard getPrimaryClip signature: package");
+                        Ln.i("Clipboard fallback signature: package only");
                         return (ClipData) m.invoke(this.manager, ServiceManager.PACKAGE_NAME);
                     } catch (Throwable t) {
                         Ln.e("Failed invoking getPrimaryClip(1)", t);
                     }
                 }
             }
+        }
+        
+        // 4. android.content.ClipboardManager via FakeContext
+        try {
+            Context ctx = getFakeContext();
+            if (ctx != null) {
+                android.content.ClipboardManager cb = (android.content.ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cb != null) {
+                    Ln.i("Clipboard fallback signature: Context.CLIPBOARD_SERVICE");
+                    return cb.getPrimaryClip();
+                }
+            }
+        } catch (Throwable t) {
+            Ln.e("Failed invoking ClipboardManager via FakeContext", t);
         }
         
         Ln.e("No matching getPrimaryClip method found");
@@ -76,6 +109,7 @@ public class ClipboardManager {
                     try {
                         Ln.i("Clipboard setPrimaryClip signature: clip+package+attribution+user");
                         m.invoke(this.manager, clipData, ServiceManager.PACKAGE_NAME, null, ServiceManager.USER_ID);
+                        Ln.i("Device clipboard set");
                         return true;
                     } catch (Throwable t) {
                         Ln.e("Failed invoking setPrimaryClip(4)", t);
@@ -90,8 +124,9 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 3 && params[0] == ClipData.class && params[1] == String.class && (params[2] == int.class || params[2] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard setPrimaryClip signature: clip+package+user");
+                        Ln.i("Clipboard fallback signature: clip+package+user");
                         m.invoke(this.manager, clipData, ServiceManager.PACKAGE_NAME, ServiceManager.USER_ID);
+                        Ln.i("Device clipboard set");
                         return true;
                     } catch (Throwable t) {
                         Ln.e("Failed invoking setPrimaryClip(3)", t);
@@ -106,14 +141,31 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 2 && params[0] == ClipData.class && params[1] == String.class) {
                     try {
-                        Ln.i("Clipboard setPrimaryClip signature: clip+package");
+                        Ln.i("Clipboard fallback signature: clip+package only");
                         m.invoke(this.manager, clipData, ServiceManager.PACKAGE_NAME);
+                        Ln.i("Device clipboard set");
                         return true;
                     } catch (Throwable t) {
                         Ln.e("Failed invoking setPrimaryClip(2)", t);
                     }
                 }
             }
+        }
+
+        // 4. android.content.ClipboardManager via FakeContext
+        try {
+            Context ctx = getFakeContext();
+            if (ctx != null) {
+                android.content.ClipboardManager cb = (android.content.ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cb != null) {
+                    Ln.i("Clipboard fallback signature: Context.CLIPBOARD_SERVICE set");
+                    cb.setPrimaryClip(clipData);
+                    Ln.i("Device clipboard set");
+                    return true;
+                }
+            }
+        } catch (Throwable t) {
+            Ln.e("Failed invoking ClipboardManager.setPrimaryClip via FakeContext", t);
         }
         
         Ln.e("No matching setPrimaryClip method found");
