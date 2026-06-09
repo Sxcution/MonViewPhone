@@ -288,3 +288,8 @@ All UI lists, grids, or containers that display dynamic data (such as profile li
 - Use a container with a fixed or maximum height (`height` or `max-height`).
 - Use `display: flex` and `flex-direction: column` on the column/panel wrappers, and set `height: 100%` on these column wrappers if they reside within grid cells or flex cells.
 - Set `flex: 1; min-height: 0; overflow-y: auto;` on the list/grid content wrappers to force scrollbars to appear and prevent them from stretching their parent containers.
+## Scrcpy Server Build Rules
+
+Thu m?c server-go/scrcpy-decompiled là source code Java có ch?a do?n code ClipboardManager.java dã du?c fix tham s? deviceId + Looper c?a Android 14. 
+Nó dóng vai trò nhu b?n backup mã ngu?n d? sau này n?u c?n nghiên c?u thêm có th? m? ra xem, nhung TUY?T Ð?I KHÔNG ÐU?C dùng script d? build l?i toàn b? scrcpy-server.jar t? thu m?c dó n?a (do WebSocket Core s? b? h?ng và gây l?i "Waiting for response").
+N?u c?n s?a file jar, hãy dùng phuong pháp Smali Injection: gi?i nén classes.dex t? file scrcpy-server.jar g?c dang ch?y, d?ch ngu?c b?ng baksmali, chép dè file smali c?n s?a, r?i build l?i classes.dex b?ng smali và dóng gói l?i vào jar b?ng l?nh jar uf.
