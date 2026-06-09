@@ -1221,7 +1221,14 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     let progressStarted = false;
 
     try {
-      const tasks: Promise<void>[] = [];
+      /* ── thu thập group metadata (targets + rows + syncSettings) ── */
+      type InterleavedGroup = {
+        targets: ReturnType<typeof getTargetsByUdids>;
+        runnableRows: AutomationMacroRow[];
+        syncSettings: SyncMacroSettings;
+        udids: string[];
+      };
+      const groups: InterleavedGroup[] = [];
       for (const [, group] of profileGroups) {
         const binding = (action.bindings ?? []).find(b => b.profileId === group.profile.id);
         if (!binding) {
@@ -1237,18 +1244,12 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         if (!targets.length) continue;
         ranProfiles.push(group.profile.name);
         const macroSyncSettings = normalizeSyncMacroSettings(macro.syncMacroSettings ?? DEFAULT_SYNC_MACRO_SETTINGS);
-        tasks.push((async () => {
-          try {
-            updateRunningMacroUdids(group.udids, true);
-            for (const row of macro.rows) {
-              if (controller.signal.aborted) break;
-              if (!isRunnableMacroRow(row)) continue;
-              await runMacroRow(targets, row, controller, macroSyncSettings, setStatus);
-            }
-          } finally {
-            updateRunningMacroUdids(group.udids, false);
-          }
-        })());
+        groups.push({
+          targets,
+          runnableRows: macro.rows.filter(isRunnableMacroRow),
+          syncSettings: macroSyncSettings,
+          udids: group.udids,
+        });
       }
       for (const { binding, udids } of legacyTasks) {
         const macro = latestSavedMacros.find(m => m.id === binding.macroId);
@@ -1256,20 +1257,14 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         const targets = getTargetsByUdids(udids);
         if (!targets.length) continue;
         const macroSyncSettings = normalizeSyncMacroSettings(macro.syncMacroSettings ?? DEFAULT_SYNC_MACRO_SETTINGS);
-        tasks.push((async () => {
-          try {
-            updateRunningMacroUdids(udids, true);
-            for (const row of macro.rows) {
-              if (controller.signal.aborted) break;
-              if (!isRunnableMacroRow(row)) continue;
-              await runMacroRow(targets, row, controller, macroSyncSettings, setStatus);
-            }
-          } finally {
-            updateRunningMacroUdids(udids, false);
-          }
-        })());
+        groups.push({
+          targets,
+          runnableRows: macro.rows.filter(isRunnableMacroRow),
+          syncSettings: macroSyncSettings,
+          udids,
+        });
       }
-      if (!tasks.length) {
+      if (!groups.length) {
         const parts: string[] = [];
         if (missingMacroProfiles.length) parts.push(`Thiếu macro: ${missingMacroProfiles.join(', ')}`);
         if (macroNotFoundProfiles.length) parts.push(`Macro đã mất: ${macroNotFoundProfiles.join(', ')}`);
@@ -1281,7 +1276,97 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
       }
       progressStarted = true;
       updatePlaybackProgress({ id: playbackId, running: true, title: action.name, udids: targetUdidsList, startedAt });
-      await Promise.all(tasks);
+
+      /* ── chọn sync settings chung (ưu tiên cái có delayEnabled) ── */
+      const syncSettings = groups.find(g => g.syncSettings.delayEnabled)?.syncSettings
+        ?? groups[0].syncSettings;
+
+      /* ── đánh dấu tất cả máy đang chạy ── */
+      const allUdids = groups.flatMap(g => g.udids);
+      updateRunningMacroUdids(allUdids, true);
+
+      try {
+        /* ── interleaved execution: mỗi step, tất cả máy xếp chung hàng ── */
+        const maxSteps = Math.max(0, ...groups.map(g => g.runnableRows.length));
+
+        for (let stepIdx = 0; stepIdx < maxSteps; stepIdx++) {
+          if (controller.signal.aborted) break;
+
+          /* thu thập entry (target + row) cho step này từ tất cả groups */
+          type DeviceEntry = { target: ReturnType<typeof getTargetsByUdids>[number]; row: AutomationMacroRow };
+          const entries: DeviceEntry[] = [];
+          for (const group of groups) {
+            if (stepIdx >= group.runnableRows.length) continue;
+            const row = group.runnableRows[stepIdx];
+            for (const target of group.targets) {
+              entries.push({ target, row });
+            }
+          }
+          if (!entries.length) continue;
+
+          /* áp dụng row delay (lấy từ entry đầu tiên) */
+          const rowDelay = resolveMacroDelayMs(entries[0].row);
+          if (rowDelay > 0) {
+            setStatus(`wait ${rowDelay}`);
+            await sleepMs(rowDelay, controller.signal);
+            if (controller.signal.aborted) break;
+          }
+
+          /* shuffle nếu randomOrder */
+          let ordered = entries;
+          if (syncSettings.delayEnabled && syncSettings.randomOrder) {
+            ordered = [...entries];
+            for (let i = ordered.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+            }
+          }
+
+          /* seeding: tạo text riêng cho mỗi thiết bị */
+          const isSeeding = entries[0].row.action === 'seeding';
+          const seedingTexts = isSeeding ? pickSeedingContents(ordered.length) : [];
+          if (isSeeding && !seedingTexts.length) {
+            setStatus('Seeding lỗi: danh sách từ ngữ chung trống');
+            continue;
+          }
+
+          /* thực thi từng thiết bị với sync delay xen kẽ */
+          for (let i = 0; i < ordered.length; i++) {
+            if (controller.signal.aborted) break;
+
+            /* sync stagger delay giữa các thiết bị */
+            if (i > 0 && syncSettings.delayEnabled) {
+              if (syncSettings.intervalEnabled) {
+                const { minMs, maxMs } = syncMacroDelayRangeMs(syncSettings.intervalSec);
+                await sleepMs(randomInt(minMs, maxMs), controller.signal);
+              } else {
+                await sleepMs(100, controller.signal);
+              }
+              if (controller.signal.aborted) break;
+            }
+
+            const { target, row } = ordered[i];
+            if (isSeeding) {
+              const text = seedingTexts[i] ?? pickSeedingContent();
+              const no = deviceByUdid.get(target.udid)?.number;
+              setStatus(`Seeding #${no ?? target.udid}: ${text}`);
+              await runScript([target], rowToSteps(row, { seedingText: text }), {
+                signal: controller.signal,
+                syncSettings,
+              });
+            } else {
+              await runScript([target], rowToSteps(row), {
+                signal: controller.signal,
+                syncSettings,
+                log: setStatus,
+              });
+            }
+          }
+        }
+      } finally {
+        updateRunningMacroUdids(allUdids, false);
+      }
+
       if (controller.signal.aborted) {
         setStatus('Đã dừng phát');
       } else {
@@ -1300,7 +1385,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         updatePlaybackProgress({ id: playbackId, running: false, title: action.name, udids: targetUdidsList, startedAt });
       }
     }
-  }, [getTargetsByUdids, recordTargetUdid, runMacroRow, selectedUdids, updatePlaybackProgress, updateRunningMacroUdids]);
+  }, [deviceByUdid, getTargetsByUdids, recordTargetUdid, selectedUdids, updatePlaybackProgress, updateRunningMacroUdids]);
 
   useImperativeHandle(ref, () => ({
     playAppAction,
