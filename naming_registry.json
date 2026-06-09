@@ -148,9 +148,7 @@
       "right_panel_automation_open_key": "rightPanel.automationOpen",
       "automation_quick_slots_v1": "automationQuickSlotsV1",
       "macro_status": "macroStatus",
-      "auto_physical_screen_off": "autoPhysicalScreenOff",
-      "paste_mode": "pasteMode",
-      "paste_error": "pasteError"
+      "auto_physical_screen_off": "autoPhysicalScreenOff"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

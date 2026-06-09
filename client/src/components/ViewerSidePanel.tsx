@@ -107,32 +107,6 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; idx: number } | null>(null);
   const [editingPreset, setEditingPreset] = useState<{ idx: number; label: string; cmd: string } | null>(null);
 
-  // state_pasteMode : Phương thức Paste của thiết bị
-  const [pasteMode, setPasteMode] = useState<'clipboard-auto' | 'clipboard-keycode-paste' | 'clipboard-ctrl-v'>(() => {
-    return (localStorage.getItem(`monviewphone:paste-mode:${udid}`) as any) || 'clipboard-auto';
-  });
-
-  // state_pasteError : Đánh dấu lỗi paste
-  const [pasteError, setPasteError] = useState<boolean>(() => {
-    return localStorage.getItem(`monviewphone:paste-error:${udid}`) === 'true';
-  });
-
-  // effect_pasteMode_persist : Lưu phương thức Paste vào localStorage khi đổi
-  useEffect(() => {
-    localStorage.setItem(`monviewphone:paste-mode:${udid}`, pasteMode);
-  }, [pasteMode, udid]);
-
-  // effect_pasteError_persist : Lưu đánh dấu lỗi paste vào localStorage khi đổi
-  useEffect(() => {
-    localStorage.setItem(`monviewphone:paste-error:${udid}`, String(pasteError));
-  }, [pasteError, udid]);
-
-  // effect_paste_sync : Đồng bộ trạng thái khi thay đổi thiết bị udid
-  useEffect(() => {
-    setPasteMode((localStorage.getItem(`monviewphone:paste-mode:${udid}`) as any) || 'clipboard-auto');
-    setPasteError(localStorage.getItem(`monviewphone:paste-error:${udid}`) === 'true');
-  }, [udid]);
-
   // ADB submenu on hover
   const [showAdbSubmenu, setShowAdbSubmenu] = useState(false);
   const adbHoverTimer = useRef<number | null>(null);
@@ -386,41 +360,6 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
               </div>
             </div>
           )}
-
-          {/* Paste Mode selector */}
-          <div className="vsp-section">
-            <div className="vsp-profile-inline" style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <span className="vsp-label">{t('Phương thức Paste:')}</span>
-                <select 
-                  className="vsp-select" 
-                  value={pasteMode} 
-                  onChange={e => setPasteMode(e.target.value as any)}
-                  style={{ flex: 1, marginLeft: '12px', minWidth: '130px' }}
-                >
-                  <option value="clipboard-auto">{t('Tự động (Auto)')}</option>
-                  <option value="clipboard-keycode-paste">KEYCODE_PASTE</option>
-                  <option value="clipboard-ctrl-v">Ctrl + V</option>
-                </select>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                <input 
-                  type="checkbox" 
-                  id={`paste-error-${udid}`}
-                  checked={pasteError} 
-                  onChange={e => setPasteError(e.target.checked)} 
-                  style={{ cursor: 'pointer' }}
-                />
-                <label 
-                  htmlFor={`paste-error-${udid}`}
-                  className="vsp-label" 
-                  style={{ fontSize: '12px', cursor: 'pointer', userSelect: 'none' }}
-                >
-                  {t('Đánh dấu lỗi paste (Dùng Ctrl+V)')}
-                </label>
-              </div>
-            </div>
-          </div>
 
           {/* 3. Cài APK */}
           <div className="vsp-section">

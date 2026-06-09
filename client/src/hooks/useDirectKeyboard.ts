@@ -47,15 +47,7 @@ function getOrCreateHiddenPasteTarget(): HTMLTextAreaElement {
 }
 
 export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLElement | null) {
-  const {
-    sendToActive,
-    activeUdid,
-    altSoloUdid,
-    syncAll,
-    syncMain,
-    syncTargets,
-    getTargetsByUdids
-  } = useActive();
+  const { sendToActive, activeUdid } = useActive();
 
   // buffer text (optional quick input)
   const kbBufRef = useRef('');
@@ -79,81 +71,6 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
     flushTimerRef.current = window.setTimeout(flushText, 35);
   }
 
-  // helper uniq
-  function uniq(arr: string[]): string[] {
-    const s = new Set<string>();
-    const out: string[] = [];
-    for (const x of arr) {
-      if (!s.has(x)) {
-        s.add(x);
-        out.push(x);
-      }
-    }
-    return out;
-  }
-
-  // performUnicodePaste: Tách set clipboard và dán phím ảo với delay 120ms
-  const performUnicodePaste = useCallback(async (text: string) => {
-    if (!activeUdid) return;
-
-    // Resolve targets
-    let targetUdids: string[] = [];
-    if (altSoloUdid !== null) {
-      if (activeUdid === altSoloUdid) {
-        targetUdids = [activeUdid];
-      }
-    } else {
-      const isInSyncGroup =
-        syncTargets.includes(activeUdid) ||
-        (syncMain !== null && activeUdid === syncMain);
-
-      if (isInSyncGroup) {
-        targetUdids = uniq([
-          ...(syncMain ? [syncMain] : []),
-          ...syncTargets,
-        ]);
-      } else if (syncAll) {
-        targetUdids = uniq([activeUdid, ...syncTargets.filter(Boolean)]);
-      } else {
-        targetUdids = [activeUdid];
-      }
-    }
-
-    const targets = getTargetsByUdids(targetUdids);
-    if (!targets.length) return;
-
-    // Gửi clipboard và dán cho từng device
-    for (const t of targets) {
-      try {
-        const mode = localStorage.getItem(`monviewphone:paste-mode:${t.udid}`) || 'clipboard-auto';
-        const isError = localStorage.getItem(`monviewphone:paste-error:${t.udid}`) === 'true';
-
-        // Gửi clipboard (paste = false)
-        t.ws.send(encodeSetClipboardMessage(text, false));
-
-        const useCtrlV = mode === 'clipboard-ctrl-v' || (mode === 'clipboard-auto' && isError);
-
-        setTimeout(() => {
-          try {
-            if (useCtrlV) {
-              // Gửi Ctrl+V phần cứng
-              t.ws.send(encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_V, 0, AndroidKeycode.META_CTRL_ON));
-              t.ws.send(encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_V, 0, AndroidKeycode.META_CTRL_ON));
-            } else {
-              // Gửi KEYCODE_PASTE
-              t.ws.send(encodeKeycodeMessage(KeyEventAction.DOWN, AndroidKeycode.KEYCODE_PASTE, 0, 0));
-              t.ws.send(encodeKeycodeMessage(KeyEventAction.UP, AndroidKeycode.KEYCODE_PASTE, 0, 0));
-            }
-          } catch (e) {
-            console.warn('[performUnicodePaste] key trigger failed for', t.udid, e);
-          }
-        }, 120);
-      } catch (err) {
-        console.warn('[performUnicodePaste] failed for target', t.udid, err);
-      }
-    }
-  }, [activeUdid, altSoloUdid, syncTargets, syncMain, syncAll, getTargetsByUdids]);
-
   // Paste thủ công qua navigator.clipboard.readText (dùng cho nút bấm)
   const manualPaste = useCallback(async () => {
     try {
@@ -162,12 +79,12 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
         if (activeUdid) {
           emitAutomationText({ udid: activeUdid, text, timestamp: Date.now() });
         }
-        await performUnicodePaste(text);
+        sendToActive(encodeSetClipboardMessage(text, true));
       }
     } catch (err) {
       console.warn('[manualPaste] clipboard.readText failed:', err);
     }
-  }, [activeUdid, performUnicodePaste]);
+  }, [activeUdid, sendToActive]);
 
   // Giữ hidden textarea luôn focus khi có device active
   useEffect(() => {
@@ -355,7 +272,7 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
         if (activeUdid) {
           emitAutomationText({ udid: activeUdid, text, timestamp: Date.now() });
         }
-        performUnicodePaste(text);
+        sendToActive(encodeSetClipboardMessage(text, true));
         e.preventDefault();
         // Xóa nội dung textarea ẩn để không lưu rác
         const sink = document.getElementById(PASTE_SINK_ID) as HTMLTextAreaElement | null;
@@ -369,7 +286,7 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       window.removeEventListener('keyup', onKeyUp, { capture: true } as any);
       window.removeEventListener('paste', onPaste, { capture: true } as any);
     };
-  }, [enabled, allowedContainer, activeUdid, sendToActive, performUnicodePaste]);
+  }, [enabled, allowedContainer, activeUdid, sendToActive]);
 
   return { queueText, flushText, manualPaste };
 }
