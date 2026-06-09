@@ -70,7 +70,7 @@ $ClassFilesFile = Join-Path $ProjectRoot "classes_list.txt"
 $ClassFiles | Out-File -Encoding ascii $ClassFilesFile
 
 # Run d8
-& $D8Path --output $RepackDir "@$ClassFilesFile"
+& $D8Path --min-api 21 --lib $AndroidJar --output $RepackDir "@$ClassFilesFile"
 Remove-Item -Force $ClassFilesFile
 
 Write-Host "Packaging jar..."

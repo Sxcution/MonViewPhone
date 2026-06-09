@@ -41,7 +41,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 3 && params[0] == String.class && params[1] == String.class && (params[2] == int.class || params[2] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard getPrimaryClip signature: package+attribution+user");
+                        Ln.e("Clipboard getPrimaryClip signature: package+attribution+user");
                         return (ClipData) m.invoke(this.manager, ServiceManager.PACKAGE_NAME, null, ServiceManager.USER_ID);
                     } catch (Throwable t) {
                         Ln.e("Failed invoking getPrimaryClip(3)", t);
@@ -56,7 +56,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 2 && params[0] == String.class && (params[1] == int.class || params[1] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard fallback signature: package+user");
+                        Ln.e("Clipboard fallback signature: package+user");
                         return (ClipData) m.invoke(this.manager, ServiceManager.PACKAGE_NAME, ServiceManager.USER_ID);
                     } catch (Throwable t) {
                         Ln.e("Failed invoking getPrimaryClip(2)", t);
@@ -71,7 +71,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 1 && params[0] == String.class) {
                     try {
-                        Ln.i("Clipboard fallback signature: package only");
+                        Ln.e("Clipboard fallback signature: package only");
                         return (ClipData) m.invoke(this.manager, ServiceManager.PACKAGE_NAME);
                     } catch (Throwable t) {
                         Ln.e("Failed invoking getPrimaryClip(1)", t);
@@ -86,7 +86,7 @@ public class ClipboardManager {
             if (ctx != null) {
                 android.content.ClipboardManager cb = (android.content.ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
                 if (cb != null) {
-                    Ln.i("Clipboard fallback signature: Context.CLIPBOARD_SERVICE");
+                    Ln.e("Clipboard fallback signature: Context.CLIPBOARD_SERVICE");
                     return cb.getPrimaryClip();
                 }
             }
@@ -107,9 +107,9 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 4 && params[0] == ClipData.class && params[1] == String.class && params[2] == String.class && (params[3] == int.class || params[3] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard setPrimaryClip signature: clip+package+attribution+user");
+                        Ln.e("Clipboard setPrimaryClip signature: clip+package+attribution+user");
                         m.invoke(this.manager, clipData, ServiceManager.PACKAGE_NAME, null, ServiceManager.USER_ID);
-                        Ln.i("Device clipboard set");
+                        Ln.e("Device clipboard set");
                         return true;
                     } catch (Throwable t) {
                         Ln.e("Failed invoking setPrimaryClip(4)", t);
@@ -124,9 +124,9 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 3 && params[0] == ClipData.class && params[1] == String.class && (params[2] == int.class || params[2] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard fallback signature: clip+package+user");
+                        Ln.e("Clipboard fallback signature: clip+package+user");
                         m.invoke(this.manager, clipData, ServiceManager.PACKAGE_NAME, ServiceManager.USER_ID);
-                        Ln.i("Device clipboard set");
+                        Ln.e("Device clipboard set");
                         return true;
                     } catch (Throwable t) {
                         Ln.e("Failed invoking setPrimaryClip(3)", t);
@@ -141,9 +141,9 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 2 && params[0] == ClipData.class && params[1] == String.class) {
                     try {
-                        Ln.i("Clipboard fallback signature: clip+package only");
+                        Ln.e("Clipboard fallback signature: clip+package only");
                         m.invoke(this.manager, clipData, ServiceManager.PACKAGE_NAME);
-                        Ln.i("Device clipboard set");
+                        Ln.e("Device clipboard set");
                         return true;
                     } catch (Throwable t) {
                         Ln.e("Failed invoking setPrimaryClip(2)", t);
@@ -158,9 +158,9 @@ public class ClipboardManager {
             if (ctx != null) {
                 android.content.ClipboardManager cb = (android.content.ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
                 if (cb != null) {
-                    Ln.i("Clipboard fallback signature: Context.CLIPBOARD_SERVICE set");
+                    Ln.e("Clipboard fallback signature: Context.CLIPBOARD_SERVICE set");
                     cb.setPrimaryClip(clipData);
-                    Ln.i("Device clipboard set");
+                    Ln.e("Device clipboard set");
                     return true;
                 }
             }
@@ -193,7 +193,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 5 && params[0] == IOnPrimaryClipChangedListener.class && params[1] == String.class && params[2] == String.class && (params[3] == int.class || params[3] == Integer.TYPE) && (params[4] == int.class || params[4] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard addPrimaryClipChangedListener signature: listener+package+attribution+user+device");
+                        Ln.e("Clipboard addPrimaryClipChangedListener signature: listener+package+attribution+user+device");
                         m.invoke(this.manager, listener, ServiceManager.PACKAGE_NAME, null, ServiceManager.USER_ID, 0);
                         return true;
                     } catch (Throwable t) {
@@ -209,7 +209,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 4 && params[0] == IOnPrimaryClipChangedListener.class && params[1] == String.class && params[2] == String.class && (params[3] == int.class || params[3] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard addPrimaryClipChangedListener signature: listener+package+attribution+user");
+                        Ln.e("Clipboard addPrimaryClipChangedListener signature: listener+package+attribution+user");
                         m.invoke(this.manager, listener, ServiceManager.PACKAGE_NAME, null, ServiceManager.USER_ID);
                         return true;
                     } catch (Throwable t) {
@@ -225,7 +225,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 3 && params[0] == IOnPrimaryClipChangedListener.class && params[1] == String.class && (params[2] == int.class || params[2] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard addPrimaryClipChangedListener signature: listener+package+user");
+                        Ln.e("Clipboard addPrimaryClipChangedListener signature: listener+package+user");
                         m.invoke(this.manager, listener, ServiceManager.PACKAGE_NAME, ServiceManager.USER_ID);
                         return true;
                     } catch (Throwable t) {
@@ -241,7 +241,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 2 && params[0] == IOnPrimaryClipChangedListener.class && params[1] == String.class) {
                     try {
-                        Ln.i("Clipboard addPrimaryClipChangedListener signature: listener+package");
+                        Ln.e("Clipboard addPrimaryClipChangedListener signature: listener+package");
                         m.invoke(this.manager, listener, ServiceManager.PACKAGE_NAME);
                         return true;
                     } catch (Throwable t) {
@@ -251,6 +251,30 @@ public class ClipboardManager {
             }
         }
         
+        // 5. android.content.ClipboardManager via FakeContext
+        try {
+            Context ctx = getFakeContext();
+            if (ctx != null) {
+                android.content.ClipboardManager cb = (android.content.ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cb != null) {
+                    Ln.e("Clipboard fallback signature: Context.CLIPBOARD_SERVICE addPrimaryClipChangedListener");
+                    cb.addPrimaryClipChangedListener(new android.content.ClipboardManager.OnPrimaryClipChangedListener() {
+                        @Override
+                        public void onPrimaryClipChanged() {
+                            try {
+                                listener.dispatchPrimaryClipChanged();
+                            } catch (Exception e) {
+                                Ln.e("Failed to dispatch primary clip changed", e);
+                            }
+                        }
+                    });
+                    return true;
+                }
+            }
+        } catch (Throwable t) {
+            Ln.e("Failed invoking ClipboardManager.addPrimaryClipChangedListener via FakeContext", t);
+        }
+
         Ln.e("No matching addPrimaryClipChangedListener method found");
         return false;
     }
@@ -264,7 +288,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 5 && params[0] == IOnPrimaryClipChangedListener.class && params[1] == String.class && params[2] == String.class && (params[3] == int.class || params[3] == Integer.TYPE) && (params[4] == int.class || params[4] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard removePrimaryClipChangedListener signature: listener+package+attribution+user+device");
+                        Ln.e("Clipboard removePrimaryClipChangedListener signature: listener+package+attribution+user+device");
                         m.invoke(this.manager, listener, ServiceManager.PACKAGE_NAME, null, ServiceManager.USER_ID, 0);
                         return true;
                     } catch (Throwable t) {
@@ -280,7 +304,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 4 && params[0] == IOnPrimaryClipChangedListener.class && params[1] == String.class && params[2] == String.class && (params[3] == int.class || params[3] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard removePrimaryClipChangedListener signature: listener+package+attribution+user");
+                        Ln.e("Clipboard removePrimaryClipChangedListener signature: listener+package+attribution+user");
                         m.invoke(this.manager, listener, ServiceManager.PACKAGE_NAME, null, ServiceManager.USER_ID);
                         return true;
                     } catch (Throwable t) {
@@ -296,7 +320,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 3 && params[0] == IOnPrimaryClipChangedListener.class && params[1] == String.class && (params[2] == int.class || params[2] == Integer.TYPE)) {
                     try {
-                        Ln.i("Clipboard removePrimaryClipChangedListener signature: listener+package+user");
+                        Ln.e("Clipboard removePrimaryClipChangedListener signature: listener+package+user");
                         m.invoke(this.manager, listener, ServiceManager.PACKAGE_NAME, ServiceManager.USER_ID);
                         return true;
                     } catch (Throwable t) {
@@ -312,7 +336,7 @@ public class ClipboardManager {
                 Class<?>[] params = m.getParameterTypes();
                 if (params.length == 2 && params[0] == IOnPrimaryClipChangedListener.class && params[1] == String.class) {
                     try {
-                        Ln.i("Clipboard removePrimaryClipChangedListener signature: listener+package");
+                        Ln.e("Clipboard removePrimaryClipChangedListener signature: listener+package");
                         m.invoke(this.manager, listener, ServiceManager.PACKAGE_NAME);
                         return true;
                     } catch (Throwable t) {
