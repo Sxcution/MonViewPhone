@@ -531,6 +531,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   const [showProfileSection, setShowProfileSection] = useState(true);
   const [deviceAssigningProfileId, setDeviceAssigningProfileId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [macroStatus, setMacroStatus] = useState<string | null>(null);
   const [savedMacros, setSavedMacros] = useState<SavedAutomationMacro[]>(loadSavedMacros);
   const [appActions, setAppActions] = useState<Record<AutomationAppId, AutomationAppAction[]>>(loadAppActions);
   const [deviceProfiles, setDeviceProfiles] = useState<AutomationDeviceProfile[]>(loadDeviceProfiles);
@@ -584,6 +585,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   );
 
   const statusIsError = status === ONLY_ONE_DEVICE_MSG || status === SELECT_ONE_DEVICE_MSG;
+  const macroStatusIsError = macroStatus === ONLY_ONE_DEVICE_MSG || macroStatus === SELECT_ONE_DEVICE_MSG;
   const sortedSavedMacros = useMemo(() => sortMacros(savedMacros, macroSortMode), [savedMacros, macroSortMode]);
   const selectedProfile = useMemo(
     () => deviceProfiles.find(profile => profile.id === activeProfileId) ?? null,
@@ -650,6 +652,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     setMacroCtxMenu(null);
     setRowDelayCtxMenu(null);
     setMacroSortMenuOpen(false);
+    setMacroStatus(null);
     onClose();
   }, [onClose]);
 
@@ -804,10 +807,45 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     setStatus(`Đã xoá gán macro cho ${profile.name} / ${action.name}`);
   }, []);
 
+  const renameAppAction = useCallback((appId: AutomationAppId, action: AutomationAppAction) => {
+    setInputModal({
+      key: makeId('input'),
+      title: 'Đổi tên hành động',
+      label: 'Tên mới',
+      defaultValue: action.name,
+      onConfirm: (name) => {
+        setAppActions(prev => {
+          const next = { ...prev, [appId]: prev[appId].map(a => a.id === action.id ? { ...a, name } : a) };
+          saveAppActions(next);
+          return next;
+        });
+        setStatus(`Đã đổi tên thành "${name}"`);
+        setInputModal(null);
+      },
+    });
+  }, []);
+
+  const deleteAppAction = useCallback((appId: AutomationAppId, action: AutomationAppAction) => {
+    const bindingCount = (action.bindings ?? []).filter(b => b.profileId).length;
+    setConfirmModal({
+      title: 'Xoá hành động',
+      message: `Xoá hành động "${action.name}" sẽ xoá toàn bộ macro binding đã gán (${bindingCount} profile). File macro gốc vẫn được giữ.\n\nBạn có chắc muốn xoá không?`,
+      onConfirm: () => {
+        setAppActions(prev => {
+          const next = { ...prev, [appId]: prev[appId].filter(a => a.id !== action.id) };
+          saveAppActions(next);
+          return next;
+        });
+        setStatus(`Đã xoá hành động: ${action.name}`);
+        setConfirmModal(null);
+      },
+    });
+  }, []);
+
   const openCoordinatePanel = useCallback(() => {
     setCoordinatePanelOpen(true);
     if (!recordTargetUdid) {
-      setStatus(SELECT_ONE_DEVICE_MSG);
+      setMacroStatus(SELECT_ONE_DEVICE_MSG);
     }
   }, [recordTargetUdid]);
 
@@ -815,24 +853,24 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     setCoordinatePanelOpen(true);
     if (!viewerUdid && selectedUdids.length > 1) {
       setRecording(false);
-      setStatus(ONLY_ONE_DEVICE_MSG);
+      setMacroStatus(ONLY_ONE_DEVICE_MSG);
       return;
     }
     if (!recordTargetUdid) {
       setRecording(false);
-      setStatus(SELECT_ONE_DEVICE_MSG);
+      setMacroStatus(SELECT_ONE_DEVICE_MSG);
       return;
     }
     setRecording(true);
     lastRecordTimestampRef.current = 0;
     const no = deviceByUdid.get(recordTargetUdid)?.number;
-    setStatus(`Đang ghi${realtimeRecording ? ' (Realtime)' : ''}${no ? ` máy #${formatDeviceNo(no)}` : ''}`);
+    setMacroStatus(`Đang ghi${realtimeRecording ? ' (Realtime)' : ''}${no ? ` máy #${formatDeviceNo(no)}` : ''}`);
   }, [deviceByUdid, recordTargetUdid, realtimeRecording, selectedUdids.length, viewerUdid]);
 
   const toggleRecording = useCallback(() => {
     if (recording) {
       setRecording(false);
-      setStatus('Đã dừng ghi tọa độ');
+      setMacroStatus('Đã dừng ghi tọa độ');
       return;
     }
     startRecording();
@@ -855,18 +893,18 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   const startEditTouchDetails = useCallback((row: AutomationMacroRow, index: number) => {
     if (row.action !== 'touch') return;
     if (!recordTargetUdid) {
-      setStatus(SELECT_ONE_DEVICE_MSG);
+      setMacroStatus(SELECT_ONE_DEVICE_MSG);
       return;
     }
     setEditingTouchRowId(row.id);
-    setStatus(`Chọn tọa độ mới cho step ${index + 1}`);
+    setMacroStatus(`Chọn tọa độ mới cho step ${index + 1}`);
   }, [recordTargetUdid]);
 
   const deleteRow = useCallback((rowId: string) => {
     setRows(prev => {
       const index = prev.findIndex(row => row.id === rowId);
       const next = prev.filter(row => row.id !== rowId);
-      setStatus(index >= 0 ? `Đã xoá step ${index + 1}` : 'Đã xoá step');
+      setMacroStatus(index >= 0 ? `Đã xoá step ${index + 1}` : 'Đã xoá step');
       return next;
     });
     if (editingTouchRowIdRef.current === rowId) setEditingTouchRowId(null);
@@ -884,7 +922,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
       const adjustedTargetIndex = next.findIndex(row => row.id === targetId);
       const insertAt = placement === 'after' ? adjustedTargetIndex + 1 : adjustedTargetIndex;
       next.splice(insertAt, 0, moved);
-      setStatus(`Đã chuyển step ${sourceIndex + 1} đến ${targetIndex + 1}`);
+      setMacroStatus(`Đã chuyển step ${sourceIndex + 1} đến ${targetIndex + 1}`);
       return next;
     });
   }, []);
@@ -925,13 +963,13 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
       onConfirm: (value) => {
         const sec = Number(value.replace(',', '.'));
         if (!Number.isFinite(sec) || sec <= 0) {
-          setStatus('Delay random phải lớn hơn 0 giây');
+          setMacroStatus('Delay random phải lớn hơn 0 giây');
           return;
         }
         const cleanSec = Math.max(1, Math.round(sec));
         updateRow(row.id, { delayMs: cleanSec * 1000, delayRandomBaseSec: cleanSec });
         const { minMs, maxMs } = macroRandomDelayRangeMs(cleanSec);
-        setStatus(`Delay random: ${Math.round(minMs / 1000)}-${Math.round(maxMs / 1000)} giây`);
+        setMacroStatus(`Delay random: ${Math.round(minMs / 1000)}-${Math.round(maxMs / 1000)} giây`);
         setInputModal(null);
       },
     });
@@ -940,7 +978,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   const clearRandomDelay = useCallback((rowId: string) => {
     updateRow(rowId, { delayRandomBaseSec: undefined });
     setRowDelayCtxMenu(null);
-    setStatus('Đã tắt random delay cho dòng');
+    setMacroStatus('Đã tắt random delay cho dòng');
   }, [updateRow]);
 
   const saveMacro = useCallback(() => {
@@ -968,7 +1006,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
           return next;
         });
         setCurrentMacroName(cleanName);
-        setStatus(`Đã lưu File Macro: ${cleanName}`);
+        setMacroStatus(`Đã lưu File Macro: ${cleanName}`);
         setInputModal(null);
       },
     });
@@ -976,13 +1014,13 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
 
   const loadMacro = useCallback((macro: SavedAutomationMacro) => {
     if (recordingRef.current) {
-      setStatus('⚠ Đang ghi macro – hãy Dừng ghi hoặc Lưu trước khi mở file khác');
+      setMacroStatus('⚠ Đang ghi macro – hãy Dừng ghi hoặc Lưu trước khi mở file khác');
       return;
     }
     setRows(cloneRows(macro.rows));
     setCurrentMacroName(macro.name);
     setSyncMacroSettings(saveSyncMacroSettings(normalizeSyncMacroSettings(macro.syncMacroSettings ?? DEFAULT_SYNC_MACRO_SETTINGS)));
-    setStatus(`Đã mở File Macro: ${macro.name}`);
+    setMacroStatus(`Đã mở File Macro: ${macro.name}`);
   }, []);
 
   const renameMacro = useCallback((macroId: string, newName: string) => {
@@ -1006,7 +1044,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
       saveAppActions(next);
       return next;
     });
-    setStatus(`Đã đổi tên File Macro thành "${newName}"`);
+    setMacroStatus(`Đã đổi tên File Macro thành "${newName}"`);
   }, [savedMacros, currentMacroName]);
 
   const deleteMacroImpl = useCallback((macroId: string) => {
@@ -1019,7 +1057,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     if (macro && currentMacroName === macro.name) {
       setCurrentMacroName('');
     }
-    setStatus(`Đã xoá File Macro: ${macro?.name ?? ''}`);
+    setMacroStatus(`Đã xoá File Macro: ${macro?.name ?? ''}`);
   }, [savedMacros, currentMacroName]);
 
   const runMacroRow = useCallback(async (
@@ -1027,10 +1065,11 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     row: AutomationMacroRow,
     controller: AbortController,
     macroSyncSettings: SyncMacroSettings,
+    log?: (msg: string) => void,
   ) => {
     const delayMs = resolveMacroDelayMs(row);
     if (delayMs > 0) {
-      setStatus(`wait ${delayMs}`);
+      log?.(`wait ${delayMs}`);
       await sleepMs(delayMs, controller.signal);
       if (controller.signal.aborted) return;
     }
@@ -1038,19 +1077,19 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     const seedingTexts = row.action === 'seeding' ? pickSeedingContents(targets.length) : [];
     if (row.action === 'seeding') {
       if (!seedingTexts.length) {
-        setStatus('Seeding lỗi: danh sách từ ngữ chung trống');
+        log?.('Seeding lỗi: danh sách từ ngữ chung trống');
         return;
       }
       const hasOpenStream = targets.some(t => t.ws && t.ws.readyState === WebSocket.OPEN);
       if (!hasOpenStream) {
-        setStatus('Seeding lỗi: target chưa online hoặc stream chưa mở');
+        log?.('Seeding lỗi: target chưa online hoặc stream chưa mở');
         return;
       }
       const formattedUdids = targets.map(t => {
         const no = deviceByUdid.get(t.udid)?.number;
         return '#' + (no ?? t.udid);
       }).join(', ');
-      setStatus(`Seeding ${formattedUdids}: random rieng tung may`);
+      log?.(`Seeding ${formattedUdids}: random rieng tung may`);
       for (let i = 0; i < targets.length; i++) {
         if (controller.signal.aborted) return;
         if (i > 0 && macroSyncSettings.delayEnabled) {
@@ -1065,20 +1104,19 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         const target = targets[i];
         const text = seedingTexts[i] ?? pickSeedingContent();
         const no = deviceByUdid.get(target.udid)?.number;
-        setStatus(`Seeding #${no ?? target.udid}: ${text}`);
+        log?.(`Seeding #${no ?? target.udid}: ${text}`);
         await runScript([target], rowToSteps(row, { seedingText: text }), {
           signal: controller.signal,
           syncSettings: macroSyncSettings,
         });
       }
       return;
-      setStatus(`Seeding máy ${formattedUdids}: ${seedingText}`);
     }
     await runScript(targets, rowToSteps(row, { seedingText }), {
       signal: controller.signal,
       syncSettings: macroSyncSettings,
       log: msg => {
-        if (row.action !== 'seeding') setStatus(msg);
+        if (row.action !== 'seeding') log?.(msg);
       },
     });
   }, [deviceByUdid]);
@@ -1121,7 +1159,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
       const currentMacroSyncSettings = normalizeSyncMacroSettings(syncMacroSettings);
       for (const row of runnableRows) {
         if (controller.signal.aborted) break;
-        await runMacroRow(targets, row, controller, currentMacroSyncSettings);
+        await runMacroRow(targets, row, controller, currentMacroSyncSettings, setMacroStatus);
       }
       setStatus(controller.signal.aborted ? 'Đã dừng phát' : 'Đã phát xong');
     } finally {
@@ -1205,7 +1243,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
             for (const row of macro.rows) {
               if (controller.signal.aborted) break;
               if (!isRunnableMacroRow(row)) continue;
-              await runMacroRow(targets, row, controller, macroSyncSettings);
+              await runMacroRow(targets, row, controller, macroSyncSettings, setStatus);
             }
           } finally {
             updateRunningMacroUdids(group.udids, false);
@@ -1224,7 +1262,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
             for (const row of macro.rows) {
               if (controller.signal.aborted) break;
               if (!isRunnableMacroRow(row)) continue;
-              await runMacroRow(targets, row, controller, macroSyncSettings);
+              await runMacroRow(targets, row, controller, macroSyncSettings, setStatus);
             }
           } finally {
             updateRunningMacroUdids(udids, false);
@@ -1353,9 +1391,9 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   useEffect(() => { editingTouchRowIdRef.current = editingTouchRowId; }, [editingTouchRowId]);
 
   useEffect(() => {
-    if (status === ONLY_ONE_DEVICE_MSG && (selectedUdids.length <= 1 || viewerUdid)) setStatus(null);
-    if (status === SELECT_ONE_DEVICE_MSG && recordTargetUdid) setStatus(null);
-  }, [recordTargetUdid, selectedUdids.length, status, viewerUdid]);
+    if (macroStatus === ONLY_ONE_DEVICE_MSG && (selectedUdids.length <= 1 || viewerUdid)) setMacroStatus(null);
+    if (macroStatus === SELECT_ONE_DEVICE_MSG && recordTargetUdid) setMacroStatus(null);
+  }, [recordTargetUdid, selectedUdids.length, macroStatus, viewerUdid]);
 
   useEffect(() => {
     if (open) return;
@@ -1364,6 +1402,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     setMacroCtxMenu(null);
     setRowDelayCtxMenu(null);
     setMacroSortMenuOpen(false);
+    setMacroStatus(null);
   }, [open]);
 
   useEffect(() => {
@@ -1447,7 +1486,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
           targetUdids: [detail.udid],
         } : row)));
         setEditingTouchRowId(null);
-        setStatus(`Đã cập nhật tọa độ${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: X=${detail.x}, Y=${detail.y}`);
+        setMacroStatus(`Đã cập nhật tọa độ${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: X=${detail.x}, Y=${detail.y}`);
         return;
       }
       if (!recordingRef.current) return;
@@ -1461,7 +1500,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         width: detail.width, height: detail.height,
         sourceUdid: detail.udid, targetUdids: [detail.udid], note: '',
       }]);
-      setStatus(`Touch${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: x=${detail.x}, y=${detail.y}${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
+      setMacroStatus(`Touch${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: x=${detail.x}, y=${detail.y}${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
     };
     const onAutomationSwipe = (event: Event) => {
       if (!recordingRef.current) return;
@@ -1480,7 +1519,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         width: detail.width, height: detail.height, durationMs: detail.durationMs,
         sourceUdid: detail.udid, targetUdids: [detail.udid], note: '',
       }]);
-      setStatus(`Swipe${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: (${detail.startX},${detail.startY}) → (${detail.endX},${detail.endY}) ${detail.durationMs}ms${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
+      setMacroStatus(`Swipe${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: (${detail.startX},${detail.startY}) → (${detail.endX},${detail.endY}) ${detail.durationMs}ms${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
     };
     const onAutomationKey = (event: Event) => {
       if (!recordingRef.current) return;
@@ -1497,7 +1536,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         keycode: detail.keycode,
         sourceUdid: detail.udid, targetUdids: [detail.udid], note: '',
       }]);
-      setStatus(`Key${sourceNo ? ` mÃ¡y #${formatDeviceNo(sourceNo)}` : ''}: ${detail.keycode}${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
+      setMacroStatus(`Key${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: ${detail.keycode}${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
     };
     const onAutomationText = (event: Event) => {
       if (!recordingRef.current) return;
@@ -1514,7 +1553,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         text: detail.text,
         sourceUdid: detail.udid, targetUdids: [detail.udid], note: '',
       }]);
-      setStatus(`Text${sourceNo ? ` mÃ¡y #${formatDeviceNo(sourceNo)}` : ''}: ${detail.text.length} ky tu${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
+      setMacroStatus(`Text${sourceNo ? ` máy #${formatDeviceNo(sourceNo)}` : ''}: ${detail.text.length} ký tự${realtimeRecording ? ` (delay ${delayMs}ms)` : ''}`);
     };
     window.addEventListener(AUTOMATION_CLICK_EVENT, onAutomationClick as EventListener);
     window.addEventListener(AUTOMATION_SWIPE_EVENT, onAutomationSwipe as EventListener);
@@ -1551,6 +1590,12 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                 <span>Automation</span>
                 {currentMacroName ? <span className='automationMacroName'>{currentMacroName}</span> : null}
               </div>
+              {/* text_macro_status : Thông báo trạng thái */}
+              {status ? (
+                <div className='automationHeaderNotification'>
+                  <span className='automationStatus'>{status}</span>
+                </div>
+              ) : null}
               <button className='btn-close automationClose' aria-label='Close' onClick={closeModal}><X size={16} strokeWidth={2} /></button>
             </div>
 
@@ -1559,6 +1604,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
               <div className='automationProfileBlock'>
                 <div className='automationSectionTitle'>
                   <span>Profile</span>
+                  {/* btn_app_select : Các nút chọn ứng dụng cha */}
                   <div className='automationProfileAppTabs' aria-label='Chọn ứng dụng'>
                     {AUTOMATION_APPS.map(app => (
                       <button
@@ -1577,6 +1623,10 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                       <Plus size={15} />
                       <span>Hành động</span>
                     </button>
+                    <button type='button' className='automationArrowBtn automationProfileCreateBtn' onClick={createProfile} title='Tạo profile'>
+                      <Plus size={15} />
+                      <span>Tạo profile</span>
+                    </button>
                     <button
                       type='button'
                       className='automationArrowBtn'
@@ -1585,10 +1635,6 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                     >
                       {showProfileSection ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                       <span>{showProfileSection ? 'Ẩn' : 'Hiện'}</span>
-                    </button>
-                    <button type='button' className='automationArrowBtn automationProfileCreateBtn' onClick={createProfile} title='Tạo profile'>
-                      <Plus size={15} />
-                      <span>Tạo profile</span>
                     </button>
                   </div>
                 </div>
@@ -1636,17 +1682,37 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                             : null;
                           const isActive = activeProfileAction?.appId === item.app.id && activeProfileAction?.actionId === item.action.id;
                           return (
-                            <button
-                              key={`${item.app.id}-${item.action.id}`}
-                              type='button'
-                              className={`automationProfileActionBtn${isActive ? ' active' : ''}`}
-                              onClick={() => setActiveProfileAction({ appId: item.app.id, actionId: item.action.id })}
-                              title={binding ? `${item.action.name} -> ${binding.macroName}` : item.action.name}
-                            >
-                              <img src={item.app.icon} alt='' />
-                              <span>{item.action.name}</span>
-                              <small>{binding ? binding.macroName : 'Chưa gán'}</small>
-                            </button>
+                            <div key={`${item.app.id}-${item.action.id}`} className={`automationActionRow${isActive ? ' active' : ''}`}>
+                              {/* btn_action_select : Nút chọn hành động */}
+                              <button
+                                type='button'
+                                className='automationProfileActionBtn'
+                                style={{ border: 'none', background: 'transparent' }}
+                                onClick={() => {
+                                  console.log('Action select clicked:', item.action.id);
+                                  setActiveProfileAction({ appId: item.app.id, actionId: item.action.id });
+                                }}
+                                title={binding ? `${item.action.name} -> ${binding.macroName}` : item.action.name}
+                              >
+                                <img src={item.app.icon} alt='' />
+                                <span>{item.action.name}</span>
+                                <small>{binding ? binding.macroName : 'Chưa áp dụng'}</small>
+                              </button>
+                              {/* btn_action_edit : Nút sửa tên hành động */}
+                              <button type='button' className='automationProfileIconBtn' onClick={() => {
+                                console.log('Action edit clicked:', item.action.id);
+                                renameAppAction(item.app.id, item.action);
+                              }} title='Đổi tên hành động'>
+                                <Pencil size={13} />
+                              </button>
+                              {/* btn_action_delete : Nút xoá hành động */}
+                              <button type='button' className='automationProfileIconBtn danger' onClick={() => {
+                                console.log('Action delete clicked:', item.action.id);
+                                deleteAppAction(item.app.id, item.action);
+                              }} title='Xoá hành động'>
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
                           );
                         })}
                         {!profileActionItems.length ? <div className='automationProfileEmpty'>Chưa có hành động</div> : null}
@@ -1655,23 +1721,12 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
 
                     <div className='automationProfileColumn last'>
                       <div className='automationProfileColumnTitle'>File Macro</div>
-                      {selectedProfile && selectedProfileActionItem && selectedProfileBinding ? (
-                        <div className='automationProfileCurrentBinding'>
-                          <span>Đang gán: {selectedProfileBinding.macroName}</span>
-                          <button
-                            type='button'
-                            className='automationProfileUnbindBtn'
-                            onClick={() => removeProfileActionBinding(selectedProfile, selectedProfileActionItem.app.id, selectedProfileActionItem.action)}
-                          >
-                            Xoá gán
-                          </button>
-                        </div>
-                      ) : null}
                       <div className='automationProfileList'>
                         {sortedSavedMacros.map(macro => {
                           const isActive = selectedProfileBinding?.macroId === macro.id;
                           const disabled = !selectedProfile || !selectedProfileActionItem;
                           return (
+                            /* btn_macro_select : Nút chọn hoặc bỏ áp dụng File Macro */
                             <button
                               key={macro.id}
                               type='button'
@@ -1679,7 +1734,11 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                               disabled={disabled}
                               onClick={() => {
                                 if (!selectedProfile || !selectedProfileActionItem) return;
-                                assignMacroToProfileAction(selectedProfile, selectedProfileActionItem.app.id, selectedProfileActionItem.action, macro);
+                                if (isActive) {
+                                  removeProfileActionBinding(selectedProfile, selectedProfileActionItem.app.id, selectedProfileActionItem.action);
+                                } else {
+                                  assignMacroToProfileAction(selectedProfile, selectedProfileActionItem.app.id, selectedProfileActionItem.action, macro);
+                                }
                               }}
                               title={macro.name}
                             >
@@ -1698,7 +1757,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
               <button className={`automationCoordinateRow${coordinatePanelOpen ? ' open' : ''}`} onClick={openCoordinatePanel}>
                 <div className='automationCoordinateTitle'>Thiết Lập Macro</div>
                 <div className='automationCoordinateMeta'>{selectedUdids.length ? `${selectedUdids.length} máy được chọn` : 'Chưa chọn máy'}</div>
-                {status ? <div className={`automationStatus${statusIsError ? ' error' : ''}`}>{status}</div> : <div className='automationStatus muted'>Mở bảng Record/Phát tọa độ</div>}
+                <div className='automationStatus muted'>Mở bảng Record/Phát tọa độ</div>
                 <ChevronRight size={16} />
               </button>
             </div>
@@ -1715,10 +1774,10 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
               <div className='modal-header automationHeader' onPointerDown={startDrag}>
                 <div className='automationTitle'><Video size={17} /><span>Thiết Lập Macro</span></div>
                 <div className='automationHeaderNotification'>
-                  <span className={statusIsError ? 'automationErrorText' : undefined}>
+                  <span className={macroStatusIsError ? 'automationErrorText' : undefined}>
                     {selectedRecordDevice ? `Máy ghi: #${formatDeviceNo(selectedRecordDevice.number)}` : selectedUdids.length > 1 ? `${selectedUdids.length} máy được chọn` : 'Chưa chọn máy'}
                   </span>
-                  {status ? <span className={`automationStatus${statusIsError ? ' error' : ''}`}>{status}</span> : null}
+                  {macroStatus ? <span className={`automationStatus${macroStatusIsError ? ' error' : ''}`}>{macroStatus}</span> : null}
                 </div>
                 <button className='btn-close automationClose' aria-label='Close coordinate panel' onClick={() => setCoordinatePanelOpen(false)}><X size={16} strokeWidth={2} /></button>
               </div>

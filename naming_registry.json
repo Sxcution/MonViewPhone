@@ -91,7 +91,8 @@
       "rcp_automation_grid": "rcpAutomationGrid",
       "rcp_automation_btn": "rcpAutomationBtn",
       "automation_context_menu_panel": "automationContextMenuPanel",
-      "automation_context_menu_item": "automationContextMenuItem"
+      "automation_context_menu_item": "automationContextMenuItem",
+      "automation_action_row": "automationActionRow"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -145,7 +146,8 @@
       "display_filter": "displayFilter",
       "display_filter_open": "displayFilterOpen",
       "right_panel_automation_open_key": "rightPanel.automationOpen",
-      "automation_quick_slots_v1": "automationQuickSlotsV1"
+      "automation_quick_slots_v1": "automationQuickSlotsV1",
+      "macro_status": "macroStatus"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
@@ -164,9 +166,9 @@
       "remove_binding_impl": "removeBindingImpl",
       "play_app_action": "playAppAction",
       "rename_profile": "renameProfile",
-      "delete_profile_impl": "deleteProfileImpl",
+      "delete_profile": "deleteProfile",
       "rename_app_action": "renameAppAction",
-      "delete_app_action_impl": "deleteAppActionImpl",
+      "delete_app_action": "deleteAppAction",
       "click_device": "clickDevice",
       "set_wallpaper_devices": "handleSetWallpaperForDevices"
     },

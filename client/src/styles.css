@@ -5917,6 +5917,7 @@ button:focus-visible {
 }
 
 .automationSectionTitle {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5928,7 +5929,7 @@ button:focus-visible {
 }
 
 .automationProfileBlock > .automationSectionTitle {
-  justify-content: center;
+  justify-content: space-between;
 }
 
 .automationProfileAppTabs {
@@ -5936,8 +5937,10 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  flex: 1;
-  min-width: 0;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
 }
 
 .automationProfileAppTabs .automationAppIconButton {
@@ -6001,12 +6004,15 @@ button:focus-visible {
   position: sticky;
   top: 0;
   z-index: 10;
-  height: 32px;
-  padding: 8px 10px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
   color: #c9d4e5;
   background: #202020;
   border-bottom: 1px solid #343434;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   text-align: center;
 }
@@ -6027,6 +6033,18 @@ button:focus-visible {
 }
 
 .automationProfileRow.active {
+  background: rgba(13, 110, 253, 0.16);
+}
+
+.automationActionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px 28px;
+  align-items: center;
+  gap: 4px;
+  border-radius: 5px;
+}
+
+.automationActionRow.active {
   background: rgba(13, 110, 253, 0.16);
 }
 
