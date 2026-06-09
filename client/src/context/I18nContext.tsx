@@ -11,6 +11,13 @@ type I18nContextValue = {
 
 // Legacy map: Vietnamese -> English
 const legacyViToEn: Record<string, string> = {
+  'Tự tắt màn hình vật lý khi kết nối': 'Auto physical screen off on connect',
+  'Giữ màn hình thức khi sạc': 'Stay awake while plugged in',
+  'Tắt màn hình vật lý': 'Physical screen off',
+  'Bật màn hình vật lý': 'Physical screen on',
+  'Phương thức Paste:': 'Paste Mode:',
+  'Tự động (Auto)': 'Auto (Fallback)',
+  'Đánh dấu lỗi paste (Dùng Ctrl+V)': 'Mark paste error (Use Ctrl+V)',
   'Kích thước tile': 'Tile size',
   'Kích thước lớn': 'Large size',
   'Giảm kích thước tile': 'Decrease tile width',

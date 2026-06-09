@@ -49,5 +49,11 @@ Removed legacy layers:
 - [NEW] [settings.json](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/settings.json): Unified storage for all user settings, device ordering, groups, and automation profiles, persisted directly inside the project directory.
 - [NEW] [SetWallpaper.java](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/wallpaper/SetWallpaper.java): Java source file compiled into a dex-based JAR helper (`wallpaper_helper.jar`) which runs on the device via `app_process` to apply wallpapers.
 - [MODIFY] [main.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/main.go) & [rest.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/rest.go): Added the `/api/goog/device/set-wallpaper` endpoint to push the helper JAR and image, then run `app_process` to silently apply the generated wallpaper.
+- [NEW] [DisplayPower.java](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/displaypower/helper/src/com/monviewphone/displaypower/DisplayPower.java): Java source file compiled into a dex-based JAR helper running on the device via `app_process` to control display power modes using the `SurfaceControl` API.
+- [NEW] [build-helper.ps1](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/displaypower/helper/build-helper.ps1): Build script to compile and package the display power helper JAR.
+- [NEW] [display_power.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/display_power.go): Go backend service file implementing the `/api/goog/device/display-power` endpoint.
+- [MODIFY] [main.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/main.go): Registered the `/api/goog/device/display-power` route.
+- [MODIFY] [useDirectKeyboard.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/hooks/useDirectKeyboard.ts): Updated manualPaste and onPaste handlers to separate clipboard copying from key event pasting. Sends setClipboard with paste=false, then triggers KEYCODE_PASTE or Ctrl+V depending on the target device configuration after 120ms delay.
+- [MODIFY] [ViewerSidePanel.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/ViewerSidePanel.tsx): Added dropdown option for per-device paste modes (Auto, KEYCODE_PASTE, Ctrl+V) and checkbox option to mark paste error (forcing Ctrl+V fallback when Auto is selected).
 
 

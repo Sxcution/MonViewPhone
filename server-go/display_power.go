@@ -1,0 +1,105 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"server-go/adb"
+)
+
+type displayPowerRequest struct {
+	UDID         string `json:"udid"`
+	Mode         string `json:"mode"`
+	DisplayIndex int    `json:"displayIndex"`
+}
+
+func handleDisplayPower(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
+		return
+	}
+
+	var req displayPowerRequest
+	if err := readJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid JSON"})
+		return
+	}
+
+	udid := strings.TrimSpace(req.UDID)
+	mode := strings.ToLower(strings.TrimSpace(req.Mode))
+	if udid == "" || (mode != "off" && mode != "on") {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": `Invalid "udid" or "mode"`})
+		return
+	}
+	if req.DisplayIndex < 0 {
+		req.DisplayIndex = 0
+	}
+
+	output, method, err := setDisplayPower(udid, mode, req.DisplayIndex)
+	if err != nil {
+		writeJSON(w, http.StatusOK, jsonResponse{
+			"success": false,
+			"error":   err.Error(),
+			"output":  output,
+			"method":  method,
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, jsonResponse{
+		"success": true,
+		"output":  output,
+		"method":  method,
+	})
+}
+
+func setDisplayPower(udid string, mode string, displayIndex int) (string, string, error) {
+	sdkOut, _ := adb.Shell(udid, "getprop ro.build.version.sdk")
+	sdk, _ := strconv.Atoi(strings.TrimSpace(sdkOut))
+
+	if sdk >= 35 {
+		cmdMode := "power-off"
+		if mode == "on" {
+			cmdMode = "power-on"
+		}
+		out, err := adb.Shell(udid, fmt.Sprintf("cmd display %s %d", cmdMode, displayIndex))
+		if err == nil {
+			return out, "cmd-display", nil
+		}
+		// fallback to helper below
+	}
+
+	out, err := runDisplayPowerHelper(udid, mode, displayIndex)
+	if err != nil {
+		return out, "surfacecontrol-helper", err
+	}
+	return out, "surfacecontrol-helper", nil
+}
+
+func runDisplayPowerHelper(udid string, mode string, displayIndex int) (string, error) {
+	localJar, err := filepath.Abs(filepath.Join("displaypower", "bin", "monview-display-power.jar"))
+	if err != nil {
+		return "", err
+	}
+
+	remoteJar := "/data/local/tmp/monview-display-power.jar"
+	if out, err := adb.Command("-s", udid, "push", localJar, remoteJar); err != nil {
+		return out, fmt.Errorf("push display power helper failed: %w", err)
+	}
+
+	cmd := fmt.Sprintf(
+		"CLASSPATH=%s app_process / com.monviewphone.displaypower.DisplayPower %s %d",
+		shellQuote(remoteJar),
+		shellQuote(mode),
+		displayIndex,
+	)
+
+	out, err := adb.Shell(udid, cmd)
+	if err != nil {
+		return out, fmt.Errorf("display power helper failed: %w", err)
+	}
+	return out, nil
+}

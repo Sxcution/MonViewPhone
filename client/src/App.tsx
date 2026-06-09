@@ -18,7 +18,8 @@ import {
   installApk,
   installUploadedApk,
   runAdbCommandApi,
-  setDeviceWallpaper
+  setDeviceWallpaper,
+  setDeviceDisplayPower
 } from '@/lib/serverApi'
 import { SyncPanel } from '@/components/SyncPanel'
 import { SyncTimeSettingsModal } from '@/components/SyncTimeSettingsModal'
@@ -198,19 +199,29 @@ function httpApiUrl(wsServer: string, path: string): string {
   return url.toString()
 }
 
+// type_QuickActionId : Định nghĩa các id phím tắt nhanh
 type QuickActionId =
+  | 'physicalScreenOff'
+  | 'physicalScreenOn'
   | 'screenOff'
   | 'mute'
   | 'soundOn'
   | 'maxVolume'
   | 'syncTime'
+  | 'stayAwakeOn'
+  | 'automation'
 
+// DEFAULT_QUICK_ACTION_ORDER : Thứ tự mặc định các phím tắt nhanh
 const DEFAULT_QUICK_ACTION_ORDER: QuickActionId[] = [
+  'physicalScreenOff',
+  'physicalScreenOn',
   'screenOff',
   'mute',
   'soundOn',
   'maxVolume',
-  'syncTime'
+  'syncTime',
+  'stayAwakeOn',
+  'automation'
 ]
 
 function loadQuickActionOrder(): QuickActionId[] {
@@ -1450,6 +1461,60 @@ export function App() {
     [quickCommandTargets, wsServer]
   )
 
+  // state_autoPhysicalScreenOff : Trạng thái tự động tắt màn hình vật lý khi kết nối
+  const [autoPhysicalScreenOff, setAutoPhysicalScreenOff] = useState(() => {
+    try {
+      return localStorage.getItem('monviewphone:auto-physical-screen-off') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  // effect_autoPhysicalScreenOff_persist : Lưu trạng thái tự động tắt màn hình vào localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('monviewphone:auto-physical-screen-off', String(autoPhysicalScreenOff))
+    } catch {}
+  }, [autoPhysicalScreenOff])
+
+  // ref_autoPhysicalScreenOffDone : Lưu danh sách thiết bị đã được tự động tắt màn hình để tránh spam
+  const autoPhysicalScreenOffDoneRef = useRef<Set<string>>(new Set())
+
+  // effect_autoPhysicalScreenOff_trigger : Tự động tắt màn hình vật lý khi thiết bị online
+  useEffect(() => {
+    if (!autoPhysicalScreenOff) return
+    const online = orderedRegistered.filter(id => connectedUdids.has(id))
+    for (const udid of online) {
+      if (autoPhysicalScreenOffDoneRef.current.has(udid)) continue
+      autoPhysicalScreenOffDoneRef.current.add(udid)
+      setDeviceDisplayPower(wsServer, udid, 'off').catch(err => {
+        console.warn('[display-power] auto off failed', udid, err)
+      })
+    }
+  }, [autoPhysicalScreenOff, orderedRegistered, connectedUdids, wsServer])
+
+  // callback_runDisplayPowerForTargets : Chạy lệnh bật/tắt màn hình vật lý cho các thiết bị được chọn
+  const runDisplayPowerForTargets = useCallback(
+    async (mode: 'off' | 'on') => {
+      const targets = quickCommandTargets()
+      if (!targets.length) return
+      setGlobalAdbStatus(`${mode === 'off' ? 'Đang tắt' : 'Đang bật'} màn hình vật lý cho ${targets.length} thiết bị...`)
+      try {
+        let ok = 0
+        let lastMethod = ''
+        for (const udid of targets) {
+          const result = await setDeviceDisplayPower(wsServer, udid, mode)
+          ok += 1
+          if (result.method) lastMethod = result.method
+        }
+        setGlobalAdbStatus(`${mode === 'off' ? 'Đã tắt' : 'Đã bật'} màn hình vật lý cho ${ok}/${targets.length} thiết bị${lastMethod ? ` (${lastMethod})` : ''}`)
+      } catch (err: any) {
+        setGlobalAdbStatus(`Lỗi ${mode === 'off' ? 'tắt' : 'bật'} màn hình vật lý: ${err?.message || err}`)
+      }
+    },
+    [quickCommandTargets, wsServer]
+  )
+
   const handleContextApkSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files || [])
@@ -2047,8 +2112,18 @@ export function App() {
 
   const quickActions = useMemo(
     () => ({
+      physicalScreenOff: {
+        label: t('Tắt màn hình vật lý') || 'Tắt màn hình vật lý',
+        icon: <MonitorOff size={15} strokeWidth={1.8} />,
+        run: () => runDisplayPowerForTargets('off')
+      },
+      physicalScreenOn: {
+        label: t('Bật màn hình vật lý') || 'Bật màn hình vật lý',
+        icon: <MonitorOff size={15} strokeWidth={1.8} />,
+        run: () => runDisplayPowerForTargets('on')
+      },
       screenOff: {
-        label: 'Tắt màn hình',
+        label: 'Power key',
         icon: <MonitorOff size={15} strokeWidth={1.8} />,
         run: () => runQuickAdbCommands(['adb shell input keyevent 26'])
       },
@@ -2088,9 +2163,19 @@ export function App() {
         label: 'Sync Time',
         icon: <Clock3 size={15} strokeWidth={1.8} />,
         run: () => setSyncTimeModalOpen(true)
+      },
+      stayAwakeOn: {
+        label: t('Giữ màn hình thức khi sạc') || 'Stay Awake',
+        icon: <Clock3 size={15} strokeWidth={1.8} />,
+        run: () => runQuickAdbCommands(['adb shell settings put global stay_on_while_plugged_in 7'])
+      },
+      automation: {
+        label: t('Tự động hóa') || 'Automation',
+        icon: <Bot size={15} strokeWidth={1.8} />,
+        run: () => setAutomationOpen(true)
       }
     }),
-    [runQuickAdbCommands, quickCommandTargets]
+    [runQuickAdbCommands, runDisplayPowerForTargets, quickCommandTargets, t]
   )
 
   {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */ }
@@ -2442,6 +2527,17 @@ export function App() {
                     onClick={() => setShowTileInfo(prev => !prev)}
                   >
                     {showTileInfo ? t('Bật') : t('Ẩn')}
+                  </button>
+                </div>
+              </div>
+              <div className='rcpToggleRow'>
+                <span>{t('Tự tắt màn hình vật lý khi kết nối') || 'Auto physical screen off on connect'}</span>
+                <div style={{ display: 'contents' }}>
+                  <button
+                    className={`rcpToggleBtn ${autoPhysicalScreenOff ? 'on' : ''}`}
+                    onClick={() => setAutoPhysicalScreenOff(prev => !prev)}
+                  >
+                    {autoPhysicalScreenOff ? t('Bật') : t('Tắt')}
                   </button>
                 </div>
               </div>

@@ -670,3 +670,26 @@ export async function setDeviceWallpaper(
     throw new Error(json?.error || `Failed to set wallpaper (status ${res.status})`);
   }
 }
+
+export async function setDeviceDisplayPower(
+  wsServer: string,
+  udid: string,
+  mode: 'off' | 'on',
+  displayIndex = 0,
+): Promise<{ success: boolean; output: string; method?: string }> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/display-power`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, mode, displayIndex }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || json?.output || `Display power failed (status ${res.status})`);
+  }
+  return {
+    success: true,
+    output: json?.output || '',
+    method: json?.method,
+  };
+}
