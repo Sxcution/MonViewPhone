@@ -2,7 +2,7 @@ import { clamp, encodeKeycodeMessage, encodeScrollMessage, encodeTouchMessage, K
 import type { InputTarget } from '@/context/ActiveContext';
 import { AndroidKeycode } from './keyEvent';
 import { emitAutomationClick, emitAutomationSwipe } from './automation';
-import { loadSyncTimeSettings, syncTimeDelayRangeMs, type SyncTimeSettings } from './syncTimeSettings';
+import { loadSyncTimeSettings, syncTimeDelayRangeMs, SYNC_TIME_SETTINGS_EVENT, type SyncTimeSettings } from './syncTimeSettings';
 
 type TargetsGetter = () => InputTarget[];
 
@@ -81,6 +81,48 @@ function isOpenTarget(t: InputTarget) {
 
 function sleep(ms: number) {
   return new Promise<void>(resolve => window.setTimeout(resolve, Math.max(0, ms)));
+}
+
+let syncTimeDelayGeneration = 0;
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(SYNC_TIME_SETTINGS_EVENT, (event) => {
+    const settings = (event as CustomEvent<SyncTimeSettings>).detail;
+    if (!settings?.delayEnabled) {
+      syncTimeDelayGeneration++;
+    }
+  });
+}
+
+function isSyncTimeDelayStillActive(generation: number) {
+  return generation === syncTimeDelayGeneration && loadSyncTimeSettings().delayEnabled;
+}
+
+function sleepWithSyncTimeCancel(ms: number, generation: number) {
+  return new Promise<boolean>(resolve => {
+    if (!isSyncTimeDelayStillActive(generation)) {
+      resolve(false);
+      return;
+    }
+
+    let settled = false;
+    let timeout = 0;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      window.removeEventListener(SYNC_TIME_SETTINGS_EVENT, onSettings);
+      resolve(value);
+    };
+    const onSettings = (event: Event) => {
+      const settings = (event as CustomEvent<SyncTimeSettings>).detail;
+      if (!settings?.delayEnabled || generation !== syncTimeDelayGeneration) {
+        finish(false);
+      }
+    };
+    timeout = window.setTimeout(() => finish(isSyncTimeDelayStillActive(generation)), Math.max(0, ms));
+    window.addEventListener(SYNC_TIME_SETTINGS_EVENT, onSettings);
+  });
 }
 
 function randomInt(min: number, max: number) {
@@ -210,14 +252,19 @@ export function attachTouchControls(
   async function replayDelayedFollowers(st: ActivePointerState, endXY: { x01: number; y01: number }, movedPx: number, durationMs: number) {
     if (!st.delayedFollowers.length) return;
     const { minMs, maxMs } = syncTimeDelayRangeMs(st.syncSettings.intervalSec);
+    const delayGeneration = syncTimeDelayGeneration;
     
     for (const follower of st.delayedFollowers) {
+      if (!isSyncTimeDelayStillActive(delayGeneration)) return;
       if (st.syncSettings.intervalEnabled) {
-        await sleep(randomInt(minMs, maxMs));
+        const ok = await sleepWithSyncTimeCancel(randomInt(minMs, maxMs), delayGeneration);
+        if (!ok) return;
       } else {
         // Run sequentially with a tiny 100ms gap when interval delay is disabled
-        await sleep(100);
+        const ok = await sleepWithSyncTimeCancel(100, delayGeneration);
+        if (!ok) return;
       }
+      if (!isSyncTimeDelayStillActive(delayGeneration)) return;
       if (movedPx <= 8) {
         await replayDelayedTap(follower, st.pid, endXY.x01, endXY.y01);
       } else {

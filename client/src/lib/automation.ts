@@ -198,7 +198,7 @@ function shuffleTargets<T>(items: T[]): T[] {
 export async function runScript(
   targets: InputTarget[],
   steps: AutomationStep[],
-  opts?: { signal?: AbortSignal; log?: (msg: string) => void },
+  opts?: { signal?: AbortSignal; log?: (msg: string) => void; syncSettings?: SyncMacroSettings },
 ) {
   const log = opts?.log ?? (() => {});
   if (!targets.length) {
@@ -206,7 +206,7 @@ export async function runScript(
     return;
   }
 
-  const syncSettings = loadSyncMacroSettings();
+  const syncSettings = opts?.syncSettings ?? loadSyncMacroSettings();
   const orderedTargets = (syncSettings.delayEnabled && syncSettings.randomOrder) 
     ? shuffleTargets(targets) 
     : targets;

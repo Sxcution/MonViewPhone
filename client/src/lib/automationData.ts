@@ -6,6 +6,8 @@
 
 /* ── types ─────────────────────────────────────────────────────── */
 
+import { normalizeSyncMacroSettings, type SyncMacroSettings } from './syncMacroSettings';
+
 export type AutomationAppId = 'wechat' | 'line' | 'tantan' | 'setting';
 
 export type AutomationActionMacroBinding = {
@@ -56,6 +58,7 @@ export type SavedAutomationMacro = {
   id: string;
   name: string;
   rows: AutomationMacroRow[];
+  syncMacroSettings?: SyncMacroSettings;
   createdAt?: number;
   updatedAt: number;
 };
@@ -66,6 +69,9 @@ export const AUTOMATION_MACROS_KEY = 'automationMacrosV1';
 export const AUTOMATION_APP_ACTIONS_KEY = 'automationAppActionsV1';
 export const AUTOMATION_DEVICE_PROFILES_KEY = 'automationDeviceProfilesV1';
 export const AUTOMATION_SEEDING_CONTENTS_KEY = 'automationSeedingContentsV1';
+export const AUTOMATION_DATA_CHANGED_EVENT = 'monviewphone:automation-data-changed';
+
+export type AutomationDataChangedKind = 'macros' | 'actions' | 'profiles';
 
 export const AUTOMATION_APPS: Array<{ id: AutomationAppId; label: string; icon: string }> = [
   { id: 'wechat', label: 'Wechat', icon: '/automation-icons/WechatIcon.png' },
@@ -96,6 +102,13 @@ export function emptyAppActions(): Record<AutomationAppId, AutomationAppAction[]
   return { wechat: [], line: [], tantan: [], setting: [] };
 }
 
+function dispatchAutomationDataChanged(kind: AutomationDataChangedKind) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(AUTOMATION_DATA_CHANGED_EVENT, { detail: { kind } }));
+  } catch { /* ignore */ }
+}
+
 /* ── persistence ───────────────────────────────────────────────── */
 
 export function loadSavedMacros(): SavedAutomationMacro[] {
@@ -106,6 +119,7 @@ export function loadSavedMacros(): SavedAutomationMacro[] {
       .filter((item): item is SavedAutomationMacro => Boolean(item?.id && item?.name && Array.isArray(item?.rows)))
       .map(item => ({
         ...item,
+        syncMacroSettings: item.syncMacroSettings ? normalizeSyncMacroSettings(item.syncMacroSettings) : undefined,
         createdAt: Number(item.createdAt) || Number(item.updatedAt) || Date.now(),
         updatedAt: Number(item.updatedAt) || Number(item.createdAt) || Date.now(),
       }));
@@ -113,7 +127,10 @@ export function loadSavedMacros(): SavedAutomationMacro[] {
 }
 
 export function saveSavedMacros(macros: SavedAutomationMacro[]) {
-  try { localStorage.setItem(AUTOMATION_MACROS_KEY, JSON.stringify(macros)); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(AUTOMATION_MACROS_KEY, JSON.stringify(macros));
+    dispatchAutomationDataChanged('macros');
+  } catch { /* ignore */ }
 }
 
 export function loadAppActions(): Record<AutomationAppId, AutomationAppAction[]> {
@@ -144,7 +161,10 @@ export function loadAppActions(): Record<AutomationAppId, AutomationAppAction[]>
 }
 
 export function saveAppActions(actions: Record<AutomationAppId, AutomationAppAction[]>) {
-  try { localStorage.setItem(AUTOMATION_APP_ACTIONS_KEY, JSON.stringify(actions)); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(AUTOMATION_APP_ACTIONS_KEY, JSON.stringify(actions));
+    dispatchAutomationDataChanged('actions');
+  } catch { /* ignore */ }
 }
 
 export function loadDeviceProfiles(): AutomationDeviceProfile[] {
@@ -156,7 +176,10 @@ export function loadDeviceProfiles(): AutomationDeviceProfile[] {
 }
 
 export function saveDeviceProfiles(profiles: AutomationDeviceProfile[]) {
-  try { localStorage.setItem(AUTOMATION_DEVICE_PROFILES_KEY, JSON.stringify(sortDeviceProfilesByName(profiles))); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(AUTOMATION_DEVICE_PROFILES_KEY, JSON.stringify(sortDeviceProfilesByName(profiles)));
+    dispatchAutomationDataChanged('profiles');
+  } catch { /* ignore */ }
 }
 
 /* ── seeding content persistence ─────────────────────────────── */

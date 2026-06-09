@@ -27,7 +27,7 @@ func warmUpAdb() {
 }
 
 func main() {
-	log.Println("Starting Solumate Go Backend...")
+	log.Println("Starting MonViewPhone Go Backend...")
 
 	// Warm up ADB trước khi làm gì khác
 	warmUpAdb()
@@ -43,7 +43,7 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-UDID, X-Filename, X-File-Size, X-Remote-Path")
 		w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length")
-		w.Header().Set("X-Solumate-Backend", "server-go")
+		w.Header().Set("X-MonViewPhone-Backend", "server-go")
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
@@ -78,6 +78,12 @@ func main() {
 		case "/api/goog/device/pull-file":
 			handlePullFile(w, r)
 			return
+		case "/api/goog/device/settings":
+			handleSettings(w, r)
+			return
+		case "/api/goog/device/set-wallpaper":
+			handleSetWallpaper(w, r)
+			return
 		}
 
 		action := r.URL.Query().Get("action")
@@ -90,7 +96,7 @@ func main() {
 			websocket.HandleDeviceList(w, r, tracker)
 		default:
 			// Fallback simple message for REST
-			w.Write([]byte("Solumate Go Backend is running! Action: " + action))
+			w.Write([]byte("MonViewPhone Go Backend is running! Action: " + action))
 		}
 	})
 

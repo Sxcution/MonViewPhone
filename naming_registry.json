@@ -145,7 +145,8 @@
       "delete_profile_impl": "deleteProfileImpl",
       "rename_app_action": "renameAppAction",
       "delete_app_action_impl": "deleteAppActionImpl",
-      "click_device": "clickDevice"
+      "click_device": "clickDevice",
+      "set_wallpaper_devices": "handleSetWallpaperForDevices"
     },
     "refs": {
       "rubber_band_ref": "rubberBandRef",

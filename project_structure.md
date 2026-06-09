@@ -5,6 +5,7 @@
 - `server-go/`: Go backend. This is the only backend kept in the main project.
 - `APK Build/`: Android helper APK source.
 - `rule.md`: Local development rules and UI interaction notes.
+- [NEW] [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw): Windows tray launcher and process manager for starting backend and frontend in the background. Handles standalone browser app window launch.
 
 Removed legacy layers:
 - Root Electron wrapper.
@@ -43,3 +44,8 @@ Removed legacy layers:
 - `server-go/server-go.exe`: Current compiled Go backend binary.
 - `server-go/Start_PhoneFarm.bat`: Starts Go backend and Vite frontend.
 - `server-go/Start_PhoneFarm_Air.bat`: Optional Go hot-reload launcher for backend development.
+- [NEW] [settings.json](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/settings.json): Unified storage for all user settings, device ordering, groups, and automation profiles, persisted directly inside the project directory.
+- [NEW] [SetWallpaper.java](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/wallpaper/SetWallpaper.java): Java source file compiled into a dex-based JAR helper (`wallpaper_helper.jar`) which runs on the device via `app_process` to apply wallpapers.
+- [MODIFY] [main.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/main.go) & [rest.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/rest.go): Added the `/api/goog/device/set-wallpaper` endpoint to push the helper JAR and image, then run `app_process` to silently apply the generated wallpaper.
+
+

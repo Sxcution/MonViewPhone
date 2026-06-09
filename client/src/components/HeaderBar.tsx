@@ -8,7 +8,6 @@ type Props = {
 
 export function HeaderBar ({ wsServer }: Props) {
   const { t } = useI18n()
-  const logoSrc = 'https://solumate.vn/logo_gold.png'
   const [restarting, setRestarting] = useState(false)
 
   const handleRestart = async () => {
@@ -60,8 +59,7 @@ export function HeaderBar ({ wsServer }: Props) {
     <div id='header'>
       <div className='headerLeft'>
         <div className='headerBrand'>
-          <img src={logoSrc} alt='Solumate' className='headerLogo' />
-          <h1 className='headerGradientTitle'>Solumate</h1>
+          <h1 className='headerGradientTitle'>MonViewPhone</h1>
         </div>
       </div>
 

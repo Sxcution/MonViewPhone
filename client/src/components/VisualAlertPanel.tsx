@@ -219,7 +219,7 @@ export function VisualAlertPanel({ registeredUdids, orderMap }: VisualAlertPanel
                 </div>
               </label>
               <label className="visualAlertSettingItem">
-                <span>Chờ (s)</span>
+                <span>Báo Lại</span>
                 <div className="visualAlertInputWrap">
                   <input
                     type="number"

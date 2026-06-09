@@ -39,6 +39,7 @@ When coding any notification modal such as confirm delete, rename, create, or in
    - Overlay: `position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;`
    - Card: app-owned `background`, `border`, `border-radius`, and `box-shadow`
 4. Do not use native browser dialogs: no `window.prompt()`, `window.confirm()`, `alert()`, or `confirm()`. Use custom app modals such as `InputModal` or `ConfirmDeleteModal`.
+5. Any child modal opened from inside a parent modal, including settings/config modals like Sync Macro opened from Thiết Lập Macro, must render through `createPortal(..., document.body)` and use the same top overlay layer (`z-index: 27000+`) so it appears above the parent, never behind it.
 
 ## UI/UX Styling Standard
 

@@ -653,3 +653,20 @@ export async function installApkToUser(
     throw new Error(json?.error || `Install failed (status ${res.status})`);
   }
 }
+
+export async function setDeviceWallpaper(
+  wsServer: string,
+  udid: string,
+  base64Image: string,
+): Promise<void> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/set-wallpaper`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, image: base64Image }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Failed to set wallpaper (status ${res.status})`);
+  }
+}

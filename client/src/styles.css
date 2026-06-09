@@ -30,7 +30,7 @@
   --panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 
   /* === DESIGN TOKENS - MonDashboard command-center theme === */
-  --md-bg: #020203;
+  --md-bg: #272828;
   --md-bg-soft: #050608;
   --md-header: #000000;
   --md-surface: #11141a;
@@ -87,12 +87,7 @@ body {
   height: calc(var(--vh, 1vh) * 100);
   display: flex;
   flex-direction: column;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    var(--md-bg);
-  background-size: 100px 100px, 100px 100px, auto;
-  background-position: center top;
+  background: var(--md-bg);
   /* Nền xám đen chống chói */
   color: var(--md-text);
   /* Chữ xám nhạt để dịu mắt */
@@ -164,8 +159,8 @@ body.sidebarCollapsed {
 .devices-grid,
 .tiles-container {
   display: grid;
-  gap: 2px !important;
-  padding: 2px;
+  gap: 5px !important;
+  padding: 10px;
   box-sizing: border-box;
   grid-template-columns: repeat(auto-fill, minmax(var(--tile-width, 120px), var(--tile-width, 120px)));
   grid-auto-rows: max-content;
@@ -1569,8 +1564,10 @@ video {
 
 .tile {
   background: #1e1e1e;
-  border: 2px solid #333333;
-  border-radius: 4px;
+  border: 2px solid #2596be;
+  /* tile_border_gray : Viền xám cho grid con */
+  border-radius: 16px;
+  /* tile_radius : Bo góc nhiều hơn giống Viewer */
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1582,6 +1579,9 @@ video {
   justify-content: center;
   align-items: center;
   box-sizing: border-box;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  /* tile_shadow : Bóng mờ giống Viewer */
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
 }
 
 .tileBody {
@@ -4569,8 +4569,8 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 .device-viewer-container {
   border: 2px solid #3b3b3b;
   /* Viền xám đen hiện đại */
-  border-radius: 8px;
-  /* Bo góc mềm mại */
+  border-radius: 16px;
+  /* Bo góc nhiều hơn */
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
   /* Đổ bóng tạo chiều sâu */
   overflow: hidden;
@@ -4760,8 +4760,8 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 .device-viewer-container {
   border: 2px solid #3b3b3b;
   /* Viền xám đen hiện đại */
-  border-radius: 8px;
-  /* Bo góc mềm mại */
+  border-radius: 16px;
+  /* Bo góc nhiều hơn */
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
   /* Đổ bóng tạo chiều sâu */
   overflow: hidden;
@@ -4819,7 +4819,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 }
 
 .fvl-canvas {
-  /* Gi? d�ng aspect ratio, chi?u cao max 100vh */
+  /* Gi? dng aspect ratio, chi?u cao max 100vh */
   max-height: 100vh;
   max-width: 100%;
   width: auto;
@@ -5271,7 +5271,7 @@ input[type="number"] {
   flex: 1;
 }
 
-/* === Context menu nh�m === */
+/* === Context menu nhm === */
 .ctxMenuItem {
   background: transparent;
   border: none;
@@ -5299,11 +5299,11 @@ input[type="number"] {
   cursor: grabbing;
 }
 
-/* === Drag reorder nh�m === */
+/* === Drag reorder nhm === */
 
 
 
-/* ?n tile kh�ng thu?c nh�m dang focus � KH�NG unmount d? gi? WebSocket */
+/* ?n tile khng thu?c nhm dang focus  KHNG unmount d? gi? WebSocket */
 .tileDraggableWrapper.hiddenByGroup {
   display: none !important;
 }
@@ -5590,7 +5590,7 @@ button:focus-visible {
 }
 
 .automationDialog {
-  width: min(420px, calc(100vw - 36px));
+  width: min(860px, calc(100vw - 36px));
   max-height: calc(100dvh - 92px);
   margin: 0;
 }
@@ -5602,8 +5602,13 @@ button:focus-visible {
 
 .automationCoordinateDialog {
   width: min(860px, calc(100vw - 470px));
+  min-width: min(720px, calc(100vw - 36px));
+  height: min(720px, calc(100dvh - 92px));
+  min-height: 420px;
   max-height: calc(100dvh - 92px);
   margin: 0;
+  overflow: auto;
+  resize: both;
 }
 
 .automationContent {
@@ -5616,6 +5621,11 @@ button:focus-visible {
   border-radius: 6px;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58);
   overflow: hidden;
+}
+
+.automationCoordinateDialog .automationContent {
+  height: 100%;
+  max-height: none;
 }
 
 .automationHeader {
@@ -5769,6 +5779,7 @@ button:focus-visible {
 
 .automationDeviceBlock,
 .automationActionBlock,
+.automationProfileBlock,
 .automationCoordinateRow {
   border: 1px solid #343434;
   border-radius: 6px;
@@ -5779,6 +5790,10 @@ button:focus-visible {
   position: relative;
   z-index: 5;
   overflow: visible;
+}
+
+.automationProfileBlock {
+  overflow: hidden;
 }
 
 .automationSectionTitle {
@@ -5814,6 +5829,206 @@ button:focus-visible {
 
 .automationArrowBtn:hover {
   background: #333333;
+}
+
+.automationProfileCreateBtn {
+  min-width: 116px;
+}
+
+.automationProfileManagerGrid {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.82fr) minmax(190px, 1fr) minmax(220px, 1.12fr);
+  min-height: 230px;
+  max-height: 310px;
+}
+
+.automationProfileColumn {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid #3a3a3a;
+}
+
+.automationProfileColumn.last {
+  border-right: 0;
+}
+
+.automationProfileColumnTitle {
+  height: 32px;
+  padding: 8px 10px;
+  color: #c9d4e5;
+  background: rgba(255, 255, 255, 0.025);
+  border-bottom: 1px solid #343434;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.automationProfileList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  padding: 8px;
+  overflow: auto;
+}
+
+.automationProfileRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px 28px;
+  align-items: center;
+  gap: 4px;
+  border-radius: 5px;
+}
+
+.automationProfileRow.active {
+  background: rgba(13, 110, 253, 0.16);
+}
+
+.automationProfileNameBtn,
+.automationProfileActionBtn,
+.automationProfileMacroBtn {
+  display: grid;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 8px;
+  color: #e9eefb;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.automationProfileNameBtn {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.automationProfileNameBtn span,
+.automationProfileActionBtn span,
+.automationProfileMacroBtn span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automationProfileNameBtn small,
+.automationProfileActionBtn small {
+  color: #8e99aa;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.automationProfileNameBtn:hover,
+.automationProfileActionBtn:hover,
+.automationProfileMacroBtn:hover,
+.automationProfileActionBtn.active,
+.automationProfileMacroBtn.active {
+  border-color: rgba(13, 110, 253, 0.5);
+  background: rgba(13, 110, 253, 0.14);
+}
+
+.automationProfileActionBtn {
+  grid-template-columns: 24px minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 2px;
+}
+
+.automationProfileActionBtn img {
+  grid-row: 1 / span 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.automationProfileActionBtn small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.automationProfileMacroBtn {
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 7px;
+}
+
+.automationProfileMacroBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.automationProfileIconBtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #cdd6e4;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.automationProfileIconBtn:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.automationProfileIconBtn.danger {
+  color: #ff7a86;
+}
+
+.automationProfileIconBtn.danger:hover {
+  background: rgba(220, 53, 69, 0.2);
+}
+
+.automationProfileCurrentBinding {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+  margin: 8px 8px 0;
+  padding: 6px 8px;
+  color: #bcd7ff;
+  background: rgba(13, 110, 253, 0.13);
+  border: 1px solid rgba(13, 110, 253, 0.32);
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.automationProfileCurrentBinding span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automationProfileUnbindBtn {
+  height: 24px;
+  padding: 0 8px;
+  color: #ffb0b8;
+  background: rgba(220, 53, 69, 0.14);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.automationProfileEmpty {
+  padding: 14px 8px;
+  color: #8e99aa;
+  font-size: 12px;
+  text-align: center;
 }
 
 .automationGridWrap {
@@ -5889,6 +6104,7 @@ button:focus-visible {
 .automationMainTableWrap,
 .automationSavedTableWrap {
   min-width: 0;
+  max-height: 100%;
   overflow: auto;
 }
 
@@ -5913,6 +6129,9 @@ button:focus-visible {
 
 .automationMacroTable th,
 .automationSavedTable th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   height: 38px;
   background: #2b2b2b;
   font-weight: 700;
@@ -5951,6 +6170,19 @@ button:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.automationMacroRow.dragging td {
+  background: rgba(13, 110, 253, 0.16);
+}
+
+.automationStepCell {
+  cursor: grab;
+  user-select: none;
+}
+
+.automationStepCell:active {
+  cursor: grabbing;
 }
 
 .automationActionSelect,
@@ -6095,11 +6327,14 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
   padding: 12px;
+  overflow: hidden;
 }
 
 .automationCoordinateContent {
   width: 100%;
+  min-height: 0;
 }
 
 .automationCoordinateContext {
@@ -6121,7 +6356,9 @@ button:focus-visible {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 128px;
   gap: 0;
-  min-height: 360px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .automationActionIconArea {
@@ -6766,12 +7003,7 @@ button:focus-visible {
 html,
 body {
   background-color: var(--md-bg) !important;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    var(--md-bg) !important;
-  background-size: 100px 100px, 100px 100px, auto !important;
-  background-position: center top !important;
+  background: var(--md-bg) !important;
 }
 
 #main,
@@ -6785,7 +7017,7 @@ body {
 #grid,
 .devices-grid,
 .tiles-container {
-  padding: 4px;
+  padding: 10px;
 }
 
 ::-webkit-scrollbar {
@@ -6839,9 +7071,13 @@ body {
 }
 
 .tile {
-  border: 1px solid var(--md-border);
+  border: 4px solid #3a3a3a;
+  /* tile_border_gray : Viền xám cho grid con */
+  border-radius: 16px;
+  /* tile_radius : Bo góc nhiều hơn giống Viewer */
   background: var(--md-card);
-  box-shadow: var(--md-shadow-soft);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  /* tile_shadow : Bóng mờ giống Viewer */
   transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
 }
 
@@ -8164,7 +8400,7 @@ textarea:focus,
 .syncTimeOverlay {
   position: fixed;
   inset: 0;
-  z-index: 20000;
+  z-index: 27000;
   pointer-events: none;
   background: transparent;
   display: flex;
@@ -8174,6 +8410,7 @@ textarea:focus,
 
 .syncTimeCard {
   position: fixed;
+  z-index: 27001;
   pointer-events: auto;
   width: 340px;
   background: var(--md-card);

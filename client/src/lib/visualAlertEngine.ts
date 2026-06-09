@@ -23,6 +23,8 @@ export type RedThreshold = {
   gMax: number;
   bMax: number;
   minPixels: number;
+  dominanceMin?: number;
+  saturationMin?: number;
 };
 
 export type VisualAlertConfig = {
@@ -70,6 +72,8 @@ export const DEFAULT_VISUAL_ALERT_CONFIG: VisualAlertConfig = {
     gMax: 100,
     bMax: 100,
     minPixels: 12,
+    dominanceMin: 45,
+    saturationMin: 0.28,
   },
 };
 
@@ -79,6 +83,12 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
 }
 
 function clamp01(value: unknown, min = 0): number {
@@ -95,7 +105,44 @@ function normalizeThreshold(raw: unknown): RedThreshold {
     gMax: clampInt(o.gMax, 0, 255, 100),
     bMax: clampInt(o.bMax, 0, 255, 100),
     minPixels: clampInt(o.minPixels, 1, 10000, 12),
+    dominanceMin: clampInt(o.dominanceMin, 0, 255, 45),
+    saturationMin: clampNumber(o.saturationMin, 0, 1, 0.28),
   };
+}
+
+function hueFromRGB(r: number, g: number, b: number, max: number, delta: number): number {
+  if (delta <= 0) return 0;
+  let hue = 0;
+  if (max === r) {
+    hue = 60 * (((g - b) / delta) % 6);
+  } else if (max === g) {
+    hue = 60 * ((b - r) / delta + 2);
+  } else {
+    hue = 60 * ((r - g) / delta + 4);
+  }
+  return hue < 0 ? hue + 360 : hue;
+}
+
+function isRedPixel(r: number, g: number, b: number, threshold: RedThreshold): boolean {
+  // Preserve the old strict rule for strong pure red pixels.
+  if (r > threshold.rMin && g < threshold.gMax && b < threshold.bMax) {
+    return true;
+  }
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  if (max <= 0 || delta <= 0 || max !== r) return false;
+
+  const dominanceMin = threshold.dominanceMin ?? 45;
+  const saturationMin = threshold.saturationMin ?? 0.28;
+  const redDominance = r - Math.max(g, b);
+  const saturation = delta / max;
+  const hue = hueFromRGB(r, g, b, max, delta);
+  const hueIsRed = hue <= 18 || hue >= 342;
+  const brightEnough = r >= Math.max(120, threshold.rMin - 45);
+
+  return brightEnough && hueIsRed && redDominance >= dominanceMin && saturation >= saturationMin;
 }
 
 /** Normalize a single ROI object (with id/name) */
@@ -207,7 +254,7 @@ export function scanCanvasROI(
     const r = data[i];
     const g = data[i + 1];
     const b = data[i + 2];
-    if (r > threshold.rMin && g < threshold.gMax && b < threshold.bMax) {
+    if (isRedPixel(r, g, b, threshold)) {
       redPixelCount++;
     }
   }
@@ -255,7 +302,7 @@ export function scanCanvasROIs(
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
-        if (r > threshold.rMin && g < threshold.gMax && b < threshold.bMax) {
+        if (isRedPixel(r, g, b, threshold)) {
           roiRedCount++;
         }
       }

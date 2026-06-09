@@ -1,4 +1,4 @@
-# scrcpy multi - Hướng dẫn sử dụng nhanh
+# MonViewPhone - Hướng dẫn sử dụng nhanh
 
 > Lưu ý: Mình không thể tự chụp ảnh màn hình trong phiên làm việc này. Bạn có thể mở ứng dụng và chụp lại nếu cần minh họa.
 

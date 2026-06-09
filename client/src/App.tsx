@@ -16,7 +16,8 @@ import { encodeKeycodeMessage, KeyEventAction } from '@/lib/control'
 import {
   installApk,
   installUploadedApk,
-  runAdbCommandApi
+  runAdbCommandApi,
+  setDeviceWallpaper
 } from '@/lib/serverApi'
 import { SyncPanel } from '@/components/SyncPanel'
 import { SyncTimeSettingsModal } from '@/components/SyncTimeSettingsModal'
@@ -1405,6 +1406,42 @@ export function App() {
     },
     [pushFile, quickCommandTargets]
   )
+
+  const handleSetWallpaperForDevices = useCallback(
+    async (udids: string[]) => {
+      if (!udids.length) return
+      setGlobalAdbStatus(`Đang đặt hình nền cho ${udids.length} thiết bị...`)
+      try {
+        for (const udid of udids) {
+          const num = getTileNumber(udid, 0)
+          const padded = String(num).padStart(2, '0')
+          
+          const canvas = document.createElement('canvas')
+          canvas.width = 1080
+          canvas.height = 1920
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.fillStyle = '#000000'
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
+            
+            ctx.fillStyle = '#2BD03C'
+            ctx.font = 'bold 450px Roboto, sans-serif'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(padded, canvas.width / 2, canvas.height / 2)
+            
+            const base64Image = canvas.toDataURL('image/png')
+            await setDeviceWallpaper(wsServer, udid, base64Image)
+          }
+        }
+        setGlobalAdbStatus('Đã đặt hình nền xong')
+      } catch (err: any) {
+        setGlobalAdbStatus(`Lỗi đặt hình nền: ${err?.message || err}`)
+      }
+    },
+    [getTileNumber, wsServer]
+  )
+
 
   const runGlobalAdbCommand = useCallback(async () => {
     const commands = globalAdbCommand
@@ -3391,6 +3428,7 @@ export function App() {
         open={automationOpen}
         devices={automationDevices}
         selectedUdids={selectedVisible}
+        viewerUdid={viewerUdid}
         onClose={() => setAutomationOpen(false)}
       />
 
@@ -3541,6 +3579,20 @@ export function App() {
           >
             {focusGroupIdx === groupContextMenu.idx ? '👁 Hiện tất cả' : '👁 Chỉ hiện nhóm này'}
           </button>
+          {/* btn_set_wallpaper_group : Nút đặt số hiệu làm hình nền cho toàn bộ nhóm */}
+          <button
+            className='ctxMenuItem'
+            style={{ color: '#2BD03C' }}
+            onClick={() => {
+              const group = savedGroups[groupContextMenu.idx]
+              if (group && group.udids.length > 0) {
+                handleSetWallpaperForDevices(group.udids)
+              }
+              setGroupContextMenu(null)
+            }}
+          >
+            🖼️ Đặt số hiệu làm hình nền
+          </button>
         </div>
       )}
       {contextMenuTarget ? (
@@ -3619,6 +3671,44 @@ export function App() {
               />
             </div>
 
+            {/* btn_set_wallpaper_device : Nút đặt số hiệu làm hình nền */}
+            <button
+              className='ctxMenuItem'
+              onPointerDown={e => {
+                e.preventDefault()
+                e.stopPropagation()
+                const clickedUdid = contextMenuTarget!.udid
+                const ctxTargets = connectSelection.size > 0 && connectSelection.has(clickedUdid)
+                  ? Array.from(connectSelection)
+                  : [clickedUdid]
+                handleSetWallpaperForDevices(ctxTargets)
+                setContextMenuTarget(null)
+                setContextMenuOpen(false)
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#2BD03C',
+                fontSize: '13px',
+                cursor: 'pointer',
+                padding: '7px 8px',
+                textAlign: 'left',
+                width: '100%',
+                borderRadius: 4,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(43,208,60,0.1)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'transparent'
+              }}
+            >
+              <span>🖼️</span> <span>Đặt số hiệu làm hình nền</span>
+            </button>
+
             {/* === Device Profile section === */}
             <div style={{ position: 'relative' }} className='ctxAddToGroupWrap' onMouseEnter={() => setCtxSub({ main: 'profileList' })} onMouseLeave={() => setCtxSub(null)}>
               <button
@@ -3636,8 +3726,8 @@ export function App() {
                     {(() => {
                       const clickedUdid = contextMenuTarget!.udid;
                       const profile = deviceProfiles.find(p => p.udids.includes(clickedUdid));
-                      if (profile) return `Profile: ${profile.name}`;
-                      return 'Device Profile';
+                      if (profile) return 'Chọn profile';
+                      return 'Chọn profile';
                     })()}
                   </span>
                 </span>
@@ -3672,7 +3762,7 @@ export function App() {
                     style={{
                       background: 'transparent', border: 'none', color: '#cfcfcf',
                       fontSize: '13px', cursor: 'pointer', padding: '6px 10px', textAlign: 'left', borderRadius: 4,
-                      display: 'flex', alignItems: 'center', gap: 8, width: '100%'
+                      display: 'none', alignItems: 'center', gap: 8, width: '100%'
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
@@ -3716,7 +3806,7 @@ export function App() {
                       ? Array.from(connectSelection)
                       : [clickedUdid];
                     const isCurrentProfile = profile.udids.includes(clickedUdid);
-                    const isL3Open = ctxSub?.nested && typeof ctxSub.nested === 'object' && ctxSub.nested.type === 'profileActions' && ctxSub.nested.profileId === profile.id;
+                    const isL3Open = false;
 
                     return (
                       <div
@@ -3724,6 +3814,13 @@ export function App() {
                         style={{ position: 'relative' }}
                         onMouseEnter={() => setCtxSub({ main: 'profileList', nested: { type: 'profileActions', profileId: profile.id } })}
                         onMouseLeave={() => setCtxSub({ main: 'profileList' })}
+                        onPointerDown={e => {
+                          e.preventDefault(); e.stopPropagation();
+                          if (isCurrentProfile) return;
+                          assignDevicesToProfile(profile.id, ctxTargets);
+                          setContextMenuTarget(null);
+                          setContextMenuOpen(false);
+                        }}
                       >
                         <button
                           type='button'
@@ -3741,7 +3838,7 @@ export function App() {
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {profile.name}
                           </span>
-                          <span style={{ fontSize: 10, color: '#555' }}>▶</span>
+                          {isCurrentProfile ? <span style={{ fontSize: 11, color: '#7aadff' }}>Đang dùng</span> : null}
                         </button>
 
                         {/* Level 3 Submenu: Profile actions */}

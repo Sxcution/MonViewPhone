@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -530,3 +531,140 @@ func handlePullFile(w http.ResponseWriter, r *http.Request) {
 	}
 	_, _ = io.Copy(w, file)
 }
+
+func handleSettings(w http.ResponseWriter, r *http.Request) {
+	settingsFile := filepath.Join(".", "settings.json")
+
+	if r.Method == http.MethodGet {
+		data, err := os.ReadFile(settingsFile)
+		if err != nil {
+			if os.IsNotExist(err) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("{}"))
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(data)
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": err.Error()})
+			return
+		}
+		defer r.Body.Close()
+
+		var temp map[string]interface{}
+		if err := json.Unmarshal(body, &temp); err != nil {
+			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid JSON: " + err.Error()})
+			return
+		}
+
+		if err := os.WriteFile(settingsFile, body, 0644); err != nil {
+			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, jsonResponse{"success": true})
+		return
+	}
+
+	writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
+}
+
+func handleSetWallpaper(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		UDID  string `json:"udid"`
+		Image string `json:"image"`
+	}
+	if err := readJSON(r, &req); err != nil || strings.TrimSpace(req.UDID) == "" || strings.TrimSpace(req.Image) == "" {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid request parameters"})
+		return
+	}
+
+	udid := strings.TrimSpace(req.UDID)
+	imgData := req.Image
+	if idx := strings.Index(imgData, ","); idx != -1 {
+		imgData = imgData[idx+1:]
+	}
+
+	dec, err := base64.StdEncoding.DecodeString(imgData)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid image base64 data: " + err.Error()})
+		return
+	}
+
+	root, err := uploadDir()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to resolve upload directory: " + err.Error()})
+		return
+	}
+	if err := os.MkdirAll(root, 0755); err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to create upload directory: " + err.Error()})
+		return
+	}
+
+	// 1. Write the image locally
+	localImgPath := filepath.Join(root, fmt.Sprintf("wp-%d-%s.png", time.Now().UnixNano(), udid))
+	if err := os.WriteFile(localImgPath, dec, 0644); err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to write local image: " + err.Error()})
+		return
+	}
+	defer os.Remove(localImgPath)
+
+	// 2. Write the jar locally from embedded base64
+	jarB64 := "UEsDBBQACAgIAAAAIQAAAAAAAAAAAAAAAAALAAkAY2xhc3Nlcy5kZXhVVAUAAQAAAACNll1sHFcVx8987PeuvbuJ43Zx4smu2ziNvWs7cWJ7HavESSor3iTqJkbESO3szPXuNLsz49mxs6ElBCHRIKASIOAhFRVISFDxUKl9KA8FCVGEeEB5QhT1DSQeQAipCB7oA/97Z9ZeB5Cw/NO5c86555577pnZa7Jecub0PJUWPlB+eetrb/rXrj6sfum3f0789f7P73/xweu/SxG5RNTbOJOn8G8Kumcp0D/BpUSUgXwEqUK2ZSLu/FVI/NOYQvRKnOgzkMUo0TNgBTTBA/AV8Br4Bvg2eAjeAD8DvwcfgXMxohfAZ8HXwQ/Be+AR+BP4GIxjjdPgObAJPPAa+A54E/wK/Ab8DXwE/gn+BShBdAo8D24CC9wD3wTfBz8F74Nfg0fgA/AH8A+gJImGgAYmwSkwC86C58B1sAmawE0G9YEglJDSFNRtCAyDLMhRULtD4DAYAUfAaFjrJ0EBfAIcByfAJDgJngEoA+EY6MOI2JbgjxhHwnUp9OHjv0AZDfP4O8bxMJePwzHPQ40G6xwK5xbDMfcvheN0dH/MY0708x/Qj0V5LkkaF+sFMotVyqFcDPM+LWSClvnaqNI54rnHxNoRzFwgnnOwkyj008RzTVJV7FWiFbE3hWaEjNJcKM+ImsdoSayvCr+hMO4QunQ2zKMi9h2hsxScVS4b1ITC/IR/isJ8Al3ffjSUo6E9jrhKOIuf2RhOtyCdony+VBqhMTVH+UhNVSL2TJKySppKx49QLSbhOUcvSpNyJhpEHkUMSUo9IXGJ5+9Fgtzc7JBYPQ2tgj3+APr3eV+8lc/NZ9PUwPoFWSNbi5FG29ks/PJ0OZWihqxQQTkmLHPwmYI1Ae+0XFDOU0kdIXsmRXNqWimpR5Alz6iOp4KKL0U0sF6IpmVu5TZ4yuOyTIsyVlWwqqqI2KvhqttZEtH37fIBe1GJkqtF6G2xXzs7zL1TBXWZ8pdLTdQqHqMaGIsrXEoNtGf+JEaJRhx7WsIoyXO6EkunSiaqqKhUi6jSdjaO6GmqkZrYzmbQCWKc5DmfUhspVIGeEpmkaHIok5oczaRsTUJNAtvToc3ORlHhQDfW988F2slIhrY1GZoTKcxG3VPhrobC97mG8YuQVXTMG6IfU/QjISV6B1KB509Ev0mkSqn3M+n/pu9LhH+35XiMCYR60rv/Pme9Wrv1QfTvZUrYPPYuDR+WBoZfkV2jsqZqfHlu8svy9ZR+fC3ji2f7/erHMrDoRwe6GNZdM8RIYfxpZHCb4Ms8s6J51GKLlu25a9Q/uLCxET9ru23mG8Zq22926UTl3WrzUzNd7Qm87VP6e22q7vMq+m23mSeZtldX7cNRuP7jk7D1y1bq9/t+qyjrTq2z3o+SWskrZO8vgbWSVlf5w+36Ni6bpueY5kV3XUrj8ev0pN7doMHsv1KGLBKo3umpqe7LcvoVp5nBgwX1g2nU+k49q7F7rgtx2aVFmsjaqXO/L0lJiYu9Xzm2Xp7b88XdOO263j+TJWe/r9i8Pxe0nf1iuVULmP/a7a749d9j+mdKo3smf6H+rpn2XvqQ4G6rdvNygXHaTPdrlJuQCkônjuxXF3qGcz1Lcc+OH0NBRLFOz6gvOrUd4xWjfktxxyYlx9wudZ4SdRvUIf0LLv5mE6c7MFUbrQ8547eaLMqFQbUHttqI2YlWLdKsfrN1dVL9TrlBstY5hNorO7rno/VtDt9g2a0EIWVy2VSb3z6+iXSbnbRF0va4Gxt2epA+YKr+60VkjZI3kCTbaDJNtBkJ/f9uujgLcfrdya6R1t3jNta1/AYs8v01EHXXUvXtqBp6NyHhSdVJukW5Tf/82AObf6XUh5Q9muZ0U2zvuO6Hut2mUmFsI3LeAPKnzR8a9fy76KeTDcpYrSdLiOFeR6prGf5FMMOruodRnG8kMFLmsPoIjPausfMoNCUgmqt/24m8BDqsxgG2++/l1HL3nVuM5I6pHbw3Li5Pj07DbpDa2fgHTEiAlF26bEXiUo2RWRanxWbFdv77BrW/RQunfv4sLLRV41ZpvFpaLJesWpIl4n12rrvOumO47JhKGx04SppXenjRYzbnd3Ot3iEmreZVPFjmVP665VXJqp6nZb+vQsZmwhFXPrzGyjYc4tNObPnjZn2SKbWTTmt87NmeeMeUOfX1ww5xF0l3ldrIVJC+W58ty0yXaLnxPfRvnL2odR/hFUvnBf/XFMSvwi1v/df+wewOWzFNyD+TezfxfGNffAfbh/J47Q/r04Svt3Y0kL5vD7saIFev4bL2WD+xu/y+FnUniform8/k+hD7iJIN8phMiQuMGPP7+b8BUEsHCMoRhsbNBgAA2AsAAFBLAQIUABQACAgIAAAAIQDKEYbGzQYAANgLAAALAAkAAAAAAAAAAAAAAAAAAABjbGFzc2VzLmRleFVUBQABAAAAAFBLBQYAAAAAAQABAEIAAAAPBwAAAAA="
+	jarDec, err := base64.StdEncoding.DecodeString(jarB64)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Internal error decoding jar: " + err.Error()})
+		return
+	}
+	localJarPath := filepath.Join(root, "wallpaper_helper.jar")
+	if err := os.WriteFile(localJarPath, jarDec, 0644); err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to write local jar helper: " + err.Error()})
+		return
+	}
+
+	// 3. Push the jar helper to the device
+	remoteJarPath := "/data/local/tmp/wallpaper_helper.jar"
+	if _, err := adb.Command("-s", udid, "push", localJarPath, remoteJarPath); err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to push jar helper to device: " + err.Error()})
+		return
+	}
+
+	// 4. Push the image to the device
+	remoteImgPath := "/data/local/tmp/temp_wallpaper.png"
+	if _, err := adb.Command("-s", udid, "push", localImgPath, remoteImgPath); err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to push wallpaper image to device: " + err.Error()})
+		return
+	}
+	defer adb.Shell(udid, "rm "+shellQuote(remoteImgPath))
+
+	// 5. Run the helper program on the device to set the wallpaper
+	cmdStr := fmt.Sprintf("CLASSPATH=%s app_process /data/local/tmp com.monviewphone.helper.SetWallpaper %s", remoteJarPath, remoteImgPath)
+	out, err := adb.Shell(udid, cmdStr)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to execute wallpaper setter on device: " + err.Error(), "output": out})
+		return
+	}
+
+	if !strings.Contains(out, "SUCCESS") {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Setter failed, output: " + out})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, jsonResponse{"success": true})
+}
+
+
