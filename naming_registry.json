@@ -12,7 +12,8 @@
       "sidebar_device_grid": "SidebarDeviceGrid",
       "automation_modal": "AutomationModal",
       "sync_time_settings_modal": "SyncTimeSettingsModal",
-      "automation_panel": "AutomationPanel"
+      "automation_panel": "AutomationPanel",
+      "device_account_overlay": "DeviceAccountOverlay"
     },
     "css_classes": {
       "right_config_panel": "rightConfigPanel",
@@ -148,7 +149,8 @@
       "right_panel_automation_open_key": "rightPanel.automationOpen",
       "automation_quick_slots_v1": "automationQuickSlotsV1",
       "macro_status": "macroStatus",
-      "auto_physical_screen_off": "autoPhysicalScreenOff"
+      "auto_physical_screen_off": "autoPhysicalScreenOff",
+      "device_account_overlay_open": "deviceAccountOverlayOpen"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
