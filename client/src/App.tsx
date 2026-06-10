@@ -1464,7 +1464,11 @@ export function App() {
   // state_autoPhysicalScreenOff : Trạng thái tự động tắt màn hình vật lý khi kết nối
   const [autoPhysicalScreenOff, setAutoPhysicalScreenOff] = useState(() => {
     try {
-      return localStorage.getItem('monviewphone:auto-physical-screen-off') === 'true'
+      const val = localStorage.getItem('monviewphone:auto-physical-screen-off')
+      if (val === 'true') {
+        localStorage.setItem('monviewphone:auto-physical-screen-off', 'false')
+      }
+      return false
     } catch {
       return false
     }
@@ -1486,12 +1490,24 @@ export function App() {
     const online = orderedRegistered.filter(id => connectedUdids.has(id))
     for (const udid of online) {
       if (autoPhysicalScreenOffDoneRef.current.has(udid)) continue
+      
       autoPhysicalScreenOffDoneRef.current.add(udid)
+
+      const d = androidDeviceMap[udid]
+      if (d) {
+        const sdk = parseInt(d['ro.build.version.sdk'] || '0', 10)
+        const isAndroid15 = sdk >= 35 || d['ro.build.version.release'] === '15'
+        if (isAndroid15 || udid === 'R3CR200MXTR' || udid === 'RFCRB1CQ2VE') {
+          console.warn('[display-power] skipped auto off for Android 15 / blocked udid', udid)
+          continue
+        }
+      }
+
       setDeviceDisplayPower(wsServer, udid, 'off').catch(err => {
         console.warn('[display-power] auto off failed', udid, err)
       })
     }
-  }, [autoPhysicalScreenOff, orderedRegistered, connectedUdids, wsServer])
+  }, [autoPhysicalScreenOff, orderedRegistered, connectedUdids, wsServer, androidDeviceMap])
 
   // callback_runDisplayPowerForTargets : Chạy lệnh bật/tắt màn hình vật lý cho các thiết bị được chọn
   const runDisplayPowerForTargets = useCallback(
