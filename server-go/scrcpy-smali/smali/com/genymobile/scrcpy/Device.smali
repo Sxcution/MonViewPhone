@@ -394,7 +394,7 @@
 
     if-eqz v0, :cond_1
 
-    if-eqz p1, :cond_0
+    const/4 v0, 0x0
 
     .line 189
     invoke-static {p0, p1}, Lcom/genymobile/scrcpy/wrappers/InputManager;->setDisplayId(Landroid/view/InputEvent;I)Z
@@ -406,8 +406,6 @@
     invoke-virtual {p1}, Lcom/genymobile/scrcpy/wrappers/ServiceManager;->getInputManager()Lcom/genymobile/scrcpy/wrappers/InputManager;
 
     move-result-object p1
-
-    const/4 v0, 0x0
 
     invoke-virtual {p1, p0, v0}, Lcom/genymobile/scrcpy/wrappers/InputManager;->injectInputEvent(Landroid/view/InputEvent;I)Z
 

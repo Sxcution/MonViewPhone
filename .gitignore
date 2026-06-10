@@ -13,8 +13,3 @@ uploads/
 !server-go/scrcpy-server.jar
 !server-go/displaypower/bin/monview-display-power.jar
 !server-go/wallpaper/wallpaper_helper.jar
-
-# Scrcpy build artifacts
-scrcpy-recompiled.*
-scrcpy-unpacked/
-tmp-scrcpy/

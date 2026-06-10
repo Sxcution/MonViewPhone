@@ -1067,78 +1067,58 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     macroSyncSettings: SyncMacroSettings,
     log?: (msg: string) => void,
   ) => {
-    let orderedTargets = targets;
-    if (macroSyncSettings.delayEnabled && macroSyncSettings.randomOrder) {
-      orderedTargets = [...targets];
-      for (let i = orderedTargets.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [orderedTargets[i], orderedTargets[j]] = [orderedTargets[j], orderedTargets[i]];
-      }
+    const delayMs = resolveMacroDelayMs(row);
+    if (delayMs > 0) {
+      log?.(`wait ${delayMs}`);
+      await sleepMs(delayMs, controller.signal);
+      if (controller.signal.aborted) return;
     }
-    
-    const isSeeding = row.action === 'seeding';
-    const seedingTexts = isSeeding ? pickSeedingContents(orderedTargets.length) : [];
-    if (isSeeding) {
+    const seedingText = row.action === 'seeding' ? pickSeedingContent() : undefined;
+    const seedingTexts = row.action === 'seeding' ? pickSeedingContents(targets.length) : [];
+    if (row.action === 'seeding') {
       if (!seedingTexts.length) {
         log?.('Seeding lỗi: danh sách từ ngữ chung trống');
         return;
       }
-      const hasOpenStream = orderedTargets.some(t => t.ws && t.ws.readyState === WebSocket.OPEN);
+      const hasOpenStream = targets.some(t => t.ws && t.ws.readyState === WebSocket.OPEN);
       if (!hasOpenStream) {
         log?.('Seeding lỗi: target chưa online hoặc stream chưa mở');
         return;
       }
-      const formattedUdids = orderedTargets.map(t => {
+      const formattedUdids = targets.map(t => {
         const no = deviceByUdid.get(t.udid)?.number;
         return '#' + (no ?? t.udid);
       }).join(', ');
-      log?.(`Seeding ${formattedUdids}: random riêng từng máy`);
-    }
-
-    const promises = orderedTargets.map(async (target, i) => {
-      if (controller.signal.aborted) return;
-      
-      const rowDelay = resolveMacroDelayMs(row);
-      let staggerDelay = 0;
-      if (macroSyncSettings.delayEnabled && i > 0) {
-        if (macroSyncSettings.intervalEnabled) {
-          const { minMs, maxMs } = syncMacroDelayRangeMs(macroSyncSettings.intervalSec);
-          staggerDelay = randomInt(minMs, maxMs);
-        } else {
-          staggerDelay = 100;
-        }
-      }
-      
-      const totalDelay = rowDelay + staggerDelay;
-      if (totalDelay > 0) {
-        const no = deviceByUdid.get(target.udid)?.number;
-        log?.(`wait ${totalDelay}ms cho #${no ?? target.udid}`);
-        await sleepMs(totalDelay, controller.signal);
+      log?.(`Seeding ${formattedUdids}: random rieng tung may`);
+      for (let i = 0; i < targets.length; i++) {
         if (controller.signal.aborted) return;
-      }
-
-      const runSyncSettings = { ...macroSyncSettings, delayEnabled: false };
-
-      if (isSeeding) {
+        if (i > 0 && macroSyncSettings.delayEnabled) {
+          if (macroSyncSettings.intervalEnabled) {
+            const { minMs, maxMs } = syncMacroDelayRangeMs(macroSyncSettings.intervalSec);
+            await sleepMs(randomInt(minMs, maxMs), controller.signal);
+          } else {
+            await sleepMs(100, controller.signal);
+          }
+          if (controller.signal.aborted) return;
+        }
+        const target = targets[i];
         const text = seedingTexts[i] ?? pickSeedingContent();
         const no = deviceByUdid.get(target.udid)?.number;
         log?.(`Seeding #${no ?? target.udid}: ${text}`);
         await runScript([target], rowToSteps(row, { seedingText: text }), {
           signal: controller.signal,
-          syncSettings: runSyncSettings,
-        });
-      } else {
-        await runScript([target], rowToSteps(row), {
-          signal: controller.signal,
-          syncSettings: runSyncSettings,
-          log: msg => {
-            if (orderedTargets.length === 1) log?.(msg);
-          }
+          syncSettings: macroSyncSettings,
         });
       }
+      return;
+    }
+    await runScript(targets, rowToSteps(row, { seedingText }), {
+      signal: controller.signal,
+      syncSettings: macroSyncSettings,
+      log: msg => {
+        if (row.action !== 'seeding') log?.(msg);
+      },
     });
-
-    await Promise.all(promises);
   }, [deviceByUdid]);
 
   const newMacro = useCallback(() => {
@@ -1324,6 +1304,14 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
           }
           if (!entries.length) continue;
 
+          /* áp dụng row delay (lấy từ entry đầu tiên) */
+          const rowDelay = resolveMacroDelayMs(entries[0].row);
+          if (rowDelay > 0) {
+            setStatus(`wait ${rowDelay}`);
+            await sleepMs(rowDelay, controller.signal);
+            if (controller.signal.aborted) break;
+          }
+
           /* shuffle nếu randomOrder */
           let ordered = entries;
           if (syncSettings.delayEnabled && syncSettings.randomOrder) {
@@ -1342,51 +1330,38 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
             continue;
           }
 
-          /* thực thi từng thiết bị với sync delay và random delay độc lập */
-          const promises = ordered.map(async (entry, i) => {
-            if (controller.signal.aborted) return;
-            
-            const { target, row } = entry;
-            const rowDelay = resolveMacroDelayMs(row);
-            let staggerDelay = 0;
-            
+          /* thực thi từng thiết bị với sync delay xen kẽ */
+          for (let i = 0; i < ordered.length; i++) {
+            if (controller.signal.aborted) break;
+
+            /* sync stagger delay giữa các thiết bị */
             if (i > 0 && syncSettings.delayEnabled) {
               if (syncSettings.intervalEnabled) {
                 const { minMs, maxMs } = syncMacroDelayRangeMs(syncSettings.intervalSec);
-                staggerDelay = randomInt(minMs, maxMs);
+                await sleepMs(randomInt(minMs, maxMs), controller.signal);
               } else {
-                staggerDelay = 100;
+                await sleepMs(100, controller.signal);
               }
+              if (controller.signal.aborted) break;
             }
-            
-            const totalDelay = rowDelay + staggerDelay;
-            if (totalDelay > 0) {
-              const no = deviceByUdid.get(target.udid)?.number;
-              setStatus(`wait ${totalDelay}ms cho #${no ?? target.udid}`);
-              await sleepMs(totalDelay, controller.signal);
-              if (controller.signal.aborted) return;
-            }
-            
-            const runSyncSettings = { ...syncSettings, delayEnabled: false };
-            
+
+            const { target, row } = ordered[i];
             if (isSeeding) {
               const text = seedingTexts[i] ?? pickSeedingContent();
               const no = deviceByUdid.get(target.udid)?.number;
               setStatus(`Seeding #${no ?? target.udid}: ${text}`);
               await runScript([target], rowToSteps(row, { seedingText: text }), {
                 signal: controller.signal,
-                syncSettings: runSyncSettings,
+                syncSettings,
               });
             } else {
               await runScript([target], rowToSteps(row), {
                 signal: controller.signal,
-                syncSettings: runSyncSettings,
+                syncSettings,
                 log: setStatus,
               });
             }
-          });
-          
-          await Promise.all(promises);
+          }
         }
       } finally {
         updateRunningMacroUdids(allUdids, false);

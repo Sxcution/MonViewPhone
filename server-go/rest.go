@@ -306,7 +306,7 @@ func handleAdbCommand(w http.ResponseWriter, r *http.Request) {
 		args := append([]string{"-s", udid}, cleaned...)
 		out, err = adb.Command(args...)
 	} else {
-		out, err = adb.FastShell(udid, command)
+		out, err = adb.Shell(udid, command)
 	}
 
 	if err != nil {

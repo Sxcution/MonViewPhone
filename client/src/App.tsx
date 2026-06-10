@@ -2131,14 +2131,19 @@ export function App() {
         label: 'Tắt tiếng',
         icon: <VolumeX size={15} strokeWidth={1.8} />,
         run: () =>
-          runQuickAdbCommands(['cmd notification set_dnd none'])
+          runQuickAdbCommands(['adb shell cmd notification set_dnd none'])
       },
       soundOn: {
         label: 'Mở Âm Thanh',
         icon: <Volume2 size={15} strokeWidth={1.8} />,
         run: () =>
           runQuickAdbCommands([
-            'cmd notification set_dnd off; cmd media_session volume --stream 3 --set 7; cmd media_session volume --stream 2 --set 7; cmd media_session volume --stream 5 --set 7; cmd media_session volume --stream 4 --set 7; cmd media_session volume --stream 1 --set 7'
+            'adb shell cmd notification set_dnd off',
+            'adb shell cmd media_session volume --stream 3 --set 7',
+            'adb shell cmd media_session volume --stream 2 --set 7',
+            'adb shell cmd media_session volume --stream 5 --set 7',
+            'adb shell cmd media_session volume --stream 4 --set 7',
+            'adb shell cmd media_session volume --stream 1 --set 7'
           ])
       },
       maxVolume: {
@@ -2146,7 +2151,12 @@ export function App() {
         icon: <Volume2 size={15} strokeWidth={1.8} />,
         run: () =>
           runQuickAdbCommands([
-            'cmd notification set_dnd off; cmd media_session volume --stream 1 --set 7; cmd media_session volume --stream 2 --set 15; cmd media_session volume --stream 3 --set 15; cmd media_session volume --stream 4 --set 15; cmd media_session volume --stream 5 --set 15'
+            'adb shell cmd notification set_dnd off',
+            'adb shell cmd media_session volume --stream 1 --set 7',
+            'adb shell cmd media_session volume --stream 2 --set 15',
+            'adb shell cmd media_session volume --stream 3 --set 15',
+            'adb shell cmd media_session volume --stream 4 --set 15',
+            'adb shell cmd media_session volume --stream 5 --set 15'
           ])
       },
       syncTime: {
