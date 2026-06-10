@@ -2,6 +2,7 @@ import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useActive } from '@/context/ActiveContext';
 import { useServer } from '@/context/ServerContext';
 import { attachTouchControls } from '@/lib/touchControls';
+import { runAdbCommandApi } from '@/lib/serverApi';
 import type { FileStats } from '@/lib/serverApi';
 import { encodeKeycodeMessage, KeyEventAction } from '@/lib/control';
 import { AndroidKeycode } from '@/lib/keyEvent';
@@ -93,7 +94,10 @@ type PreviewState =
  */
 const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChangeOrder }: Props) => {
   const { androidDeviceMap, listDir, pullFile, pushFile } = useServer();
-  const { getCanvasForUdid, getInputTargetsForSource, selectOnly } = useActive();
+  const { getCanvasForUdid, getInputTargetsForSource, selectOnly, adbModeUdids } = useActive();
+  
+  const adbModeUdidsRef = useRef(adbModeUdids);
+  adbModeUdidsRef.current = adbModeUdids;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const detachRef = useRef<(() => void) | null>(null);
@@ -184,7 +188,9 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
       c,
       () => getInputTargetsForSource(udid),
       onActivate,
-      udid
+      udid,
+      () => adbModeUdidsRef.current,
+      (targetUdid: string, cmd: string) => runAdbCommandApi(wsServer, targetUdid, cmd)
     );
 
     return () => {

@@ -79,6 +79,10 @@ type ActiveContextValue = {
   getIsAltHeld: () => boolean;
   selectedGridUdid: string | null;
   clickDevice: (udid: string | null) => void;
+
+  /** ADB Fallback Mode state */
+  adbModeUdids: string[];
+  toggleAdbMode: (udid: string) => void;
 };
 
 const Ctx = createContext<ActiveContextValue | null>(null);
@@ -123,6 +127,26 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     syncTargetsRef.current = syncTargets;
   }, [syncTargets]);
+
+  const [adbModeUdids, setAdbModeUdids] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('adbModeUdids');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return uniq(parsed.map(String));
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('adbModeUdids', JSON.stringify(adbModeUdids));
+    } catch {
+      // ignore
+    }
+  }, [adbModeUdids]);
 
   const activeUdidRef = useRef<string | null>(null);
 
@@ -403,6 +427,14 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       getIsAltHeld,
       selectedGridUdid,
       clickDevice,
+      adbModeUdids,
+      toggleAdbMode: (udid: string) => {
+        setAdbModeUdids((prev) => {
+          const exists = prev.includes(udid);
+          const next = exists ? prev.filter((u) => u !== udid) : [...prev, udid];
+          return uniq(next);
+        });
+      },
     }),
     [
       activeUdid,
@@ -427,6 +459,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       getIsAltHeld,
       selectedGridUdid,
       clickDevice,
+      adbModeUdids,
     ],
   );
 

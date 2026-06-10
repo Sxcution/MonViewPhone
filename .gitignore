@@ -5,3 +5,11 @@ uploads/
 *.log
 .env
 .env.*
+
+# Reverse Engineering Artifacts
+*_Decompiled/
+*.jar
+
+!server-go/scrcpy-server.jar
+!server-go/displaypower/bin/monview-display-power.jar
+!server-go/wallpaper/wallpaper_helper.jar

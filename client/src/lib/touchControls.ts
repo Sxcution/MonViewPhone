@@ -154,6 +154,8 @@ export function attachTouchControls(
   getTargets: TargetsGetter,
   onActivate?: () => void,
   udid?: string,
+  getAdbModeUdids?: () => string[] | undefined,
+  adbFallback?: (targetUdid: string, cmd: string) => void,
 ): () => void {
   const ptr = makePointerIdAllocator();
   const active = new Map<number, ActivePointerState>();
@@ -190,6 +192,12 @@ export function attachTouchControls(
 
   function sendTouch(tt: TouchTarget, action: MotionAction, pid: number, x01: number, y01: number, pressure: number, buttons: number) {
     if (!isOpenTarget(tt.target)) return;
+
+    if (getAdbModeUdids?.()?.includes(tt.target.udid)) {
+      // ADB mode: skip WebSockets for touch events. ADB commands are handled in onPointerUpOrCancel/replayDelayedFollowers.
+      return;
+    }
+
     const { x, y, w, h } = mapNormToDeviceXYWithOffset(tt.target.canvas, x01, y01, tt.dxPx, tt.dyPx);
     try {
       tt.target.ws.send(encodeTouchMessage(action, pid, x, y, w, h, pressure, buttons));
@@ -265,10 +273,24 @@ export function attachTouchControls(
         if (!ok) return;
       }
       if (!isSyncTimeDelayStillActive(delayGeneration)) return;
-      if (movedPx <= 8) {
-        await replayDelayedTap(follower, st.pid, endXY.x01, endXY.y01);
+      if (!isSyncTimeDelayStillActive(delayGeneration)) return;
+
+      const currentAdbModeUdids = getAdbModeUdids?.();
+      if (currentAdbModeUdids && currentAdbModeUdids.includes(follower.target.udid) && adbFallback) {
+        if (movedPx <= 8) {
+          const { x, y } = mapNormToDeviceXYWithOffset(follower.target.canvas, endXY.x01, endXY.y01, follower.dxPx, follower.dyPx);
+          adbFallback(follower.target.udid, `shell input tap ${x} ${y}`);
+        } else {
+          const startMapped = mapNormToDeviceXYWithOffset(follower.target.canvas, st.startXY.x01, st.startXY.y01, follower.dxPx, follower.dyPx);
+          const endMapped = mapNormToDeviceXYWithOffset(follower.target.canvas, endXY.x01, endXY.y01, follower.dxPx, follower.dyPx);
+          adbFallback(follower.target.udid, `shell input swipe ${startMapped.x} ${startMapped.y} ${endMapped.x} ${endMapped.y} ${durationMs}`);
+        }
       } else {
-        await replayDelayedSwipe(follower, st.pid, st.startXY, endXY, durationMs);
+        if (movedPx <= 8) {
+          await replayDelayedTap(follower, st.pid, endXY.x01, endXY.y01);
+        } else {
+          await replayDelayedSwipe(follower, st.pid, st.startXY, endXY, durationMs);
+        }
       }
     }
   }
@@ -377,6 +399,24 @@ export function attachTouchControls(
 
     const movedPx = Math.hypot(e.clientX - st.startClient.x, e.clientY - st.startClient.y);
     const durationMs = Math.max(50, Date.now() - st.downTimestamp);
+
+    const currentAdbModeUdids = getAdbModeUdids?.();
+    // Execute ADB commands for targets in ADB Mode
+    if (currentAdbModeUdids && adbFallback) {
+      for (const tt of st.touchTargets) {
+        if (currentAdbModeUdids.includes(tt.target.udid)) {
+          if (movedPx <= 8) {
+            const { x, y } = mapNormToDeviceXYWithOffset(tt.target.canvas, x01, y01, tt.dxPx, tt.dyPx);
+            adbFallback(tt.target.udid, `shell input tap ${x} ${y}`);
+          } else {
+            const startMapped = mapNormToDeviceXYWithOffset(tt.target.canvas, st.startXY.x01, st.startXY.y01, tt.dxPx, tt.dyPx);
+            const endMapped = mapNormToDeviceXYWithOffset(tt.target.canvas, x01, y01, tt.dxPx, tt.dyPx);
+            adbFallback(tt.target.udid, `shell input swipe ${startMapped.x} ${startMapped.y} ${endMapped.x} ${endMapped.y} ${durationMs}`);
+          }
+        }
+      }
+    }
+
     if (udid && movedPx <= 8) {
       const { x, y, w, h } = mapNormToDeviceXY(canvas, x01, y01);
       emitAutomationClick({

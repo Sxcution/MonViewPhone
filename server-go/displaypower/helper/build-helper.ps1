@@ -24,6 +24,15 @@ if (-not (Test-Path $AndroidJar)) {
     throw "android.jar not found"
 }
 
+$BuildTools = Get-ChildItem -Directory (Join-Path $Sdk "build-tools") | Sort-Object Name -Descending
+if (-not $BuildTools) {
+    throw "No build-tools found in $Sdk\build-tools"
+}
+$D8Path = Join-Path $BuildTools[0].FullName "d8.bat"
+if (-not (Test-Path $D8Path)) {
+    $D8Path = Join-Path $BuildTools[0].FullName "d8"
+}
+
 Remove-Item -Recurse -Force $ClassesDir -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $ClassesDir | Out-Null
 New-Item -ItemType Directory -Force $OutDir | Out-Null
@@ -31,8 +40,19 @@ New-Item -ItemType Directory -Force $OutDir | Out-Null
 $Sources = Get-ChildItem -Recurse $SrcDir -Filter "*.java" | ForEach-Object { $_.FullName }
 javac -source 1.8 -target 1.8 -bootclasspath $AndroidJar -d $ClassesDir $Sources
 
+$ClassFiles = Get-ChildItem -Recurse $ClassesDir -Filter "*.class" | ForEach-Object { $_.FullName }
+$ClassFilesFile = Join-Path $Root "classes_list.txt"
+$ClassFiles | Out-File -Encoding ascii $ClassFilesFile
+
+Write-Host "Dexing classes..."
+& $D8Path --min-api 21 --lib $AndroidJar --output $ClassesDir "@$ClassFilesFile"
+
+Remove-Item -Force $ClassFilesFile -ErrorAction SilentlyContinue
+
 $JarPath = Join-Path $OutDir "monview-display-power.jar"
 Remove-Item -Force $JarPath -ErrorAction SilentlyContinue
-jar cf $JarPath -C $ClassesDir .
+
+# Package the classes.dex into the jar
+jar cf $JarPath -C $ClassesDir classes.dex
 
 Write-Host "Built $JarPath"

@@ -43,6 +43,10 @@ type Args = {
 
     // Notify caller about current video dimensions (per-tile aspect ratio)
     onVideoDims?: (w: number, h: number) => void;
+
+    // ADB Fallback
+    adbModeUdids?: string[];
+    adbFallback?: (targetUdid: string, cmd: string) => void;
 };
 
 const STREAM_CONNECT_BATCH_SIZE = 6;
@@ -159,7 +163,13 @@ export function useTileStream(args: Args) {
         setLoading,
         reloadRef,
         onVideoDims,
+        adbModeUdids,
+        adbFallback,
     } = args;
+
+    const adbModeUdidsRef = useRef(adbModeUdids);
+    adbModeUdidsRef.current = adbModeUdids;
+
     const { t } = useI18n();
     const tRef = useRef(t);
     const ownerRef = useRef<symbol | null>(null);
@@ -327,7 +337,9 @@ export function useTileStream(args: Args) {
             canvas,
             () => getInputTargetsRef.current(udid),
             onActivate,
-            udid
+            udid,
+            () => adbModeUdidsRef.current,
+            adbFallback
         );
 
         function makeDecoder() {

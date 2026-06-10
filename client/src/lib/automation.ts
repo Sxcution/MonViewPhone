@@ -221,7 +221,13 @@ function shuffleTargets<T>(items: T[]): T[] {
 export async function runScript(
   targets: InputTarget[],
   steps: AutomationStep[],
-  opts?: { signal?: AbortSignal; log?: (msg: string) => void; syncSettings?: SyncMacroSettings },
+  opts?: { 
+    signal?: AbortSignal; 
+    log?: (msg: string) => void; 
+    syncSettings?: SyncMacroSettings;
+    adbModeUdids?: string[];
+    adbFallback?: (targetUdid: string, cmd: string) => Promise<any>;
+  },
 ) {
   const log = opts?.log ?? (() => {});
   if (!targets.length) {
@@ -297,9 +303,13 @@ export async function runScript(
         x = Math.max(0, Math.min(w, x + dxPx));
         y = Math.max(0, Math.min(h, y + dyPx));
         
-        sendSafe(t, encodeTouchMessage(MotionAction.DOWN, 0, x, y, w, h, 1, 1));
-        await sleep(60);
-        sendSafe(t, encodeTouchMessage(MotionAction.UP, 0, x, y, w, h, 0, 0));
+        if (opts?.adbModeUdids?.includes(t.udid) && opts?.adbFallback) {
+          await opts.adbFallback(t.udid, `shell input tap ${x} ${y}`);
+        } else {
+          sendSafe(t, encodeTouchMessage(MotionAction.DOWN, 0, x, y, w, h, 1, 1));
+          await sleep(60);
+          sendSafe(t, encodeTouchMessage(MotionAction.UP, 0, x, y, w, h, 0, 0));
+        }
       }
       await sleep(80);
       continue;
@@ -322,26 +332,31 @@ export async function runScript(
         };
 
         const start = getXY(step.x1, step.y1);
-        sendSafe(t, encodeTouchMessage(MotionAction.DOWN, 0, start.x, start.y, start.w, start.h, 1, 1));
-        
-        const startTime = Date.now();
-        for (let j = 1; j < nMoves; j++) {
-          if (opts?.signal?.aborted) return;
-          const a = j / nMoves;
-          const x01 = step.x1 + (step.x2 - step.x1) * a;
-          const y01 = step.y1 + (step.y2 - step.y1) * a;
-          const curr = getXY(x01, y01);
-          sendSafe(t, encodeTouchMessage(MotionAction.MOVE, 0, curr.x, curr.y, curr.w, curr.h, 1, 1));
-          
-          const elapsed = Date.now() - startTime;
-          const targetElapsed = (step.durationMs * j) / nMoves;
-          const wait = Math.max(0, Math.round(targetElapsed - elapsed));
-          if (wait) await sleep(wait);
-        }
-
         const end = getXY(step.x2, step.y2);
-        sendSafe(t, encodeTouchMessage(MotionAction.MOVE, 0, end.x, end.y, end.w, end.h, 1, 1));
-        sendSafe(t, encodeTouchMessage(MotionAction.UP, 0, end.x, end.y, end.w, end.h, 0, 0));
+
+        if (opts?.adbModeUdids?.includes(t.udid) && opts?.adbFallback) {
+          await opts.adbFallback(t.udid, `shell input swipe ${start.x} ${start.y} ${end.x} ${end.y} ${step.durationMs}`);
+        } else {
+          sendSafe(t, encodeTouchMessage(MotionAction.DOWN, 0, start.x, start.y, start.w, start.h, 1, 1));
+          
+          const startTime = Date.now();
+          for (let j = 1; j < nMoves; j++) {
+            if (opts?.signal?.aborted) return;
+            const a = j / nMoves;
+            const x01 = step.x1 + (step.x2 - step.x1) * a;
+            const y01 = step.y1 + (step.y2 - step.y1) * a;
+            const curr = getXY(x01, y01);
+            sendSafe(t, encodeTouchMessage(MotionAction.MOVE, 0, curr.x, curr.y, curr.w, curr.h, 1, 1));
+            
+            const elapsed = Date.now() - startTime;
+            const targetElapsed = (step.durationMs * j) / nMoves;
+            const wait = Math.max(0, Math.round(targetElapsed - elapsed));
+            if (wait) await sleep(wait);
+          }
+
+          sendSafe(t, encodeTouchMessage(MotionAction.MOVE, 0, end.x, end.y, end.w, end.h, 1, 1));
+          sendSafe(t, encodeTouchMessage(MotionAction.UP, 0, end.x, end.y, end.w, end.h, 0, 0));
+        }
       }
       await sleep(120);
       continue;

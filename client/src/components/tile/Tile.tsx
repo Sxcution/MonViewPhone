@@ -7,6 +7,7 @@ import { useServer } from '@/context/ServerContext';
 import type { StreamReloadOptions, TileProps } from './types';
 import { TileHeader } from './TileHeader';
 import { useTileStream } from './useTileStream';
+import { runAdbCommandApi } from '@/lib/serverApi';
 import { AlertTriangle, Info, MousePointer2, XCircle, Bell } from 'lucide-react';
 
 /**
@@ -51,6 +52,7 @@ function TileComponent({
         setAltSoloUdid,
         getIsAltHeld,   // <-- thay isAltHeld bằng getIsAltHeld
         clickDevice,
+        adbModeUdids,
     } = useActive();
     const { androidDeviceMap } = useServer();
 
@@ -158,6 +160,8 @@ function TileComponent({
         setStatus,
         setLoading,
         reloadRef,
+        adbModeUdids,
+        adbFallback: (targetUdid: string, cmd: string) => runAdbCommandApi(wsServer, targetUdid, cmd),
         onVideoDims: (w, h) => {
             if (!w || !h) return;
             setVideoAspect(w / h);
