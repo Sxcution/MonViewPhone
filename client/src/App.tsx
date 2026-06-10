@@ -274,7 +274,7 @@ type ConfirmState = {
 } | null;
 
 export function App() {
-  const [showDeviceAccountOverlay, setShowDeviceAccountOverlay] = useState(false)
+  const [deviceAccountOverlayOpen, setDeviceAccountOverlayOpen] = useState(false)
   useDirectKeyboard(true)
   const { t } = useI18n()
   const { deviceParam, wsServer } = useMemo(() => readPageParams(), [])
@@ -1440,6 +1440,20 @@ export function App() {
     }),
     [orderedRegistered, orderMap, androidDeviceMap]
   )
+  const deviceAccountOverlayDevices = useMemo(
+    () =>
+      orderedRegistered.map(udid => {
+        const meta = androidDeviceMap[udid]
+        return {
+          udid,
+          number: orderMap.get(udid) ?? 0,
+          manufacturer: meta?.['ro.product.manufacturer'] ?? undefined,
+          model: meta?.['ro.product.model'] ?? undefined,
+          online: connectedUdids.has(udid),
+        }
+      }),
+    [orderedRegistered, orderMap, androidDeviceMap, connectedUdids]
+  )
   const controlGridDevices = useMemo<DeviceSelectionGridItem[]>(
     () => orderedSidebarRegistered.map(udid => ({
       udid,
@@ -1865,21 +1879,38 @@ export function App() {
     return () => window.removeEventListener('wheel', onWheel as any)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  // Ctrl + A chon tat ca thiet bi để chọn tất cả thiết bị
+
+  useEffect(() => {
+    const handleDeviceAccountOverlayHotkey = (e: KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement | null
+
+      if (
+        active &&
+        (
+          ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) ||
+          active.isContentEditable
+        )
+      ) {
+        return
+      }
+
+      if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey && e.code === 'KeyC') {
+        e.preventDefault()
+        e.stopPropagation()
+        setDeviceAccountOverlayOpen(prev => !prev)
+      }
+
+      if (e.key === 'Escape') {
+        setDeviceAccountOverlayOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleDeviceAccountOverlayHotkey, true)
+    return () => window.removeEventListener('keydown', handleDeviceAccountOverlayHotkey, true)
+  }, [])
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-              // Ctrl+D to open Device Account Vault
-        if (deviceAccountHotkey && matchesHotkey(e, deviceAccountHotkey)) {
-          const active = document.activeElement?.nodeName.toLowerCase()
-          if (
-            ['input', 'textarea', 'select'].includes(active || '') ||
-            (document.activeElement as HTMLElement)?.isContentEditable
-          )
-            return
-          e.preventDefault()
-          setShowDeviceAccountOverlay(prev => !prev)
-        }
-        // Ctrl+A chọn tất cả (chỉ chọn các máy đang Online và không chạy Macro)
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA') {
         const active = document.activeElement?.nodeName.toLowerCase()
         if (
@@ -1894,7 +1925,7 @@ export function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [orderedRegistered, connectedUdids, runningMacroUdids, deviceAccountHotkey])
+  }, [orderedRegistered, connectedUdids, runningMacroUdids])
 
   const [draftConfig, setDraftConfig] = useState<StreamConfig>(STREAM_CONFIG)
   const [draftViewerConfig, setDraftViewerConfig] = useState<StreamConfig>(viewerStreamConfig)
@@ -4693,8 +4724,12 @@ export function App() {
         />
       ) : null}
 
-      {showDeviceAccountOverlay && (
-        <DeviceAccountOverlay onClose={() => setShowDeviceAccountOverlay(false)} />
+      {deviceAccountOverlayOpen && (
+        <DeviceAccountOverlay
+          devices={deviceAccountOverlayDevices}
+          defaultPlatform="wechat"
+          onClose={() => setDeviceAccountOverlayOpen(false)}
+        />
       )}
     </>
   )

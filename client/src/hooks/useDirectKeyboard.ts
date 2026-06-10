@@ -136,7 +136,12 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
         return;
       }
 
-      if (!enabled || (window as GlobalWithToggle).__disableDirectKeyboard) return;
+        // Don't block the hardcoded Alt+C Device Account hotkey
+        if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey && e.code === 'KeyC') {
+          return;
+        }
+
+        if (!enabled || (window as GlobalWithToggle).__disableDirectKeyboard) return;
 
       // Skip when user is typing in any input/textarea/select
       const ae = document.activeElement;
@@ -213,7 +218,12 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
         return;
       }
 
-      if (!enabled || (window as GlobalWithToggle).__disableDirectKeyboard) return;
+        // Don't block the hardcoded Alt+C Device Account hotkey
+        if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey && e.code === 'KeyC') {
+          return;
+        }
+
+        if (!enabled || (window as GlobalWithToggle).__disableDirectKeyboard) return;
 
       const ae = document.activeElement;
       if (isUserEditableElement(ae)) return;
@@ -261,7 +271,12 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
 
     // Paste handler: bắt event paste từ hidden textarea hoặc bất kỳ đâu
     const onPaste = (e: ClipboardEvent) => {
-      if (!enabled || (window as GlobalWithToggle).__disableDirectKeyboard) return;
+        // Don't block the hardcoded Alt+C Device Account hotkey
+        if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey && e.code === 'KeyC') {
+          return;
+        }
+
+        if (!enabled || (window as GlobalWithToggle).__disableDirectKeyboard) return;
       const ae = document.activeElement;
       if (isUserEditableElement(ae)) return;
       if (allowedContainer && e.target instanceof Node && allowedContainer.contains(e.target)) {
