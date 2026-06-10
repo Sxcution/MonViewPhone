@@ -229,8 +229,12 @@ func StartServer(udid string) error {
 
 func startServerUnlocked(udid string) error {
 	// Push scrcpy-server.jar
-	log.Printf("[%s] Pushing scrcpy-server.jar...", udid)
-	err := adb.Push(udid, serverJarPath(), TempPath+FileName)
+	jarPath := serverJarPath()
+	if absPath, err := filepath.Abs(jarPath); err == nil {
+		jarPath = absPath
+	}
+	log.Printf("[%s] Pushing scrcpy-server.jar from: %s", udid, jarPath)
+	err := adb.Push(udid, jarPath, TempPath+FileName)
 	if err != nil {
 		log.Printf("[%s] Failed to push scrcpy-server.jar: %v", udid, err)
 		return err
