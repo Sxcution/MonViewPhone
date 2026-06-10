@@ -293,3 +293,7 @@ All UI lists, grids, or containers that display dynamic data (such as profile li
 Thu m?c server-go/scrcpy-decompiled là source code Java có ch?a do?n code ClipboardManager.java dã du?c fix tham s? deviceId + Looper c?a Android 14. 
 Nó dóng vai trò nhu b?n backup mã ngu?n d? sau này n?u c?n nghiên c?u thêm có th? m? ra xem, nhung TUY?T Ð?I KHÔNG ÐU?C dùng script d? build l?i toàn b? scrcpy-server.jar t? thu m?c dó n?a (do WebSocket Core s? b? h?ng và gây l?i "Waiting for response").
 N?u c?n s?a file jar, hãy dùng phuong pháp Smali Injection: gi?i nén classes.dex t? file scrcpy-server.jar g?c dang ch?y, d?ch ngu?c b?ng baksmali, chép dè file smali c?n s?a, r?i build l?i classes.dex b?ng smali và dóng gói l?i vào jar b?ng l?nh jar uf.
+
+
+## SCRCPY BUILD RULE
+Tuy?t d?i KHÔNG dùng script d? build l?i toàn b? scrcpy-server.jar t? thu m?c scrcpy-decompiled (vì s? làm h?ng WebSocket Core). Thu m?c scrcpy-decompiled ch? gi? l?i d? tham kh?o mã ngu?n (ch?a do?n code fix ClipboardManager và Android 14/15). N?u c?n patch scrcpy-server.jar, hãy dùng công c? apktool d? decompile ra file .smali, s?a file .smali, và recompile l?i b?ng apktool b.
