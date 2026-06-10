@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"encoding/base64"
@@ -150,40 +150,47 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 			shellQuote(mimeType),
 			shellQuote(relPath),
 		)
-		if _, err := adb.Shell(udid, insertCmd); err != nil {
-			return err
+		
+		mediaSuccess := false
+		if _, err := adb.Shell(udid, insertCmd); err == nil {
+			queryCmd := fmt.Sprintf(
+				"content query --user %d --uri %s --projection _id --where %s",
+				userID,
+				uri,
+				shellDoubleQuote("_display_name='"+uniqueFileName+"'"),
+			)
+			if queryOut, err := adb.Shell(udid, queryCmd); err == nil {
+				match := mediaIDPattern.FindStringSubmatch(queryOut)
+				if len(match) >= 2 {
+					mediaURI := uri + "/" + match[1]
+					writeCmd := fmt.Sprintf("cat %s | content write --user %d --uri %s", shellQuote(deviceTmp), userID, mediaURI)
+					if _, err := adb.Shell(udid, writeCmd); err == nil {
+						updateCmd := fmt.Sprintf(
+							"content update --user %d --uri %s --bind _display_name:s:%s",
+							userID,
+							mediaURI,
+							shellQuote(fileName),
+						)
+						if _, err := adb.Shell(udid, updateCmd); err == nil {
+							mediaSuccess = true
+						}
+					}
+				}
+			}
 		}
 
-		queryCmd := fmt.Sprintf(
-			"content query --user %d --uri %s --projection _id --where %s",
-			userID,
-			uri,
-			shellDoubleQuote("_display_name='"+uniqueFileName+"'"),
-		)
-		queryOut, err := adb.Shell(udid, queryCmd)
-		if err != nil {
-			return err
-		}
-		match := mediaIDPattern.FindStringSubmatch(queryOut)
-		if len(match) < 2 {
-			return fmt.Errorf("failed to retrieve MediaStore ID for inserted media file")
+		if !mediaSuccess {
+			// Fallback: copy file normally and trigger media scanner
+			parent := path.Dir(remotePath)
+			if parent != "." && parent != "/" {
+				_, _ = adb.Shell(udid, "mkdir -p "+shellQuote(parent))
+			}
+			if _, err := adb.Shell(udid, "cp "+shellQuote(deviceTmp)+" "+shellQuote(remotePath)); err != nil { return err }
+			// Trigger media scanner so Gallery sees it
+			scannerCmd := fmt.Sprintf("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://%s --user %d", shellQuote(remotePath), userID)
+			_, _ = adb.Shell(udid, scannerCmd)
 		}
 
-		mediaURI := uri + "/" + match[1]
-		writeCmd := fmt.Sprintf("cat %s | content write --user %d --uri %s", shellQuote(deviceTmp), userID, mediaURI)
-		if _, err := adb.Shell(udid, writeCmd); err != nil {
-			return err
-		}
-
-		updateCmd := fmt.Sprintf(
-			"content update --user %d --uri %s --bind _display_name:s:%s",
-			userID,
-			mediaURI,
-			shellQuote(fileName),
-		)
-		if _, err := adb.Shell(udid, updateCmd); err != nil {
-			return err
-		}
 		return nil
 	}
 
@@ -666,5 +673,6 @@ func handleSetWallpaper(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, jsonResponse{"success": true})
 }
+
 
 

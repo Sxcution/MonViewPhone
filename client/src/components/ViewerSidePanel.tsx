@@ -9,7 +9,7 @@ import {
   listUserProfiles,
   runAdbCommandApi,
 } from '@/lib/serverApi';
-import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Star, List, Save, Trash2, Palette } from 'lucide-react';
+import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Star, List, Save, Trash2, Palette, Plus } from 'lucide-react';
 
 type ViewerSidePanelProps = {
   udid: string;
@@ -164,7 +164,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
   };
 
   const handleAdbLeave = () => {
-    adbHoverTimer.current = window.setTimeout(() => setShowAdbSubmenu(false), 400);
+    adbHoverTimer.current = window.setTimeout(() => setShowAdbSubmenu(false), 2000);
   };
 
   // Push file via HTTP API
@@ -423,7 +423,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
                   <button key={i}
                     className={`vsp-adb-submenu-item${c.warn ? ' vsp-cmd-warn' : ''}`}
                     style={presetColors[i] ? { color: presetColors[i] } : undefined}
-                    onClick={e => { e.stopPropagation(); c.cmd.includes('<') ? (setShowAdbModal(true), setAdbCommand(c.cmd)) : executeAdbCommand(c.cmd); setShowAdbSubmenu(false); }}
+                    onClick={e => { e.stopPropagation(); c.cmd.includes('<') ? (setShowAdbModal(true), setAdbCommand(c.cmd)) : executeAdbCommand(c.cmd); }}
                     title={c.cmd}
                   >
                     {c.label}
@@ -459,18 +459,18 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
             </div>
             <div className="vsp-modal-tab-content">
               {adbTab === 'preset' && (
-                <div className="vsp-cmd-grid">
+                <div className="automationSectionActions" style={{ flexWrap: 'wrap', gap: '8px' }}>
                   {DEFAULT_PRESETS.map((c, i) => (
-                    <button key={i}
-                      className={`vsp-cmd-item${c.warn ? ' vsp-cmd-warn' : ''}`}
-                      style={presetColors[i] ? { color: presetColors[i] } : undefined}
-                      onClick={() => { c.cmd.includes('<') ? setAdbCommand(c.cmd) : executeAdbCommand(c.cmd); }}
-                      onContextMenu={e => handlePresetContextMenu(e, i)}
-                      title={c.cmd}
-                    >
-                      <span className="vsp-cmd-label" style={presetColors[i] ? { color: presetColors[i] } : undefined}>{c.label}</span>
-                      <span className="vsp-cmd-code">{c.cmd}</span>
-                    </button>
+                      <button key={i}
+                        className={`automationArrowBtn${c.warn ? ' vsp-cmd-warn' : ''}`}
+                        style={presetColors[i] ? { color: presetColors[i] } : {}}
+                        onClick={() => { c.cmd.includes('<') ? setAdbCommand(c.cmd) : executeAdbCommand(c.cmd); }}
+                        onContextMenu={e => handlePresetContextMenu(e, i)}
+                        title={c.cmd}
+                      >
+                        <Plus size={15} style={{ flexShrink: 0 }} />
+                        <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</span>
+                      </button>
                   ))}
                 </div>
               )}
@@ -568,3 +568,5 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
     </>
   );
 }
+
+

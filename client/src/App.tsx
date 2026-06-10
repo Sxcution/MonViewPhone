@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
 import { createPortal } from 'react-dom'
+import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
 import { readPageParams } from '@/lib/params'
 import { useServer } from '@/context/ServerContext'
 import { Tile } from '@/components/Tile'
@@ -273,6 +274,7 @@ type ConfirmState = {
 } | null;
 
 export function App() {
+  const [showDeviceAccountOverlay, setShowDeviceAccountOverlay] = useState(false)
   useDirectKeyboard(true)
   const { t } = useI18n()
   const { deviceParam, wsServer } = useMemo(() => readPageParams(), [])
@@ -416,6 +418,38 @@ export function App() {
     };
     window.addEventListener(SYNC_TIME_SETTINGS_EVENT, handleUpdate);
     return () => window.removeEventListener(SYNC_TIME_SETTINGS_EVENT, handleUpdate);
+  }, []);
+
+  // ===== DEVICE ACCOUNT HOTKEY =====
+  const [deviceAccountHotkey, setDeviceAccountHotkey] = useState(() => localStorage.getItem('monviewphone:device-account-hotkey') || 'Alt+C');
+
+  const handleDeviceAccountHotkeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const lowerKey = e.key.toLowerCase();
+    if (['control', 'alt', 'shift', 'meta'].includes(lowerKey)) {
+      return;
+    }
+
+    const parts: string[] = [];
+    if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
+    if (e.altKey) parts.push('Alt');
+    if (e.shiftKey) parts.push('Shift');
+
+    let keyName = e.key;
+    if (keyName === ' ') {
+      keyName = 'Space';
+    } else if (keyName.length === 1) {
+      keyName = keyName.toUpperCase();
+    } else {
+      keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
+    }
+    parts.push(keyName);
+
+    const newHotkey = parts.join('+');
+    setDeviceAccountHotkey(newHotkey);
+    localStorage.setItem('monviewphone:device-account-hotkey', newHotkey);
   }, []);
 
   // ===== SYNC TIME HOTKEY STATES & GLOBAL LISTENER =====
@@ -1834,7 +1868,18 @@ export function App() {
   // Ctrl + A chon tat ca thiet bi để chọn tất cả thiết bị
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+A chọn tất cả (chỉ chọn các máy đang Online và không chạy Macro)
+              // Ctrl+D to open Device Account Vault
+        if (deviceAccountHotkey && matchesHotkey(e, deviceAccountHotkey)) {
+          const active = document.activeElement?.nodeName.toLowerCase()
+          if (
+            ['input', 'textarea', 'select'].includes(active || '') ||
+            (document.activeElement as HTMLElement)?.isContentEditable
+          )
+            return
+          e.preventDefault()
+          setShowDeviceAccountOverlay(prev => !prev)
+        }
+        // Ctrl+A chọn tất cả (chỉ chọn các máy đang Online và không chạy Macro)
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA') {
         const active = document.activeElement?.nodeName.toLowerCase()
         if (
@@ -1849,7 +1894,7 @@ export function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [orderedRegistered, connectedUdids, runningMacroUdids])
+  }, [orderedRegistered, connectedUdids, runningMacroUdids, deviceAccountHotkey])
 
   const [draftConfig, setDraftConfig] = useState<StreamConfig>(STREAM_CONFIG)
   const [draftViewerConfig, setDraftViewerConfig] = useState<StreamConfig>(viewerStreamConfig)
@@ -3369,6 +3414,55 @@ export function App() {
                       )}
                     </div>
                   </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', marginTop: 12 }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
+                      Mở Kho tài khoản:
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="text"
+                        placeholder="Nhấn tổ hợp phím..."
+                        readOnly
+                        value={deviceAccountHotkey}
+                        onKeyDown={handleDeviceAccountHotkeyInputKeyDown}
+                        style={{
+                          background: '#0a0a0a',
+                          color: 'var(--md-info)',
+                          border: '1px solid #444',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          fontSize: 12,
+                          width: 160,
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          outline: 'none',
+                        }}
+                      />
+                      {deviceAccountHotkey && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeviceAccountHotkey('');
+                            localStorage.removeItem('monviewphone:device-account-hotkey');
+                          }}
+                          style={{
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '6px',
+                            color: '#ff8080',
+                            padding: '6px 10px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Xoá
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               )}
             </div>
@@ -4598,6 +4692,10 @@ export function App() {
           onClose={() => setSyncTimeModalOpen(false)}
         />
       ) : null}
+
+      {showDeviceAccountOverlay && (
+        <DeviceAccountOverlay onClose={() => setShowDeviceAccountOverlay(false)} />
+      )}
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+﻿import { useEffect, useRef, useCallback } from 'react';
 import { encodeKeycodeMessage, encodeTextMessage, encodeSetClipboardMessage, KeyEventAction } from '@/lib/control';
 import { AndroidKeycode, KeyToCodeMap } from '@/lib/keyEvent';
 import { useActive } from '@/context/ActiveContext';
@@ -148,7 +148,7 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       }
 
       // Không chặn Ctrl + A để App.tsx có thể bắt sự kiện Select All
-      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA') {
+      if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyA' || e.code === 'KeyD')) {
         return;
       }
 
@@ -222,7 +222,7 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA') return;
+      if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyA' || e.code === 'KeyD')) return;
       const isCopyPaste = (e.ctrlKey || e.metaKey) && (e.code === 'KeyC' || e.code === 'KeyV' || e.code === 'KeyX');
       if (isCopyPaste) return;
 

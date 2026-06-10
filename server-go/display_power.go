@@ -60,23 +60,31 @@ func setDisplayPower(udid string, mode string, displayIndex int) (string, string
 	sdkOut, _ := adb.Shell(udid, "getprop ro.build.version.sdk")
 	sdk, _ := strconv.Atoi(strings.TrimSpace(sdkOut))
 
-	if sdk >= 35 {
+	// Prioritize surfacecontrol-helper for all devices
+	out, err := runDisplayPowerHelper(udid, mode, displayIndex)
+
+	if mode == "on" {
+		adb.Shell(udid, "input keyevent 224")
+		adb.Shell(udid, "wm dismiss-keyguard")
+	}
+
+	if err == nil {
+		return out, "surfacecontrol-helper", nil
+	}
+
+	// Fallback to cmd display only for sdk < 35 (Android 14 and below)
+	if sdk < 35 {
 		cmdMode := "power-off"
 		if mode == "on" {
 			cmdMode = "power-on"
 		}
-		out, err := adb.Shell(udid, fmt.Sprintf("cmd display %s %d", cmdMode, displayIndex))
-		if err == nil {
-			return out, "cmd-display", nil
+		fallbackOut, fallbackErr := adb.Shell(udid, fmt.Sprintf("cmd display %s %d", cmdMode, displayIndex))
+		if fallbackErr == nil {
+			return fallbackOut, "cmd-display", nil
 		}
-		// fallback to helper below
 	}
 
-	out, err := runDisplayPowerHelper(udid, mode, displayIndex)
-	if err != nil {
-		return out, "surfacecontrol-helper", err
-	}
-	return out, "surfacecontrol-helper", nil
+	return out, "surfacecontrol-helper", err
 }
 
 func runDisplayPowerHelper(udid string, mode string, displayIndex int) (string, error) {
