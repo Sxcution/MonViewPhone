@@ -19,8 +19,6 @@ import {
   X,
 } from 'lucide-react';
 import { useActive } from '@/context/ActiveContext';
-import { useServer } from '@/context/ServerContext';
-import { runAdbCommandApi } from '@/lib/serverApi';
 import {
   AUTOMATION_CLICK_EVENT,
   AUTOMATION_KEY_EVENT,
@@ -523,8 +521,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     viewerUdid = null,
     onClose,
   }, ref) {
-  const { getTargetsByUdids, adbModeUdids } = useActive();
-  const { wsServer } = useServer();
+  const { getTargetsByUdids } = useActive();
 
   /* ── state ── */
   const [coordinatePanelOpen, setCoordinatePanelOpen] = useState(false);
@@ -1129,15 +1126,11 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         await runScript([target], rowToSteps(row, { seedingText: text }), {
           signal: controller.signal,
           syncSettings: runSyncSettings,
-          adbModeUdids,
-          adbFallback: (targetUdid: string, cmd: string) => runAdbCommandApi(wsServer, targetUdid, cmd)
         });
       } else {
         await runScript([target], rowToSteps(row), {
           signal: controller.signal,
           syncSettings: runSyncSettings,
-          adbModeUdids,
-          adbFallback: (targetUdid: string, cmd: string) => runAdbCommandApi(wsServer, targetUdid, cmd),
           log: msg => {
             if (orderedTargets.length === 1) log?.(msg);
           }
@@ -1146,7 +1139,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     });
 
     await Promise.all(promises);
-  }, [deviceByUdid, adbModeUdids, wsServer]);
+  }, [deviceByUdid]);
 
   const newMacro = useCallback(() => {
     setRows([]);
@@ -1383,8 +1376,6 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
               await runScript([target], rowToSteps(row, { seedingText: text }), {
                 signal: controller.signal,
                 syncSettings: runSyncSettings,
-                adbModeUdids,
-                adbFallback: (targetUdid: string, cmd: string) => runAdbCommandApi(wsServer, targetUdid, cmd)
               });
             } else {
               await runScript([target], rowToSteps(row), {

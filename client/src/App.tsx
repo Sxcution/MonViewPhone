@@ -290,8 +290,6 @@ export function App() {
     clickDevice,
     syncAll,
     syncMain,
-    adbModeUdids,
-    toggleAdbMode,
   } = useActive()
 
   const [streamConfig, setStreamConfig] = useState<StreamConfig>(() => {
@@ -1463,58 +1461,6 @@ export function App() {
     [quickCommandTargets, wsServer]
   )
 
-  const runBatchKeycodesMulti = useCallback(
-    async (keycodes: number[], fallbackCommands?: string[]) => {
-      const targets = quickCommandTargets()
-      if (!targets.length) return
-      
-      const wsTargets = getTargetsByUdids(targets)
-      const wsUdids = new Set(wsTargets.map(t => t.udid))
-      
-      if (wsTargets.length > 0) {
-        for (const keycode of keycodes) {
-          const downMsg = encodeKeycodeMessage(KeyEventAction.DOWN, keycode)
-          const upMsg = encodeKeycodeMessage(KeyEventAction.UP, keycode)
-          for (const t of wsTargets) {
-            try {
-              if (t.ws && t.ws.readyState === WebSocket.OPEN) {
-                t.ws.send(downMsg)
-                t.ws.send(upMsg)
-              }
-            } catch {}
-          }
-          if (keycodes.length > 1) {
-            await new Promise(r => setTimeout(r, 10))
-          }
-        }
-      }
-
-      const fallbackUdids = targets.filter(u => !wsUdids.has(u))
-      if (fallbackUdids.length > 0) {
-        let cmds: string[]
-        if (fallbackCommands) {
-          cmds = fallbackCommands
-        } else {
-          // Combine multiple keyevents into a single adb shell execution
-          const script = keycodes.map(k => `input keyevent ${k}`).join('; ')
-          cmds = [`adb shell "${script}"`]
-        }
-        
-        // Execute concurrently for all fallback devices
-        await Promise.all(
-          fallbackUdids.map(async udid => {
-            for (const cmd of cmds) {
-              try {
-                await runAdbCommandApi(wsServer, udid, cmd)
-              } catch {}
-            }
-          })
-        )
-      }
-    },
-    [quickCommandTargets, getTargetsByUdids, wsServer]
-  )
-
   // state_autoPhysicalScreenOff : Trạng thái tự động tắt màn hình vật lý khi kết nối
   const [autoPhysicalScreenOff, setAutoPhysicalScreenOff] = useState(() => {
     try {
@@ -2179,22 +2125,29 @@ export function App() {
       screenOff: {
         label: 'Power key',
         icon: <MonitorOff size={15} strokeWidth={1.8} />,
-        run: () => runBatchKeycodesMulti([AndroidKeycode.KEYCODE_POWER])
+        run: () => runQuickAdbCommands(['adb shell input keyevent 26'])
       },
       mute: {
         label: 'Tắt tiếng',
         icon: <VolumeX size={15} strokeWidth={1.8} />,
-        run: () => runBatchKeycodesMulti([AndroidKeycode.KEYCODE_VOLUME_MUTE])
+        run: () =>
+          runQuickAdbCommands(['cmd notification set_dnd none'])
       },
       soundOn: {
         label: 'Mở Âm Thanh',
         icon: <Volume2 size={15} strokeWidth={1.8} />,
-        run: () => runBatchKeycodesMulti(Array(7).fill(AndroidKeycode.KEYCODE_VOLUME_UP))
+        run: () =>
+          runQuickAdbCommands([
+            'cmd notification set_dnd off; cmd media_session volume --stream 3 --set 7; cmd media_session volume --stream 2 --set 7; cmd media_session volume --stream 5 --set 7; cmd media_session volume --stream 4 --set 7; cmd media_session volume --stream 1 --set 7'
+          ])
       },
       maxVolume: {
         label: 'Max âm lượng',
         icon: <Volume2 size={15} strokeWidth={1.8} />,
-        run: () => runBatchKeycodesMulti(Array(15).fill(AndroidKeycode.KEYCODE_VOLUME_UP))
+        run: () =>
+          runQuickAdbCommands([
+            'cmd notification set_dnd off; cmd media_session volume --stream 1 --set 7; cmd media_session volume --stream 2 --set 15; cmd media_session volume --stream 3 --set 15; cmd media_session volume --stream 4 --set 15; cmd media_session volume --stream 5 --set 15'
+          ])
       },
       syncTime: {
         label: 'Sync Time',
@@ -4509,28 +4462,6 @@ export function App() {
                 </div>
               </div>
             )}
-
-            {/* === Chế độ ADB/WebSocket === */}
-            {(() => {
-              const isAdb = adbModeUdids.includes(contextMenuTarget.udid);
-              return (
-                <button
-                  style={{ background: 'transparent', border: 'none', color: isAdb ? '#ffb84d' : '#4dff88', fontSize: '13px', cursor: 'pointer', padding: '7px 8px', textAlign: 'left', width: '100%', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
-                  onMouseEnter={e => (e.currentTarget.style.background = isAdb ? 'rgba(255,184,77,0.1)' : 'rgba(77,255,136,0.1)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleAdbMode(contextMenuTarget.udid);
-                    setContextMenuTarget(null);
-                    setContextMenuOpen(false);
-                    setSubMenuOpen(false);
-                  }}
-                >
-                  <span>{isAdb ? '📱' : '🚀'}</span> Chế độ: <strong style={{color: isAdb ? '#ffd085' : '#85ffae'}}>{isAdb ? 'ADB (Chống lag cảm ứng)' : 'WebSocket (Siêu mượt)'}</strong>
-                </button>
-              );
-            })()}
 
             {/* === Xoá khỏi nhóm — hiện khi click từ grid dropdown nhóm, HOẶC khi đang load nhóm và click từ grid tổng === */}
             {contextMenuTarget.groupIdx !== undefined && (() => {
