@@ -21,4 +21,20 @@
   - Account `Risk` -> cam `#f97316`
   - Account không Die/Risk, trên 1 năm tuổi -> xanh lá `#22c55e`
   - Account không Die/Risk, dưới 1 năm tuổi hoặc chưa có ngày tạo -> trắng `#ffffff`
+- Ưu tiên trạng thái màu tên tài khoản và badge dot cho WeChat Active Nearby eligible với màu xanh dương (`#3b82f6` cho tên, class `.nearby` cho dot).
+- Sửa lỗi dot màu trạng thái cho tài khoản dưới 1 năm: Thêm class `.under-one-year` để dot có nền màu trắng thay vì bị fallback sang xanh lá (live).
+- Tích hợp Location icon (cho cả eligible/upcoming) và Notice Bell icon (đỏ nếu hết hạn, vàng nếu chưa) vào Context Menu và Danh sách badge đếm số tài khoản.
+- Sắp xếp thứ tự các icon hiển thị sau tên tài khoản đúng chuẩn: Tên tài khoản $\rightarrow$ Location Nearby $\rightarrow$ Chuông thông báo $\rightarrow$ AppType icon.
+- Đảm bảo logic Open Nearby People không bị ảnh hưởng, tự động chuyển về trạng thái thường khi set 30 ngày.
+- Sửa bug khoảng hở/khe giữa context menu cha và submenu trong Overlay Account:
+  - Thay đổi `.dav-ctx-has-sub` thành `position: static` để submenu bám toạ độ theo `.dav-ctx-submenu-container` (ngăn cản khoảng hở do padding/margin của menu item).
+  - Căn chỉnh lại `left: calc(100% - 1px)` và `top: 0` cho submenu dính sát vào menu cha.
+  - Hỗ trợ `.dav-ctx-submenu::before` làm cầu nối vô hình rộng 8px ở mép của submenu để duy trì trạng thái hover liên tục khi di chuột.
+  - Đồng bộ hoá cho cả menu thông thường và menu đổi hướng sang bên trái (`.direction-left`).
+- Tự động điền ngày/tháng/năm hiện tại của hệ thống PC (`Date.now()`) vào trường ngày tạo (`createdAt`) của tài khoản mới khi nhấn "Thêm tài khoản" ở cả context menu và giao diện trống.
+- Sửa lại tuỳ chọn "Set UnVerify" ở submenu "Trạng Thái" trong context menu:
+  - Khi tài khoản chưa UnVerify: hiển thị dòng "Set UnVerify" (màu vàng `#eab308`).
+  - Khi tài khoản đã là UnVerify: dòng đó sẽ tự động chuyển thành dòng chữ "Verify Success" (màu xanh lá `#22c55e`). Khi click vào dòng này, tài khoản sẽ được chuyển sang trạng thái "Verify".
+- Cập nhật màu tên tài khoản (`getAccountListNameColor`), màu icon bảo mật (`shieldColor`) và màu trường tên tài khoản (`nameColor`) trong panel thành màu vàng (`#eab308`) khi tài khoản đang ở trạng thái `Unverified`.
+- Thêm icon hình màu vàng dấu chấm than (sử dụng `ShieldAlert` từ `lucide-react`) vào sau tên của tài khoản đang ở trạng thái `Unverified` ở cả danh sách badge đếm số tài khoản và context menu "Tài Khoản".
 - Xác thực và chạy `npm run build` thành công trên frontend.

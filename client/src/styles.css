@@ -9641,7 +9641,7 @@ select.dav-input {
 }
 
 .dav-ctx-has-sub {
-  position: relative;
+  position: static;
 }
 
 /* Controlled via React hover state instead of CSS hover to prevent multiple submenus overlapping */
@@ -9654,8 +9654,9 @@ select.dav-input {
 .dav-ctx-submenu {
   display: none;
   position: absolute;
-  left: calc(100% - 15px);
-  top: -6px;
+  left: calc(100% - 1px);
+  top: 0;
+  margin-left: 0;
   background: #252525;
   border: 1px solid #333;
   border-radius: 8px;
@@ -9666,13 +9667,29 @@ select.dav-input {
   z-index: 10001;
 }
 
+.dav-ctx-submenu::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  width: 8px;
+}
+
 .dav-ctx-menu.direction-left {
   transform: translateX(-100%);
 }
 
 .dav-ctx-menu.direction-left .dav-ctx-submenu {
   left: auto;
-  right: calc(100% - 15px);
+  right: calc(100% - 1px);
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.dav-ctx-menu.direction-left .dav-ctx-submenu::before {
+  left: auto;
+  right: -8px;
 }
 
 .tile-account-overlay {
@@ -10509,4 +10526,9 @@ input[type=number] {
   font-weight: 700;
   line-height: 1.1;
   text-shadow: 0 0 6px rgba(239, 68, 68, 0.25);
+}
+
+.dav-account-state-dot.under-one-year {
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.35);
 }

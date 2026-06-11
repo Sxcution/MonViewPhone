@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings } from 'lucide-react';
+import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, ShieldAlert, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings } from 'lucide-react';
 import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby';
 import { 
   getDeviceAccountData, 
@@ -108,6 +108,10 @@ function getElapsedDaysSince(ts?: number | null): number {
 }
 
 function getAccountListNameColor(account: Account): string {
+  if (account.status === 'Unverified') return '#eab308';
+
+  if (getNearbyAccountState(account) === 'eligible') return '#3b82f6';
+
   if (account.status === 'Die') return '#ef4444';
   if (account.status === 'Risk') return '#f97316';
 
@@ -117,9 +121,7 @@ function getAccountListNameColor(account: Account): string {
     (account.createdAt && Date.now() - account.createdAt >= oneYearMs)
   );
 
-  if (isOverOneYear) return '#22c55e';
-
-  return '#ffffff';
+  return isOverOneYear ? '#22c55e' : '#ffffff';
 }
 
 function clampDavPanelPosition(pos: { x: number; y: number }, panel?: HTMLElement | null) {
@@ -250,6 +252,48 @@ function renderNearbyAccountIcon(account: Account) {
   }
 
   return null;
+}
+
+function renderAccountNoticeIcon(account: Account) {
+  if (!account.notice || !account.notice.title) return null;
+
+  const expired = !!(account.notice.dueDate && account.notice.dueDate <= Date.now());
+
+  return (
+    <span
+      title={expired ? 'Thông báo đã đến hạn' : 'Tài khoản có thông báo'}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        flexShrink: 0,
+        marginLeft: 4,
+      }}
+    >
+      <Bell
+        size={13}
+        color={expired ? '#ef4444' : '#eab308'}
+        className={expired ? 'dav-bell-expired' : undefined}
+      />
+    </span>
+  );
+}
+
+function renderUnverifiedIcon(account: Account) {
+  if (account.status !== 'Unverified') return null;
+
+  return (
+    <span
+      title="Tài khoản chưa Verify"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        flexShrink: 0,
+        marginLeft: 4,
+      }}
+    >
+      <ShieldAlert size={13} color="#eab308" />
+    </span>
+  );
 }
 
 // --- Device Panel Component ---
@@ -805,21 +849,24 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   }, [ctxMenu]);
 
   const getAccountStatusClass = (account: Account) => {
-    if (activeTab === 'wechat') {
-      // Điều kiện Nearby: tài khoản PHẢI đủ 1 năm tuổi
-      const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-      const accountIsOverOneYear = !!(account.isOneYearOld || (account.createdAt && (Date.now() - account.createdAt) >= oneYearMs));
-      if (accountIsOverOneYear) {
-        if (account.nearbyPeopleDueDate) {
-          if (account.nearbyPeopleDueDate <= Date.now()) return 'nearby';
-        } else {
-          return 'nearby';
-        }
-      }
-    }
     if (account.status === 'Die') return 'die';
     if (account.status === 'Risk') return 'risk';
     if (account.status === 'Verify' || account.status === 'Unverified') return 'verify';
+
+    if (activeTab === 'wechat') {
+      const nearbyState = getNearbyAccountState(account);
+      if (nearbyState === 'eligible') return 'nearby';
+
+      const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+      const accountIsOverOneYear = !!(
+        account.isOneYearOld ||
+        (account.createdAt && Date.now() - account.createdAt >= oneYearMs)
+      );
+
+      if (accountIsOverOneYear) return 'live';
+      return 'under-one-year';
+    }
+
     return 'live';
   };
 
@@ -847,6 +894,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
   const shieldColor = useMemo(() => {
     if (!selectedAccount) return '#fff';
+    if (selectedAccount.status === 'Unverified') {
+      return '#eab308'; // Vàng khi tài khoản Unverified
+    }
     if (selectedAccount.status === 'Die') {
       return '#ef4444'; // Đỏ khi tài khoản Die
     }
@@ -864,6 +914,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
   const nameColor = useMemo(() => {
     if (!selectedAccount) return '#fff';
+    if (selectedAccount.status === 'Unverified') {
+      return '#eab308'; // Vàng khi tài khoản Unverified
+    }
     if (selectedAccount.status === 'Die') {
       return '#ef4444'; // Đỏ khi tài khoản Die
     }
@@ -987,6 +1040,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       >
                         {account.name || account.phone || account.nickname || 'Không tên'}
                         {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
+                        {renderUnverifiedIcon(account)}
+                        {renderAccountNoticeIcon(account)}
                         {renderAppTypeIcon(account.appType)}
                       </span>
                     </button>
@@ -1413,6 +1468,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       }}
                     >
                       {a.name || a.phone || a.nickname || 'Tài khoản'}
+                      {activeTab === 'wechat' && renderNearbyAccountIcon(a)}
+                      {renderUnverifiedIcon(a)}
+                      {renderAccountNoticeIcon(a)}
                       {renderAppTypeIcon(a.appType)}
                     </span>
                   </button>
@@ -1490,6 +1548,27 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   }}
                 >
                   <div className="dav-status-dot" style={{ background: '#f97316' }} /> Set Risk {selectedAccount.status === 'Risk' ? '(Hiện tại)' : ''}
+                </button>
+                <button 
+                  className={`dav-ctx-item ${selectedAccount.status === 'Unverified' ? 'active' : ''}`} 
+                  style={selectedAccount.status === 'Unverified' ? { color: '#22c55e', fontWeight: 'bold' } : {}}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const targetStatus = selectedAccount.status === 'Unverified' ? 'Verify' : 'Unverified';
+                    handleUpdateAccount(selectedAccount.id, { status: targetStatus });
+                    setCtxMenu(null);
+                  }}
+                >
+                  {selectedAccount.status === 'Unverified' ? (
+                    <>
+                      <div className="dav-status-dot" style={{ background: '#22c55e' }} /> Verify Success
+                    </>
+                  ) : (
+                    <>
+                      <div className="dav-status-dot" style={{ background: '#eab308' }} /> Set UnVerify
+                    </>
+                  )}
                 </button>
               </div>
             </div>

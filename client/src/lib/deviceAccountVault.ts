@@ -168,7 +168,7 @@ export function createNewAccount(isWeChat: boolean): Account {
   if (isWeChat) {
     return {
       ...base,
-      createdAt: null,
+      createdAt: Date.now(),
       verifyStatus: 'Unknown',
       phoneRegion: 'Unknown',
       scanCount: 0,
