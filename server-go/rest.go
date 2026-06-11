@@ -665,8 +665,9 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			settings[k] = v
 		}
 
-		if rawVault, ok := settings[deviceAccountVaultKey].(string); ok {
-			if err := syncDeviceAccountVaultToDB(rawVault); err != nil {
+		incomingVaultRaw, hasIncomingVault := temp[deviceAccountVaultKey].(string)
+		if hasIncomingVault {
+			if err := syncDeviceAccountVaultToDB(incomingVaultRaw); err != nil {
 				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to sync device account DB: " + err.Error()})
 				return
 			}
@@ -676,6 +677,14 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 				return
 			} else if ok {
 				settings[deviceAccountVaultKey] = vaultRaw
+			}
+		} else {
+			if vaultRaw, ok, err := loadDeviceAccountVaultFromDB(); err != nil {
+				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
+				return
+			} else if ok {
+				settings[deviceAccountVaultKey] = vaultRaw
+				settings["monviewphone:device-account-db"] = "data/Data.db"
 			}
 		}
 
