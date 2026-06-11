@@ -13,6 +13,8 @@ import { DeviceSelectionGrid, type DeviceSelectionGridItem } from '@/components/
 import { AutomationModal, type AutomationDeviceOption, type AutomationModalRef } from '@/components/AutomationModal'
 import { AutomationPanel } from '@/components/AutomationPanel'
 import { VisualAlertPanel } from '@/components/VisualAlertPanel'
+import { ThemeInspector } from '@/components/ThemeInspector'
+import { applyThemeOverrides, loadThemeOverrides, clearThemeOverrides } from '@/lib/themeInspector'
 import { useActive } from '@/context/ActiveContext'
 import { AndroidKeycode } from '@/lib/keyEvent'
 import { encodeKeycodeMessage, KeyEventAction } from '@/lib/control'
@@ -297,12 +299,41 @@ export function App() {
     return () => window.removeEventListener('device-account-updated', handleAccountUpdate)
   }, [])
 
+  const [themeInspectorEnabled, setThemeInspectorEnabled] = useState(false);
+
   useEffect(() => {
-    (window as any).__disableDirectKeyboard = deviceAccountOverlayOpen;
+    applyThemeOverrides(loadThemeOverrides());
+  }, []);
+
+  useEffect(() => {
+    (window as any).__disableDirectKeyboard = deviceAccountOverlayOpen || themeInspectorEnabled;
     return () => {
       (window as any).__disableDirectKeyboard = false;
     };
-  }, [deviceAccountOverlayOpen]);
+  }, [deviceAccountOverlayOpen, themeInspectorEnabled]);
+
+  useEffect(() => {
+    const handleThemeInspectorHotkey = (e: KeyboardEvent) => {
+      const active = document.activeElement?.nodeName.toLowerCase();
+      if (
+        ['input', 'textarea', 'select'].includes(active || '') ||
+        (document.activeElement as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'i') {
+        e.preventDefault();
+        e.stopPropagation();
+        setThemeInspectorEnabled(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleThemeInspectorHotkey, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleThemeInspectorHotkey, { capture: true });
+    };
+  }, []);
   useDirectKeyboard(true)
   const { t } = useI18n()
   const { deviceParam, wsServer } = useMemo(() => readPageParams(), [])
@@ -3797,6 +3828,37 @@ export function App() {
               )}
             </div>
 
+            {/* Theme Inspector Section */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', marginBottom: 6 }}>
+                Theme Inspector
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--md-muted)', marginBottom: 12 }}>
+                Rê chuột vào UI để xem mã màu, click để đổi màu
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className={themeInspectorEnabled ? 'modalBtnPrimary' : 'modalBtn'}
+                  style={{ height: 34, borderRadius: 8, padding: '0 16px', fontSize: 12, cursor: 'pointer' }}
+                  onClick={() => setThemeInspectorEnabled(prev => !prev)}
+                >
+                  {themeInspectorEnabled ? 'Tắt Theme Inspector' : 'Bật Theme Inspector'}
+                </button>
+                <button
+                  type="button"
+                  className='modalBtnDanger'
+                  style={{ height: 34, borderRadius: 8, padding: '0 16px', fontSize: 12, cursor: 'pointer' }}
+                  onClick={() => {
+                    clearThemeOverrides();
+                    window.dispatchEvent(new CustomEvent('monviewphone:theme-reset-all'));
+                  }}
+                >
+                  Reset toàn bộ màu đã chỉnh
+                </button>
+              </div>
+            </div>
+
 
             <div className='confirmBtns' style={{ marginTop: 32, justifyContent: 'flex-end', display: 'flex' }}>
               <button
@@ -4031,6 +4093,7 @@ export function App() {
         viewerUdid={viewerUdid}
         onClose={() => setAutomationOpen(false)}
       />
+      <ThemeInspector enabled={themeInspectorEnabled} onEnabledChange={setThemeInspectorEnabled} />
       {macroPlaybackItems.length ? createPortal(
         <section
           className={`macroPlaybackPanel${macroPlaybackExpanded ? ' expanded' : ' collapsed'}`}

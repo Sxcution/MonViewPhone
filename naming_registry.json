@@ -140,7 +140,10 @@
       "mxh_filter_none": "mxh-filter-none",
       "tile_account_inner": "tile-account-inner",
       "macro_playback_close_btn": "macroPlaybackCloseBtn",
-      "macro_playback_stop_btn": "macroPlaybackStopBtn"
+      "macro_playback_stop_btn": "macroPlaybackStopBtn",
+      "theme_inspector_hover_target": "themeInspectorHoverTarget",
+      "theme_inspector_tooltip": "themeInspectorTooltip",
+      "theme_inspector_panel": "themeInspectorPanel"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -200,6 +203,7 @@
       "macro_playback_items": "macroPlaybackItems",
       "macro_playback_expanded": "macroPlaybackExpanded",
       "macro_playback_position": "macroPlaybackPosition",
+      "theme_inspector_enabled": "themeInspectorEnabled",
       "device_account_overlay_open": "deviceAccountOverlayOpen",
       "device_account_overlay_mounted": "deviceAccountOverlayMounted",
       "dav_search": "davSearch",

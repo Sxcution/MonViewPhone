@@ -10185,3 +10185,81 @@ input[type=number] {
   background: #3b82f6 !important;
   color: #fff !important;
 }
+
+/* === Theme Inspector Mode === */
+.themeInspectorHoverTarget {
+  outline: 2px solid var(--md-info) !important;
+  outline-offset: 2px;
+  cursor: crosshair !important;
+}
+
+.themeInspectorTooltip {
+  position: fixed;
+  z-index: 31000;
+  pointer-events: none;
+  background: var(--md-card);
+  border: 1px solid var(--md-border-strong);
+  color: var(--md-text);
+  border-radius: var(--md-radius-sm);
+  box-shadow: var(--md-shadow-panel);
+  padding: 8px 10px;
+  font-size: 12px;
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.themeInspectorOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 31001;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.themeInspectorPanel {
+  width: min(420px, calc(100vw - 32px));
+  background: var(--md-card);
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-md);
+  box-shadow: var(--md-shadow-panel);
+  color: var(--md-text);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.themeInspectorRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.themeInspectorLabel {
+  font-size: 12px;
+  color: var(--md-muted);
+}
+
+.themeInspectorCode {
+  font-family: monospace;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.themeInspectorColorRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.themeInspectorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
