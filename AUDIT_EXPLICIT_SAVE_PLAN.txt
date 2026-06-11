@@ -1,0 +1,136 @@
+================================================================================
+          BÁO CÁO AUDIT VỀ VIỆC BỎ INTERVALL SYNC LOCALSTORAGE TRÊN CLIENT
+================================================================================
+
+I. BỐI CẢNH VÀ TRẠNG THÁI HIỆN TẠI
+--------------------------------------------------------------------------------
+* Ứng dụng MonViewPhone đang chạy thành công ở chế độ Production Local 1 Server:
+  - Backend Go lắng nghe cổng 11000 phục vụ cả API và Static Frontend.
+  - Phục hồi an toàn: 35 thiết bị, 105 tài khoản WeChat (bao gồm Emma Zhao máy 2), tileOrder/tileOrderNumbers đầy đủ.
+* Cơ chế đồng bộ hiện tại trong main.tsx:
+  - Không còn override global localStorage.setItem/removeItem/clear.
+  - Sử dụng Change Detector loop (setInterval 1.5s) quét danh sách SYNCED_KEYS trong localStorage, nếu phát hiện thay đổi so với cache và thỏa mãn Guard (validateVaultData/validateBackendSettings) thì chỉ POST duy nhất key thay đổi đó lên `/api/goog/device/settings`.
+
+Mục tiêu Audit: Đánh giá tác động và lập kế hoạch sửa đổi nếu loại bỏ hoàn toàn cơ chế setInterval quét tự động này, chuyển sang cơ chế SAVE chủ động (Explicit Save).
+
+---
+
+II. DANH SÁCH CÁC VÙNG SỬ DỤNG LOCALSTORAGE & ĐÁNH GIÁ TÁC ĐỘNG
+--------------------------------------------------------------------------------
+
+1. CẤU HÌNH TÀI KHOẢN (ACCOUNT / DEVICEACCOUNTVALUET)
+* File: client/src/lib/deviceAccountVault.ts
+* Các function liên quan:
+  - `saveDeviceAccountVault(data: VaultData)`
+  - `saveDeviceAccountData(udid: string, data: DeviceAccountData)`
+* Key localStorage: `monviewphone:device-account-vault`
+* Cách lưu hiện tại: Ghi trực tiếp chuỗi JSON vào localStorage.
+* Tác động nếu bỏ setInterval: BỊ MẤT persist lên Backend. Khi chỉnh sửa/thêm/xoá tài khoản WeChat trong overlay, dữ liệu chỉ lưu tạm ở trình duyệt, nếu restart server/đổi trình duyệt dữ liệu sẽ bị mất hoặc rollback.
+* Thay thế bằng API:
+  - Tạo hàm helper gọi POST `/api/goog/device/settings` gửi payload `{"monviewphone:device-account-vault": stringifiedVault}`.
+  - Gọi trực tiếp hàm này bên trong `saveDeviceAccountVault` sau khi gọi `localStorage.setItem`.
+
+2. THỨ TỰ THIẾT BỊ (TILE ORDER / SỐ THỨ TỰ MÁY)
+* File: client/src/store/useTileOrder.ts
+* Các function liên quan:
+  - Hook `useTileOrder` (phần useEffect theo dõi `mergedOrder` và `orderNumbers`).
+  - Hàm `restoreKnownFarmOrder`, `saveTileNumbersSnapshot`.
+* Key localStorage: `tileOrder`, `tileOrderNumbers`
+* Cách lưu hiện tại: Ghi trực tiếp vào localStorage qua `useEffect` khi danh sách hoặc số thứ tự thay đổi.
+* Tác động nếu bỏ setInterval: BỊ MẤT persist lên Backend. Việc kéo thả sắp xếp lại máy hoặc đổi số máy sẽ không lưu lên file settings.json của backend.
+* Thay thế bằng API:
+  - Thực hiện gọi POST trực tiếp lên backend trong các hàm cập nhật thứ tự (`moveTile`, `setTileNumber`), hoặc tích hợp trực tiếp lệnh gửi POST vào `useEffect` lưu trữ trong `useTileOrder.ts`.
+
+3. TỰ ĐỘNG HÓA (AUTOMATION)
+* File: 
+  - client/src/lib/automationData.ts
+  - client/src/components/AutomationModal.tsx
+  - client/src/components/AutomationPanel.tsx
+* Các function liên quan:
+  - `saveMacros`, `saveAppActions`, `saveDeviceProfiles` (trong automationData.ts)
+  - `saveSettings` (trong AutomationModal.tsx)
+  - `saveQuickActions` (trong AutomationPanel.tsx)
+* Key localStorage: 
+  - `automationMacrosV1`, `automationAppActionsV1`, `automationDeviceProfilesV1`
+  - `automationSettingsV1`, `automationQuickSlotsV1`
+* Cách lưu hiện tại: Ghi trực tiếp vào localStorage.
+* Tác động nếu bỏ setInterval: BỊ MẤT persist lên Backend. Các kịch bản macro, thao tác app actions tự thiết lập của người dùng sẽ không được lưu vào backend.
+* Thay thế bằng API:
+  - Gọi POST settings trực tiếp mỗi lần lưu macro/actions/profiles/quickslots thành công.
+
+4. PHÍM TẮT (HOTKEY)
+* File: client/src/App.tsx
+* Các function liên quan:
+  - Các hàm gán hotkey trong Settings (dòng 543, 598).
+* Key localStorage: `monviewphone:device-account-hotkey`, `monviewphone:sync-time-hotkey`, `syncTimeHotkey`
+* Cách lưu hiện tại: Ghi trực tiếp vào localStorage khi phím tắt thay đổi.
+* Tác động nếu bỏ setInterval: BỊ MẤT persist lên Backend. Thay đổi cấu hình phím tắt không được lưu vào file settings.json.
+* Thay thế bằng API:
+  - Gọi POST settings trực tiếp khi user bấm gán phím tắt mới.
+
+5. THIẾT LẬP GIAO DIỆN (THEME / UI SETTINGS)
+* File:
+  - client/src/lib/themeInspector.ts
+  - client/src/App.tsx
+* Key localStorage:
+  - `themeInspectorOverridesV1`, `themeInspectorEnabled`
+  - `isSidebarPinned`, `rightPanel.streamControlsOpen`, `rightPanel.quickControlsOpen`, `showTileInfo`, `viewerWidthPx`, `deviceDimensions`
+* Cách lưu hiện tại: Ghi trực tiếp vào localStorage.
+* Tác động nếu bỏ setInterval: KHÔNG ảnh hưởng nghiêm trọng. Đây là các tùy chọn giao diện tạm thời (UI Preference) của trình duyệt hiện tại, hoàn toàn có thể lưu thuần túy trên client localStorage mà không cần lưu xuống backend.
+* Thay thế bằng API: Giữ nguyên cơ chế localStorage đơn thuần, không cần POST lên backend.
+
+6. CẢNH BÁO HÌNH ẢNH (VISUAL ALERT)
+* File: 
+  - client/src/lib/visualAlertEngine.ts
+  - client/src/components/VisualAlertPanel.tsx
+* Key localStorage: `visualAlertGlobalSettingsV1`, `rightPanel.visualAlertOpen`
+* Tác động nếu bỏ setInterval: BỊ MẤT cấu hình vùng quét ROI của Visual Alert.
+* Thay thế bằng API: Gọi POST settings trực tiếp khi người dùng sửa vùng quét hoặc bật tắt cảnh báo.
+
+7. ĐỒNG BỘ THỜI GIAN (SYNC TIME)
+* File: client/src/lib/syncTimeSettings.ts
+* Key localStorage: `manualSyncTimeSettingsV1` (được mapping với syncTime Settings trong main.tsx)
+* Tác động nếu bỏ setInterval: Mất lưu cấu hình khoảng cách trễ đồng bộ.
+* Thay thế bằng API: Gọi POST settings trực tiếp khi thiết lập thay đổi.
+
+---
+
+III. KIỂM TRA PHÍA BACKEND GO
+--------------------------------------------------------------------------------
+1. GET `/api/goog/device/settings`:
+   - Đọc trực tiếp từ tệp `server-go/settings.json`.
+   - Nếu tồn tại dữ liệu accounts trong SQLite `Data.db`, backend tự động truy vấn và chèn đè lên trường `monviewphone:device-account-vault` trước khi trả về cho client.
+2. POST `/api/goog/device/settings`:
+   - Đọc body gửi lên từ client.
+   - Đọc tệp `settings.json` hiện tại, thực hiện merge các key mới gửi lên (giải quyết bằng logic merge map ở rest.go).
+   - Nếu phát hiện key `monviewphone:device-account-vault` được gửi lên, backend tự động đồng bộ hóa ghi đè danh sách tài khoản/thiết bị vào SQLite `Data.db`.
+   - Lưu trữ map đã merge ngược lại tệp `settings.json`.
+3. Guard kiểm soát an toàn:
+   - Backend Go hiện tại KHÔNG có guard chặn giảm số lượng accounts trong database. Nhiệm vụ Guard hoàn toàn nằm ở phía Client (`main.tsx` thực hiện validate dữ liệu trước khi cho phép render ứng dụng hoặc cho phép đẩy dữ liệu lên qua Change Detector).
+   - Rủi ro ghi đè settings.json: Nếu client gửi lên một payload lỗi hoặc rỗng thông qua POST, backend sẽ ghi đè vào settings.json. Việc có Guard kiểm tra chặt chẽ ở client trước khi POST là yếu tố bảo vệ cốt lõi nhất.
+
+---
+
+IV. KẾT LUẬN & ĐỀ XUẤT KẾ HOẠCH
+--------------------------------------------------------------------------------
+
+1. CÓ NÊN BỎ SETINTERVAL ĐỒNG BỘ NGAY KHÔNG?
+- **KHÔNG NÊN BỎ NGAY LẬP TỨC**. Nếu xóa bỏ cơ chế setInterval trong main.tsx mà không thay đổi code của các component/store/helper khác, ứng dụng sẽ hoàn toàn mất khả năng lưu trữ cấu hình lâu dài (mất lưu account WeChat, mất sắp xếp thứ tự máy, mất lưu Macro, v.v.).
+
+2. CÁC FILE CẦN SỬA TỐI THIỂU NẾU MUỐN BỎ SETINTERVAL:
+Để bỏ setInterval và chuyển sang lưu chủ động, cần sửa tối thiểu 5 file sau:
+* `client/src/lib/deviceAccountVault.ts`: Tích hợp lệnh POST API trực tiếp trong hàm `saveDeviceAccountVault`.
+* `client/src/store/useTileOrder.ts`: Tích hợp lệnh POST API trực tiếp trong useEffect của `tileOrder` và `orderNumbers` (hoặc gọi API trực tiếp trong `moveTile` và `setTileNumber`).
+* `client/src/lib/automationData.ts`: Thêm lệnh POST API vào cuối các hàm `saveMacros`, `saveAppActions`, `saveDeviceProfiles`.
+* `client/src/lib/syncTimeSettings.ts` & `syncMacroSettings.ts`: Thêm lệnh POST API vào hàm save.
+* `client/src/lib/visualAlertEngine.ts`: Thêm lệnh POST API vào hàm lưu cấu hình toàn cục.
+
+3. FILE CÓ NGUY CƠ RỦI RO CAO NHẤT:
+* `client/src/lib/deviceAccountVault.ts` và `client/src/store/useTileOrder.ts`.
+Đây là hai nơi ghi dữ liệu cực kỳ thường xuyên và mang tính quyết định cho toàn bộ hoạt động của PhoneFarm (quản lý account và thứ tự hiển thị máy). Sửa hai file này thiếu sót sẽ dẫn tới việc rollback mất dữ liệu khi restart app.
+
+4. CÁC KỊCH BẢN THỬ NGHIỆM (TEST CASES) BẮT BUỘC:
+* **Test Case 1 (Cập nhật tài khoản):** Vào Overlay Account -> Thêm một tài khoản WeChat test -> Tắt app -> Mở lại app -> Kiểm tra tài khoản test vẫn tồn tại.
+* **Test Case 2 (Sắp xếp thứ tự máy):** Kéo thả hoán đổi vị trí máy số 1 và máy số 2 -> Đổi số thứ tự hiển thị của một máy -> Tắt app -> Mở lại app -> Kiểm tra thứ tự hiển thị máy vẫn giữ nguyên.
+* **Test Case 3 (Guard an toàn):** Giả lập gọi API POST dữ liệu lỗi hoặc rỗng -> Xác minh client chặn không cho gửi lên hoặc hiển thị màn hình báo lỗi đỏ dữ liệu không an toàn.
+================================================================================

@@ -1,3 +1,5 @@
+import { saveDeviceAccountVaultToBackend } from './backendSettings';
+
 export type AccountStatus = 'Live' | 'Die' | 'Verify' | 'Risk' | 'Unverified';
 export type PhoneRegion = 'VN' | 'HK' | 'Unknown';
 export type PlatformType = string;
@@ -102,6 +104,7 @@ export function loadDeviceAccountVault(): VaultData {
 export function saveDeviceAccountVault(data: VaultData): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    saveDeviceAccountVaultToBackend(data);
   } catch (err) {
     console.error('Failed to save device account vault:', err);
   }

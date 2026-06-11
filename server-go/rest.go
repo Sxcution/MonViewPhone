@@ -605,6 +605,10 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if rawVault, ok := settings[deviceAccountVaultKey].(string); ok {
+			if err := validateNewVaultAgainstDB(rawVault); err != nil {
+				writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": err.Error()})
+				return
+			}
 			if err := syncDeviceAccountVaultToDB(rawVault); err != nil {
 				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to sync device account DB: " + err.Error()})
 				return
