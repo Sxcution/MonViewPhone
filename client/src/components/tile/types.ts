@@ -33,5 +33,6 @@ export type TileProps = {
     accountData?: DeviceAccountData;
     isFilteredOut?: boolean;
     nearbyAutoOpenEnabled?: boolean;
+    onOpenDeviceViewer?: (udid: string) => void;
 };
 

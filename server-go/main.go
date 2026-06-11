@@ -1,17 +1,175 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"server-go/adb"
 	"server-go/websocket"
 	"time"
 )
 
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Sync()
+}
+
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}
+
+func ensureAdbKeys() {
+	log.Println("[ADB] Checking ADB keys...")
+
+	// 1. Get %USERPROFILE%\.android
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("[ADB] Failed to get user home directory: %v", err)
+		return
+	}
+	androidDir := filepath.Join(homeDir, ".android")
+	androidKey := filepath.Join(androidDir, "adbkey")
+	androidPub := filepath.Join(androidDir, "adbkey.pub")
+
+	// 2. Get project root Backup/adb
+	exePath, err := os.Executable()
+	if err != nil {
+		exePath = "."
+	}
+	projectRoot := filepath.Dir(filepath.Dir(exePath))
+	backupDir := filepath.Join(projectRoot, "Backup", "adb")
+	backupKey := filepath.Join(backupDir, "adbkey")
+	backupPub := filepath.Join(backupDir, "adbkey.pub")
+
+	// 3. Get xiaowei backup dir
+	xiaoweiDir := `C:\Program Files (x86)\xiaowei\backup`
+	xiaoweiKey := filepath.Join(xiaoweiDir, "adbkey")
+	xiaoweiPub := filepath.Join(xiaoweiDir, "adbkey.pub")
+
+	// Checking and copying flow
+	androidKeyExists := fileExists(androidKey)
+	backupKeyExists := fileExists(backupKey)
+	xiaoweiKeyExists := fileExists(xiaoweiKey)
+
+	if androidKeyExists {
+		// Scenario A: Copy from %USERPROFILE%\.android to Backup/adb
+		log.Println("[ADB] Found key in %USERPROFILE%\\.android. Ensuring project Backup...")
+		if err := os.MkdirAll(backupDir, 0755); err != nil {
+			log.Printf("[ADB] Failed to create backup directory: %v", err)
+			return
+		}
+		
+		// Copy key
+		if err := copyFile(androidKey, backupKey); err != nil {
+			log.Printf("[ADB] Failed to backup adbkey: %v", err)
+		} else {
+			log.Println("[ADB] Successfully backed up adbkey to Backup/adb")
+		}
+
+		// Copy pub
+		if fileExists(androidPub) {
+			if err := copyFile(androidPub, backupPub); err != nil {
+				log.Printf("[ADB] Failed to backup adbkey.pub: %v", err)
+			} else {
+				log.Println("[ADB] Successfully backed up adbkey.pub to Backup/adb")
+			}
+		}
+	} else if backupKeyExists {
+		// Scenario B: Restore from Backup/adb to %USERPROFILE%\.android
+		log.Println("[ADB] Key missing in %USERPROFILE%\\.android but exists in project Backup. Restoring...")
+		if err := os.MkdirAll(androidDir, 0755); err != nil {
+			log.Printf("[ADB] Failed to create .android directory: %v", err)
+			return
+		}
+
+		// Copy key
+		if err := copyFile(backupKey, androidKey); err != nil {
+			log.Printf("[ADB] Failed to restore adbkey: %v", err)
+		} else {
+			log.Println("[ADB] Successfully restored adbkey to %USERPROFILE%\\.android")
+		}
+
+		// Copy pub
+		if fileExists(backupPub) {
+			if err := copyFile(backupPub, androidPub); err != nil {
+				log.Printf("[ADB] Failed to restore adbkey.pub: %v", err)
+			} else {
+				log.Println("[ADB] Successfully restored adbkey.pub to %USERPROFILE%\\.android")
+			}
+		}
+	} else if xiaoweiKeyExists {
+		// Scenario C: Both missing, but xiaowei backup key exists. Sync from xiaowei to both.
+		log.Println("[ADB] Keys missing in both locations but found in xiaowei backup. Syncing from xiaowei...")
+		
+		// Ensure both dirs exist
+		if err := os.MkdirAll(backupDir, 0755); err != nil {
+			log.Printf("[ADB] Failed to create backup directory: %v", err)
+		}
+		if err := os.MkdirAll(androidDir, 0755); err != nil {
+			log.Printf("[ADB] Failed to create .android directory: %v", err)
+		}
+
+		// Copy key to backup
+		if err := copyFile(xiaoweiKey, backupKey); err != nil {
+			log.Printf("[ADB] Failed to copy xiaowei adbkey to backup: %v", err)
+		} else {
+			log.Println("[ADB] Successfully copied xiaowei adbkey to Backup/adb")
+		}
+
+		// Copy key to .android
+		if err := copyFile(xiaoweiKey, androidKey); err != nil {
+			log.Printf("[ADB] Failed to copy xiaowei adbkey to .android: %v", err)
+		} else {
+			log.Println("[ADB] Successfully copied xiaowei adbkey to %USERPROFILE%\\.android")
+		}
+
+		// Copy pub to backup
+		if fileExists(xiaoweiPub) {
+			if err := copyFile(xiaoweiPub, backupPub); err != nil {
+				log.Printf("[ADB] Failed to copy xiaowei adbkey.pub to backup: %v", err)
+			} else {
+				log.Println("[ADB] Successfully copied xiaowei adbkey.pub to Backup/adb")
+			}
+
+			// Copy pub to .android
+			if err := copyFile(xiaoweiPub, androidPub); err != nil {
+				log.Printf("[ADB] Failed to copy xiaowei adbkey.pub to .android: %v", err)
+			} else {
+				log.Println("[ADB] Successfully copied xiaowei adbkey.pub to %USERPROFILE%\\.android")
+			}
+		}
+	} else {
+		log.Println("[ADB] No existing keys found in target, project backup, or xiaowei backup.")
+	}
+}
+
 // warmUpAdb đảm bảo adb server đã sẵn sàng trước khi server Go nhận kết nối
 func warmUpAdb() {
+	// Khôi phục/Sao lưu ADB Keys trước khi chạy start-server
+	ensureAdbKeys()
+
 	log.Println("[ADB] Warming up adb server...")
 	for i := 0; i < 5; i++ {
 		cmd := exec.Command(adb.GetAdbPath(), "start-server")

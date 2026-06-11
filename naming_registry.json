@@ -209,7 +209,7 @@
       "right_panel_automation_open_key": "rightPanel.automationOpen",
       "automation_quick_slots_v1": "automationQuickSlotsV1",
       "macro_status": "macroStatus",
-      "auto_physical_screen_off": "autoPhysicalScreenOff",
+      "physical_screen_button_mode": "physicalScreenButtonMode",
       "macro_playback_items": "macroPlaybackItems",
       "macro_playback_expanded": "macroPlaybackExpanded",
       "macro_playback_position": "macroPlaybackPosition",

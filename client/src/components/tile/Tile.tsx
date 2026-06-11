@@ -41,6 +41,7 @@ function TileComponent({
     accountData,
     isFilteredOut = false,
     nearbyAutoOpenEnabled = false,
+    onOpenDeviceViewer,
 }: TileProps) {
     const { t } = useI18n();
     const [accountOverlayMounted, setAccountOverlayMounted] = useState(false);
@@ -397,6 +398,7 @@ function TileComponent({
                                             activeTab={tileTab}
                                             setActiveTab={setTileTab}
                                             nearbyAutoOpenEnabled={nearbyAutoOpenEnabled}
+                                            onOpenDeviceViewer={onOpenDeviceViewer}
                                         />
                                     </div>
                                 )}

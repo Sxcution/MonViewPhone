@@ -37,4 +37,7 @@
   - Khi tài khoản đã là UnVerify: dòng đó sẽ tự động chuyển thành dòng chữ "Verify Success" (màu xanh lá `#22c55e`). Khi click vào dòng này, tài khoản sẽ được chuyển sang trạng thái "Verify".
 - Cập nhật màu tên tài khoản (`getAccountListNameColor`), màu icon bảo mật (`shieldColor`) và màu trường tên tài khoản (`nameColor`) trong panel thành màu vàng (`#eab308`) khi tài khoản đang ở trạng thái `Unverified`.
 - Thêm icon hình màu vàng dấu chấm than (sử dụng `ShieldAlert` từ `lucide-react`) vào sau tên của tài khoản đang ở trạng thái `Unverified` ở cả danh sách badge đếm số tài khoản và context menu "Tài Khoản".
+- Cho phép tương tác bàn phím và điều khiển trực tiếp trên `DeviceViewer` khi `DeviceAccountOverlay` đang mở (không khoá phím toàn cục qua `__disableDirectKeyboard` nữa, chỉ khoá khi `ThemeInspector` hoạt động).
+- Hỗ trợ nhấp nút con lăn chuột (middle-click/auxclick) vào vùng số thứ tự/tiêu đề `.dav-panel-title-left` hoặc các tài khoản trong danh sách dropdown `.dav-title-account-item` để mở hoặc chuyển đổi trực tiếp `DeviceViewer` sang thiết bị tương ứng mà không đóng Overlay Account.
+- Đồng bộ hoá callback qua `onOpenDeviceViewer` prop từ `App.tsx` $\rightarrow$ `Tile.tsx` $\rightarrow$ `DeviceAccountPanel`.
 - Xác thực và chạy `npm run build` thành công trên frontend.

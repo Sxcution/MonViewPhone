@@ -7,6 +7,7 @@
 - [NEW] [assets/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/assets): Project assets directory. Contains `IconMonViewPhone.png` (original image) and `IconMonViewPhone.ico` (multi-size Windows icon file).
 - `rule.md`: Local development rules and UI interaction notes.
 - [NEW] [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw): Windows tray launcher and process manager for starting backend and frontend in the background. Handles standalone browser app window launch and loads the custom tray icon from `assets/IconMonViewPhone.png`.
+- [NEW] [Backup/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/Backup): Local directory for backup data (ignored by Git). Contains `Backup/adb/` for copying and restoring ADB host keys (`adbkey` and `adbkey.pub`) when starting the application.
 
 Removed legacy layers:
 - Root Electron wrapper.
@@ -15,7 +16,7 @@ Removed legacy layers:
 - Old root launcher scripts.
 
 ## Frontend
-- `client/src/App.tsx`: Main UI, device grid, right control panel, group filtering, stream settings, quick controls, context menus, global device actions, Middle Mouse Button (MMB) toggle handler, Sync Time hotkey binding setting, online/all device display filters, global device account search & statistics filtering, parallel quick ADB command execution with bounded concurrency, and WebSocket-based Power key optimization.
+- `client/src/App.tsx`: Main UI, device grid, right control panel, group filtering, stream settings, quick controls, context menus, global device actions, Middle Mouse Button (MMB) toggle handler, Sync Time hotkey binding setting, online/all device display filters, global device account search & statistics filtering, parallel quick ADB command execution with bounded concurrency, WebSocket-based Power key optimization, consolidated physical screen toggle button, and automatic stay-awake + screen off on device connection.
 - `client/src/components/DeviceViewer.tsx`: Expanded single-device viewer, supports Middle Mouse Button click to close and return to grid.
 - `client/src/components/ViewerSidePanel.tsx`: Viewer-side controls for profiles, APK install, file import/export, and ADB commands.
 - `client/src/components/SyncPanel.tsx`: Device synchronization UI.

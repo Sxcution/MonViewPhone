@@ -31,6 +31,7 @@ type DeviceAccountOverlayProps = {
   setActiveFilter: (val: string) => void;
   activeTab: PlatformType;
   setActiveTab: (val: PlatformType) => void;
+  onOpenDeviceViewer?: (udid: string) => void;
 };
 
 const ACCOUNT_STATUS_COLORS: Record<string, string> = {
@@ -306,7 +307,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   initialData,
   activeTab,
   setActiveTab,
-  nearbyAutoOpenEnabled
+  nearbyAutoOpenEnabled,
+  onOpenDeviceViewer
 }: { 
   udid: string; 
   order: number; 
@@ -317,6 +319,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   activeTab: PlatformType;
   setActiveTab: (tab: PlatformType) => void;
   nearbyAutoOpenEnabled?: boolean;
+  onOpenDeviceViewer?: (udid: string) => void;
 }) {
   const [data, setData] = useState(initialData);
   const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
@@ -336,6 +339,20 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeLevel1, setActiveLevel1] = useState<'tai_khoan' | 'trang_thai' | 'nearby' | 'quet_qr' | null>(null);
   const [activeLevel2, setActiveLevel2] = useState<string | null>(null);
+
+  const handleOpenViewerMiddleClick = (e: React.MouseEvent<HTMLElement>) => {
+    if (e.button !== 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onOpenDeviceViewer?.(udid);
+  };
+
+  const handleOpenViewerAuxClick = (e: React.MouseEvent<HTMLElement>) => {
+    if (e.button !== 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onOpenDeviceViewer?.(udid);
+  };
   
   // Sync state data when initialData prop changes (synchronized from parent vault update)
   useEffect(() => {
@@ -937,7 +954,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   return (
     <div className="dav-panel" onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}>
       <div className="dav-panel-header">
-        <div className="dav-panel-title-left">
+        <div 
+          className="dav-panel-title-left"
+          onMouseDown={handleOpenViewerMiddleClick}
+          onAuxClick={handleOpenViewerAuxClick}
+          title="Click con lăn để mở màn hình lớn"
+        >
           <span className={`dav-order ${panelHasNearbyEligibleAccount ? 'dav-order-nearby-eligible' : ''}`}>
             {order.toString().padStart(2, '0')}
           </span>
@@ -1015,6 +1037,20 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       key={account.id}
                       type="button"
                       className={`dav-title-account-item ${selectedAccount?.id === account.id ? 'active' : ''}`}
+                      onMouseDown={(e) => {
+                        if (e.button === 1) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onOpenDeviceViewer?.(accUdid);
+                        }
+                      }}
+                      onAuxClick={(e) => {
+                        if (e.button === 1) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onOpenDeviceViewer?.(accUdid);
+                        }
+                      }}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
