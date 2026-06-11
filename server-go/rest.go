@@ -588,23 +588,40 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid JSON: " + err.Error()})
 			return
 		}
-		if rawVault, ok := temp[deviceAccountVaultKey].(string); ok {
+
+		// Read existing settings
+		existingData, err := os.ReadFile(settingsFile)
+		var settings map[string]interface{}
+		if err == nil {
+			_ = json.Unmarshal(existingData, &settings)
+		}
+		if settings == nil {
+			settings = make(map[string]interface{})
+		}
+
+		// Merge new keys from temp into settings
+		for k, v := range temp {
+			settings[k] = v
+		}
+
+		if rawVault, ok := settings[deviceAccountVaultKey].(string); ok {
 			if err := syncDeviceAccountVaultToDB(rawVault); err != nil {
 				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to sync device account DB: " + err.Error()})
 				return
 			}
-			temp["monviewphone:device-account-db"] = "data/Data.db"
+			settings["monviewphone:device-account-db"] = "data/Data.db"
 			if vaultRaw, ok, err := loadDeviceAccountVaultFromDB(); err != nil {
 				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
 				return
 			} else if ok {
-				temp[deviceAccountVaultKey] = vaultRaw
+				settings[deviceAccountVaultKey] = vaultRaw
 			}
-			body, err = json.Marshal(temp)
-			if err != nil {
-				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
-				return
-			}
+		}
+
+		body, err = json.Marshal(settings)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
+			return
 		}
 
 		if err := os.WriteFile(settingsFile, body, 0644); err != nil {

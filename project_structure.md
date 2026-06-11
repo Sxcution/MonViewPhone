@@ -6,7 +6,7 @@
 - `APK Build/`: Android helper APK source.
 - [NEW] [assets/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/assets): Project assets directory. Contains `IconMonViewPhone.png` (original image) and `IconMonViewPhone.ico` (multi-size Windows icon file).
 - `rule.md`: Local development rules and UI interaction notes.
-- [NEW] [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw): Windows tray launcher and process manager for starting backend and frontend in the background. Handles standalone browser app window launch and loads the custom tray icon from `assets/IconMonViewPhone.png`.
+- [NEW] [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw): Windows tray launcher and process manager. Starts the Go backend server and executes a preflight data safety check before opening Chrome in App mode pointing to `http://localhost:11000/`. Does not run Vite or NPM. Loads the custom tray icon from `assets/IconMonViewPhone.png`.
 - [NEW] [Backup/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/Backup): Local directory for backup data (ignored by Git). Contains `Backup/adb/` for copying and restoring ADB host keys (`adbkey` and `adbkey.pub`) when starting the application.
 
 Removed legacy layers:
@@ -43,13 +43,13 @@ Removed legacy layers:
 - 
 - 
 - ## Go Backend
-- `server-go/main.go`: HTTP/WebSocket entry point and CORS setup.
+- `server-go/main.go`: HTTP/WebSocket entry point, CORS setup, and serves React static files from `client/dist` (including SPA routing fallback).
 - `server-go/rest.go`: REST endpoints used by the frontend, including profile listing, APK install, file import/export, and ADB command execution.
 - `server-go/adb/`: ADB helpers and device tracker.
 - `server-go/scrcpy/`: Scrcpy server launch/config helpers.
 - `server-go/websocket/`: Device-list and stream proxy WebSocket handlers.
 - `server-go/server-go.exe`: Current compiled Go backend binary.
-- `server-go/Start_PhoneFarm.bat`: Starts Go backend and Vite frontend.
+- `server-go/Start_PhoneFarm.bat`: Starts the Go backend server by running the launcher script `run.pyw`.
 - `server-go/Start_PhoneFarm_Air.bat`: Optional Go hot-reload launcher for backend development.
 - [NEW] [settings.json](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/settings.json): Unified storage for all user settings, device ordering, groups, and automation profiles, persisted directly inside the project directory.
 - [NEW] [SetWallpaper.java](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/wallpaper/SetWallpaper.java): Java source file compiled into a dex-based JAR helper (`wallpaper_helper.jar`) which runs on the device via `app_process` to apply wallpapers.

@@ -2,7 +2,6 @@ node_modules/
 dist/
 uploads/
 *.tsbuildinfo
-*.log
 .env
 .env.*
 
@@ -14,6 +13,25 @@ uploads/
 !server-go/displaypower/bin/monview-display-power.jar
 !server-go/wallpaper/wallpaper_helper.jar
 
-# ADB Key Backups
-Backup/adb/adbkey
-Backup/adb/adbkey.pub
+# Safe single server ignore list
+Backup/
+*.ldb
+*.log
+*.bak
+*.backup
+*.tmp
+*.sqlite-wal
+*.sqlite-shm
+*.db-wal
+*.db-shm
+server-go/data/*.db
+server-go/data/*.db-wal
+server-go/data/*.db-shm
+server-go/settings.json
+adbkey
+adbkey.pub
+.android/
+chrome-profile/
+User Data/
+Local Storage/
+leveldb/

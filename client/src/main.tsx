@@ -42,87 +42,272 @@ function getSettingsUrl(wsServer: string): string {
   }
 }
 
-async function syncSettingsWithBackend() {
-  const { wsServer } = readPageParams();
-  const settingsUrl = getSettingsUrl(wsServer);
-  let isSyncingFromServer = false;
-
-  const pushChangesToServer = async () => {
-    try {
-      const payload: Record<string, string> = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key) {
-          const val = localStorage.getItem(key);
-          if (val !== null) {
-            payload[key] = val;
-          }
-        }
-      }
-      
-      await fetch(settingsUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    } catch (err) {
-      console.error('Failed to save settings to server:', err);
-    }
-  };
-
-  // 1. Fetch settings from backend (Server is the absolute source of truth)
-  try {
-    isSyncingFromServer = true;
-    const res = await fetch(settingsUrl);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && typeof data === 'object') {
-        // ALWAYS overwrite client localStorage with whatever the server has.
-        // No bidirectional sync or fallback checks.
-        localStorage.clear();
-        for (const [key, val] of Object.entries(data)) {
-          if (typeof val === 'string') {
-            localStorage.setItem(key, val);
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Failed to load settings from server:', err);
-  } finally {
-    isSyncingFromServer = false;
+function validateVaultData(vault: any) {
+  if (!vault || typeof vault !== 'object' || !vault.devices || typeof vault.devices !== 'object') {
+    return { valid: false, deviceCount: 0, wechatAccountCount: 0, totalAccountCount: 0, hasEmmaZhao: false };
   }
 
-  // 2. Intercept localStorage methods to auto-save to server
-  const originalSetItem = localStorage.setItem;
-  let saveTimeout: any = null;
+  let deviceCount = 0;
+  let wechatAccountCount = 0;
+  let totalAccountCount = 0;
+  let hasEmmaZhao = false;
 
-  localStorage.setItem = function(key, value) {
-    originalSetItem.call(localStorage, key, value);
-    if (isSyncingFromServer) return;
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(pushChangesToServer, 1000);
-  };
-  
-  const originalRemoveItem = localStorage.removeItem;
-  localStorage.removeItem = function(key) {
-    originalRemoveItem.call(localStorage, key);
-    if (isSyncingFromServer) return;
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(pushChangesToServer, 1000);
-  };
-  
-  const originalClear = localStorage.clear;
-  localStorage.clear = function() {
-    originalClear.call(localStorage);
-    if (isSyncingFromServer) return;
-    if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(pushChangesToServer, 1000);
-  };
+  for (const udid of Object.keys(vault.devices)) {
+    deviceCount++;
+    const dev = vault.devices[udid];
+    if (dev && dev.platforms && typeof dev.platforms === 'object') {
+      for (const platform of Object.keys(dev.platforms)) {
+        const accounts = dev.platforms[platform];
+        if (Array.isArray(accounts)) {
+          totalAccountCount += accounts.length;
+          if (platform === 'wechat') {
+            wechatAccountCount += accounts.length;
+          }
+          for (const acc of accounts) {
+            if (acc && acc.name && acc.name.includes('Emma Zhao')) {
+              hasEmmaZhao = true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const valid = deviceCount >= 35 && wechatAccountCount >= 104 && hasEmmaZhao;
+  return { valid, deviceCount, wechatAccountCount, totalAccountCount, hasEmmaZhao };
+}
+
+function validateBackendSettings(settings: any) {
+  if (!settings || typeof settings !== 'object') {
+    return { valid: false, reason: 'Settings is not an object' };
+  }
+
+  const vaultStr = settings['monviewphone:device-account-vault'];
+  if (!vaultStr) {
+    return { valid: false, reason: 'Missing vault key (monviewphone:device-account-vault)' };
+  }
+
+  let vault;
+  try {
+    vault = JSON.parse(vaultStr);
+  } catch (e: any) {
+    return { valid: false, reason: `Vault is not valid JSON: ${e.message}` };
+  }
+
+  const vaultResult = validateVaultData(vault);
+  if (!vaultResult.valid) {
+    return {
+      valid: false,
+      reason: `Vault verification failed. Devices: ${vaultResult.deviceCount}/35, WeChat accounts: ${vaultResult.wechatAccountCount}/104, Emma Zhao: ${vaultResult.hasEmmaZhao ? 'Yes' : 'No'}`
+    };
+  }
+
+  const tileOrderStr = settings['tileOrder'];
+  if (!tileOrderStr) {
+    return { valid: false, reason: 'Missing tileOrder key' };
+  }
+  let tileOrder;
+  try {
+    tileOrder = JSON.parse(tileOrderStr);
+  } catch (e: any) {
+    return { valid: false, reason: `tileOrder is not valid JSON: ${e.message}` };
+  }
+  if (!Array.isArray(tileOrder) || tileOrder.length < 35) {
+    return { valid: false, reason: `tileOrder length is ${tileOrder ? tileOrder.length : 0} (expected >= 35)` };
+  }
+
+  const tileOrderNumbersStr = settings['tileOrderNumbers'];
+  if (!tileOrderNumbersStr) {
+    return { valid: false, reason: 'Missing tileOrderNumbers key' };
+  }
+  let tileOrderNumbers;
+  try {
+    tileOrderNumbers = JSON.parse(tileOrderNumbersStr);
+  } catch (e: any) {
+    return { valid: false, reason: `tileOrderNumbers is not valid JSON: ${e.message}` };
+  }
+  if (!tileOrderNumbers || typeof tileOrderNumbers !== 'object' || Object.keys(tileOrderNumbers).length < 35) {
+    return { valid: false, reason: `tileOrderNumbers keys length is ${tileOrderNumbers ? Object.keys(tileOrderNumbers).length : 0} (expected >= 35)` };
+  }
+
+  return { valid: true };
+}
+
+function showErrorScreen(msg: string) {
+  const root = document.getElementById('root');
+  if (root) {
+    root.innerHTML = `
+      <div style="background: #111; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 20px; text-align: center; box-sizing: border-box;">
+        <div style="background: rgba(220, 38, 38, 0.1); border: 1px solid #dc2626; border-radius: 8px; max-width: 600px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+          <h2 style="color: #dc2626; margin-top: 0; font-size: 22px;">⚠️ CẢNH BÁO AN TOÀN DỮ LIỆU</h2>
+          <p style="font-size: 16px; line-height: 1.6; color: #eee; margin-bottom: 20px;">
+            ${msg}
+          </p>
+          <p style="font-size: 14px; color: #888; margin-bottom: 0;">
+            Vui lòng kiểm tra lại server-go/settings.json hoặc khôi phục từ bản backup mới nhất để tránh mất dữ liệu.
+          </p>
+        </div>
+      </div>
+    `;
+  }
+}
+
+const SYNCED_KEYS = [
+  'monviewphone:device-account-vault',
+  'tileOrder',
+  'tileOrderNumbers',
+  'automationMacrosV1',
+  'automationAppActionsV1',
+  'automationDeviceProfilesV1',
+  'automationSettingsV1',
+  'manualSyncMacroSettingsV1',
+  'automationQuickSlotsV1',
+  'visualAlertGlobalSettingsV1',
+  'themeInspectorEnabled',
+  'themeInspectorOverridesV1',
+  'syncTimeHotkey'
+];
+
+const lastSyncedValues: Record<string, string | null> = {};
+
+async function syncSettingsWithBackend(): Promise<boolean> {
+  const { wsServer } = readPageParams();
+  const settingsUrl = getSettingsUrl(wsServer);
+
+  // 1. Fetch settings from backend
+  try {
+    const res = await fetch(settingsUrl);
+    if (!res.ok) {
+      throw new Error(`HTTP status ${res.status}`);
+    }
+    const data = await res.json();
+    if (!data || typeof data !== 'object') {
+      throw new Error('Backend settings is not an object');
+    }
+
+    // Run safety checks on backend settings
+    const checkResult = validateBackendSettings(data);
+    if (!checkResult.valid) {
+      showErrorScreen(`DỮ LIỆU BACKEND KHÔNG AN TOÀN: ${checkResult.reason}`);
+      return false;
+    }
+
+    // Parse backend vault to get counts
+    const backendVaultStr = data['monviewphone:device-account-vault'];
+    let backendWechatCount = 0;
+    try {
+      const backendVault = JSON.parse(backendVaultStr);
+      backendWechatCount = validateVaultData(backendVault).wechatAccountCount;
+    } catch(e){}
+
+    // Compare with local vault
+    const localVaultStr = localStorage.getItem('monviewphone:device-account-vault');
+    let localWechatCount = 0;
+    if (localVaultStr) {
+      try {
+        const localVault = JSON.parse(localVaultStr);
+        localWechatCount = validateVaultData(localVault).wechatAccountCount;
+      } catch(e){}
+    }
+
+    // Populate localStorage with backend keys
+    for (const [key, val] of Object.entries(data)) {
+      if (typeof val === 'string') {
+        if (key === 'monviewphone:device-account-vault') {
+          if (localWechatCount > backendWechatCount) {
+            console.warn(`Local vault has more accounts (${localWechatCount}) than backend (${backendWechatCount}). Skipping overwrite.`);
+            continue;
+          }
+        }
+        localStorage.setItem(key, val);
+      }
+    }
+
+    // Initialize change detector cache
+    for (const key of SYNCED_KEYS) {
+      lastSyncedValues[key] = localStorage.getItem(key);
+    }
+
+    // Start periodic change detector
+    setInterval(async () => {
+      for (const key of SYNCED_KEYS) {
+        const currentVal = localStorage.getItem(key);
+        if (currentVal !== lastSyncedValues[key]) {
+          // If key is deleted or empty, do not sync empty settings to backend to avoid data wipe
+          if (currentVal === null || currentVal.trim() === '') {
+            continue;
+          }
+
+          // Guard checking for the vault
+          if (key === 'monviewphone:device-account-vault') {
+            try {
+              const parsed = JSON.parse(currentVal);
+              const res = validateVaultData(parsed);
+              if (!res.valid) {
+                console.error(`Refusing to sync invalid vault to backend! Devices: ${res.deviceCount}, WeChat accounts: ${res.wechatAccountCount}, Has Emma Zhao: ${res.hasEmmaZhao}`);
+                continue;
+              }
+            } catch (e) {
+              console.error('Refusing to sync vault: invalid JSON format', e);
+              continue;
+            }
+          }
+
+          // Guard check for tileOrder
+          if (key === 'tileOrder') {
+            try {
+              const parsed = JSON.parse(currentVal);
+              if (!Array.isArray(parsed) || parsed.length < 35) {
+                console.error('Refusing to sync tileOrder: invalid format or size < 35');
+                continue;
+              }
+            } catch (e) { continue; }
+          }
+
+          // Guard check for tileOrderNumbers
+          if (key === 'tileOrderNumbers') {
+            try {
+              const parsed = JSON.parse(currentVal);
+              if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length < 35) {
+                console.error('Refusing to sync tileOrderNumbers: invalid format or size < 35');
+                continue;
+              }
+            } catch (e) { continue; }
+          }
+
+          // POST only the changed key-value pair to backend
+          try {
+            const postRes = await fetch(settingsUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ [key]: currentVal })
+            });
+            if (postRes.ok) {
+              lastSyncedValues[key] = currentVal;
+              console.log(`Successfully synced settings key: "${key}" to backend.`);
+            } else {
+              console.error(`Failed to sync settings key: "${key}" to backend: status ${postRes.status}`);
+            }
+          } catch (postErr) {
+            console.error(`Error syncing settings key "${key}" to backend:`, postErr);
+          }
+        }
+      }
+    }, 1500);
+
+    return true;
+  } catch (err: any) {
+    console.error('Failed to load settings from server:', err);
+    showErrorScreen(`Không thể tải cấu hình từ Backend: ${err.message || err}`);
+    return false;
+  }
 }
 
 async function startApp() {
-  await syncSettingsWithBackend();
+  const ok = await syncSettingsWithBackend();
+  if (!ok) {
+    return;
+  }
 
   // Serve static docs without mounting SPA
   if (window.location.pathname.startsWith('/docs')) {

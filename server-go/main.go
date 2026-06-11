@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"server-go/adb"
 	"server-go/websocket"
 	"time"
@@ -184,6 +185,35 @@ func warmUpAdb() {
 	log.Println("[ADB] Warning: adb server may not be ready, continuing anyway.")
 }
 
+func findDistDir() string {
+	wd, err := os.Getwd()
+	if err == nil {
+		path := filepath.Join(wd, "client", "dist")
+		if fileExists(filepath.Join(path, "index.html")) {
+			return path
+		}
+		path = filepath.Join(wd, "..", "client", "dist")
+		if fileExists(filepath.Join(path, "index.html")) {
+			return path
+		}
+	}
+
+	exePath, err := os.Executable()
+	if err == nil {
+		exeDir := filepath.Dir(exePath)
+		path := filepath.Join(exeDir, "client", "dist")
+		if fileExists(filepath.Join(path, "index.html")) {
+			return path
+		}
+		path = filepath.Join(exeDir, "..", "client", "dist")
+		if fileExists(filepath.Join(path, "index.html")) {
+			return path
+		}
+	}
+
+	return ""
+}
+
 func main() {
 	log.Println("Starting MonViewPhone Go Backend...")
 
@@ -214,51 +244,92 @@ func main() {
 			return
 		}
 
-		switch r.URL.Path {
-		case "/api/goog/device/user-profiles":
-			handleUserProfiles(w, r)
-			return
-		case "/api/goog/device/adb-command":
-			handleAdbCommand(w, r)
-			return
-		case "/api/goog/device/install-apk-binary":
-			handleInstallApkBinary(w, r)
-			return
-		case "/api/goog/device/install-uploaded":
-			handleInstallUploaded(w, r)
-			return
-		case "/api/goog/device/install-apk-user":
-			handleInstallApkUser(w, r)
-			return
-		case "/api/goog/device/push-file":
-			handlePushFile(w, r)
-			return
-		case "/api/goog/device/pull-file":
-			handlePullFile(w, r)
-			return
-		case "/api/goog/device/settings":
-			handleSettings(w, r)
-			return
-		case "/api/goog/device/set-wallpaper":
-			handleSetWallpaper(w, r)
-			return
-		case "/api/goog/device/display-power":
-			handleDisplayPower(w, r)
+		// Route APIs explicitly
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			switch r.URL.Path {
+			case "/api/goog/device/user-profiles":
+				handleUserProfiles(w, r)
+				return
+			case "/api/goog/device/adb-command":
+				handleAdbCommand(w, r)
+				return
+			case "/api/goog/device/install-apk-binary":
+				handleInstallApkBinary(w, r)
+				return
+			case "/api/goog/device/install-uploaded":
+				handleInstallUploaded(w, r)
+				return
+			case "/api/goog/device/install-apk-user":
+				handleInstallApkUser(w, r)
+				return
+			case "/api/goog/device/push-file":
+				handlePushFile(w, r)
+				return
+			case "/api/goog/device/pull-file":
+				handlePullFile(w, r)
+				return
+			case "/api/goog/device/settings":
+				handleSettings(w, r)
+				return
+			case "/api/goog/device/set-wallpaper":
+				handleSetWallpaper(w, r)
+				return
+			case "/api/goog/device/display-power":
+				handleDisplayPower(w, r)
+				return
+			default:
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte(`{"success":false,"error":"API route not found"}`))
+				return
+			}
+		}
+
+		// Route actions
+		action := r.URL.Query().Get("action")
+		if action != "" {
+			switch action {
+			case "proxy-adb":
+				websocket.HandleProxyAdb(w, r)
+				return
+			case "devices-list":
+				websocket.HandleSimpleDevicesList(w, r, tracker)
+				return
+			case "goog-device-list":
+				websocket.HandleDeviceList(w, r, tracker)
+				return
+			default:
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(`{"success":false,"error":"Invalid action: ` + action + `"}`))
+				return
+			}
+		}
+
+		// Serve static frontend
+		distDir := findDistDir()
+		if distDir == "" {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`<html><body style="font-family: sans-serif; padding: 50px; background: #111; color: #eee; text-align: center;">` +
+				`<h2 style="color: #e53e3e;">Frontend build not found</h2>` +
+				`<p>Please build the frontend by running:</p>` +
+				`<code style="background: #222; padding: 10px; border-radius: 4px; display: inline-block; color: #f6ad55; font-size: 16px;">cd client && npm run build</code>` +
+				`</body></html>`))
 			return
 		}
 
-		action := r.URL.Query().Get("action")
-		switch action {
-		case "proxy-adb":
-			websocket.HandleProxyAdb(w, r)
-		case "devices-list":
-			websocket.HandleSimpleDevicesList(w, r, tracker)
-		case "goog-device-list":
-			websocket.HandleDeviceList(w, r, tracker)
-		default:
-			// Fallback simple message for REST
-			w.Write([]byte("MonViewPhone Go Backend is running! Action: " + action))
+		cleanPath := filepath.Clean(r.URL.Path)
+		targetFile := filepath.Join(distDir, cleanPath)
+		if strings.HasPrefix(targetFile, distDir) {
+			if info, err := os.Stat(targetFile); err == nil && !info.IsDir() {
+				http.ServeFile(w, r, targetFile)
+				return
+			}
 		}
+
+		// SPA Fallback
+		http.ServeFile(w, r, filepath.Join(distDir, "index.html"))
 	})
 
 	portValue := os.Getenv("MONVIEWPHONE_GO_PORT")

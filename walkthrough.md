@@ -41,3 +41,13 @@
 - Hỗ trợ nhấp nút con lăn chuột (middle-click/auxclick) vào vùng số thứ tự/tiêu đề `.dav-panel-title-left` hoặc các tài khoản trong danh sách dropdown `.dav-title-account-item` để mở hoặc chuyển đổi trực tiếp `DeviceViewer` sang thiết bị tương ứng mà không đóng Overlay Account.
 - Đồng bộ hoá callback qua `onOpenDeviceViewer` prop từ `App.tsx` $\rightarrow$ `Tile.tsx` $\rightarrow$ `DeviceAccountPanel`.
 - Xác thực và chạy `npm run build` thành công trên frontend.
+
+## Chuyển sang chế độ chạy production local 1 server duy nhất
+
+Đã thực hiện chuyển MonViewPhone sang chế độ chạy local production trên cổng 11000:
+
+- **Backend Go serve static**: Cập nhật [server-go/main.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/main.go) tự động tìm kiếm thư mục `client/dist` theo nhiều hướng để serve tệp tĩnh của React, và cấu hình SPA routing fallback về `index.html`.
+- **Loại bỏ sync hai chiều nguy hiểm**: Cập nhật [client/src/main.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/main.tsx) bỏ cơ chế ghi đè thô bạo `localStorage.clear()` khi khởi chạy app và monkey-patching của `localStorage`. Thiết lập Change Detector loop định kỳ (1.5 giây) chỉ đồng bộ các key thay đổi thực tế lên backend.
+- **Preflight data safety check**: Tích hợp bộ lọc an toàn `validateBackendSettings` kiểm tra chặt chẽ cấu hình ở cả frontend và launcher [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw). Yêu cầu tối thiểu >= 35 thiết bị, >= 104 tài khoản WeChat, tồn tại tài khoản "Emma Zhao" và có cấu hình `tileOrder`/`tileOrderNumbers` hợp lệ.
+- **Launcher tối giản**: Sửa đổi launcher `run.pyw` chỉ khởi động `server-go.exe` (không chạy NPM/Vite dev server) và mở Chrome App Mode vào cổng `11000`.
+- **Biên dịch & Kiểm thử**: Biên dịch thành công frontend (`npm run build`) và backend (`go build`). Launcher đã kiểm chứng hoạt động tốt, mở giao diện cổng 11000 mượt mà và không sinh tiến trình `node.exe`/`vite.exe`.
