@@ -1405,7 +1405,7 @@ body.sidebarCollapsed {
   text-align: center;
   font-weight: 900;
   font-size: 13px;
-  color: #9bc1ff;
+  color: #ffffff;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
 }
 
@@ -5928,7 +5928,7 @@ button:focus-visible {
   font-weight: 700;
 }
 
-.automationProfileBlock > .automationSectionTitle {
+.automationProfileBlock>.automationSectionTitle {
   justify-content: space-between;
 }
 
@@ -8911,10 +8911,14 @@ textarea:focus,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 /* Device Account Vault Styles */
 .dav-overlay {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: rgba(15, 15, 15, 0.85);
   backdrop-filter: blur(8px);
   z-index: 9999;
@@ -8986,7 +8990,10 @@ textarea:focus,
   padding: 4px;
   display: flex;
 }
-.dav-close-btn:hover { color: #fff; }
+
+.dav-close-btn:hover {
+  color: #fff;
+}
 
 .dav-body {
   flex: 1;
@@ -9054,15 +9061,23 @@ textarea:focus,
   height: 8px;
   border-radius: 50%;
 }
-.dav-status-dot.online { background: #22c55e; }
-.dav-status-dot.offline { background: #ef4444; }
+
+.dav-status-dot.online {
+  background: #22c55e;
+}
+
+.dav-status-dot.offline {
+  background: #ef4444;
+}
 
 .dav-total-badge {
   font-size: 12px;
-  background: #3b82f6;
+  background: var(--md-muted-2);
   color: #fff;
   padding: 2px 6px;
   border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
 }
 
 .dav-tabs {
@@ -9083,7 +9098,10 @@ textarea:focus,
   transition: all 0.2s;
 }
 
-.dav-tab:hover { color: #ccc; }
+.dav-tab:hover {
+  color: #ccc;
+}
+
 .dav-tab.active {
   color: #3b82f6;
   border-bottom-color: #3b82f6;
@@ -9104,7 +9122,10 @@ textarea:focus,
   color: #666;
 }
 
-.dav-empty-state p { margin: 0 0 12px 0; font-size: 13px; }
+.dav-empty-state p {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+}
 
 .dav-btn {
   display: inline-flex;
@@ -9115,12 +9136,22 @@ textarea:focus,
   font-size: 13px;
   border: none;
   cursor: pointer;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
-.dav-btn:hover { background: rgba(255,255,255,0.15); }
-.dav-btn.primary { background: #3b82f6; color: #fff; }
-.dav-btn.primary:hover { background: #2563eb; }
+
+.dav-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.dav-btn.primary {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.dav-btn.primary:hover {
+  background: #2563eb;
+}
 
 .dav-account-card {
   display: flex;
@@ -9150,8 +9181,9 @@ textarea:focus,
   border-radius: 4px;
   width: 150px;
 }
+
 .dav-input-inline:focus {
-  border-color: rgba(255,255,255,0.2);
+  border-color: rgba(255, 255, 255, 0.2);
   outline: none;
 }
 
@@ -9171,8 +9203,34 @@ textarea:focus,
 
 .dav-card-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
+}
+
+.dav-platform-select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 20px 4px 8px;
+  /* Extra padding right for arrow */
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  appearance: menulist;
+  /* standard platform select dropdown */
+  transition: all 0.2s ease;
+}
+
+.dav-platform-select:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.dav-platform-select option {
+  background: #1a1a1a;
+  color: #fff;
 }
 
 .dav-field {
@@ -9195,6 +9253,7 @@ textarea:focus,
   font-size: 13px;
   width: 100%;
 }
+
 .dav-input:focus {
   border-color: #3b82f6;
   outline: none;
@@ -9210,9 +9269,9 @@ select.dav-input {
   border: 1px solid #333;
   border-radius: 8px;
   padding: 6px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
   z-index: 10000;
-  min-width: 180px;
+  min-width: 160px;
   display: flex;
   flex-direction: column;
 }
@@ -9221,21 +9280,38 @@ select.dav-input {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 10px 14px;
   background: transparent;
   border: none;
   color: #ddd;
-  font-size: 13px;
+  font-size: 14px;
   border-radius: 4px;
   cursor: pointer;
   text-align: left;
   width: 100%;
 }
 
-.dav-ctx-item:hover { background: rgba(255,255,255,0.1); color: #fff; }
-.dav-ctx-item.danger { color: #ef4444; }
-.dav-ctx-item.danger:hover { background: rgba(239, 68, 68, 0.1); }
-.dav-ctx-item.active { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+.dav-ctx-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.dav-ctx-item.danger {
+  color: #ef4444;
+}
+
+.dav-ctx-item.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.dav-ctx-item.active {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.dav-ctx-item.active onPointerDown {
+  font-weight: bold;
+}
 
 .dav-ctx-divider {
   height: 1px;
@@ -9246,19 +9322,337 @@ select.dav-input {
 .dav-ctx-submenu-container {
   position: relative;
 }
+
+.dav-ctx-has-sub {
+  position: relative;
+}
+
+/* Controlled via React hover state instead of CSS hover to prevent multiple submenus overlapping */
+/*
 .dav-ctx-has-sub:hover .dav-ctx-submenu {
   display: flex;
 }
+*/
+
 .dav-ctx-submenu {
   display: none;
   position: absolute;
-  left: 100%;
-  top: 0;
+  left: calc(100% - 13px);
+  top: -6px;
   background: #252525;
   border: 1px solid #333;
   border-radius: 8px;
   padding: 6px;
-  min-width: 150px;
+  min-width: 200px;
   flex-direction: column;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  z-index: 10001;
+}
+
+.tile-account-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: #141416;
+  overflow: hidden;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tile-account-overlay .dav-panel {
+  border: none;
+  background: transparent;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.tile-account-overlay .dav-panel-header {
+  padding: 4px 6px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tile-account-overlay .dav-panel-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tile-account-overlay .dav-panel-body {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tile-account-overlay .dav-account-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tile-account-overlay .dav-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tile-account-overlay .dav-field-row:last-child {
+  border-bottom: none;
+}
+
+.tile-account-overlay .dav-field-label {
+  flex: 0 0 68px;
+  font-size: 11px;
+  color: #999;
+  padding-left: 6px;
+  user-select: none;
+  font-weight: 500;
+}
+
+.tile-account-overlay .dav-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #eee;
+  padding: 5px 6px;
+  font-size: 12px;
+  outline: none;
+  width: 100%;
+}
+
+.tile-account-overlay .dav-input:focus {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tile-account-overlay .dav-name-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tile-account-overlay .dav-name-input {
+  font-weight: bold;
+  color: #fff;
+  font-size: 13px;
+  padding: 7px 6px;
+}
+
+.tile-account-overlay .dav-notice-row {
+  cursor: pointer;
+  background: rgba(249, 115, 22, 0.04);
+}
+
+.tile-account-overlay .dav-notice-row:hover {
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.tile-account-overlay .dav-notice-value {
+  flex: 1;
+  font-size: 11px;
+  padding: 5px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+.tile-account-overlay .dav-notice-value.counting {
+  color: #f97316;
+  font-weight: 500;
+}
+
+.tile-account-overlay .dav-notice-value.expired {
+  color: #ef4444;
+  font-weight: bold;
+  animation: dav-bell-blink 1s infinite;
+}
+
+.tile-account-overlay .dav-notice-value.none .muted {
+  color: #666;
+  font-style: italic;
+}
+
+/* Edit Form inside panel */
+.tile-account-overlay .dav-notice-edit-form {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  margin: 4px;
+}
+
+.tile-account-overlay .dav-edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #eee;
+  padding: 2px 4px 6px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tile-account-overlay .dav-edit-back {
+  background: transparent;
+  border: none;
+  color: #3b82f6;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0;
+}
+
+.tile-account-overlay .dav-edit-back:hover {
+  text-decoration: underline;
+}
+
+.tile-account-overlay .dav-edit-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 0 4px;
+}
+
+.tile-account-overlay .dav-edit-btn {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #fff;
+  transition: opacity 0.15s;
+}
+
+.tile-account-overlay .dav-edit-btn:hover {
+  opacity: 0.9;
+}
+
+.tile-account-overlay .dav-edit-btn.save {
+  background: #3b82f6;
+}
+
+.tile-account-overlay .dav-edit-btn.clear {
+  background: #ef4444;
+}
+
+/* Blinking for expired bell and text */
+@keyframes dav-bell-blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.tile-account-overlay .dav-bell-expired {
+  animation: dav-bell-blink 1s infinite;
+}
+
+.tile-account-overlay .dav-empty-state {
+  padding: 15px 0;
+}
+
+/* Hide spinners for numeric inputs globally */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Centered stacks layout for DeviceAccountOverlay card with prefix inside input */
+.tile-account-overlay .dav-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 4px 8px;
+  width: calc(100% - 24px);
+  margin: 4px auto;
+  transition: all 0.15s ease;
+}
+
+.tile-account-overlay .dav-input-wrapper:focus-within {
+  border-color: #eab308;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tile-account-overlay .dav-transparent-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #eee;
+  text-align: center;
+  font-size: 12px;
+  padding: 2px 0;
+  width: 100%;
+}
+
+.tile-account-overlay .dav-stats-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  padding: 8px 12px;
+  font-size: 12px;
+  user-select: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 6px;
+}
+
+.tile-account-overlay .dav-notice-centered-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.tile-account-overlay .dav-notice-centered-row:hover {
+  background: rgba(234, 179, 8, 0.05);
+}
+
+.tile-account-overlay .dav-centered-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 10px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+
+.tile-account-overlay .dav-centered-input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 10px;
+  text-align: center;
+  outline: none;
+  cursor: pointer;
 }

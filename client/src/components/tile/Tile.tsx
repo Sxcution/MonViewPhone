@@ -8,6 +8,7 @@ import type { StreamReloadOptions, TileProps } from './types';
 import { TileHeader } from './TileHeader';
 import { useTileStream } from './useTileStream';
 import { AlertTriangle, Info, MousePointer2, XCircle, Bell } from 'lucide-react';
+import { DeviceAccountPanel } from '@/components/DeviceAccountOverlay';
 
 /**
  * Device tile.
@@ -35,6 +36,8 @@ function TileComponent({
     onChangeOrderNumber,
     onDragStart,
     onDragEnd,
+    showAccountOverlay = false,
+    orderMap,
 }: TileProps) {
     const { t } = useI18n();
     const {
@@ -64,6 +67,10 @@ function TileComponent({
         if (hasUsbIface) return 'USB';
         if (udid.includes(':')) return 'WIFI';
         return 'USB';
+    }, [androidDeviceMap, udid]);
+    const modelName = useMemo(() => {
+        const meta = androidDeviceMap[udid];
+        return meta ? [meta.manufacturer, meta['ro.product.model']].filter(Boolean).join(' ') : '';
     }, [androidDeviceMap, udid]);
     const isSyncMain = syncAll && syncMain === udid;
     const isSyncFollower = syncAll && syncTargets.includes(udid);
@@ -347,6 +354,19 @@ function TileComponent({
                         ) : null}
 
                         {videoFrame}
+
+                        {showAccountOverlay && (
+                            <div className="tile-account-overlay" onMouseDown={e => e.stopPropagation()}>
+                                <DeviceAccountPanel
+                                    udid={udid}
+                                    order={order ?? 0}
+                                    model={modelName}
+                                    isOnline={!isDisconnected}
+                                    filterSearch=""
+                                    orderMap={orderMap || new Map()}
+                                />
+                            </div>
+                        )}
 
                         {visualAlertActive ? (
                             <div 

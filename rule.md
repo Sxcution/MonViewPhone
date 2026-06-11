@@ -297,3 +297,9 @@ N?u c?n s?a file jar, hãy dùng phuong pháp Smali Injection: gi?i nén classes.dex
 
 ## SCRCPY BUILD RULE
 Tuy?t d?i KHÔNG dùng script d? build l?i toàn b? scrcpy-server.jar t? thu m?c scrcpy-decompiled (vì s? làm h?ng WebSocket Core). Thu m?c scrcpy-decompiled ch? gi? l?i d? tham kh?o mã ngu?n (ch?a do?n code fix ClipboardManager và Android 14/15). N?u c?n patch scrcpy-server.jar, hãy dùng công c? apktool d? decompile ra file .smali, s?a file .smali, và recompile l?i b?ng apktool b.
+
+## Rules for Number Inputs
+1. Trong các ô nh?p S?, luôn luôn b? thanh Tang/Gi?m (spinner controls).
+   - Web (CSS): input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+   - Desktop (QSS): QSpinBox::up-button, QSpinBox::down-button { width: 0; }
+

@@ -275,6 +275,12 @@ type ConfirmState = {
 
 export function App() {
   const [deviceAccountOverlayOpen, setDeviceAccountOverlayOpen] = useState(false)
+  useEffect(() => {
+    (window as any).__disableDirectKeyboard = deviceAccountOverlayOpen;
+    return () => {
+      (window as any).__disableDirectKeyboard = false;
+    };
+  }, [deviceAccountOverlayOpen]);
   useDirectKeyboard(true)
   const { t } = useI18n()
   const { deviceParam, wsServer } = useMemo(() => readPageParams(), [])
@@ -973,6 +979,14 @@ export function App() {
     } catch { }
   }, [savedGroups])
 
+  useEffect(() => {
+    const handleUpdate = () => {
+      setSavedGroups(loadSavedGroups());
+    };
+    window.addEventListener('saved-groups-updated', handleUpdate);
+    return () => window.removeEventListener('saved-groups-updated', handleUpdate);
+  }, []);
+
   const [groupModalOpen, setGroupModalOpen] = useState(false)
   const [groupModalName, setGroupModalName] = useState('')
 
@@ -1440,20 +1454,7 @@ export function App() {
     }),
     [orderedRegistered, orderMap, androidDeviceMap]
   )
-  const deviceAccountOverlayDevices = useMemo(
-    () =>
-      orderedRegistered.map(udid => {
-        const meta = androidDeviceMap[udid]
-        return {
-          udid,
-          number: orderMap.get(udid) ?? 0,
-          manufacturer: meta?.['ro.product.manufacturer'] ?? undefined,
-          model: meta?.['ro.product.model'] ?? undefined,
-          online: connectedUdids.has(udid),
-        }
-      }),
-    [orderedRegistered, orderMap, androidDeviceMap, connectedUdids]
-  )
+
   const controlGridDevices = useMemo<DeviceSelectionGridItem[]>(
     () => orderedSidebarRegistered.map(udid => ({
       udid,
@@ -1894,10 +1895,19 @@ export function App() {
         return
       }
 
-      if (e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey && e.code === 'KeyC') {
+      const savedHotkey = localStorage.getItem('monviewphone:device-account-hotkey') || 'Alt+C'
+      const isAltC =
+        e.altKey &&
+        !e.ctrlKey &&
+        !e.shiftKey &&
+        !e.metaKey &&
+        (e.code === 'KeyC' || e.key.toLowerCase() === 'c')
+
+      if (isAltC || matchesHotkey(e, savedHotkey)) {
         e.preventDefault()
         e.stopPropagation()
         setDeviceAccountOverlayOpen(prev => !prev)
+        return
       }
 
       if (e.key === 'Escape') {
@@ -1905,8 +1915,16 @@ export function App() {
       }
     }
 
-    window.addEventListener('keydown', handleDeviceAccountOverlayHotkey, true)
-    return () => window.removeEventListener('keydown', handleDeviceAccountOverlayHotkey, true)
+    window.addEventListener('keydown', handleDeviceAccountOverlayHotkey, {
+      capture: true,
+      passive: false,
+    })
+
+    return () => {
+      window.removeEventListener('keydown', handleDeviceAccountOverlayHotkey, {
+        capture: true,
+      } as any)
+    }
   }, [])
 
   useEffect(() => {
@@ -2487,7 +2505,7 @@ export function App() {
                     isViewing={viewerUdid === udid}
                     selected={connectSelection.has(udid)}
                     showTileInfo={showTileInfo}
-                    isDisconnected={!isConnected}   // <-- THÊM DÒNG NÀY
+                    isDisconnected={!isConnected}
                     visualAlertActive={Boolean(visualTileAlerts[udid])}
                     onClearVisualAlert={() => clearVisualAlert(udid)}
                     streamConfig={
@@ -2502,6 +2520,8 @@ export function App() {
                     onChangeOrderNumber={setTileNumber}
                     onDragStart={id => setDraggingTile(id)}
                     onDragEnd={() => setDraggingTile(null)}
+                    showAccountOverlay={deviceAccountOverlayOpen}
+                    orderMap={orderMap}
                   />
                 </div>
               );
@@ -4723,14 +4743,6 @@ export function App() {
           onClose={() => setSyncTimeModalOpen(false)}
         />
       ) : null}
-
-      {deviceAccountOverlayOpen && (
-        <DeviceAccountOverlay
-          devices={deviceAccountOverlayDevices}
-          defaultPlatform="wechat"
-          onClose={() => setDeviceAccountOverlayOpen(false)}
-        />
-      )}
     </>
   )
 }

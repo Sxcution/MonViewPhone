@@ -27,4 +27,7 @@ export type TileProps = {
     onChangeOrderNumber?: (udid: string, nextNumber: number) => void;
     onDragStart?: (udid: string) => void;
     onDragEnd?: () => void;
+    showAccountOverlay?: boolean;
+    orderMap?: Map<string, number>;
 };
+

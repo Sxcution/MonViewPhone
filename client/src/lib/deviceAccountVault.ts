@@ -6,6 +6,8 @@ export interface AccountNotice {
   title: string;
   content: string;
   dueDate: number | null; // Timestamp
+  days?: number;
+  startDate?: number | null;
 }
 
 export interface BaseAccount {
@@ -17,6 +19,7 @@ export interface BaseAccount {
   note: string;
   status: AccountStatus;
   notice: AccountNotice | null;
+  appType?: 'main' | 'clone' | 'secure' | 'shelter';
 }
 
 export interface WeChatAccount extends BaseAccount {
