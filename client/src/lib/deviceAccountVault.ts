@@ -1,6 +1,36 @@
 export type AccountStatus = 'Live' | 'Die' | 'Verify' | 'Risk' | 'Unverified';
 export type PhoneRegion = 'VN' | 'HK' | 'Unknown';
-export type PlatformType = 'wechat' | 'line' | 'tantan' | 'telegram' | 'other';
+export type PlatformType = string;
+
+export function getSavedPlatforms(): { id: string; label: string }[] {
+  try {
+    const saved = localStorage.getItem('monviewphone:device-account-platforms');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        const REMOVED = new Set(['tantan', 'line', 'telegram', 'other', 'khác']);
+        return parsed.map((p: any) => {
+          if (typeof p === 'string') {
+            return { id: p, label: p === 'wechat' ? 'WeChat' : p };
+          }
+          if (p && p.id) {
+            return { id: p.id, label: p.label || p.id };
+          }
+          return p;
+        }).filter(p => p && !REMOVED.has(p.id.toLowerCase()));
+      }
+    }
+  } catch {}
+  return [{ id: 'wechat', label: 'WeChat' }];
+}
+
+export function saveSavedPlatforms(platforms: { id: string; label: string }[]): void {
+  try {
+    localStorage.setItem('monviewphone:device-account-platforms', JSON.stringify(platforms));
+  } catch (err) {
+    console.error('Failed to save platforms:', err);
+  }
+}
 
 export interface AccountNotice {
   title: string;
@@ -77,30 +107,30 @@ export function saveDeviceAccountVault(data: VaultData): void {
 }
 
 export function getDeviceAccountDataFromVault(vault: VaultData, udid: string): DeviceAccountData {
+  const platformsList = getSavedPlatforms();
   if (vault && vault.devices && vault.devices[udid]) {
-    // Ensure all platform keys exist
     const device = vault.devices[udid];
-    if (!device.platforms) device.platforms = { wechat: [], line: [], tantan: [], telegram: [], other: [] };
-    if (!device.platforms.wechat) device.platforms.wechat = [];
-    if (!device.platforms.line) device.platforms.line = [];
-    if (!device.platforms.tantan) device.platforms.tantan = [];
-    if (!device.platforms.telegram) device.platforms.telegram = [];
-    if (!device.platforms.other) device.platforms.other = [];
+    if (!device.platforms) device.platforms = {};
+    platformsList.forEach(p => {
+      if (!device.platforms[p.id]) {
+        device.platforms[p.id] = [];
+      }
+    });
     if (!device.selectedAccountByPlatform) device.selectedAccountByPlatform = {};
     return device;
   }
+
+  const initialPlatforms: Record<string, Account[]> = {};
+  platformsList.forEach(p => {
+    initialPlatforms[p.id] = [];
+  });
+
   return {
     udid,
     displayName: '',
     defaultPlatform: 'wechat',
     selectedAccountByPlatform: {},
-    platforms: {
-      wechat: [],
-      line: [],
-      tantan: [],
-      telegram: [],
-      other: [],
-    },
+    platforms: initialPlatforms,
     updatedAt: Date.now(),
   };
 }

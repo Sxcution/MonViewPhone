@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2 } from 'lucide-react';
+import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder } from 'lucide-react';
 import { 
   getDeviceAccountData, 
   saveDeviceAccountData, 
@@ -11,7 +11,10 @@ import {
   PlatformType, 
   Account, 
   WeChatAccount, 
-  createNewAccount 
+  createNewAccount,
+  getSavedPlatforms,
+  saveSavedPlatforms,
+  saveDeviceAccountVault
 } from '@/lib/deviceAccountVault';
 
 type DeviceAccountOverlayProps = {
@@ -21,15 +24,13 @@ type DeviceAccountOverlayProps = {
   connectedUdids: Set<string>;
   orderMap: Map<string, number>;
   androidDeviceMap: Record<string, any>;
+  search: string;
+  setSearch: (val: string) => void;
+  activeFilter: string;
+  setActiveFilter: (val: string) => void;
+  activeTab: PlatformType;
+  setActiveTab: (val: PlatformType) => void;
 };
-
-const PLATFORMS: { id: PlatformType; label: string }[] = [
-  { id: 'wechat', label: 'WeChat' },
-  { id: 'line', label: 'Line' },
-  { id: 'tantan', label: 'Tantan' },
-  { id: 'telegram', label: 'Telegram' },
-  { id: 'other', label: 'Khác' }
-];
 
 const ACCOUNT_STATUS_COLORS: Record<string, string> = {
   'Live': '#22c55e',
@@ -141,26 +142,88 @@ function getAppTypeLabel(type?: 'main' | 'clone' | 'secure' | 'shelter') {
   return 'Main';
 }
 
+function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter') {
+  if (!type || type === 'main') return null;
+  
+  if (type === 'shelter') {
+    return (
+      <span title="Shelter" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
+        <Briefcase 
+          size={13} 
+          color="#3b82f6" 
+          style={{ flexShrink: 0, marginLeft: '4px' }} 
+        />
+      </span>
+    );
+  }
+  
+  if (type === 'secure') {
+    return (
+      <span title="Secure Folder" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
+        <Folder 
+          size={13} 
+          color="#3b82f6" 
+          style={{ flexShrink: 0, marginLeft: '4px' }} 
+        />
+      </span>
+    );
+  }
+  
+  if (type === 'clone') {
+    return (
+      <span title="Clone App" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
+        <svg 
+          width="13" 
+          height="13" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="#f59e0b" 
+          strokeWidth="3.5" 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          style={{ flexShrink: 0, marginLeft: '4px' }}
+        >
+          <circle cx="9" cy="15" r="5" />
+          <circle cx="15" cy="9" r="5" />
+        </svg>
+      </span>
+    );
+  }
+  
+  return null;
+}
+
 // --- Device Panel Component ---
 export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({ 
   udid, 
   order, 
   model, 
   isOnline,
-  filterSearch,
   orderMap,
-  initialData
+  initialData,
+  activeTab,
+  setActiveTab
 }: { 
   udid: string; 
   order: number; 
   model: string; 
   isOnline: boolean;
-  filterSearch: string;
   orderMap: Map<string, number>;
   initialData: DeviceAccountData;
+  activeTab: PlatformType;
+  setActiveTab: (tab: PlatformType) => void;
 }) {
   const [data, setData] = useState(initialData);
-  const [activeTab, setActiveTab] = useState<PlatformType>(data.defaultPlatform || 'wechat');
+  const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setPlatforms(getSavedPlatforms());
+    };
+    window.addEventListener('device-account-platforms-updated', handleUpdate);
+    return () => window.removeEventListener('device-account-platforms-updated', handleUpdate);
+  }, []);
+
   const [ctxMenu, setCtxMenu] = useState<{ x: number, y: number, accountId: string } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeLevel1, setActiveLevel1] = useState<'tai_khoan' | 'trang_thai' | 'nearby' | 'quet_qr' | null>(null);
@@ -170,13 +233,6 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   useEffect(() => {
     setData(initialData);
   }, [initialData]);
-
-  // Keep default platform tab sync if tab settings changed externally
-  useEffect(() => {
-    if (initialData.defaultPlatform && initialData.defaultPlatform !== activeTab) {
-      setActiveTab(initialData.defaultPlatform);
-    }
-  }, [initialData.defaultPlatform, activeTab]);
 
   // Load savedGroups and reactive listener
   const [savedGroups, setSavedGroups] = useState<{ name: string, udids: string[] }[]>(() => {
@@ -334,31 +390,25 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const selectedAccountId = data.selectedAccountByPlatform[activeTab];
   let selectedAccount = activeAccounts.find(a => a.id === selectedAccountId) || activeAccounts[0];
 
-  // If search matches anything inside this device
-  const matchesSearch = useMemo(() => {
-    if (!filterSearch) return true;
-    const lowerSearch = filterSearch.toLowerCase();
-    if (udid.toLowerCase().includes(lowerSearch)) return true;
-    if (String(order).includes(lowerSearch)) return true;
-    if (model && model.toLowerCase().includes(lowerSearch)) return true;
-    
-    // Check accounts
-    for (const plt of Object.keys(data.platforms) as PlatformType[]) {
-      for (const acc of data.platforms[plt]) {
-        if (
-          acc.name.toLowerCase().includes(lowerSearch) ||
-          acc.nickname.toLowerCase().includes(lowerSearch) ||
-          acc.phone.toLowerCase().includes(lowerSearch) ||
-          acc.email.toLowerCase().includes(lowerSearch)
-        ) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }, [filterSearch, data, udid, order, model]);
+  const isOverOneYear = useMemo(() => {
+    if (!selectedAccount) return false;
+    if (selectedAccount.isOneYearOld) return true;
+    if (!selectedAccount.createdAt) return false;
+    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+    return (Date.now() - selectedAccount.createdAt) >= oneYearMs;
+  }, [selectedAccount]);
 
-  if (!matchesSearch) return null;
+  const headerDotBg = useMemo(() => {
+    if (!selectedAccount) {
+      return isOnline ? 'var(--md-success)' : 'var(--md-danger)';
+    }
+    if (selectedAccount.status === 'Die') return 'var(--md-danger)';
+    if (selectedAccount.status === 'Risk') return 'var(--md-warning)';
+    if (!isOverOneYear) {
+      return '#ffffff';
+    }
+    return 'var(--md-success)';
+  }, [selectedAccount, isOnline, isOverOneYear]);
 
   const totalAccounts = Object.values(data.platforms).reduce((acc, curr) => acc + curr.length, 0);
   const isWeChat = activeTab === 'wechat';
@@ -377,6 +427,44 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       remainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
     }
   }
+
+  const accountsWithNotices = useMemo(() => {
+    return (data.platforms[activeTab] || []).filter(acc => acc.notice && acc.notice.title);
+  }, [data.platforms, activeTab]);
+
+  const deviceNoticeStatus = useMemo(() => {
+    if (accountsWithNotices.length === 0) return 'none';
+    const hasExpired = accountsWithNotices.some(acc => acc.notice?.dueDate && acc.notice.dueDate <= Date.now());
+    return hasExpired ? 'expired' : 'counting';
+  }, [accountsWithNotices]);
+
+  const noticeTooltipText = useMemo(() => {
+    return accountsWithNotices.map(acc => {
+      const accName = acc.name || acc.phone || acc.nickname || 'Không tên';
+      return `${accName} : ${acc.notice?.title || ''}`;
+    }).join('\n');
+  }, [accountsWithNotices]);
+
+  const handleNoticeIconClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (accountsWithNotices.length === 0) return;
+    
+    const expired = accountsWithNotices.filter(acc => acc.notice?.dueDate && acc.notice.dueDate <= Date.now());
+    const nonExpired = accountsWithNotices.filter(acc => !acc.notice?.dueDate || acc.notice.dueDate > Date.now());
+    const ordered = [...expired, ...nonExpired];
+    
+    if (ordered.length === 0) return;
+    
+    const currIdx = ordered.findIndex(acc => acc.id === selectedAccount?.id);
+    if (currIdx === -1) {
+      handleSetMain(ordered[0].id);
+    } else {
+      const nextIdx = (currIdx + 1) % ordered.length;
+      handleSetMain(ordered[nextIdx].id);
+    }
+  };
 
   // QR scan countdown calculation
   let qrCountdownText = '';
@@ -600,11 +688,15 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
   const getAccountStatusClass = (account: Account) => {
     if (activeTab === 'wechat') {
-      if (account.nearbyPeopleDueDate) {
-        if (account.nearbyPeopleDueDate <= Date.now()) return 'nearby';
-      } else if (account.createdAt) {
-        const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-        if (account.isOneYearOld || Date.now() - account.createdAt >= oneYearMs) return 'nearby';
+      // Điều kiện Nearby: tài khoản PHẢI đủ 1 năm tuổi
+      const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+      const accountIsOverOneYear = !!(account.isOneYearOld || (account.createdAt && (Date.now() - account.createdAt) >= oneYearMs));
+      if (accountIsOverOneYear) {
+        if (account.nearbyPeopleDueDate) {
+          if (account.nearbyPeopleDueDate <= Date.now()) return 'nearby';
+        } else {
+          return 'nearby';
+        }
       }
     }
     if (account.status === 'Die') return 'die';
@@ -613,14 +705,6 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     return 'live';
   };
 
-  const isOverOneYear = useMemo(() => {
-    if (!selectedAccount || !selectedAccount.createdAt) return false;
-    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-    return !!(
-      selectedAccount.isOneYearOld || 
-      (Date.now() - selectedAccount.createdAt >= oneYearMs)
-    );
-  }, [selectedAccount]);
 
   const isEligibleNearby = useMemo(() => {
     if (activeTab !== 'wechat') return false;
@@ -629,6 +713,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
   const showBlueNearby = useMemo(() => {
     if (activeTab !== 'wechat' || !selectedAccount) return false;
+    // Điều kiện bắt buộc: tài khoản phải đủ 1 năm tuổi
+    if (!isEligibleNearby) return false;
     
     if (selectedAccount.nearbyPeopleDueDate) {
       const diffMs = selectedAccount.nearbyPeopleDueDate - Date.now();
@@ -638,11 +724,11 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       return true; // Đã hết đếm ngược -> màu Xanh dương
     }
     
-    return isEligibleNearby;
+    return true; // Đủ 1 năm, chưa bật Nearby -> xanh dương
   }, [selectedAccount, activeTab, isEligibleNearby]);
 
   const shieldColor = useMemo(() => {
-    if (!selectedAccount) return '#22c55e';
+    if (!selectedAccount) return '#fff';
     if (selectedAccount.status === 'Die') {
       return '#ef4444'; // Đỏ khi tài khoản Die
     }
@@ -652,8 +738,11 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     if (showBlueNearby) {
       return '#3b82f6'; // Xanh dương khi đủ điều kiện Nearby People
     }
-    return ACCOUNT_STATUS_COLORS[selectedAccount.status] || '#22c55e';
-  }, [selectedAccount, showBlueNearby]);
+    if (!isOverOneYear) {
+      return '#ffffff'; // Trắng cho tài khoản dưới 1 năm tuổi
+    }
+    return ACCOUNT_STATUS_COLORS[selectedAccount.status] || '#22c55e'; // Xanh lá
+  }, [selectedAccount, showBlueNearby, isOverOneYear]);
 
   const nameColor = useMemo(() => {
     if (!selectedAccount) return '#fff';
@@ -666,10 +755,13 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     if (showBlueNearby) {
       return '#3b82f6'; // Xanh dương khi đủ điều kiện Nearby People
     }
-    return '#fff'; // Mặc định là trắng
-  }, [selectedAccount, showBlueNearby]);
+    if (!isOverOneYear) {
+      return '#ffffff'; // Trắng cho tài khoản dưới 1 năm tuổi
+    }
+    return '#22c55e'; // Xanh lá cho tài khoản trên 1 năm tuổi
+  }, [selectedAccount, showBlueNearby, isOverOneYear]);
 
-  const activePlatformLabel = PLATFORMS.find(p => p.id === activeTab)?.label || 'WeChat';
+  const activePlatformLabel = platforms.find(p => p.id === activeTab)?.label || 'WeChat';
 
   return (
     <div className="dav-panel" onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}>
@@ -678,14 +770,30 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           <span className="dav-order">{order.toString().padStart(2, '0')}</span>
           <span 
             className="dav-status-dot" 
-            style={{ 
-              background: selectedAccount 
-                ? (selectedAccount.status === 'Die' ? 'var(--md-danger)' : selectedAccount.status === 'Risk' ? 'var(--md-warning)' : 'var(--md-success)')
-                : (isOnline ? 'var(--md-success)' : 'var(--md-danger)')
-            }} 
+            style={{ background: headerDotBg }} 
           />
-          {noticeStatus !== 'none' && (
-            <Bell size={13} color={noticeStatus === 'expired' ? 'var(--md-danger)' : 'var(--md-warning)'} className={noticeStatus === 'expired' ? "dav-bell-expired" : ""} />
+          {deviceNoticeStatus !== 'none' && (
+            <button
+              type="button"
+              className="dav-bell-btn"
+              title={noticeTooltipText}
+              onClick={handleNoticeIconClick}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Bell 
+                size={13} 
+                color={deviceNoticeStatus === 'expired' ? 'var(--md-danger)' : 'var(--md-warning)'} 
+                className={deviceNoticeStatus === 'expired' ? "dav-bell-expired animate-pulse" : ""} 
+              />
+            </button>
           )}
         </div>
 
@@ -693,7 +801,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           <div className="dav-title-dropdown-wrap" ref={accountTitleDropdownRef}>
             <button
               type="button"
-              className="dav-total-badge"
+              className={`dav-total-badge ${showBlueNearby ? 'nearby-active' : ''}`}
               title="Tong so tai khoan tren dien thoai nay"
               onClick={(e) => {
                 e.preventDefault();
@@ -728,8 +836,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       }}
                     >
                       <span className={`dav-account-state-dot ${getAccountStatusClass(account)}`} />
-                      <span className="dav-title-account-name">
-                        {account.name || account.phone || account.nickname || 'Khong ten'} ({getAppTypeLabel(account.appType)})
+                      <span className="dav-title-account-name" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                        {account.name || account.phone || account.nickname || 'Khong ten'}
+                        {renderAppTypeIcon(account.appType)}
                       </span>
                     </button>
                   ))
@@ -753,7 +862,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             </button>
             {platformDropdownOpen && (
               <div className="dav-platform-menu contextMenuPanel">
-                {PLATFORMS.map(p => (
+                {platforms.map(p => (
                   <button
                     key={p.id}
                     type="button"
@@ -777,7 +886,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       <div className="dav-panel-body">
         {!selectedAccount ? (
           <div className="dav-empty-state">
-            <p>Chưa có tài khoản {PLATFORMS.find(p => p.id === activeTab)?.label}</p>
+            <p>Chưa có tài khoản {platforms.find(p => p.id === activeTab)?.label || 'WeChat'}</p>
             <button className="dav-btn primary" onClick={handleAddAccount}>
               <Plus size={14} /> Thêm tài khoản
             </button>
@@ -993,7 +1102,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
               {(() => {
                 if (!isWeChat || !selectedAccount) return null;
-                if (!isEligibleNearby && !selectedAccount.nearbyPeopleDueDate) return null;
+                // Điều kiện bắt buộc: tài khoản phải đủ 1 năm tuổi mới hiển thị Nearby
+                if (!isEligibleNearby) return null;
                 const nearbyDays = selectedAccount.nearbyPeopleDueDate
                   ? Math.ceil((selectedAccount.nearbyPeopleDueDate - Date.now()) / (1000 * 60 * 60 * 24))
                   : 0;
@@ -1030,7 +1140,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               {noticeStatus === 'none' ? (
                 <span className="muted" style={{ color: '#666', fontStyle: 'italic', fontSize: '11px' }}>Chưa đặt thông báo</span>
               ) : (
-                <span style={{ color: '#eab308', fontWeight: noticeStatus === 'expired' ? 'bold' : '500' }}>
+                <span style={{ color: noticeStatus === 'expired' ? '#ef4444' : '#eab308', fontWeight: noticeStatus === 'expired' ? 'bold' : '500' }}>
                   {selectedAccount.notice?.title} {noticeStatus === 'expired' ? ': đã đến hạn' : `: còn ${remainingDays} ngày`}
                 </span>
               )}
@@ -1105,50 +1215,21 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               <Users size={16} /> Tài Khoản
               <div className="dav-ctx-submenu" style={{ display: activeLevel1 === 'tai_khoan' ? 'flex' : 'none' }}>
                 {activeAccounts.map(a => (
-                  <div 
-                    key={a.id} 
-                    className="dav-ctx-submenu-container"
-                    onMouseEnter={() => setActiveLevel2(a.id)}
-                    onMouseLeave={() => setActiveLevel2(null)}
+                  <button
+                    key={a.id}
+                    className={`dav-ctx-item ${a.id === selectedAccount.id ? 'active' : ''}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSetMain(a.id);
+                      setCtxMenu(null);
+                    }}
                   >
-                    <div className="dav-ctx-item dav-ctx-has-sub">
-                      <span style={{ fontWeight: a.id === selectedAccount.id ? 'bold' : 'normal' }}>
-                        {a.name || a.phone || a.nickname || 'Tài khoản'} ({getAppTypeLabel(a.appType)}){a.id === selectedAccount.id ? ' (Hiện tại)' : ''}
-                      </span>
-                      <div className="dav-ctx-submenu" style={{ display: activeLevel2 === a.id ? 'flex' : 'none' }}>
-                        {a.id !== selectedAccount.id && (
-                          <>
-                            <button 
-                              className="dav-ctx-item" 
-                              onPointerDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleSetMain(a.id);
-                                setCtxMenu(null);
-                              }}
-                            >
-                              Sử dụng tài khoản này
-                            </button>
-                            <div className="dav-ctx-divider" />
-                          </>
-                        )}
-                        {(['main', 'clone', 'secure', 'shelter'] as const).map(type => (
-                          <button
-                            key={type}
-                            className={`dav-ctx-item ${(a.appType || 'main') === type ? 'active' : ''}`}
-                            onPointerDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleUpdateAccount(a.id, { appType: type });
-                              setCtxMenu(null);
-                            }}
-                          >
-                            {getAppTypeLabel(type)} {(a.appType || 'main') === type ? '✓' : ''}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                    <span style={{ fontWeight: a.id === selectedAccount.id ? 'bold' : 'normal', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                      {a.name || a.phone || a.nickname || 'Tài khoản'}
+                      {renderAppTypeIcon(a.appType)}
+                    </span>
+                  </button>
                 ))}
                 
                 <div className="dav-ctx-divider" />
@@ -1435,11 +1516,85 @@ export function DeviceAccountOverlay({
   registeredUdids,
   connectedUdids,
   orderMap,
-  androidDeviceMap
+  androidDeviceMap,
+  search,
+  setSearch,
+  activeFilter,
+  setActiveFilter,
+  activeTab,
+  setActiveTab
 }: DeviceAccountOverlayProps) {
-  const [search, setSearch] = useState('');
   const [vault, setVault] = useState<VaultData>(() => loadDeviceAccountVault());
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
+  const [showAddPlatformModal, setShowAddPlatformModal] = useState(false);
+  const [newPlatformName, setNewPlatformName] = useState('');
+  const [addPlatformError, setAddPlatformError] = useState('');
+
+  const [platformCtxMenu, setPlatformCtxMenu] = useState<{ x: number; y: number; platformId: string } | null>(null);
+  const platformCtxMenuRef = useRef<HTMLDivElement>(null);
+  const [pendingDeletePlatform, setPendingDeletePlatform] = useState<string | null>(null);
+
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const saved = localStorage.getItem('monviewphone:dav-drag-pos');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const dragStartRef = useRef<{ x: number; y: number; panelX: number; panelY: number } | null>(null);
+
+  const handleHeaderMouseDown = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('select')) {
+      return;
+    }
+    e.preventDefault();
+    const panel = target.closest('.dav-floating-panel') as HTMLElement;
+    if (!panel) return;
+    
+    const rect = panel.getBoundingClientRect();
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      panelX: rect.left,
+      panelY: rect.top,
+    };
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragStartRef.current) return;
+      const dx = moveEvent.clientX - dragStartRef.current.x;
+      const dy = moveEvent.clientY - dragStartRef.current.y;
+      const newPos = {
+        x: dragStartRef.current.panelX + dx,
+        y: dragStartRef.current.panelY + dy,
+      };
+      setDragPos(newPos);
+      localStorage.setItem('monviewphone:dav-drag-pos', JSON.stringify(newPos));
+    };
+    
+    const handleMouseUp = () => {
+      dragStartRef.current = null;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  useEffect(() => {
+    if (!platformCtxMenu) return;
+    const hide = (e: MouseEvent) => {
+      if (platformCtxMenuRef.current && !platformCtxMenuRef.current.contains(e.target as Node)) {
+        setPlatformCtxMenu(null);
+      }
+    };
+    window.addEventListener('mousedown', hide);
+    return () => window.removeEventListener('mousedown', hide);
+  }, [platformCtxMenu]);
 
   // Sync vault state when updates occur (one listener for all panels)
   useEffect(() => {
@@ -1450,15 +1605,70 @@ export function DeviceAccountOverlay({
     return () => window.removeEventListener('device-account-updated', handleAccountUpdate);
   }, []);
 
-  // Handle ESC key to close
   useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const handlePlatformsUpdate = () => {
+      setPlatforms(getSavedPlatforms());
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
+    window.addEventListener('device-account-platforms-updated', handlePlatformsUpdate);
+    return () => window.removeEventListener('device-account-platforms-updated', handlePlatformsUpdate);
+  }, []);
+
+  const handleConfirmAddPlatform = () => {
+    const name = newPlatformName.trim();
+    if (!name) {
+      setAddPlatformError('Tên nhóm không được để trống');
+      return;
+    }
+    const id = name.toLowerCase();
+    
+    // Check duplicate
+    const currentPlatforms = getSavedPlatforms();
+    if (currentPlatforms.some(p => p.id === id)) {
+      setAddPlatformError('Nhóm này đã tồn tại');
+      return;
+    }
+    
+    const updated = [...currentPlatforms, { id, label: name }];
+    saveSavedPlatforms(updated);
+    
+    window.dispatchEvent(new Event('device-account-platforms-updated'));
+    setActiveTab(id);
+    setShowAddPlatformModal(false);
+    setNewPlatformName('');
+    setAddPlatformError('');
+  };
+
+  const handleConfirmDeletePlatform = () => {
+    if (!pendingDeletePlatform) return;
+    
+    const currentPlatforms = getSavedPlatforms();
+    const updatedPlatforms = currentPlatforms.filter(p => p.id !== pendingDeletePlatform);
+    saveSavedPlatforms(updatedPlatforms);
+    
+    const updatedVault = { ...vault };
+    for (const udid in updatedVault.devices) {
+      const dev = updatedVault.devices[udid];
+      if (dev.platforms) {
+        delete dev.platforms[pendingDeletePlatform];
+      }
+      if (dev.selectedAccountByPlatform) {
+        delete dev.selectedAccountByPlatform[pendingDeletePlatform];
+      }
+      if (dev.defaultPlatform === pendingDeletePlatform) {
+        dev.defaultPlatform = 'wechat';
+      }
+    }
+    saveDeviceAccountVault(updatedVault);
+    
+    window.dispatchEvent(new Event('device-account-platforms-updated'));
+    window.dispatchEvent(new Event('device-account-updated'));
+    
+    if (activeTab === pendingDeletePlatform) {
+      setActiveTab('wechat');
+    }
+    
+    setPendingDeletePlatform(null);
+  };
 
   // Auto-focus search input when opened
   useEffect(() => {
@@ -1470,56 +1680,330 @@ export function DeviceAccountOverlay({
     }
   }, [open]);
 
+  // 1. Tính toán statistics
+  const { totalAccs, oneYearCount, newMonthCount, disabledCount, unverifiedCount, incompleteInfoCount } = useMemo(() => {
+    let total = 0;
+    let oneYear = 0;
+    let newMonth = 0;
+    let disabled = 0;
+    let unverified = 0;
+    let incomplete = 0;
+    
+    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    
+    for (const udid of registeredUdids) {
+      const d = getDeviceAccountDataFromVault(vault, udid);
+      const accounts = d.platforms[activeTab] || [];
+      total += accounts.length;
+      for (const acc of accounts) {
+        if (acc.createdAt) {
+          if ((Date.now() - acc.createdAt) >= oneYearMs) {
+            oneYear++;
+          } else if ((Date.now() - acc.createdAt) < thirtyDaysMs) {
+            newMonth++;
+          }
+        } else if ((acc as any).isOneYearOld === true) {
+          oneYear++;
+        } else if ((acc as any).isNew === true) {
+          newMonth++;
+        }
+        
+        if (acc.status === 'Die' || acc.status === 'Risk') {
+          disabled++;
+        }
+        if (acc.status === 'Unverified' || (acc as any).verifyStatus === 'Unverified') {
+          unverified++;
+        }
+        if (!acc.name || !acc.nickname || !acc.phone || !acc.email) {
+          incomplete++;
+        }
+      }
+    }
+    
+    return {
+      totalAccs: total,
+      oneYearCount: oneYear,
+      newMonthCount: newMonth,
+      disabledCount: disabled,
+      unverifiedCount: unverified,
+      incompleteInfoCount: incomplete
+    };
+  }, [registeredUdids, activeTab, vault]);
+
+  const { totalDevices, scanVNCount, scanHKCount, hasNoticeCount, nearbyPeopleCount } = useMemo(() => {
+    let scanVN = 0;
+    let scanHK = 0;
+    let hasNotice = 0;
+    let nearbyPeople = 0;
+    
+    for (const udid of registeredUdids) {
+      const d = getDeviceAccountDataFromVault(vault, udid);
+      const accounts = d.platforms[activeTab] || [];
+      
+      if (activeTab === 'wechat') {
+        const hasVN = accounts.some(acc => {
+          const wc = acc as WeChatAccount;
+          const scanCount = wc.scanCount || 0;
+          if (scanCount >= 3) return false;
+          if (wc.lastScanDate) {
+            const nextScan = wc.lastScanDate + 30 * 24 * 60 * 60 * 1000;
+            if (nextScan > Date.now()) return false;
+          }
+          return wc.phoneRegion !== 'HK';
+        });
+        if (hasVN) scanVN++;
+
+        const hasHK = accounts.some(acc => {
+          const wc = acc as WeChatAccount;
+          const scanCount = wc.scanCount || 0;
+          if (scanCount >= 3) return false;
+          if (wc.lastScanDate) {
+            const nextScan = wc.lastScanDate + 30 * 24 * 60 * 60 * 1000;
+            if (nextScan > Date.now()) return false;
+          }
+          return wc.phoneRegion === 'HK';
+        });
+        if (hasHK) scanHK++;
+        
+        const hasNearby = accounts.some(acc => {
+          if (!acc || acc.status === 'Die' || acc.status === 'Risk') return false;
+          const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+          const isOverOneYear = !!(acc.isOneYearOld || (acc.createdAt && (Date.now() - acc.createdAt) >= oneYearMs));
+          if (!isOverOneYear) return false;
+          
+          if (acc.nearbyPeopleDueDate) {
+            const hoursLeft = (acc.nearbyPeopleDueDate - Date.now()) / (1000 * 60 * 60);
+            if (hoursLeft > 12) return false;
+          }
+          return true;
+        });
+        if (hasNearby) nearbyPeople++;
+      }
+      
+      const hasN = accounts.some(acc => !!(acc.notice && acc.notice.dueDate));
+      if (hasN) hasNotice++;
+    }
+    
+    return {
+      totalDevices: registeredUdids.length,
+      scanVNCount: scanVN,
+      scanHKCount: scanHK,
+      hasNoticeCount: hasNotice,
+      nearbyPeopleCount: nearbyPeople
+    };
+  }, [registeredUdids, activeTab, vault]);
+
+  const handleFilterClick = (filter: string) => {
+    setActiveFilter(activeFilter === filter ? 'default' : filter);
+  };
+
   return ReactDOM.createPortal(
-    <div className={`dav-overlay ${open ? 'is-open' : 'is-hidden'}`}>
-      <div className="dav-header">
-        <div className="dav-header-left">
-          <h2 className="dav-title">Kho tài khoản thiết bị</h2>
-          <span className="dav-subtitle">Ctrl + D để mở/đóng</span>
-        </div>
-        <div className="dav-header-center">
-          <div className="dav-search-box">
-            <Search size={16} />
-            <input 
-              ref={searchInputRef}
-              type="text" 
-              placeholder="Tìm theo UDID, Tên, Số thứ tự, Số điện thoại..." 
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+    <>
+      <div className={`dav-overlay ${open ? 'is-open' : 'is-hidden'}`}>
+      <div className="dav-floating-panel" style={dragPos ? { position: 'absolute', left: `${dragPos.x}px`, top: `${dragPos.y}px`, transform: 'none' } : {}}>
+        <div className="dav-floating-header" onMouseDown={handleHeaderMouseDown}>
+          <div className="dav-floating-title-left">
+            <span className="dav-floating-title">Quản lý tài khoản</span>
           </div>
-        </div>
-        <div className="dav-header-right">
-          <button className="dav-close-btn" onClick={onClose}>
-            <X size={24} />
+          
+          <div className="dav-floating-platform-select">
+            {platforms.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                className={`dav-floating-platform-btn ${activeTab === p.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(p.id)}
+                onContextMenu={(e) => {
+                  if (p.id === 'wechat') return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setPlatformCtxMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    platformId: p.id
+                  });
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="dav-floating-platform-btn-add"
+              onClick={() => setShowAddPlatformModal(true)}
+              title="Thêm nhóm mới"
+            >
+              <Plus size={12} />
+            </button>
+          </div>
+
+          <button className="dav-floating-close-btn" onClick={onClose}>
+            <X size={16} />
           </button>
         </div>
-      </div>
-      
-      <div className="dav-body">
-        <div className="dav-grid">
-          {registeredUdids.map(udid => {
-            const order = orderMap.get(udid) ?? 0;
-            const meta = androidDeviceMap[udid];
-            const model = meta ? [meta.manufacturer, meta['ro.product.model']].filter(Boolean).join(' ') : '';
-            const isOnline = connectedUdids.has(udid);
-            const initialData = getDeviceAccountDataFromVault(vault, udid);
-            return (
-              <DeviceAccountPanel 
-                key={udid} 
-                udid={udid} 
-                order={order} 
-                model={model} 
-                isOnline={isOnline}
-                filterSearch={search}
-                orderMap={orderMap}
-                initialData={initialData}
-              />
-            );
-          })}
+
+        {/* Thanh lọc statistics */}
+        <div className="dav-stats-container">
+          <div className="dav-stats-row-global">
+            <span className="dav-stats-label">Tài khoản:</span>
+            <span className="dav-stats-val-total">{totalAccs}</span>
+            <span className="dav-stats-divider">|</span>
+            <span className={`dav-stats-btn ${activeFilter === 'one_year' ? 'active' : ''}`} onClick={() => handleFilterClick('one_year')}>
+              TK 1 năm: <strong style={{ color: '#fff' }}>{oneYearCount}</strong>
+            </span>
+            <span className="dav-stats-divider">|</span>
+            <span className={`dav-stats-btn ${activeFilter === 'new_month' ? 'active' : ''}`} onClick={() => handleFilterClick('new_month')}>
+              TK mới: <strong style={{ color: '#fff' }}>{newMonthCount}</strong>
+            </span>
+            <span className="dav-stats-divider">|</span>
+            <span className={`dav-stats-btn ${activeFilter === 'disabled' ? 'active' : ''}`} onClick={() => handleFilterClick('disabled')}>
+              TK hạn chế: <strong style={{ color: 'var(--md-danger)' }}>{disabledCount}</strong>
+            </span>
+            <span className="dav-stats-divider">|</span>
+            <span className={`dav-stats-btn ${activeFilter === 'unverified' ? 'active' : ''}`} onClick={() => handleFilterClick('unverified')}>
+              UnVerify: <strong style={{ color: 'var(--md-warning)' }}>{unverifiedCount}</strong>
+            </span>
+            <span className="dav-stats-divider">|</span>
+            <span className={`dav-stats-btn ${activeFilter === 'incomplete_info' ? 'active' : ''}`} onClick={() => handleFilterClick('incomplete_info')}>
+              Thiếu Info: <strong style={{ color: 'var(--md-info)' }}>{incompleteInfoCount}</strong>
+            </span>
+          </div>
+          
+          <div className="dav-stats-row-global">
+            <span className="dav-stats-label">Thiết bị:</span>
+            <span className="dav-stats-val-total">{totalDevices}</span>
+            <span className="dav-stats-divider">|</span>
+            <span className={`dav-stats-btn ${activeFilter === 'wechat_scan_vn' ? 'active' : ''}`} onClick={() => handleFilterClick('wechat_scan_vn')}>
+              Scan VN: <strong style={{ color: 'var(--md-success)' }}>{scanVNCount}</strong>
+            </span>
+            <span className="dav-stats-divider">|</span>
+            <span className={`dav-stats-btn ${activeFilter === 'wechat_scan_hk' ? 'active' : ''}`} onClick={() => handleFilterClick('wechat_scan_hk')}>
+              Scan HK: <strong style={{ color: '#8b5cf6' }}>{scanHKCount}</strong>
+            </span>
+            <span className="dav-stats-divider">|</span>
+            <span className={`dav-stats-btn ${activeFilter === 'has_notice' ? 'active' : ''}`} onClick={() => handleFilterClick('has_notice')}>
+              Thông báo: <strong style={{ color: 'var(--md-warning)' }}>{hasNoticeCount}</strong>
+            </span>
+            <span className="dav-stats-divider">|</span>
+            <span className={`dav-stats-btn ${activeFilter === 'nearby_people' ? 'active' : ''}`} onClick={() => handleFilterClick('nearby_people')}>
+              Nearby People: <strong style={{ color: '#ec4899' }}>{nearbyPeopleCount}</strong>
+            </span>
+          </div>
+        </div>
+
+        {/* Thanh tìm kiếm ngay phía dưới */}
+        <div className="dav-search-box-global">
+          <Search size={14} />
+          <input 
+            ref={searchInputRef}
+            type="text" 
+            placeholder="Tìm theo Tên, Nickname, SĐT, Email..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
         </div>
       </div>
-    </div>,
+    </div>
+      
+      {showAddPlatformModal && (
+        <div className="confirmOverlay" style={{ zIndex: 28000 }} onMouseDown={() => {
+          setShowAddPlatformModal(false);
+          setNewPlatformName('');
+          setAddPlatformError('');
+        }}>
+          <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480, zIndex: 28001 }} onMouseDown={e => e.stopPropagation()}>
+            <div className="confirmTitle">Thêm nhóm mới</div>
+            <div className="confirmText">
+              <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>Tên nhóm mới</label>
+              <input
+                type='text'
+                className="modalInput"
+                placeholder="Nhập tên nhóm mới..."
+                value={newPlatformName}
+                onChange={e => {
+                  setNewPlatformName(e.target.value);
+                  setAddPlatformError('');
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleConfirmAddPlatform();
+                  if (e.key === 'Escape') {
+                    setShowAddPlatformModal(false);
+                    setNewPlatformName('');
+                    setAddPlatformError('');
+                  }
+                }}
+                autoFocus
+              />
+              {addPlatformError && (
+                <div style={{ color: 'var(--md-danger)', fontSize: 11, marginTop: 6 }}>
+                  {addPlatformError}
+                </div>
+              )}
+            </div>
+            <div className="confirmActions">
+              <button type='button' className="modalBtn" onClick={() => {
+                setShowAddPlatformModal(false);
+                setNewPlatformName('');
+                setAddPlatformError('');
+              }}>Huỷ</button>
+              <button
+                type='button'
+                className="modalBtnPrimary"
+                style={{
+                  opacity: newPlatformName.trim() ? 1 : 0.5,
+                  cursor: newPlatformName.trim() ? 'pointer' : 'not-allowed'
+                }}
+                disabled={!newPlatformName.trim()}
+                onClick={handleConfirmAddPlatform}
+              >
+                Xác Nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {platformCtxMenu && (
+        <div 
+          ref={platformCtxMenuRef}
+          className="dav-ctx-menu contextMenuPanel" 
+          style={{ 
+            left: platformCtxMenu.x, 
+            top: platformCtxMenu.y, 
+            zIndex: 29000
+          }}
+          onContextMenu={e => e.preventDefault()}
+        >
+          <button
+            type="button"
+            className="dav-ctx-item danger"
+            onClick={() => {
+              setPendingDeletePlatform(platformCtxMenu.platformId);
+              setPlatformCtxMenu(null);
+            }}
+          >
+            <Trash2 size={16} /> Xoá Nhóm
+          </button>
+        </div>
+      )}
+
+      {pendingDeletePlatform && (
+        <div className="confirmOverlay" style={{ zIndex: 28000 }} onMouseDown={() => setPendingDeletePlatform(null)}>
+          <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480, zIndex: 28001 }} onMouseDown={e => e.stopPropagation()}>
+            <div className="confirmTitle">Xác nhận xoá nhóm</div>
+            <div className="confirmText">
+              Bạn có chắc chắn muốn xoá nhóm <strong>{platforms.find(p => p.id === pendingDeletePlatform)?.label || pendingDeletePlatform}</strong>?
+              Tất cả tài khoản và dữ liệu thuộc nhóm này sẽ bị xoá vĩnh viễn khỏi toàn bộ thiết bị.
+            </div>
+            <div className="confirmActions">
+              <button type="button" className="modalBtn" onClick={() => setPendingDeletePlatform(null)}>Huỷ</button>
+              <button type="button" className="modalBtnDanger" onClick={handleConfirmDeletePlatform}>Xác nhận</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>,
     document.body
   );
 }

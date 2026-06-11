@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
-import { loadDeviceAccountVault, getDeviceAccountDataFromVault, type VaultData } from '@/lib/deviceAccountVault'
+import { loadDeviceAccountVault, getDeviceAccountDataFromVault, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
 import { readPageParams } from '@/lib/params'
 import { useServer } from '@/context/ServerContext'
 import { Tile } from '@/components/Tile'
@@ -44,6 +44,7 @@ import {
   MACRO_RUNNING_UDIDS_EVENT,
   MACRO_PLAYBACK_PROGRESS_EVENT,
   MACRO_PLAYBACK_STOP_EVENT,
+  MACRO_PLAYBACK_REPLAY_EVENT,
   type MacroPlaybackProgressDetail,
   type MacroPlaybackStopDetail,
   loadSeedingContents,
@@ -278,6 +279,9 @@ export function App() {
   const [deviceAccountOverlayOpen, setDeviceAccountOverlayOpen] = useState(false)
   const [deviceAccountOverlayMounted, setDeviceAccountOverlayMounted] = useState(false)
   const [vault, setVault] = useState<VaultData>(() => loadDeviceAccountVault())
+  const [davSearch, setDavSearch] = useState('')
+  const [davActiveFilter, setDavActiveFilter] = useState('default')
+  const [davActiveTab, setDavActiveTab] = useState<PlatformType>('wechat')
 
   useEffect(() => {
     if (deviceAccountOverlayOpen) {
@@ -662,7 +666,10 @@ export function App() {
       const detail = (e as CustomEvent<MacroPlaybackProgressDetail>).detail
       if (!detail?.id) return
       setMacroPlaybackItems(prev => {
-        if (!detail.running) return prev.filter(item => item.id !== detail.id)
+        if (!detail.running) {
+          // Macro xong: giữ item, đánh dấu finished
+          return prev.map(item => item.id === detail.id ? { ...detail, running: false } : item)
+        }
         const next = prev.filter(item => item.id !== detail.id)
         return [...next, detail]
       })
@@ -1433,13 +1440,58 @@ export function App() {
   }, [macroPlaybackNow])
   const orderedRegistered = useMemo(() => {
     const arr = [...filteredRegistered]
+
+    // Nếu bộ lọc tài khoản là nearby_people đang hoạt động và đang mở overlay
+    if (deviceAccountOverlayOpen && davActiveFilter === 'nearby_people' && davActiveTab === 'wechat') {
+      const now = Date.now();
+      
+      const getHours = (udid: string) => {
+        const accountData = getDeviceAccountDataFromVault(vault, udid);
+        const accounts = accountData.platforms['wechat'] || [];
+        let nearest = Number.POSITIVE_INFINITY;
+        
+        for (const acc of accounts) {
+          if (!acc || acc.status === 'Die' || acc.status === 'Risk') continue;
+          
+          const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+          const isOverOneYear = !!(acc.isOneYearOld || (acc.createdAt && (now - acc.createdAt) >= oneYearMs));
+          if (!isOverOneYear) continue;
+          
+          const hours = acc.nearbyPeopleDueDate 
+            ? Math.max(0, (acc.nearbyPeopleDueDate - now) / (1000 * 60 * 60))
+            : 0;
+            
+          if (hours < nearest) {
+            nearest = hours;
+          }
+        }
+        return nearest;
+      };
+
+      arr.sort((a, b) => {
+        const ha = getHours(a);
+        const hb = getHours(b);
+        
+        if (ha !== hb) {
+          return ha - hb;
+        }
+        
+        // Cùng giá trị thì sắp xếp theo số thứ tự máy
+        const oa = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER;
+        const ob = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
+        return oa - ob;
+      });
+      
+      return arr;
+    }
+
     arr.sort((a, b) => {
       const oa = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER
       const ob = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER
       return oa - ob
     })
     return arr
-  }, [filteredRegistered, orderMap])
+  }, [filteredRegistered, orderMap, deviceAccountOverlayOpen, davActiveFilter, davActiveTab, vault])
   const orderedSidebarRegistered = useMemo(() => {
     const arr = [...sidebarRegistered]
     arr.sort((a, b) => {
@@ -1455,6 +1507,97 @@ export function App() {
     }
     return null;
   }, [focusGroupIdx, savedGroups]);
+
+  const isDeviceMatchingAccountFilter = useCallback((udid: string) => {
+    // Nếu không mở overlay tài khoản thì không áp dụng bộ lọc
+    if (!deviceAccountOverlayOpen) return true;
+
+    const accountData = getDeviceAccountDataFromVault(vault, udid);
+    const accounts = (accountData.platforms[davActiveTab] || []).filter(acc => acc !== null && acc !== undefined);
+
+    // 1. Lọc theo davActiveFilter
+    if (davActiveFilter !== 'default') {
+      let filterMatched = false;
+      const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+
+      if (davActiveFilter === 'one_year') {
+        filterMatched = accounts.some(acc => {
+          if (acc.createdAt) return (Date.now() - acc.createdAt) >= oneYearMs;
+          return (acc as any).isOneYearOld === true;
+        });
+      } else if (davActiveFilter === 'new_month') {
+        filterMatched = accounts.some(acc => {
+          if (acc.createdAt) return (Date.now() - acc.createdAt) < thirtyDaysMs;
+          return (acc as any).isNew === true;
+        });
+      } else if (davActiveFilter === 'disabled') {
+        filterMatched = accounts.some(acc => acc.status === 'Die' || acc.status === 'Risk');
+      } else if (davActiveFilter === 'unverified') {
+        filterMatched = accounts.some(acc => acc.status === 'Unverified' || (acc as any).verifyStatus === 'Unverified');
+      } else if (davActiveFilter === 'incomplete_info') {
+        filterMatched = accounts.some(acc => !acc.name || !acc.nickname || !acc.phone || !acc.email);
+      } else if (davActiveFilter === 'wechat_scan_vn') {
+        if (davActiveTab === 'wechat') {
+          filterMatched = accounts.some(acc => {
+            const wc = acc as WeChatAccount;
+            const scanCount = wc.scanCount || 0;
+            if (scanCount >= 3) return false;
+            if (wc.lastScanDate) {
+              const nextScan = wc.lastScanDate + 30 * 24 * 60 * 60 * 1000;
+              if (nextScan > Date.now()) return false;
+            }
+            return wc.phoneRegion !== 'HK';
+          });
+        }
+      } else if (davActiveFilter === 'wechat_scan_hk') {
+        if (davActiveTab === 'wechat') {
+          filterMatched = accounts.some(acc => {
+            const wc = acc as WeChatAccount;
+            const scanCount = wc.scanCount || 0;
+            if (scanCount >= 3) return false;
+            if (wc.lastScanDate) {
+              const nextScan = wc.lastScanDate + 30 * 24 * 60 * 60 * 1000;
+              if (nextScan > Date.now()) return false;
+            }
+            return wc.phoneRegion === 'HK';
+          });
+        }
+      } else if (davActiveFilter === 'has_notice') {
+        filterMatched = accounts.some(acc => !!(acc.notice && acc.notice.dueDate));
+      } else if (davActiveFilter === 'nearby_people') {
+        if (davActiveTab === 'wechat') {
+          const now = Date.now();
+          filterMatched = accounts.some(acc => {
+            if (!acc || acc.status === 'Die' || acc.status === 'Risk') return false;
+            const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+            const isOverOneYear = !!(acc.isOneYearOld || (acc.createdAt && (now - acc.createdAt) >= oneYearMs));
+            return isOverOneYear;
+          });
+        }
+      }
+
+      if (!filterMatched) return false;
+    }
+
+    // 2. Lọc theo search query (chỉ lọc trong danh sách tài khoản, không lọc theo model máy/số thiết bị)
+    if (davSearch.trim() !== '') {
+      const q = davSearch.toLowerCase().trim();
+
+      const accountMatch = accounts.some(acc => {
+        return (
+          (acc.name || '').toLowerCase().includes(q) ||
+          (acc.nickname || '').toLowerCase().includes(q) ||
+          (acc.phone || '').toLowerCase().includes(q) ||
+          (acc.email || '').toLowerCase().includes(q)
+        );
+      });
+
+      if (!accountMatch) return false;
+    }
+
+    return true;
+  }, [deviceAccountOverlayOpen, vault, davActiveTab, davActiveFilter, davSearch]);
 
   const selectedVisible = useMemo(
     () => orderedRegistered.filter(id => connectSelection.has(id)),
@@ -2422,144 +2565,198 @@ export function App() {
               } as React.CSSProperties
             }
           >
-            {mergedOrder.map((udid, idx) => {
-              const isConnected = connectedUdids.has(udid)
-              // isVisible: kiểm tra bộ lọc loại kết nối và nhóm (khi focus vào nhóm chỉ hiện máy online)
-              const isVisible = (deviceFilter === 'all' || getDeviceConnectionType(udid) === deviceFilter) &&
-                (!currentFocusGroupSet || (currentFocusGroupSet.has(udid) && isConnected));
+            {(() => {
+              let renderOrder = [...mergedOrder];
+              if (deviceAccountOverlayOpen && davActiveFilter === 'nearby_people' && davActiveTab === 'wechat') {
+                const now = Date.now();
+                const getHours = (udid: string) => {
+                  const accountData = getDeviceAccountDataFromVault(vault, udid);
+                  const accounts = accountData.platforms['wechat'] || [];
+                  let nearest = Number.POSITIVE_INFINITY;
+                  
+                  for (const acc of accounts) {
+                    if (!acc || acc.status === 'Die' || acc.status === 'Risk') continue;
+                    
+                    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+                    const isOverOneYear = !!(acc.isOneYearOld || (acc.createdAt && (now - acc.createdAt) >= oneYearMs));
+                    if (!isOverOneYear) continue;
+                    
+                    const hours = acc.nearbyPeopleDueDate 
+                      ? Math.max(0, (acc.nearbyPeopleDueDate - now) / (1000 * 60 * 60))
+                      : 0;
+                      
+                    if (hours < nearest) {
+                      nearest = hours;
+                    }
+                  }
+                  return nearest;
+                };
 
-              return (
-                <div
-                  key={udid}
-                  data-udid={udid}
-                  className={`tileDraggableWrapper${isSingleDevice ? ' single' : ''
-                    }${dragging ? ' dragging' : ''}${viewerUdid === udid ? ' hiddenByViewer' : ''
-                    }${dropTarget === udid ? ' dropTarget' : ''}${runningMacroUdids.has(udid) ? ' macroRunning' : ''}`}
-                  onPointerDownCapture={e => {
-                    if (e.button !== 2) return
-                    const target = e.target as HTMLElement
-                    if (target.tagName.toLowerCase() === 'canvas') return // Allow right click down to canvas for Back key
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
-                  onMouseDownCapture={e => {
-                    if (e.button !== 2) return
-                    const target = e.target as HTMLElement
-                    if (target.tagName.toLowerCase() === 'canvas') return // Allow right click down to canvas for Back key
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
-                  onPointerDown={onTilePointerDown}
-                  onClick={(e) => {
-                    const target = e.target as HTMLElement;
-                    // Nhường thao tác UI cho các nút riêng
-                    if (target.closest('button') || target.tagName.toLowerCase() === 'input') return;
+                renderOrder.sort((a, b) => {
+                  const ha = getHours(a);
+                  const hb = getHours(b);
+                  
+                  if (ha !== hb) {
+                    return ha - hb;
+                  }
+                  
+                  // Cùng giá trị thì sắp xếp theo số thứ tự máy
+                  const oa = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER;
+                  const ob = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
+                  return oa - ob;
+                });
+              }
 
-                    // Click registers this device selection
-                    clickDevice(udid);
+              return renderOrder.map((udid, idx) => {
+                const isConnected = connectedUdids.has(udid)
+                
+                // 1. Kiểm tra bộ lọc loại kết nối và nhóm (khi focus vào nhóm chỉ hiện máy online)
+                const isMatchedByConnectionAndGroup = (deviceFilter === 'all' || getDeviceConnectionType(udid) === deviceFilter) &&
+                  (!currentFocusGroupSet || (currentFocusGroupSet.has(udid) && isConnected));
 
-                    // CHỈ CÓ TÁC DỤNG nếu đang đè phím Ctrl/Meta
-                    if (!e.ctrlKey && !e.metaKey) return;
-                    if (runningMacroUdids.has(udid)) return;
+                // 2. Kiểm tra bộ lọc tài khoản (chỉ khi overlay tài khoản đang mở)
+                const isAccountMatched = isDeviceMatchingAccountFilter(udid);
 
-                    // Chọn/Bỏ chọn đa nhiệm (viền xanh)
-                    setConnectSelection(prev => {
-                      const next = new Set(prev);
-                      if (next.has(udid)) next.delete(udid);
-                      else next.add(udid);
-                      return next;
-                    });
-                    // Bật chế độ active duy nhất (viền trắng) để làm tâm điểm
-                    selectOnly(udid);
-                  }}
-                  onContextMenu={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    clickDevice(udid)
-                    if (e.ctrlKey || e.metaKey) {
-                      selectOnly(udid)
-                      setViewerUdid(udid)
-                      return
-                    }
-                    const target = e.target as HTMLElement
-                    if (target.tagName.toLowerCase() === 'canvas') {
-                      // Right-clicked the stream screen -> Back key sent, skip context menu
-                      return
-                    }
-                    // Mở context menu nhóm cho tile này
-                    setContextMenuTarget({ x: e.clientX, y: e.clientY, udid, sourceGrid: 'main', groupIdx: activeGroupIdx ?? undefined })
-                    setContextMenuInput(String(orderMap.get(udid) ?? 0))
-                    setContextMenuOpen(true)
-                  }}
-                  onDragOver={e => {
-                    if (draggingTile) e.preventDefault()
-                    if (draggingTile && dropTarget !== udid) {
-                      setDropTarget(udid)
-                    }
-                    if (draggingTile && draggingTile !== udid) {
-                      const toIndex = mergedOrder.indexOf(udid)
-                      const fromIndex = mergedOrder.indexOf(draggingTile)
-                      if (
-                        toIndex >= 0 &&
-                        fromIndex >= 0 &&
-                        toIndex !== fromIndex
-                      ) {
-                        moveTile(draggingTile, toIndex)
-                      }
-                    }
-                  }}
-                  onDrop={e => {
-                    e.preventDefault()
-                    if (draggingTile) {
-                      const toIndex = mergedOrder.indexOf(udid)
-                      if (toIndex >= 0) moveTile(draggingTile, toIndex)
-                      setDraggingTile(null)
-                    }
-                    setDropTarget(null)
-                  }}
-                  onDragLeave={() => {
-                    setDropTarget(prev => (prev === udid ? null : prev))
-                  }}
-                  style={{
-                    display: isVisible ? 'block' : 'none',
-                    ...(isSingleDevice
-                      ? {
-                        ['--drag-x' as any]: `${dragOffset.x}px`,
-                        ['--drag-y' as any]: `${dragOffset.y}px`
-                      }
-                      : {})
-                  }}
-                >
-                  <Tile
-                    udid={udid}
-                    order={getTileNumber(udid, idx + 1)}
-                    deviceParam={udid}
-                    wsServer={wsServer}
-                    isViewing={viewerUdid === udid}
-                    selected={connectSelection.has(udid)}
-                    showTileInfo={showTileInfo}
-                    isDisconnected={!isConnected}
-                    visualAlertActive={Boolean(visualTileAlerts[udid])}
-                    onClearVisualAlert={() => clearVisualAlert(udid)}
-                    streamConfig={
-                      viewerUdid === udid ? viewerStreamConfig : streamConfig
-                    }
-                    onRegisterReload={registerReload}
-                    onUnregisterReload={unregisterReload}
-                    onViewDevice={id => {
-                      setViewerUdid(prev => prev === id ? null : id)
+                // 3. Quyết định hiển thị hay ẩn hoàn toàn
+                // Nếu không khớp kết nối/nhóm -> Ẩn hoàn toàn.
+                // Nếu khớp kết nối/nhóm -> Luôn hiển thị. Nhưng nếu overlay tài khoản mở và không khớp bộ lọc tài khoản -> Làm mờ tối.
+                const isVisible = isMatchedByConnectionAndGroup;
+                const isFilteredOut = deviceAccountOverlayOpen && isMatchedByConnectionAndGroup && !isAccountMatched;
+
+                return (
+                  <div
+                    key={udid}
+                    data-udid={udid}
+                    className={`tileDraggableWrapper${isSingleDevice ? ' single' : ''
+                      }${dragging ? ' dragging' : ''}${viewerUdid === udid ? ' hiddenByViewer' : ''
+                      }${dropTarget === udid ? ' dropTarget' : ''}${runningMacroUdids.has(udid) ? ' macroRunning' : ''}${isFilteredOut ? ' mxh-filtered-out' : ''}`}
+                    onPointerDownCapture={e => {
+                      if (e.button !== 2) return
+                      const target = e.target as HTMLElement
+                      if (target.tagName.toLowerCase() === 'canvas') return // Allow right click down to canvas for Back key
+                      e.preventDefault()
+                      e.stopPropagation()
                     }}
-                    onMove={moveTile}
-                    onChangeOrderNumber={setTileNumber}
-                    onDragStart={id => setDraggingTile(id)}
-                    onDragEnd={() => setDraggingTile(null)}
-                    showAccountOverlay={deviceAccountOverlayOpen}
-                    orderMap={orderMap}
-                    accountData={getDeviceAccountDataFromVault(vault, udid)}
-                  />
-                </div>
-              );
-            })}
+                    onMouseDownCapture={e => {
+                      if (e.button !== 2) return
+                      const target = e.target as HTMLElement
+                      if (target.tagName.toLowerCase() === 'canvas') return // Allow right click down to canvas for Back key
+                      e.preventDefault()
+                      e.stopPropagation()
+                    }}
+                    onPointerDown={onTilePointerDown}
+                    onClick={(e) => {
+                      const target = e.target as HTMLElement;
+                      // Nhường thao tác UI cho các nút riêng
+                      if (target.closest('button') || target.tagName.toLowerCase() === 'input') return;
+
+                      // Click registers this device selection
+                      clickDevice(udid);
+
+                      // CHỈ CÓ TÁC DỤNG nếu đang đè phím Ctrl/Meta
+                      if (!e.ctrlKey && !e.metaKey) return;
+                      if (runningMacroUdids.has(udid)) return;
+
+                      // Chọn/Bỏ chọn đa nhiệm (viền xanh)
+                      setConnectSelection(prev => {
+                        const next = new Set(prev);
+                        if (next.has(udid)) next.delete(udid);
+                        else next.add(udid);
+                        return next;
+                      });
+                      // Bật chế độ active duy nhất (viền trắng) để làm tâm điểm
+                      selectOnly(udid);
+                    }}
+                    onContextMenu={e => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      clickDevice(udid)
+                      if (e.ctrlKey || e.metaKey) {
+                        selectOnly(udid)
+                        setViewerUdid(udid)
+                        return
+                      }
+                      const target = e.target as HTMLElement
+                      if (target.tagName.toLowerCase() === 'canvas') {
+                        // Right-clicked the stream screen -> Back key sent, skip context menu
+                        return
+                      }
+                      // Mở context menu nhóm cho tile này
+                      setContextMenuTarget({ x: e.clientX, y: e.clientY, udid, sourceGrid: 'main', groupIdx: activeGroupIdx ?? undefined })
+                      setContextMenuInput(String(orderMap.get(udid) ?? 0))
+                      setContextMenuOpen(true)
+                    }}
+                    onDragOver={e => {
+                      if (draggingTile) e.preventDefault()
+                      if (draggingTile && dropTarget !== udid) {
+                        setDropTarget(udid)
+                      }
+                      if (draggingTile && draggingTile !== udid) {
+                        const toIndex = mergedOrder.indexOf(udid)
+                        const fromIndex = mergedOrder.indexOf(draggingTile)
+                        if (
+                          toIndex >= 0 &&
+                          fromIndex >= 0 &&
+                          toIndex !== fromIndex
+                        ) {
+                          moveTile(draggingTile, toIndex)
+                        }
+                      }
+                    }}
+                    onDrop={e => {
+                      e.preventDefault()
+                      if (draggingTile) {
+                        const toIndex = mergedOrder.indexOf(udid)
+                        if (toIndex >= 0) moveTile(draggingTile, toIndex)
+                        setDraggingTile(null)
+                      }
+                      setDropTarget(null)
+                    }}
+                    onDragLeave={() => {
+                      setDropTarget(prev => (prev === udid ? null : prev))
+                    }}
+                    style={{
+                      display: isVisible ? 'block' : 'none',
+                      ...(isSingleDevice
+                        ? {
+                          ['--drag-x' as any]: `${dragOffset.x}px`,
+                          ['--drag-y' as any]: `${dragOffset.y}px`
+                        }
+                        : {})
+                    }}
+                  >
+                    <Tile
+                      udid={udid}
+                      order={orderMap.get(udid) ?? idx + 1}
+                      deviceParam={udid}
+                      wsServer={wsServer}
+                      isViewing={viewerUdid === udid}
+                      selected={connectSelection.has(udid)}
+                      showTileInfo={showTileInfo}
+                      isDisconnected={!isConnected}
+                      visualAlertActive={Boolean(visualTileAlerts[udid])}
+                      onClearVisualAlert={() => clearVisualAlert(udid)}
+                      streamConfig={
+                        viewerUdid === udid ? viewerStreamConfig : streamConfig
+                      }
+                      onRegisterReload={registerReload}
+                      onUnregisterReload={unregisterReload}
+                      onViewDevice={id => {
+                        setViewerUdid(prev => prev === id ? null : id)
+                      }}
+                      onMove={moveTile}
+                      onChangeOrderNumber={setTileNumber}
+                      onDragStart={id => setDraggingTile(id)}
+                      onDragEnd={() => setDraggingTile(null)}
+                      showAccountOverlay={deviceAccountOverlayOpen}
+                      orderMap={orderMap}
+                      accountData={getDeviceAccountDataFromVault(vault, udid)}
+                      isFilteredOut={isFilteredOut}
+                    />
+                  </div>
+                );
+              });
+            })()}
           </div>
           {rubberBand && (() => {
             const x = Math.min(rubberBand.startX, rubberBand.currentX)
@@ -3848,36 +4045,83 @@ export function App() {
           <header className='macroPlaybackHeader' onPointerDown={startMacroPlaybackDrag}>
             <div className='macroPlaybackHeading'>
               <span>Automation Playback</span>
-              <small>{macroPlaybackItems.length} đang chạy</small>
+              <small>{macroPlaybackItems.filter(i => i.running).length > 0 ? `${macroPlaybackItems.filter(i => i.running).length} đang chạy` : 'Hoàn tất'}</small>
             </div>
-            <button
-              type='button'
-              className='modalBtn macroPlaybackToggleBtn'
-              onClick={() => setMacroPlaybackExpanded(prev => !prev)}
-            >
-              {macroPlaybackExpanded ? 'Thu gọn' : 'Mở rộng'}
-            </button>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <button
+                type='button'
+                className='modalBtn macroPlaybackToggleBtn'
+                onClick={() => setMacroPlaybackExpanded(prev => !prev)}
+              >
+                {macroPlaybackExpanded ? 'Thu gọn' : 'Mở rộng'}
+              </button>
+              <button
+                type='button'
+                className='modalBtn macroPlaybackCloseBtn'
+                onClick={() => {
+                  // Dừng tất cả macro đang chạy trước khi đóng
+                  macroPlaybackItems.forEach(item => {
+                    if (item.running) {
+                      const detail: MacroPlaybackStopDetail = { id: item.id }
+                      window.dispatchEvent(new CustomEvent(MACRO_PLAYBACK_STOP_EVENT, { detail }))
+                    }
+                  })
+                  setMacroPlaybackItems([])
+                }}
+                title='Đóng panel'
+              >
+                ✕
+              </button>
+            </div>
           </header>
           {macroPlaybackExpanded ? (
             <div className='macroPlaybackList'>
               {macroPlaybackItems.map(item => (
-                <div key={item.id} className='macroPlaybackItem'>
+                <div key={item.id} className={`macroPlaybackItem${!item.running ? ' finished' : ''}`}>
                   <div className='macroPlaybackItemText'>
-                    <span>Đang chạy:</span>
+                    <span>{item.running ? 'Đang chạy:' : 'Hoàn tất:'}</span>
                     <strong>{item.title}</strong>
                     <small>{formatPlaybackElapsed(item.startedAt)}</small>
                   </div>
-                  <button
-                    type='button'
-                    className='modalBtnDanger macroPlaybackStopBtn'
-                    onClick={() => {
-                      const detail: MacroPlaybackStopDetail = { id: item.id }
-                      window.dispatchEvent(new CustomEvent(MACRO_PLAYBACK_STOP_EVENT, { detail }))
-                      setMacroPlaybackItems(prev => prev.filter(progress => progress.id !== item.id))
-                    }}
-                  >
-                    Stop
-                  </button>
+                  {item.running ? (
+                    <button
+                      type='button'
+                      className='modalBtnDanger macroPlaybackStopBtn'
+                      onClick={() => {
+                        const detail: MacroPlaybackStopDetail = { id: item.id }
+                        window.dispatchEvent(new CustomEvent(MACRO_PLAYBACK_STOP_EVENT, { detail }))
+                        setMacroPlaybackItems(prev => prev.filter(progress => progress.id !== item.id))
+                      }}
+                    >
+                      Stop
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {item.replayAppId && item.replayActionId ? (
+                        <button
+                          type='button'
+                          className='modalBtnPrimary macroPlaybackStopBtn'
+                          onClick={() => {
+                            // Xóa item cũ và dispatch replay event
+                            setMacroPlaybackItems(prev => prev.filter(p => p.id !== item.id))
+                            window.dispatchEvent(new CustomEvent(MACRO_PLAYBACK_REPLAY_EVENT, {
+                              detail: { appId: item.replayAppId, actionId: item.replayActionId }
+                            }))
+                          }}
+                        >
+                          ▶ Play
+                        </button>
+                      ) : null}
+                      <button
+                        type='button'
+                        className='modalBtn macroPlaybackStopBtn'
+                        onClick={() => setMacroPlaybackItems(prev => prev.filter(p => p.id !== item.id))}
+                        title='Xóa khỏi danh sách'
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -4777,6 +5021,22 @@ export function App() {
           onClose={() => setSyncTimeModalOpen(false)}
         />
       ) : null}
+      {deviceAccountOverlayMounted && (
+        <DeviceAccountOverlay
+          open={deviceAccountOverlayOpen}
+          onClose={() => setDeviceAccountOverlayOpen(false)}
+          registeredUdids={registeredUdids}
+          connectedUdids={connectedUdids}
+          orderMap={orderMap}
+          androidDeviceMap={androidDeviceMap}
+          search={davSearch}
+          setSearch={setDavSearch}
+          activeFilter={davActiveFilter}
+          setActiveFilter={setDavActiveFilter}
+          activeTab={davActiveTab}
+          setActiveTab={setDavActiveTab}
+        />
+      )}
     </>
   )
 }

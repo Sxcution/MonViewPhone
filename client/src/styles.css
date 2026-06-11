@@ -8934,12 +8934,12 @@ textarea:focus,
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(15, 15, 15, 0.85);
-  backdrop-filter: blur(8px);
+  background: transparent;
   z-index: 9999;
   display: flex;
   flex-direction: column;
   color: #fff;
+  pointer-events: none;
 }
 
 .is-hidden {
@@ -9916,4 +9916,240 @@ input[type=number] {
 
 .macro-panel-resizer:hover {
   background: #0d6efd;
+}
+
+.dav-header-center-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 700px;
+}
+
+.dav-stats-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  font-size: 11px;
+  width: 100%;
+}
+
+.dav-stats-row-global {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  color: var(--md-muted);
+  width: 100%;
+  gap: 2px 4px;
+}
+
+.dav-stats-label {
+  font-weight: bold;
+  margin-right: 2px;
+  color: var(--md-text-soft);
+}
+
+.dav-stats-val-total {
+  font-weight: bold;
+  color: var(--md-text);
+  margin-right: 4px;
+}
+
+.dav-stats-divider {
+  color: #333;
+  margin: 0 4px;
+}
+
+.dav-stats-btn {
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.dav-stats-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--md-text);
+}
+
+.dav-stats-btn.active {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.dav-search-box-global {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--md-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  width: 100%;
+  max-width: 500px;
+}
+
+.dav-search-box-global input {
+  background: transparent;
+  border: none;
+  color: var(--md-text);
+  font-size: 11px;
+  outline: none;
+  width: 100%;
+}
+
+.dav-floating-panel {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 20, 22, 0.95);
+  border: 1px solid var(--md-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  pointer-events: auto; /* nhận click */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 10000;
+  min-width: 460px;
+}
+
+.dav-floating-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 4px;
+  margin-bottom: 2px;
+  cursor: move;
+}
+
+.dav-floating-title-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.dav-floating-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dav-floating-subtitle {
+  font-size: 10px;
+  color: #888;
+}
+
+.dav-floating-platform-select {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dav-floating-platform-btn {
+  background: transparent;
+  border: none;
+  color: var(--md-muted);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dav-floating-platform-btn:hover {
+  color: var(--md-text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dav-floating-platform-btn.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--md-info), var(--md-blue));
+}
+
+.dav-floating-platform-btn-add {
+  background: transparent;
+  border: none;
+  color: var(--md-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dav-floating-platform-btn-add:hover {
+  color: var(--md-text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.dav-floating-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--md-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.dav-floating-close-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Account Overlay Filtering Dimming Styles (MonDashboard Style) */
+.tile-account-overlay.mxh-filtered-out .tile-account-inner {
+  filter: grayscale(1) brightness(0.55);
+  opacity: 0.35;
+  transition: filter 0.2s ease, opacity 0.2s ease;
+}
+
+.mxh-filter-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 105;
+}
+
+.mxh-filter-overlay-inner {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.65);
+  user-select: none;
+}
+
+.mxh-filter-x {
+  font-size: 3.2rem;
+  line-height: 1;
+  font-weight: 800;
+  opacity: 0.85;
+}
+
+.mxh-filter-none {
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-top: -2px;
+}
+
+.dav-total-badge.nearby-active {
+  background: #3b82f6 !important;
+  color: #fff !important;
 }

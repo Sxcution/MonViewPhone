@@ -39,9 +39,17 @@ function TileComponent({
     showAccountOverlay = false,
     orderMap,
     accountData,
+    isFilteredOut = false,
 }: TileProps) {
     const { t } = useI18n();
     const [accountOverlayMounted, setAccountOverlayMounted] = useState(false);
+    const [tileTab, setTileTab] = useState<string>('wechat');
+
+    useEffect(() => {
+        if (accountData?.defaultPlatform) {
+            setTileTab(accountData.defaultPlatform);
+        }
+    }, [accountData?.defaultPlatform]);
 
     useEffect(() => {
         if (showAccountOverlay) {
@@ -342,7 +350,7 @@ function TileComponent({
             ) : null}
 
             <div className="tileBody" ref={bodyRef}>
-                {isDisconnected ? (
+                {isDisconnected && !showAccountOverlay ? (
                     <div className="tileDisconnectedOverlay">
                         <div className="tileDisconnectedIcon" aria-hidden="true">
                             <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -355,7 +363,7 @@ function TileComponent({
                     </div>
                 ) : (
                     <>
-                        {!isViewing && loading ? (
+                        {!isViewing && loading && !showAccountOverlay ? (
                             <div className="loading">
                                 <div className="spinner"></div>
                             </div>
@@ -365,19 +373,30 @@ function TileComponent({
 
                         {accountOverlayMounted && (
                             <div 
-                                className={`tile-account-overlay ${showAccountOverlay ? 'is-open' : 'is-hidden'}`} 
+                                className={`tile-account-overlay ${showAccountOverlay ? 'is-open' : 'is-hidden'} ${isFilteredOut ? 'mxh-filtered-out' : ''}`} 
                                 onMouseDown={e => e.stopPropagation()}
                             >
+                                {isFilteredOut && (
+                                    <div className="mxh-filter-overlay">
+                                        <div className="mxh-filter-overlay-inner">
+                                            <div className="mxh-filter-x">×</div>
+                                            <div className="mxh-filter-none">None</div>
+                                        </div>
+                                    </div>
+                                )}
                                 {accountData && (
-                                    <DeviceAccountPanel
-                                        udid={udid}
-                                        order={order ?? 0}
-                                        model={modelName}
-                                        isOnline={!isDisconnected}
-                                        filterSearch=""
-                                        orderMap={orderMap || new Map()}
-                                        initialData={accountData}
-                                    />
+                                    <div className="tile-account-inner" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                                        <DeviceAccountPanel
+                                            udid={udid}
+                                            order={order ?? 0}
+                                            model={modelName}
+                                            isOnline={!isDisconnected}
+                                            orderMap={orderMap || new Map()}
+                                            initialData={accountData}
+                                            activeTab={tileTab}
+                                            setActiveTab={setTileTab}
+                                        />
+                                    </div>
                                 )}
                             </div>
                         )}

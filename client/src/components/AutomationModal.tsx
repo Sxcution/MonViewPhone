@@ -60,8 +60,10 @@ import {
   MACRO_RUNNING_UDIDS_EVENT,
   MACRO_PLAYBACK_PROGRESS_EVENT,
   MACRO_PLAYBACK_STOP_EVENT,
+  MACRO_PLAYBACK_REPLAY_EVENT,
   type MacroPlaybackProgressDetail,
   type MacroPlaybackStopDetail,
+  type MacroPlaybackReplayDetail,
 } from '@/lib/automationData';
 
 /* ── types ── */
@@ -1380,7 +1382,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         return;
       }
       progressStarted = true;
-      updatePlaybackProgress({ id: playbackId, running: true, title: action.name, udids: targetUdidsList, startedAt });
+      updatePlaybackProgress({ id: playbackId, running: true, title: action.name, udids: targetUdidsList, startedAt, replayAppId: appId, replayActionId: actionId });
 
       /* ── chọn sync settings chung (ưu tiên cái có delayEnabled) ── */
       const syncSettings = groups.find(g => g.syncSettings.delayEnabled)?.syncSettings
@@ -1490,7 +1492,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     } finally {
       playbackControllersRef.current.delete(playbackId);
       if (progressStarted) {
-        updatePlaybackProgress({ id: playbackId, running: false, title: action.name, udids: targetUdidsList, startedAt });
+        updatePlaybackProgress({ id: playbackId, running: false, title: action.name, udids: targetUdidsList, startedAt, replayAppId: appId, replayActionId: actionId });
       }
     }
   }, [deviceByUdid, getTargetsByUdids, recordTargetUdid, selectedUdids, updatePlaybackProgress, updateRunningMacroUdids]);
@@ -1607,6 +1609,16 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     window.addEventListener(MACRO_PLAYBACK_STOP_EVENT, stopPlayback);
     return () => window.removeEventListener(MACRO_PLAYBACK_STOP_EVENT, stopPlayback);
   }, []);
+
+  useEffect(() => {
+    const handleReplay = (event: Event) => {
+      const detail = (event as CustomEvent<MacroPlaybackReplayDetail>).detail;
+      if (!detail?.appId || !detail?.actionId) return;
+      playAppAction(detail.appId as AutomationAppId, detail.actionId);
+    };
+    window.addEventListener(MACRO_PLAYBACK_REPLAY_EVENT, handleReplay);
+    return () => window.removeEventListener(MACRO_PLAYBACK_REPLAY_EVENT, handleReplay);
+  }, [playAppAction]);
 
   useEffect(() => {
     if (!macroCtxMenu) return;

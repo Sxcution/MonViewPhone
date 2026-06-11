@@ -129,9 +129,16 @@
       "dav_platform_menu": "dav-platform-menu",
       "dav_platform_menu_item": "dav-platform-menu-item",
       "dav_account_action_menu": "dav-account-action-menu",
+      "dav_floating_platform_btn_add": "dav-floating-platform-btn-add",
       "is_hidden": "is-hidden",
       "column_resizer": "column-resizer",
-      "macro_panel_resizer": "macro-panel-resizer"
+      "macro_panel_resizer": "macro-panel-resizer",
+      "mxh_filtered_out": "mxh-filtered-out",
+      "mxh_filter_overlay": "mxh-filter-overlay",
+      "mxh_filter_overlay_inner": "mxh-filter-overlay-inner",
+      "mxh_filter_x": "mxh-filter-x",
+      "mxh_filter_none": "mxh-filter-none",
+      "tile_account_inner": "tile-account-inner"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -189,7 +196,18 @@
       "macro_status": "macroStatus",
       "auto_physical_screen_off": "autoPhysicalScreenOff",
       "device_account_overlay_open": "deviceAccountOverlayOpen",
-      "device_account_overlay_mounted": "deviceAccountOverlayMounted"
+      "device_account_overlay_mounted": "deviceAccountOverlayMounted",
+      "dav_search": "davSearch",
+      "dav_active_filter": "davActiveFilter",
+      "dav_active_tab": "davActiveTab",
+      "is_filtered_out": "isFilteredOut",
+      "show_add_platform_modal": "showAddPlatformModal",
+      "new_platform_name": "newPlatformName",
+      "add_platform_error": "addPlatformError",
+      "platform_ctx_menu": "platformCtxMenu",
+      "pending_delete_platform": "pendingDeletePlatform",
+      "drag_pos": "dragPos",
+      "device_notice_status": "deviceNoticeStatus"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
@@ -213,7 +231,11 @@
       "delete_app_action": "deleteAppAction",
       "click_device": "clickDevice",
       "set_wallpaper_devices": "handleSetWallpaperForDevices",
-      "run_display_power_targets": "runDisplayPowerForTargets"
+      "run_display_power_targets": "runDisplayPowerForTargets",
+      "handle_confirm_add_platform": "handleConfirmAddPlatform",
+      "handle_confirm_delete_platform": "handleConfirmDeletePlatform",
+      "handle_header_mouse_down": "handleHeaderMouseDown",
+      "handle_notice_icon_click": "handleNoticeIconClick"
     },
     "refs": {
       "rubber_band_ref": "rubberBandRef",

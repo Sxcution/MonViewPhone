@@ -93,11 +93,20 @@ export type MacroPlaybackProgressDetail = {
   title: string;
   udids: string[];
   startedAt: number;
+  replayAppId?: string;
+  replayActionId?: string;
 };
 
 export type MacroPlaybackStopDetail = {
   id: string;
 };
+
+export type MacroPlaybackReplayDetail = {
+  appId: string;
+  actionId: string;
+};
+
+export const MACRO_PLAYBACK_REPLAY_EVENT = 'monviewphone:macro-playback-replay';
 
 /* ── utility ───────────────────────────────────────────────────── */
 

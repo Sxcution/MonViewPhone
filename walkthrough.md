@@ -1,1 +1,4 @@
-- Đã sửa lỗi Random delay trong AutomationModal.tsx bằng cách chuyển từ vòng lặp đồng bộ sang xử lý bất đồng bộ (Promise.all) với thời gian delay sinh ngẫu nhiên riêng cho từng thiết bị.
+- Đã loại bỏ hoàn toàn việc tìm kiếm/lọc theo Model máy thiết bị khỏi chức năng Tìm kiếm Quản lý tài khoản (Quản lý tài khoản).
+- Thêm cơ chế lọc sạch các phần tử null/undefined trong danh sách tài khoản để tránh lỗi crash JS làm mờ/ẩn tất cả thiết bị trên Grid khi tìm kiếm.
+- Cập nhật placeholder chỉ dẫn tìm kiếm thành "Tìm theo Tên, Nickname, SĐT, Email, Ghi chú...".
+- Chạy `npm run build` thành công trên frontend.

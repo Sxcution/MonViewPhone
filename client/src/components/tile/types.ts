@@ -31,5 +31,6 @@ export type TileProps = {
     showAccountOverlay?: boolean;
     orderMap?: Map<string, number>;
     accountData?: DeviceAccountData;
+    isFilteredOut?: boolean;
 };
 
