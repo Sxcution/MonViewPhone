@@ -7,6 +7,8 @@
  * localStorage key: visualAlertGlobalSettingsV1
  */
 
+import { saveVisualAlertSettingToBackend } from './backendSettings';
+
 /* ── Types ──────────────────────────────────────────────────────── */
 
 export type VisualAlertROI = {
@@ -209,7 +211,9 @@ export function loadVisualAlertConfig(): VisualAlertConfig {
 
 export function saveVisualAlertConfig(config: VisualAlertConfig): void {
   try {
-    localStorage.setItem(VISUAL_ALERT_STORAGE_KEY, JSON.stringify(config));
+    const value = JSON.stringify(config);
+    localStorage.setItem(VISUAL_ALERT_STORAGE_KEY, value);
+    saveVisualAlertSettingToBackend(VISUAL_ALERT_STORAGE_KEY, value);
   } catch {
     /* ignore */
   }

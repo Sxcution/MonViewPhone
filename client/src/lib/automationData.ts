@@ -7,6 +7,7 @@
 /* ── types ─────────────────────────────────────────────────────── */
 
 import { normalizeSyncMacroSettings, type SyncMacroSettings } from './syncMacroSettings';
+import { saveAutomationSettingToBackend } from './backendSettings';
 
 export type AutomationAppId = 'wechat' | 'line' | 'tantan' | 'setting';
 
@@ -155,8 +156,10 @@ export function loadSavedMacros(): SavedAutomationMacro[] {
 
 export function saveSavedMacros(macros: SavedAutomationMacro[]) {
   try {
-    localStorage.setItem(AUTOMATION_MACROS_KEY, JSON.stringify(macros));
+    const value = JSON.stringify(macros);
+    localStorage.setItem(AUTOMATION_MACROS_KEY, value);
     dispatchAutomationDataChanged('macros');
+    saveAutomationSettingToBackend(AUTOMATION_MACROS_KEY, value);
   } catch { /* ignore */ }
 }
 
@@ -189,8 +192,10 @@ export function loadAppActions(): Record<AutomationAppId, AutomationAppAction[]>
 
 export function saveAppActions(actions: Record<AutomationAppId, AutomationAppAction[]>) {
   try {
-    localStorage.setItem(AUTOMATION_APP_ACTIONS_KEY, JSON.stringify(actions));
+    const value = JSON.stringify(actions);
+    localStorage.setItem(AUTOMATION_APP_ACTIONS_KEY, value);
     dispatchAutomationDataChanged('actions');
+    saveAutomationSettingToBackend(AUTOMATION_APP_ACTIONS_KEY, value);
   } catch { /* ignore */ }
 }
 
@@ -204,8 +209,10 @@ export function loadDeviceProfiles(): AutomationDeviceProfile[] {
 
 export function saveDeviceProfiles(profiles: AutomationDeviceProfile[]) {
   try {
-    localStorage.setItem(AUTOMATION_DEVICE_PROFILES_KEY, JSON.stringify(sortDeviceProfilesByName(profiles)));
+    const value = JSON.stringify(sortDeviceProfilesByName(profiles));
+    localStorage.setItem(AUTOMATION_DEVICE_PROFILES_KEY, value);
     dispatchAutomationDataChanged('profiles');
+    saveAutomationSettingToBackend(AUTOMATION_DEVICE_PROFILES_KEY, value);
   } catch { /* ignore */ }
 }
 

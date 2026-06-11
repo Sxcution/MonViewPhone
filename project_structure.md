@@ -36,15 +36,18 @@ Removed legacy layers:
 - `client/src/hooks/useVisualAlert.ts`: React hook managing stagger-scan loop, per-device confirm count, cooldown tracking, and alert triggering for Visual Alert. Uses `scanCanvasROIs` for multi-ROI detection.
 - `client/src/lib/visualAlertEngine.ts`: Pure logic engine for Visual Alert — supports Multi-ROI scanning via `scanCanvasROIs` (iterates each ROI, getImageData per region, counts red pixels per ROI), single-ROI `scanCanvasROI` for modal testing, AudioContext beep sound, browser Notification API. Includes migration from old single-ROI `roi` to new `rois[]` format. Settings persisted in localStorage key: `visualAlertGlobalSettingsV1`.
 - `client/src/lib/serverApi.ts`: HTTP API client for the Go backend.
+- [NEW] [backendSettings.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/backendSettings.ts): Client-side safety thresholds validator (devices >= 35, WeChat accounts >= 104, contains "Emma Zhao") and explicit REST API poster for device account vault data to `settings` endpoint.
 - `client/src/store/useTileOrder.ts`: Persistent device numbering and ordering.
 - `client/src/styles.css`: Main application styling. Defines design tokens, layout styles, and the standardized, unified CSS overlay confirm modal styling system.
 - [NEW] [deviceAccountNearby.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/deviceAccountNearby.ts): Centralized helper for Nearby People logic. Exports `getNearbyAccountState()` (returns `'eligible'`, `'upcoming'`, or `'none'`), `hasNearbyRelevantAccount()`, and `getNearestNearbyHours()`. Uses 3-day window for upcoming state. Imported by both App.tsx and DeviceAccountOverlay.tsx.
 - `client/public/audio/`: Directory containing static audio assets, including `notification_new.mp3` for the default alert sound.
 - 
-- 
+
+
 - ## Go Backend
 - `server-go/main.go`: HTTP/WebSocket entry point, CORS setup, and serves React static files from `client/dist` (including SPA routing fallback).
-- `server-go/rest.go`: REST endpoints used by the frontend, including profile listing, APK install, file import/export, and ADB command execution.
+- [MODIFY] [rest.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/rest.go): REST endpoints used by the frontend, including profile listing, APK install, file import/export, and ADB command execution. Modified settings endpoint POST handler to run a database-level safety check prior to writing account configurations.
+- [NEW] [account_db.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/account_db.go): SQLite database layer for device accounts (mapped to Data.db). Implements database initialization, syncing client vaults to SQLite tables, and the safety guard validator `validateNewVaultAgainstDB` to refuse saving downgrades (checks devices >= 35, WeChat accounts >= 104, has Emma Zhao).
 - `server-go/adb/`: ADB helpers and device tracker.
 - `server-go/scrcpy/`: Scrcpy server launch/config helpers.
 - `server-go/websocket/`: Device-list and stream proxy WebSocket handlers.

@@ -1,3 +1,5 @@
+import { saveSyncTimeSettingToBackend } from './backendSettings';
+
 export type SyncMacroSettings = {
   delayEnabled: boolean;
   randomOrder: boolean;
@@ -53,8 +55,10 @@ export function loadSyncMacroSettings(): SyncMacroSettings {
 export function saveSyncMacroSettings(settings: SyncMacroSettings): SyncMacroSettings {
   const normalized = normalizeSyncMacroSettings(settings);
   try {
-    localStorage.setItem(SYNC_MACRO_SETTINGS_KEY, JSON.stringify(normalized));
+    const value = JSON.stringify(normalized);
+    localStorage.setItem(SYNC_MACRO_SETTINGS_KEY, value);
     window.dispatchEvent(new CustomEvent<SyncMacroSettings>(SYNC_MACRO_SETTINGS_EVENT, { detail: normalized }));
+    saveSyncTimeSettingToBackend(SYNC_MACRO_SETTINGS_KEY, value);
   } catch {
     // ignore
   }

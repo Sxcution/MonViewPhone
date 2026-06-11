@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { saveTileOrderToBackend, saveTileOrderNumbersToBackend } from '../lib/backendSettings';
 
 const TILE_NUMBER_KEY = 'tileOrderNumbers';
 const TILE_NUMBER_BACKUP_KEY = 'tileOrderNumbersBackupV1';
@@ -172,7 +173,9 @@ export function useTileOrder(defaultDevices: string[]) {
 
   useEffect(() => {
     try {
-      localStorage.setItem('tileOrder', JSON.stringify(mergedOrder));
+      const value = JSON.stringify(mergedOrder);
+      localStorage.setItem('tileOrder', value);
+      saveTileOrderToBackend(value);
     } catch {
       // ignore
     }
@@ -204,8 +207,10 @@ export function useTileOrder(defaultDevices: string[]) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(TILE_NUMBER_KEY, JSON.stringify(orderNumbers));
+      const value = JSON.stringify(orderNumbers);
+      localStorage.setItem(TILE_NUMBER_KEY, value);
       saveTileNumbersSnapshot(TILE_NUMBER_BACKUP_KEY, orderNumbers);
+      saveTileOrderNumbersToBackend(value);
     } catch {
       // ignore
     }

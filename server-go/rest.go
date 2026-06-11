@@ -589,6 +589,23 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if len(temp) == 0 {
+			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Refusing to save empty payload"})
+			return
+		}
+
+		// Reject empty keys or null values
+		for k, v := range temp {
+			if k == "" {
+				writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Refusing to save empty key"})
+				return
+			}
+			if v == nil {
+				writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": fmt.Sprintf("Refusing to save key %q with null value", k)})
+				return
+			}
+		}
+
 		// Read existing settings
 		existingData, err := os.ReadFile(settingsFile)
 		var settings map[string]interface{}
@@ -599,16 +616,56 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			settings = make(map[string]interface{})
 		}
 
+		// Query current devices in DB for limit thresholds
+		dbDevices := 0
+		db, err := openDeviceAccountDB()
+		if err == nil {
+			_ = db.QueryRow("SELECT COUNT(*) FROM devices").Scan(&dbDevices)
+			db.Close()
+		}
+
+		// Perform validations on incoming keys
+		for k, v := range temp {
+			valStr, isStr := v.(string)
+			if !isStr {
+				writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": fmt.Sprintf("Refusing to save key %q: value must be a string", k)})
+				return
+			}
+
+			if k == deviceAccountVaultKey {
+				if err := validateNewVaultAgainstDB(valStr); err != nil {
+					writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": err.Error()})
+					return
+				}
+			} else if k == "tileOrder" {
+				var list []interface{}
+				if err := json.Unmarshal([]byte(valStr), &list); err != nil {
+					writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": fmt.Sprintf("Invalid tileOrder JSON: %v", err)})
+					return
+				}
+				if dbDevices >= 35 && len(list) < 35 {
+					writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": fmt.Sprintf("Refusing to save tileOrder: length %d < 35 (minimum 35 required)", len(list))})
+					return
+				}
+			} else if k == "tileOrderNumbers" {
+				var obj map[string]interface{}
+				if err := json.Unmarshal([]byte(valStr), &obj); err != nil {
+					writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": fmt.Sprintf("Invalid tileOrderNumbers JSON: %v", err)})
+					return
+				}
+				if dbDevices >= 35 && len(obj) < 35 {
+					writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": fmt.Sprintf("Refusing to save tileOrderNumbers: keys length %d < 35 (minimum 35 required)", len(obj))})
+					return
+				}
+			}
+		}
+
 		// Merge new keys from temp into settings
 		for k, v := range temp {
 			settings[k] = v
 		}
 
 		if rawVault, ok := settings[deviceAccountVaultKey].(string); ok {
-			if err := validateNewVaultAgainstDB(rawVault); err != nil {
-				writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": err.Error()})
-				return
-			}
 			if err := syncDeviceAccountVaultToDB(rawVault); err != nil {
 				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to sync device account DB: " + err.Error()})
 				return

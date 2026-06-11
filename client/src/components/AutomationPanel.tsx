@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Settings, ChevronUp, ChevronDown, Plus } from 'lucide-react';
 import { loadAppActions, type AutomationAppId } from '@/lib/automationData';
+import { saveAutomationSettingToBackend } from '@/lib/backendSettings';
 
 const AUTOMATION_APPS: Array<{ id: AutomationAppId; label: string; icon: string }> = [
   { id: 'wechat', label: 'Wechat', icon: '/automation-icons/WechatIcon.png' },
@@ -47,7 +48,9 @@ export function AutomationPanel({
 
   useEffect(() => {
     try {
-      localStorage.setItem('automationQuickSlotsV1', JSON.stringify(quickActions));
+      const value = JSON.stringify(quickActions);
+      localStorage.setItem('automationQuickSlotsV1', value);
+      saveAutomationSettingToBackend('automationQuickSlotsV1', value);
     } catch {}
   }, [quickActions]);
 

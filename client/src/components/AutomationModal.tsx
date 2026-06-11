@@ -66,6 +66,7 @@ import {
   type MacroPlaybackStopDetail,
   type MacroPlaybackReplayDetail,
 } from '@/lib/automationData';
+import { saveAutomationSettingToBackend } from '@/lib/backendSettings';
 
 /* ── types ── */
 
@@ -146,7 +147,9 @@ function loadAutomationSettings(): { realtimeRecording: boolean } {
 
 function saveAutomationSettings(s: { realtimeRecording: boolean }) {
   try {
-    localStorage.setItem(AUTOMATION_SETTINGS_KEY, JSON.stringify(s));
+    const value = JSON.stringify(s);
+    localStorage.setItem(AUTOMATION_SETTINGS_KEY, value);
+    saveAutomationSettingToBackend(AUTOMATION_SETTINGS_KEY, value);
   } catch {
     // ignore
   }

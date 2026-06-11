@@ -152,24 +152,6 @@ function showErrorScreen(msg: string) {
   }
 }
 
-const SYNCED_KEYS = [
-  'monviewphone:device-account-vault',
-  'tileOrder',
-  'tileOrderNumbers',
-  'automationMacrosV1',
-  'automationAppActionsV1',
-  'automationDeviceProfilesV1',
-  'automationSettingsV1',
-  'manualSyncMacroSettingsV1',
-  'automationQuickSlotsV1',
-  'visualAlertGlobalSettingsV1',
-  'themeInspectorEnabled',
-  'themeInspectorOverridesV1',
-  'syncTimeHotkey'
-];
-
-const lastSyncedValues: Record<string, string | null> = {};
-
 async function syncSettingsWithBackend(): Promise<boolean> {
   const { wsServer } = readPageParams();
   const settingsUrl = getSettingsUrl(wsServer);
@@ -222,78 +204,6 @@ async function syncSettingsWithBackend(): Promise<boolean> {
         localStorage.setItem(key, val);
       }
     }
-
-    // Initialize change detector cache
-    for (const key of SYNCED_KEYS) {
-      lastSyncedValues[key] = localStorage.getItem(key);
-    }
-
-    // Start periodic change detector
-    setInterval(async () => {
-      for (const key of SYNCED_KEYS) {
-        const currentVal = localStorage.getItem(key);
-        if (currentVal !== lastSyncedValues[key]) {
-          // If key is deleted or empty, do not sync empty settings to backend to avoid data wipe
-          if (currentVal === null || currentVal.trim() === '') {
-            continue;
-          }
-
-          // Guard checking for the vault
-          if (key === 'monviewphone:device-account-vault') {
-            try {
-              const parsed = JSON.parse(currentVal);
-              const res = validateVaultData(parsed);
-              if (!res.valid) {
-                console.error(`Refusing to sync invalid vault to backend! Devices: ${res.deviceCount}, WeChat accounts: ${res.wechatAccountCount}, Has Emma Zhao: ${res.hasEmmaZhao}`);
-                continue;
-              }
-            } catch (e) {
-              console.error('Refusing to sync vault: invalid JSON format', e);
-              continue;
-            }
-          }
-
-          // Guard check for tileOrder
-          if (key === 'tileOrder') {
-            try {
-              const parsed = JSON.parse(currentVal);
-              if (!Array.isArray(parsed) || parsed.length < 35) {
-                console.error('Refusing to sync tileOrder: invalid format or size < 35');
-                continue;
-              }
-            } catch (e) { continue; }
-          }
-
-          // Guard check for tileOrderNumbers
-          if (key === 'tileOrderNumbers') {
-            try {
-              const parsed = JSON.parse(currentVal);
-              if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length < 35) {
-                console.error('Refusing to sync tileOrderNumbers: invalid format or size < 35');
-                continue;
-              }
-            } catch (e) { continue; }
-          }
-
-          // POST only the changed key-value pair to backend
-          try {
-            const postRes = await fetch(settingsUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ [key]: currentVal })
-            });
-            if (postRes.ok) {
-              lastSyncedValues[key] = currentVal;
-              console.log(`Successfully synced settings key: "${key}" to backend.`);
-            } else {
-              console.error(`Failed to sync settings key: "${key}" to backend: status ${postRes.status}`);
-            }
-          } catch (postErr) {
-            console.error(`Error syncing settings key "${key}" to backend:`, postErr);
-          }
-        }
-      }
-    }, 1500);
 
     return true;
   } catch (err: any) {

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
+import { saveHotkeySettingToBackend } from '@/lib/backendSettings'
 import { loadDeviceAccountVault, getDeviceAccountDataFromVault, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
 import { hasNearbyRelevantAccount, getNearestNearbyHours } from '@/lib/deviceAccountNearby'
 import { readPageParams } from '@/lib/params'
@@ -541,6 +542,7 @@ export function App() {
     const newHotkey = parts.join('+');
     setDeviceAccountHotkey(newHotkey);
     localStorage.setItem('monviewphone:device-account-hotkey', newHotkey);
+    saveHotkeySettingToBackend('monviewphone:device-account-hotkey', newHotkey);
   }, []);
 
   // ===== SYNC TIME HOTKEY STATES & GLOBAL LISTENER =====
@@ -596,6 +598,7 @@ export function App() {
     const newHotkey = parts.join('+');
     setSyncTimeHotkey(newHotkey);
     localStorage.setItem('monviewphone:sync-time-hotkey', newHotkey);
+    saveHotkeySettingToBackend('monviewphone:sync-time-hotkey', newHotkey);
   }, []);
 
   // ===== GRID DISPLAY FILTER STATES =====
@@ -3785,6 +3788,7 @@ export function App() {
                           onClick={() => {
                             setSyncTimeHotkey('');
                             localStorage.removeItem('monviewphone:sync-time-hotkey');
+                            saveHotkeySettingToBackend('monviewphone:sync-time-hotkey', '');
                           }}
                           style={{
                             background: 'rgba(255,255,255,0.05)',
@@ -3833,6 +3837,7 @@ export function App() {
                           onClick={() => {
                             setDeviceAccountHotkey('');
                             localStorage.removeItem('monviewphone:device-account-hotkey');
+                            saveHotkeySettingToBackend('monviewphone:device-account-hotkey', '');
                           }}
                           style={{
                             background: 'rgba(255,255,255,0.05)',

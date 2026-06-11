@@ -51,3 +51,64 @@
 - **Preflight data safety check**: Tích hợp bộ lọc an toàn `validateBackendSettings` kiểm tra chặt chẽ cấu hình ở cả frontend và launcher [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw). Yêu cầu tối thiểu >= 35 thiết bị, >= 104 tài khoản WeChat, tồn tại tài khoản "Emma Zhao" và có cấu hình `tileOrder`/`tileOrderNumbers` hợp lệ.
 - **Launcher tối giản**: Sửa đổi launcher `run.pyw` chỉ khởi động `server-go.exe` (không chạy NPM/Vite dev server) và mở Chrome App Mode vào cổng `11000`.
 - **Biên dịch & Kiểm thử**: Biên dịch thành công frontend (`npm run build`) và backend (`go build`). Launcher đã kiểm chứng hoạt động tốt, mở giao diện cổng 11000 mượt mà và không sinh tiến trình `node.exe`/`vite.exe`.
+
+## Tăng an toàn dữ liệu: Backend Guard và Client Explicit Save
+
+Nhằm tránh nguy cơ mất mát dữ liệu hoặc hạ cấp số lượng tài khoản/thiết bị bất thường, chúng tôi đã triển khai các nâng cấp sau:
+
+1. **Bộ lọc an toàn ở Backend Go (Backend Guard)**:
+   - Triển khai hàm `validateNewVaultAgainstDB` trong [server-go/account_db.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/account_db.go) để kiểm tra các điều kiện an toàn trước khi cho phép ghi đè cơ sở dữ liệu `Data.db` và tệp `settings.json`.
+   - Các điều kiện bảo vệ bao gồm:
+     - Số lượng thiết bị trong dữ liệu mới không được thấp hơn 35 (nếu cơ sở dữ liệu hiện tại có >= 35 thiết bị).
+     - Số lượng tài khoản WeChat mới không được thấp hơn 104 (nếu cơ sở dữ liệu hiện tại có >= 104 tài khoản).
+     - Dữ liệu mới không được làm mất tài khoản cực kỳ quan trọng mang tên `Emma Zhao` (nếu cơ sở dữ liệu hiện tại có chứa tài khoản này).
+     - Dữ liệu mới phải được giải mã (parse JSON) thành công.
+   - Khi dữ liệu mới không đạt điều kiện bảo vệ, API POST `/api/goog/device/settings` sẽ chặn ghi đè và phản hồi mã lỗi `400 Bad Request` kèm thông báo chi tiết lý do (ví dụ: `Refusing to downgrade account vault...`).
+
+2. **Cơ chế lưu rõ ràng ở Client (Client Explicit Save)**:
+   - Thêm tệp tiện ích [client/src/lib/backendSettings.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/backendSettings.ts) chứa hàm `saveDeviceAccountVaultToBackend` để thực hiện việc validate dữ liệu phía Client trước khi POST và tiến hành gửi API POST tường minh lên backend với riêng khóa `monviewphone:device-account-vault`.
+   - Cập nhật hàm `saveDeviceAccountVault` trong [client/src/lib/deviceAccountVault.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/deviceAccountVault.ts) để ghi dữ liệu vào cả `localStorage` làm cache và tự động gọi API POST đồng bộ lên backend ngay lập tức.
+   - Giữ nguyên cơ chế `setInterval` trong `client/src/main.tsx` để làm lớp đồng bộ dự phòng phụ cho các trạng thái khác, không sửa đổi/bỏ đi trong bước này. (Đã được nâng cấp triệt để ở bước sau).
+
+3. **Kiểm thử tự động và biên dịch**:
+   - Biên dịch frontend (`npm run build`) và backend Go (`go build -o server-go.exe`) đều thành công 100%.
+   - Chạy kịch bản test tự động `test_backend_guard.py` thành công:
+     - Thử gửi dữ liệu chứa 70 tài khoản WeChat -> bị từ chối với HTTP 400 (Chính xác).
+     - Thử gửi dữ liệu thiếu Emma Zhao -> bị từ chối với HTTP 400 (Chính xác).
+     - Thêm tài khoản test mới thành công, kiểm tra dữ liệu trên SQLite lưu thành công (106 accounts).
+     - Xoá tài khoản test thành công, dữ liệu khôi phục về 105 accounts.
+
+## Hoàn thiện cơ chế Explicit Save và Loại bỏ sync ngầm (setInterval)
+
+Chúng tôi đã chuyển hoàn toàn cơ chế đồng bộ dữ liệu của MonViewPhone sang mô hình **Explicit Save (Lưu tường minh)** 100%, đồng thời loại bỏ hoàn toàn vòng lặp quét định kỳ (`setInterval`) ở frontend:
+
+1. **Chuẩn hoá helper ở Client (`client/src/lib/backendSettings.ts`)**:
+   - Khắc phục lỗi dependency vòng (circular import) bằng cách sử dụng `import type { VaultData }` từ `deviceAccountVault.ts`.
+   - Viết các hàm helper đồng bộ an toàn:
+     - `saveBackendSetting(key, value)` và `saveBackendSettings(patch)`: Kiểm tra kỹ key rỗng, value null/undefined. Chỉ cho phép giá trị rỗng cho các key trong allowlist (`syncTimeHotkey`, `monviewphone:sync-time-hotkey`, `monviewphone:device-account-hotkey`).
+     - `saveTileOrderToBackend(value)`: Đảm bảo payload là mảng có độ dài >= 35.
+     - `saveTileOrderNumbersToBackend(value)`: Đảm bảo payload là đối tượng có số lượng keys >= 35.
+     - `saveAutomationSettingToBackend`, `saveVisualAlertSettingToBackend`, `saveSyncTimeSettingToBackend`, `saveHotkeySettingToBackend`: Kiểm tra chặt chẽ các key hợp lệ trước khi cho phép gửi POST lên backend.
+
+2. **Áp dụng Explicit Save cho các nhóm chức năng**:
+   - **Thứ tự thiết bị (Tile Order)**: Tích hợp `saveTileOrderToBackend` và `saveTileOrderNumbersToBackend` vào các `useEffect` của `client/src/store/useTileOrder.ts` ngay khi ghi `localStorage`.
+   - **Tự động hoá (Automation)**: Cập nhật `saveSavedMacros`, `saveAppActions`, `saveDeviceProfiles` trong `client/src/lib/automationData.ts` và `saveAutomationSettings` trong `client/src/components/AutomationModal.tsx`, `client/src/components/AutomationPanel.tsx` để đồng bộ trực tiếp lên backend.
+   - **Thời gian đồng bộ (Sync Time/Sync Macro)**: Cập nhật `saveSyncTimeSettings` trong `client/src/lib/syncTimeSettings.ts` và `saveSyncMacroSettings` trong `client/src/lib/syncMacroSettings.ts` để đồng bộ ngay lập tức.
+   - **Visual Alert**: Cập nhật `saveVisualAlertConfig` trong `client/src/lib/visualAlertEngine.ts` để đồng bộ cấu hình vùng quét lên backend.
+   - **Tổ hợp phím (Hotkey)**: Cập nhật các hàm gán phím nóng và xoá phím nóng trong `client/src/App.tsx` để đồng bộ tức thì lên backend (hỗ trợ lưu giá trị rỗng khi xoá).
+
+3. **Gia cố bảo vệ phía Backend (`server-go/rest.go`)**:
+   - Nâng cấp handler `/api/goog/device/settings` phương thức `POST`:
+     - Chặn payload rỗng `{}`.
+     - Chặn key rỗng hoặc giá trị null.
+     - Nếu POST chứa `tileOrder`, kiểm tra định dạng mảng và độ dài >= 35.
+     - Nếu POST chứa `tileOrderNumbers`, kiểm tra định dạng map và số lượng keys >= 35.
+     - Đảm bảo merge cấu hình cũ và patch mới an toàn, không làm mất các trường cấu hình khác.
+
+4. **Ngắt bỏ hoàn toàn vòng lặp quét sync ngầm (`client/src/main.tsx`)**:
+   - Loại bỏ hoàn toàn hằng số `SYNCED_KEYS`, đối tượng cache `lastSyncedValues` và vòng lặp `setInterval(..., 1500)`.
+   - Giữ lại đầy đủ cơ chế tải cấu hình ban đầu từ backend (bootstrap settings), kiểm tra an toàn dữ liệu đầu vào (validateBackendSettings), và ghi đè an toàn vào `localStorage` lúc tải trang.
+
+5. **Kết quả kiểm thử**:
+   - Biên dịch thành công 100% frontend (`npm run build`) và backend Go.
+   - Chạy kiểm thử tự động thành công 100% các trường hợp: chặn payload rỗng, chặn key rỗng/null, chặn tileOrder/tileOrderNumbers thiếu máy (<35), kiểm tra lưu và xoá hotkey thành công.

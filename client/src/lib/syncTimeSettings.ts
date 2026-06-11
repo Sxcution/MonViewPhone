@@ -1,3 +1,5 @@
+import { saveSyncTimeSettingToBackend } from './backendSettings';
+
 export type SyncTimeSettings = {
   delayEnabled: boolean;
   randomOrder: boolean;
@@ -53,8 +55,10 @@ export function loadSyncTimeSettings(): SyncTimeSettings {
 export function saveSyncTimeSettings(settings: SyncTimeSettings): SyncTimeSettings {
   const normalized = normalizeSyncTimeSettings(settings);
   try {
-    localStorage.setItem(SYNC_TIME_SETTINGS_KEY, JSON.stringify(normalized));
+    const value = JSON.stringify(normalized);
+    localStorage.setItem(SYNC_TIME_SETTINGS_KEY, value);
     window.dispatchEvent(new CustomEvent<SyncTimeSettings>(SYNC_TIME_SETTINGS_EVENT, { detail: normalized }));
+    saveSyncTimeSettingToBackend(SYNC_TIME_SETTINGS_KEY, value);
   } catch {
     // ignore
   }
