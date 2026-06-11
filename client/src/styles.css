@@ -9023,6 +9023,19 @@ textarea:focus,
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+
+.dav-panel-title-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dav-panel-title-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .dav-panel-title {
@@ -9071,13 +9084,26 @@ textarea:focus,
 }
 
 .dav-total-badge {
-  font-size: 12px;
   background: var(--md-muted-2);
   color: #fff;
-  padding: 2px 6px;
-  border-radius: 10px;
+  border: none;
+  font-size: 11px;
+  font-weight: bold;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  padding: 0;
+  line-height: 1;
   user-select: none;
+  transition: background 0.15s;
+}
+
+.dav-total-badge:hover {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .dav-tabs {
@@ -9233,6 +9259,183 @@ textarea:focus,
   color: #fff;
 }
 
+/* Title and Platform Dropdowns in DeviceAccountOverlay */
+.dav-title-dropdown-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.dav-title-account-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 6px;
+  right: 6px;
+  margin-top: 4px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+}
+
+.dav-title-dropdown-heading {
+  font-size: 11px;
+  color: var(--md-muted-2);
+  padding: 4px 8px 6px 8px;
+  border-bottom: 1px solid var(--md-border);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.dav-title-empty {
+  font-size: 11px;
+  color: var(--md-muted);
+  padding: 8px;
+  text-align: center;
+  font-style: italic;
+}
+
+.dav-title-account-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--md-text-soft);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.dav-title-account-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--md-text);
+}
+
+.dav-title-account-item.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--md-text);
+  font-weight: 500;
+}
+
+.dav-title-account-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.dav-account-state-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dav-account-state-dot.live {
+  background: var(--md-success);
+}
+
+.dav-account-state-dot.die {
+  background: var(--md-danger);
+}
+
+.dav-account-state-dot.risk {
+  background: var(--md-warning);
+}
+
+.dav-account-state-dot.verify {
+  background: #eab308;
+}
+
+.dav-account-state-dot.nearby {
+  background: var(--md-info);
+}
+
+.dav-platform-dropdown-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.dav-platform-trigger {
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  color: var(--md-text-soft);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 4px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  line-height: 1;
+}
+
+.dav-platform-trigger:hover {
+  color: var(--md-text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dav-platform-trigger.wechat {
+  color: var(--md-wechat, #07c160);
+}
+
+.dav-platform-trigger.wechat:hover {
+  background: rgba(7, 193, 96, 0.08);
+}
+
+.dav-platform-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 120px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+}
+
+.dav-platform-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-size: 12px;
+  color: var(--md-text-soft);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.dav-platform-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--md-text);
+}
+
+.dav-platform-menu-item.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--md-text);
+  font-weight: bold;
+}
+
+.dav-platform-menu-item.active.wechat {
+  color: var(--md-wechat, #07c160);
+}
+
 .dav-field {
   display: flex;
   flex-direction: column;
@@ -9378,6 +9581,7 @@ select.dav-input {
   justify-content: space-between;
   gap: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
 }
 
 .tile-account-overlay .dav-panel-meta {

@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"encoding/base64"
@@ -150,7 +150,7 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 			shellQuote(mimeType),
 			shellQuote(relPath),
 		)
-		
+
 		mediaSuccess := false
 		if _, err := adb.Shell(udid, insertCmd); err == nil {
 			queryCmd := fmt.Sprintf(
@@ -185,7 +185,9 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 			if parent != "." && parent != "/" {
 				_, _ = adb.Shell(udid, "mkdir -p "+shellQuote(parent))
 			}
-			if _, err := adb.Shell(udid, "cp "+shellQuote(deviceTmp)+" "+shellQuote(remotePath)); err != nil { return err }
+			if _, err := adb.Shell(udid, "cp "+shellQuote(deviceTmp)+" "+shellQuote(remotePath)); err != nil {
+				return err
+			}
 			// Trigger media scanner so Gallery sees it
 			scannerCmd := fmt.Sprintf("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://%s --user %d", shellQuote(remotePath), userID)
 			_, _ = adb.Shell(udid, scannerCmd)
@@ -554,6 +556,19 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
 			return
 		}
+		var settings map[string]interface{}
+		if err := json.Unmarshal(data, &settings); err == nil {
+			if vaultRaw, ok, err := loadDeviceAccountVaultFromDB(); err != nil {
+				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
+				return
+			} else if ok {
+				settings[deviceAccountVaultKey] = vaultRaw
+				settings["monviewphone:device-account-db"] = "data/Data.db"
+				if body, err := json.Marshal(settings); err == nil {
+					data = body
+				}
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(data)
@@ -572,6 +587,24 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		if err := json.Unmarshal(body, &temp); err != nil {
 			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid JSON: " + err.Error()})
 			return
+		}
+		if rawVault, ok := temp[deviceAccountVaultKey].(string); ok {
+			if err := syncDeviceAccountVaultToDB(rawVault); err != nil {
+				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to sync device account DB: " + err.Error()})
+				return
+			}
+			temp["monviewphone:device-account-db"] = "data/Data.db"
+			if vaultRaw, ok, err := loadDeviceAccountVaultFromDB(); err != nil {
+				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
+				return
+			} else if ok {
+				temp[deviceAccountVaultKey] = vaultRaw
+			}
+			body, err = json.Marshal(temp)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
+				return
+			}
 		}
 
 		if err := os.WriteFile(settingsFile, body, 0644); err != nil {
@@ -673,6 +706,3 @@ func handleSetWallpaper(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, jsonResponse{"success": true})
 }
-
-
-

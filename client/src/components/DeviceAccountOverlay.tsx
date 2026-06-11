@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail } from 'lucide-react';
+import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2 } from 'lucide-react';
 import { 
   getDeviceAccountData, 
   saveDeviceAccountData, 
@@ -133,7 +133,6 @@ export function DeviceAccountPanel({
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeLevel1, setActiveLevel1] = useState<'tai_khoan' | 'trang_thai' | 'nearby' | 'quet_qr' | null>(null);
   const [activeLevel2, setActiveLevel2] = useState<string | null>(null);
-  const [activeBadgeSubmenu, setActiveBadgeSubmenu] = useState<string | null>(null);
   
   // Load account data reactive update listener
   useEffect(() => {
@@ -185,23 +184,30 @@ export function DeviceAccountPanel({
     return list.sort((a, b) => (a.account.name || '').localeCompare(b.account.name || ''));
   }, [udid, activeTab, orderMap]);
 
-  const [badgeMenu, setBadgeMenu] = useState<{ x: number, y: number } | null>(null);
-  const badgeMenuRef = useRef<HTMLDivElement>(null);
+  const [accountTitleDropdownOpen, setAccountTitleDropdownOpen] = useState(false);
+  const accountTitleDropdownRef = useRef<HTMLDivElement>(null);
+  const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false);
+  const platformDropdownRef = useRef<HTMLDivElement>(null);
+  const [accountActionMenu, setAccountActionMenu] = useState<{ x: number; y: number; sourceUdid: string; account: Account } | null>(null);
+  const accountActionMenuRef = useRef<HTMLDivElement>(null);
   const [moveModal, setMoveModal] = useState<{ sourceUdid: string, account: Account } | null>(null);
   const [targetOrderStr, setTargetOrderStr] = useState('');
   const [moveError, setMoveError] = useState('');
 
   useEffect(() => {
-    if (!badgeMenu) return;
+    if (!accountTitleDropdownOpen && !platformDropdownOpen && !accountActionMenu) return;
     const hide = (e: MouseEvent) => {
-      if (badgeMenuRef.current && badgeMenuRef.current.contains(e.target as Node)) {
-        return;
-      }
-      setBadgeMenu(null);
+      const target = e.target as Node;
+      if (accountTitleDropdownRef.current?.contains(target)) return;
+      if (platformDropdownRef.current?.contains(target)) return;
+      if (accountActionMenuRef.current?.contains(target)) return;
+      setAccountTitleDropdownOpen(false);
+      setPlatformDropdownOpen(false);
+      setAccountActionMenu(null);
     };
-    window.addEventListener('click', hide);
-    return () => window.removeEventListener('click', hide);
-  }, [badgeMenu]);
+    window.addEventListener('mousedown', hide);
+    return () => window.removeEventListener('mousedown', hide);
+  }, [accountTitleDropdownOpen, platformDropdownOpen, accountActionMenu]);
 
   const handleConfirmMove = () => {
     setMoveError('');
@@ -521,12 +527,20 @@ export function DeviceAccountPanel({
     }
   }, [ctxMenu]);
 
-  // Reset submenu states when badge menu is closed
-  useEffect(() => {
-    if (!badgeMenu) {
-      setActiveBadgeSubmenu(null);
+  const getAccountStatusClass = (account: Account) => {
+    if (activeTab === 'wechat') {
+      if (account.nearbyPeopleDueDate) {
+        if (account.nearbyPeopleDueDate <= Date.now()) return 'nearby';
+      } else if (account.createdAt) {
+        const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+        if (account.isOneYearOld || Date.now() - account.createdAt >= oneYearMs) return 'nearby';
+      }
     }
-  }, [badgeMenu]);
+    if (account.status === 'Die') return 'die';
+    if (account.status === 'Risk') return 'risk';
+    if (account.status === 'Verify' || account.status === 'Unverified') return 'verify';
+    return 'live';
+  };
 
   const isOverOneYear = useMemo(() => {
     if (!selectedAccount || !selectedAccount.createdAt) return false;
@@ -584,50 +598,111 @@ export function DeviceAccountPanel({
     return '#fff'; // Mặc định là trắng
   }, [selectedAccount, showBlueNearby]);
 
+  const activePlatformLabel = PLATFORMS.find(p => p.id === activeTab)?.label || 'WeChat';
+
   return (
     <div className="dav-panel" onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}>
       <div className="dav-panel-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div className="dav-panel-title-left">
           <span className="dav-order">{order.toString().padStart(2, '0')}</span>
           <span 
             className="dav-status-dot" 
             style={{ 
               background: selectedAccount 
-                ? (selectedAccount.status === 'Die' ? '#ef4444' : selectedAccount.status === 'Risk' ? '#f97316' : '#22c55e')
-                : (isOnline ? '#22c55e' : '#ef4444')
+                ? (selectedAccount.status === 'Die' ? 'var(--md-danger)' : selectedAccount.status === 'Risk' ? 'var(--md-warning)' : 'var(--md-success)')
+                : (isOnline ? 'var(--md-success)' : 'var(--md-danger)')
             }} 
           />
           {noticeStatus !== 'none' && (
-            <Bell size={13} color={noticeStatus === 'expired' ? '#ef4444' : '#eab308'} className={noticeStatus === 'expired' ? "dav-bell-expired" : ""} />
+            <Bell size={13} color={noticeStatus === 'expired' ? 'var(--md-danger)' : 'var(--md-warning)'} className={noticeStatus === 'expired' ? "dav-bell-expired" : ""} />
           )}
-          <span 
-            className="dav-total-badge" 
-            title="Tổng số tài khoản trên điện thoại này"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setBadgeMenu({ x: e.clientX, y: e.clientY });
-            }}
-          >
-            {totalAccounts}
-          </span>
         </div>
-        
-        <select 
-          className="dav-platform-select"
-          value={activeTab} 
-          onChange={e => {
-            const val = e.target.value as PlatformType;
-            setActiveTab(val);
-            updateData({ ...data, defaultPlatform: val });
-          }}
-        >
-          {PLATFORMS.map(p => (
-            <option key={p.id} value={p.id}>{p.label}</option>
-          ))}
-        </select>
-      </div>
 
+        <div className="dav-panel-title-right">
+          <div className="dav-title-dropdown-wrap" ref={accountTitleDropdownRef}>
+            <button
+              type="button"
+              className="dav-total-badge"
+              title="Tong so tai khoan tren dien thoai nay"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setAccountTitleDropdownOpen(v => !v);
+                setPlatformDropdownOpen(false);
+              }}
+            >
+              {totalAccounts}
+            </button>
+            {accountTitleDropdownOpen && (
+              <div className="dav-title-account-dropdown contextMenuPanel">
+                <div className="dav-title-dropdown-heading">Tai khoan nhom hien tai</div>
+                {groupAccounts.length === 0 ? (
+                  <div className="dav-title-empty">Khong co tai khoan</div>
+                ) : (
+                  groupAccounts.map(({ udid: accUdid, account }) => (
+                    <button
+                      key={account.id}
+                      type="button"
+                      className={`dav-title-account-item ${selectedAccount?.id === account.id ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleSetMain(account.id);
+                        setAccountTitleDropdownOpen(false);
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setAccountActionMenu({ x: e.clientX, y: e.clientY, sourceUdid: accUdid, account });
+                      }}
+                    >
+                      <span className={`dav-account-state-dot ${getAccountStatusClass(account)}`} />
+                      <span className="dav-title-account-name">
+                        {account.name || account.phone || account.nickname || 'Khong ten'} ({getAppTypeLabel(account.appType)})
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="dav-platform-dropdown-wrap" ref={platformDropdownRef}>
+            <button
+              type="button"
+              className={`dav-platform-trigger ${activeTab === 'wechat' ? 'wechat' : ''}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setPlatformDropdownOpen(v => !v);
+                setAccountTitleDropdownOpen(false);
+              }}
+            >
+              {activePlatformLabel}
+            </button>
+            {platformDropdownOpen && (
+              <div className="dav-platform-menu contextMenuPanel">
+                {PLATFORMS.map(p => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`dav-platform-menu-item ${activeTab === p.id ? 'active' : ''} ${p.id === 'wechat' ? 'wechat' : ''}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setActiveTab(p.id);
+                      updateData({ ...data, defaultPlatform: p.id });
+                      setPlatformDropdownOpen(false);
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
       <div className="dav-panel-body">
         {!selectedAccount ? (
           <div className="dav-empty-state">
@@ -1179,92 +1254,48 @@ export function DeviceAccountPanel({
         document.body
       )}
 
-      {/* Badge Menu Portal */}
-      {badgeMenu && ReactDOM.createPortal(
-        <div 
-          ref={badgeMenuRef} 
-          className="dav-ctx-menu contextMenuPanel" 
-          style={{ left: badgeMenu.x, top: badgeMenu.y }} 
+      {/* Account Action Menu Portal */}
+      {accountActionMenu && ReactDOM.createPortal(
+        <div
+          ref={accountActionMenuRef}
+          className="dav-ctx-menu contextMenuPanel dav-account-action-menu"
+          style={{ left: accountActionMenu.x, top: accountActionMenu.y }}
           onClick={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
           onContextMenu={e => e.stopPropagation()}
         >
-          <div className="dav-ctx-header" style={{ padding: '6px 10px', fontSize: '11px', fontWeight: 'bold', color: '#888' }}>
-            Tài khoản nhóm hiện tại
-          </div>
-          <div className="dav-ctx-divider" />
-          
-          {groupAccounts.length === 0 ? (
-            <div className="dav-ctx-item" style={{ color: '#666', fontSize: '12px' }}>Không có tài khoản</div>
-          ) : (
-            groupAccounts.map(({ udid: accUdid, order: accOrder, account }) => (
-              <div 
-                key={account.id} 
-                className="dav-ctx-submenu-container"
-                onMouseEnter={() => setActiveBadgeSubmenu(account.id)}
-                onMouseLeave={() => setActiveBadgeSubmenu(null)}
-              >
-                <div className="dav-ctx-item dav-ctx-has-sub">
-                  <span style={{ fontSize: '12px', opacity: 0.5, marginRight: '4px' }}>[{accOrder.toString().padStart(2, '0')}]</span>
-                  <span style={{ flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                    {account.name || account.phone || account.nickname || 'Không tên'} ({getAppTypeLabel(account.appType)})
-                  </span>
-                  <div className="dav-ctx-submenu" style={{ display: activeBadgeSubmenu === account.id ? 'flex' : 'none' }}>
-                    <button 
-                      className="dav-ctx-item"
-                      onPointerDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setMoveModal({ sourceUdid: accUdid, account });
-                        setMoveError('');
-                        setBadgeMenu(null);
-                      }}
-                    >
-                      Di chuyển tài khoản
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+          <button
+            type="button"
+            className="dav-ctx-item"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMoveModal({ sourceUdid: accountActionMenu.sourceUdid, account: accountActionMenu.account });
+              setMoveError('');
+              setAccountActionMenu(null);
+              setAccountTitleDropdownOpen(false);
+            }}
+          >
+            Di chuyen tai khoan
+          </button>
         </div>,
         document.body
       )}
-
       {/* Move Modal Portal */}
       {moveModal && ReactDOM.createPortal(
         <div 
           className="confirmOverlay" 
-          style={{ 
-            position: 'fixed', 
-            inset: 0, 
-            background: 'rgba(0,0,0,0.6)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            zIndex: 27000 
-          }}
           onClick={e => e.stopPropagation()}
         >
           <div 
-            className="confirmPanel" 
-            style={{ 
-              background: 'var(--md-card)', 
-              border: '1px solid var(--md-border)', 
-              borderRadius: '8px', 
-              padding: '16px', 
-              minWidth: '280px',
-              boxShadow: 'var(--md-shadow-panel)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}
+            className="confirmPanel confirmPanel--compact" 
+            style={{ minWidth: '280px' }}
           >
-            <div style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--md-text)', textAlign: 'center' }}>
+            <div className="confirmTitle" style={{ textAlign: 'center', fontSize: '14px' }}>
               Di chuyển tài khoản
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--md-text-soft)', textAlign: 'center' }}>
-              Di chuyển tài khoản <strong style={{ color: '#fff' }}>{moveModal.account.name || moveModal.account.phone || moveModal.account.nickname || 'Không tên'}</strong>
+            <div className="confirmText" style={{ textAlign: 'center', fontSize: '12px' }}>
+              Di chuyển tài khoản <strong style={{ color: 'var(--md-text)' }}>{moveModal.account.name || moveModal.account.phone || moveModal.account.nickname || 'Không tên'}</strong>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -1288,7 +1319,7 @@ export function DeviceAccountPanel({
             <div className="confirmActions" style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
               <button 
                 className="modalBtn" 
-                style={{ flex: 1, height: '34px', borderRadius: '8px' }}
+                style={{ flex: 1 }}
                 onClick={() => {
                   setMoveModal(null);
                   setTargetOrderStr('');
@@ -1299,7 +1330,7 @@ export function DeviceAccountPanel({
               </button>
               <button 
                 className="modalBtnPrimary" 
-                style={{ flex: 1, height: '34px', borderRadius: '8px' }}
+                style={{ flex: 1 }}
                 onClick={() => handleConfirmMove()}
               >
                 Xác nhận
@@ -1313,8 +1344,7 @@ export function DeviceAccountPanel({
   );
 }
 
-// Ensure icon imports for context menu
-import { Users, Trash2 } from 'lucide-react';
+
 
 export function DeviceAccountOverlay({
   open,

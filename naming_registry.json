@@ -116,7 +116,19 @@
       "dav_input_wrapper": "dav-input-wrapper",
       "dav_transparent_input": "dav-transparent-input",
       "dav_stats_row": "dav-stats-row",
-      "dav_notice_centered_row": "dav-notice-centered-row"
+      "dav_notice_centered_row": "dav-notice-centered-row",
+      "dav_title_dropdown_wrap": "dav-title-dropdown-wrap",
+      "dav_title_account_dropdown": "dav-title-account-dropdown",
+      "dav_title_dropdown_heading": "dav-title-dropdown-heading",
+      "dav_title_empty": "dav-title-empty",
+      "dav_title_account_item": "dav-title-account-item",
+      "dav_title_account_name": "dav-title-account-name",
+      "dav_account_state_dot": "dav-account-state-dot",
+      "dav_platform_dropdown_wrap": "dav-platform-dropdown-wrap",
+      "dav_platform_trigger": "dav-platform-trigger",
+      "dav_platform_menu": "dav-platform-menu",
+      "dav_platform_menu_item": "dav-platform-menu-item",
+      "dav_account_action_menu": "dav-account-action-menu"
     },
     "css_variables": {
       "bg_base": "--bg-base",
