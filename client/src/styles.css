@@ -10195,6 +10195,92 @@ input[type=number] {
   margin-top: -2px;
 }
 
+/* DAV Settings Button */
+.dav-floating-settings-btn {
+  background: transparent;
+  border: none;
+  color: var(--md-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.dav-floating-settings-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* DAV Settings Modal */
+.dav-settings-overlay {
+  background: transparent;
+  pointer-events: auto;
+}
+
+.dav-settings-panel {
+  z-index: 30001;
+}
+
+.dav-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.dav-settings-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--md-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--md-border);
+  margin-bottom: 4px;
+}
+
+.dav-settings-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--md-border);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all 0.15s;
+}
+
+.dav-settings-choice:hover {
+  border-color: var(--md-border-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dav-settings-choice.active {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.dav-settings-choice strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-text);
+}
+
+.dav-settings-choice span {
+  font-size: 11px;
+  color: var(--md-muted);
+}
+
+.dav-settings-choice.active strong {
+  color: #60a5fa;
+}
+
 .dav-total-badge.nearby-active {
   background: #3b82f6 !important;
   color: #fff !important;

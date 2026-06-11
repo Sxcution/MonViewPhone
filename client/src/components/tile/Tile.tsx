@@ -40,6 +40,7 @@ function TileComponent({
     orderMap,
     accountData,
     isFilteredOut = false,
+    nearbyAutoOpenEnabled = false,
 }: TileProps) {
     const { t } = useI18n();
     const [accountOverlayMounted, setAccountOverlayMounted] = useState(false);
@@ -395,6 +396,7 @@ function TileComponent({
                                             initialData={accountData}
                                             activeTab={tileTab}
                                             setActiveTab={setTileTab}
+                                            nearbyAutoOpenEnabled={nearbyAutoOpenEnabled}
                                         />
                                     </div>
                                 )}

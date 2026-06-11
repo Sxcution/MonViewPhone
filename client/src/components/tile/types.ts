@@ -32,5 +32,6 @@ export type TileProps = {
     orderMap?: Map<string, number>;
     accountData?: DeviceAccountData;
     isFilteredOut?: boolean;
+    nearbyAutoOpenEnabled?: boolean;
 };
 

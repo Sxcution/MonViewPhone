@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder } from 'lucide-react';
+import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings } from 'lucide-react';
+import { getNearbyAccountState, hasNearbyRelevantAccount } from '@/lib/deviceAccountNearby';
 import { 
   getDeviceAccountData, 
   saveDeviceAccountData, 
@@ -150,7 +151,7 @@ function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter') {
       <span title="Shelter" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
         <Briefcase 
           size={13} 
-          color="#3b82f6" 
+          color="#ffffff" 
           style={{ flexShrink: 0, marginLeft: '4px' }} 
         />
       </span>
@@ -162,7 +163,7 @@ function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter') {
       <span title="Secure Folder" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
         <Folder 
           size={13} 
-          color="#3b82f6" 
+          color="#ffffff" 
           style={{ flexShrink: 0, marginLeft: '4px' }} 
         />
       </span>
@@ -177,7 +178,7 @@ function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter') {
           height="13" 
           viewBox="0 0 24 24" 
           fill="none" 
-          stroke="#f59e0b" 
+          stroke="#ffffff" 
           strokeWidth="3.5" 
           strokeLinecap="round" 
           strokeLinejoin="round" 
@@ -193,6 +194,28 @@ function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter') {
   return null;
 }
 
+// --- Render Nearby Icon helper ---
+function renderNearbyAccountIcon(account: Account) {
+  const state = getNearbyAccountState(account);
+  if (state === 'eligible') {
+    return (
+      <span title="Đủ điều kiện Nearby People" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, marginLeft: 4 }}>
+        <MapPin size={13} color="#3b82f6" />
+      </span>
+    );
+  }
+
+  if (state === 'upcoming') {
+    return (
+      <span title="Còn tối đa 3 ngày để hiển thị Nearby People" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, marginLeft: 4 }}>
+        <MapPin size={13} color="#f97316" />
+      </span>
+    );
+  }
+
+  return null;
+}
+
 // --- Device Panel Component ---
 export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({ 
   udid, 
@@ -202,7 +225,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   orderMap,
   initialData,
   activeTab,
-  setActiveTab
+  setActiveTab,
+  nearbyAutoOpenEnabled
 }: { 
   udid: string; 
   order: number; 
@@ -212,6 +236,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   initialData: DeviceAccountData;
   activeTab: PlatformType;
   setActiveTab: (tab: PlatformType) => void;
+  nearbyAutoOpenEnabled?: boolean;
 }) {
   const [data, setData] = useState(initialData);
   const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
@@ -279,6 +304,33 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const accountTitleDropdownRef = useRef<HTMLDivElement>(null);
   const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false);
   const platformDropdownRef = useRef<HTMLDivElement>(null);
+  const autoOpenedNearbyDropdownRef = useRef(false);
+
+  // Tính toán xem panel này có tài khoản đủ / gần đủ Nearby không
+  const panelHasNearbyRelevantAccount = useMemo(() => {
+    if (activeTab !== 'wechat') return false;
+    return hasNearbyRelevantAccount(groupAccounts.map(x => x.account));
+  }, [activeTab, groupAccounts]);
+
+  // Auto-open dropdown khi filter Nearby People bật
+  useEffect(() => {
+    const shouldOpen =
+      nearbyAutoOpenEnabled &&
+      activeTab === 'wechat' &&
+      panelHasNearbyRelevantAccount;
+
+    if (shouldOpen) {
+      setAccountTitleDropdownOpen(true);
+      setPlatformDropdownOpen(false);
+      autoOpenedNearbyDropdownRef.current = true;
+      return;
+    }
+
+    if (!nearbyAutoOpenEnabled && autoOpenedNearbyDropdownRef.current) {
+      setAccountTitleDropdownOpen(false);
+      autoOpenedNearbyDropdownRef.current = false;
+    }
+  }, [nearbyAutoOpenEnabled, activeTab, panelHasNearbyRelevantAccount]);
   const [accountActionMenu, setAccountActionMenu] = useState<{ x: number; y: number; sourceUdid: string; account: Account } | null>(null);
   const accountActionMenuRef = useRef<HTMLDivElement>(null);
   const [moveModal, setMoveModal] = useState<{ sourceUdid: string, account: Account } | null>(null);
@@ -292,13 +344,20 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       if (accountTitleDropdownRef.current?.contains(target)) return;
       if (platformDropdownRef.current?.contains(target)) return;
       if (accountActionMenuRef.current?.contains(target)) return;
+      // Khi filter Nearby đang bật và dropdown được ghim bởi auto-open,
+      // click ngoài không đóng accountTitleDropdown — chỉ đóng khi filter tắt.
+      if (nearbyAutoOpenEnabled && autoOpenedNearbyDropdownRef.current) {
+        setPlatformDropdownOpen(false);
+        setAccountActionMenu(null);
+        return;
+      }
       setAccountTitleDropdownOpen(false);
       setPlatformDropdownOpen(false);
       setAccountActionMenu(null);
     };
     window.addEventListener('mousedown', hide);
     return () => window.removeEventListener('mousedown', hide);
-  }, [accountTitleDropdownOpen, platformDropdownOpen, accountActionMenu]);
+  }, [accountTitleDropdownOpen, platformDropdownOpen, accountActionMenu, nearbyAutoOpenEnabled]);
 
   const handleConfirmMove = () => {
     setMoveError('');
@@ -837,7 +896,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     >
                       <span className={`dav-account-state-dot ${getAccountStatusClass(account)}`} />
                       <span className="dav-title-account-name" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                        {account.name || account.phone || account.nickname || 'Khong ten'}
+                        {account.name || account.phone || account.nickname || 'Không tên'}
+                        {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
                         {renderAppTypeIcon(account.appType)}
                       </span>
                     </button>
@@ -1536,6 +1596,26 @@ export function DeviceAccountOverlay({
   const platformCtxMenuRef = useRef<HTMLDivElement>(null);
   const [pendingDeletePlatform, setPendingDeletePlatform] = useState<string | null>(null);
 
+  // === Nearby Filter Mode State (dav-nearby-filter-mode) ===
+  type DavNearbyFilterMode = 'priority_sort' | 'hide_unmatched';
+  const DAV_NEARBY_FILTER_MODE_KEY_LOCAL = 'monviewphone:dav-nearby-filter-mode';
+
+  const [showAccountSettingsModal, setShowAccountSettingsModal] = useState(false);
+  const [nearbyFilterMode, setNearbyFilterMode] = useState<DavNearbyFilterMode>(() => {
+    try {
+      const raw = localStorage.getItem(DAV_NEARBY_FILTER_MODE_KEY_LOCAL);
+      return raw === 'priority_sort' ? 'priority_sort' : 'hide_unmatched';
+    } catch {
+      return 'hide_unmatched';
+    }
+  });
+
+  const updateNearbyFilterMode = (mode: DavNearbyFilterMode) => {
+    setNearbyFilterMode(mode);
+    localStorage.setItem(DAV_NEARBY_FILTER_MODE_KEY_LOCAL, mode);
+    window.dispatchEvent(new CustomEvent('monviewphone:dav-nearby-filter-mode-changed', { detail: mode }));
+  };
+
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(() => {
     try {
       const saved = localStorage.getItem('monviewphone:dav-drag-pos');
@@ -1766,18 +1846,7 @@ export function DeviceAccountOverlay({
         });
         if (hasHK) scanHK++;
         
-        const hasNearby = accounts.some(acc => {
-          if (!acc || acc.status === 'Die' || acc.status === 'Risk') return false;
-          const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-          const isOverOneYear = !!(acc.isOneYearOld || (acc.createdAt && (Date.now() - acc.createdAt) >= oneYearMs));
-          if (!isOverOneYear) return false;
-          
-          if (acc.nearbyPeopleDueDate) {
-            const hoursLeft = (acc.nearbyPeopleDueDate - Date.now()) / (1000 * 60 * 60);
-            if (hoursLeft > 12) return false;
-          }
-          return true;
-        });
+        const hasNearby = activeTab === 'wechat' && hasNearbyRelevantAccount(accounts);
         if (hasNearby) nearbyPeople++;
       }
       
@@ -1838,9 +1907,24 @@ export function DeviceAccountOverlay({
             </button>
           </div>
 
-          <button className="dav-floating-close-btn" onClick={onClose}>
-            <X size={16} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* btn_dav_settings : Nút cài đặt Quản lý tài khoản */}
+            <button
+              type="button"
+              className="dav-floating-settings-btn"
+              title="Cài đặt Quản lý tài khoản"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowAccountSettingsModal(true);
+              }}
+            >
+              <Settings size={15} />
+            </button>
+            <button className="dav-floating-close-btn" onClick={onClose}>
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Thanh lọc statistics */}
@@ -2002,6 +2086,54 @@ export function DeviceAccountOverlay({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal cài đặt Quản lý tài khoản */}
+      {showAccountSettingsModal && ReactDOM.createPortal(
+        <div
+          className="confirmOverlay dav-settings-overlay"
+          style={{ zIndex: 30000 }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          <div
+            className="confirmPanel dav-settings-panel"
+            style={{ minWidth: 420, maxWidth: 520 }}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <div className="confirmTitle">Cài đặt Quản lý tài khoản</div>
+
+            <div className="dav-settings-section">
+              <div className="dav-settings-section-title">Bộ lọc Nearby People</div>
+
+              {/* btn_dav_settings_priority_sort : Chọn mode sắp xếp ưu tiên Nearby */}
+              <button
+                type="button"
+                className={`dav-settings-choice ${nearbyFilterMode === 'priority_sort' ? 'active' : ''}`}
+                onClick={() => updateNearbyFilterMode('priority_sort')}
+              >
+                <strong>Sắp xếp ưu tiên Nearby</strong>
+                <span>Giữ cách cũ, đưa title có Nearby gần nhất lên trước</span>
+              </button>
+
+              {/* btn_dav_settings_hide_unmatched : Chọn mode ẩn title không liên quan */}
+              <button
+                type="button"
+                className={`dav-settings-choice ${nearbyFilterMode === 'hide_unmatched' ? 'active' : ''}`}
+                onClick={() => updateNearbyFilterMode('hide_unmatched')}
+              >
+                <strong>Ẩn title không liên quan</strong>
+                <span>Chỉ hiện title có tài khoản đủ điều kiện hoặc còn tối đa 3 ngày</span>
+              </button>
+            </div>
+
+            <div className="confirmActions">
+              <button type="button" className="modalBtnPrimary" onClick={() => setShowAccountSettingsModal(false)}>
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </>,
     document.body

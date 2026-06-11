@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, startTransiti
 import { createPortal } from 'react-dom'
 import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
 import { loadDeviceAccountVault, getDeviceAccountDataFromVault, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
+import { hasNearbyRelevantAccount, getNearestNearbyHours } from '@/lib/deviceAccountNearby'
 import { readPageParams } from '@/lib/params'
 import { useServer } from '@/context/ServerContext'
 import { Tile } from '@/components/Tile'
@@ -285,6 +286,18 @@ export function App() {
   const [davActiveFilter, setDavActiveFilter] = useState('default')
   const [davActiveTab, setDavActiveTab] = useState<PlatformType>('wechat')
 
+  // Nearby filter mode (stored in localStorage)
+  type DavNearbyFilterMode = 'priority_sort' | 'hide_unmatched';
+  const DAV_NEARBY_FILTER_MODE_KEY = 'monviewphone:dav-nearby-filter-mode';
+  const [davNearbyFilterMode, setDavNearbyFilterMode] = useState<DavNearbyFilterMode>(() => {
+    try {
+      const raw = localStorage.getItem(DAV_NEARBY_FILTER_MODE_KEY);
+      return raw === 'priority_sort' ? 'priority_sort' : 'hide_unmatched';
+    } catch {
+      return 'hide_unmatched';
+    }
+  });
+
   useEffect(() => {
     if (deviceAccountOverlayOpen) {
       setDeviceAccountOverlayMounted(true)
@@ -298,6 +311,18 @@ export function App() {
     window.addEventListener('device-account-updated', handleAccountUpdate)
     return () => window.removeEventListener('device-account-updated', handleAccountUpdate)
   }, [])
+
+  // Lắng nghe thay đổi setting nearby filter mode
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const mode = (e as CustomEvent<DavNearbyFilterMode>).detail;
+      if (mode === 'priority_sort' || mode === 'hide_unmatched') {
+        setDavNearbyFilterMode(mode);
+      }
+    };
+    window.addEventListener('monviewphone:dav-nearby-filter-mode-changed', handler);
+    return () => window.removeEventListener('monviewphone:dav-nearby-filter-mode-changed', handler);
+  }, []);
 
   const [themeInspectorEnabled, setThemeInspectorEnabled] = useState(false);
 
@@ -1472,47 +1497,35 @@ export function App() {
   const orderedRegistered = useMemo(() => {
     const arr = [...filteredRegistered]
 
-    // Nếu bộ lọc tài khoản là nearby_people đang hoạt động và đang mở overlay
-    if (deviceAccountOverlayOpen && davActiveFilter === 'nearby_people' && davActiveTab === 'wechat') {
+    // Nếu bộ lọc tài khoản là nearby_people và mode là priority_sort thì sort theo Nearby gần nhất
+    if (
+      deviceAccountOverlayOpen &&
+      davActiveFilter === 'nearby_people' &&
+      davActiveTab === 'wechat' &&
+      davNearbyFilterMode === 'priority_sort'
+    ) {
       const now = Date.now();
-      
+
       const getHours = (udid: string) => {
         const accountData = getDeviceAccountDataFromVault(vault, udid);
         const accounts = accountData.platforms['wechat'] || [];
-        let nearest = Number.POSITIVE_INFINITY;
-        
-        for (const acc of accounts) {
-          if (!acc || acc.status === 'Die' || acc.status === 'Risk') continue;
-          
-          const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-          const isOverOneYear = !!(acc.isOneYearOld || (acc.createdAt && (now - acc.createdAt) >= oneYearMs));
-          if (!isOverOneYear) continue;
-          
-          const hours = acc.nearbyPeopleDueDate 
-            ? Math.max(0, (acc.nearbyPeopleDueDate - now) / (1000 * 60 * 60))
-            : 0;
-            
-          if (hours < nearest) {
-            nearest = hours;
-          }
-        }
-        return nearest;
+        return getNearestNearbyHours(accounts, now);
       };
 
       arr.sort((a, b) => {
         const ha = getHours(a);
         const hb = getHours(b);
-        
+
         if (ha !== hb) {
           return ha - hb;
         }
-        
+
         // Cùng giá trị thì sắp xếp theo số thứ tự máy
         const oa = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER;
         const ob = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
         return oa - ob;
       });
-      
+
       return arr;
     }
 
@@ -1522,7 +1535,7 @@ export function App() {
       return oa - ob
     })
     return arr
-  }, [filteredRegistered, orderMap, deviceAccountOverlayOpen, davActiveFilter, davActiveTab, vault])
+  }, [filteredRegistered, orderMap, deviceAccountOverlayOpen, davActiveFilter, davActiveTab, davNearbyFilterMode, vault])
   const orderedSidebarRegistered = useMemo(() => {
     const arr = [...sidebarRegistered]
     arr.sort((a, b) => {
@@ -1598,13 +1611,7 @@ export function App() {
         filterMatched = accounts.some(acc => !!(acc.notice && acc.notice.dueDate));
       } else if (davActiveFilter === 'nearby_people') {
         if (davActiveTab === 'wechat') {
-          const now = Date.now();
-          filterMatched = accounts.some(acc => {
-            if (!acc || acc.status === 'Die' || acc.status === 'Risk') return false;
-            const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-            const isOverOneYear = !!(acc.isOneYearOld || (acc.createdAt && (now - acc.createdAt) >= oneYearMs));
-            return isOverOneYear;
-          });
+          filterMatched = hasNearbyRelevantAccount(accounts);
         }
       }
 
@@ -2598,39 +2605,28 @@ export function App() {
           >
             {(() => {
               let renderOrder = [...mergedOrder];
-              if (deviceAccountOverlayOpen && davActiveFilter === 'nearby_people' && davActiveTab === 'wechat') {
+              // Chỉ sort khi mode là priority_sort
+              if (
+                deviceAccountOverlayOpen &&
+                davActiveFilter === 'nearby_people' &&
+                davActiveTab === 'wechat' &&
+                davNearbyFilterMode === 'priority_sort'
+              ) {
                 const now = Date.now();
                 const getHours = (udid: string) => {
                   const accountData = getDeviceAccountDataFromVault(vault, udid);
                   const accounts = accountData.platforms['wechat'] || [];
-                  let nearest = Number.POSITIVE_INFINITY;
-                  
-                  for (const acc of accounts) {
-                    if (!acc || acc.status === 'Die' || acc.status === 'Risk') continue;
-                    
-                    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-                    const isOverOneYear = !!(acc.isOneYearOld || (acc.createdAt && (now - acc.createdAt) >= oneYearMs));
-                    if (!isOverOneYear) continue;
-                    
-                    const hours = acc.nearbyPeopleDueDate 
-                      ? Math.max(0, (acc.nearbyPeopleDueDate - now) / (1000 * 60 * 60))
-                      : 0;
-                      
-                    if (hours < nearest) {
-                      nearest = hours;
-                    }
-                  }
-                  return nearest;
+                  return getNearestNearbyHours(accounts, now);
                 };
 
                 renderOrder.sort((a, b) => {
                   const ha = getHours(a);
                   const hb = getHours(b);
-                  
+
                   if (ha !== hb) {
                     return ha - hb;
                   }
-                  
+
                   // Cùng giá trị thì sắp xếp theo số thứ tự máy
                   const oa = orderMap.get(a) ?? Number.MAX_SAFE_INTEGER;
                   const ob = orderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
@@ -2649,8 +2645,8 @@ export function App() {
                 const isAccountMatched = isDeviceMatchingAccountFilter(udid);
 
                 // 3. Quyết định hiển thị hay ẩn hoàn toàn
-                // Nếu không khớp kết nối/nhóm -> Ẩn hoàn toàn.
-                // Nếu khớp kết nối/nhóm -> Luôn hiển thị. Nhưng nếu overlay tài khoản mở và không khớp bộ lọc tài khoản -> Làm mờ tối.
+                // Cả 2 mode (priority_sort và hide_unmatched) đều làm mờ title không khớp.
+                // Điểm khác nhau duy nhất là priority_sort thì sort renderOrder ở trên, hide_unmatched giữ nguyên vị trí.
                 const isVisible = isMatchedByConnectionAndGroup;
                 const isFilteredOut = deviceAccountOverlayOpen && isMatchedByConnectionAndGroup && !isAccountMatched;
 
@@ -2783,6 +2779,7 @@ export function App() {
                       orderMap={orderMap}
                       accountData={getDeviceAccountDataFromVault(vault, udid)}
                       isFilteredOut={isFilteredOut}
+                      nearbyAutoOpenEnabled={davActiveTab === 'wechat' && davActiveFilter === 'nearby_people'}
                     />
                   </div>
                 );

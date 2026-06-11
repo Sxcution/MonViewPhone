@@ -37,6 +37,7 @@ Removed legacy layers:
 - `client/src/lib/serverApi.ts`: HTTP API client for the Go backend.
 - `client/src/store/useTileOrder.ts`: Persistent device numbering and ordering.
 - `client/src/styles.css`: Main application styling. Defines design tokens, layout styles, and the standardized, unified CSS overlay confirm modal styling system.
+- [NEW] [deviceAccountNearby.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/deviceAccountNearby.ts): Centralized helper for Nearby People logic. Exports `getNearbyAccountState()` (returns `'eligible'`, `'upcoming'`, or `'none'`), `hasNearbyRelevantAccount()`, and `getNearestNearbyHours()`. Uses 3-day window for upcoming state. Imported by both App.tsx and DeviceAccountOverlay.tsx.
 - `client/public/audio/`: Directory containing static audio assets, including `notification_new.mp3` for the default alert sound.
 
 
