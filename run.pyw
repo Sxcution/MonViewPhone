@@ -1,4 +1,7 @@
+import ctypes
+from ctypes import wintypes
 import os
+import socket
 import sys
 import time
 import subprocess
@@ -10,31 +13,14 @@ from pystray import Icon as TrayIcon, Menu as TrayMenu, MenuItem as TrayMenuItem
 # Global references to the subprocesses
 go_process = None
 npm_process = None
+instance_mutex = None
 
 APP_NAME = "MonViewPhone"
 BASE_URL = "http://localhost:5173/"
+BACKEND_PORT = 11000
+FRONTEND_PORT = 5173
+APP_MUTEX_NAME = r"Local\MonViewPhone_SingleInstance"
 
-def start_backend():
-    global go_process
-    # Start server-go.exe in its directory
-    server_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server-go")
-    exe_path = os.path.join(server_dir, "server-go.exe")
-    if os.path.exists(exe_path):
-        go_process = subprocess.Popen(
-            [exe_path],
-            cwd=server_dir,
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
-
-def start_frontend():
-    global npm_process
-    # Start npm run dev in client directory
-    client_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "client")
-    npm_process = subprocess.Popen(
-        ["cmd", "/c", "npm run dev"],
-        cwd=client_dir,
-        creationflags=subprocess.CREATE_NO_WINDOW
-    )
 
 def open_app(icon=None, item=None):
     # Try opening with Chrome app mode
@@ -69,28 +55,98 @@ def open_app(icon=None, item=None):
         # Fallback to default browser
         webbrowser.open(BASE_URL)
 
-def clean_up():
-    global go_process, npm_process
-    if go_process:
-        go_process.terminate()
-        go_process.wait()
-    if npm_process:
-        # Since npm run dev starts child processes, kill the process tree
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(npm_process.pid)],
+
+def acquire_single_instance_lock():
+    """Chi cho phep 1 launcher MonViewPhone chay cung luc."""
+    global instance_mutex
+
+    if os.name != "nt":
+        return True
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR]
+    kernel32.CreateMutexW.restype = wintypes.HANDLE
+
+    instance_mutex = kernel32.CreateMutexW(None, False, APP_MUTEX_NAME)
+    if not instance_mutex:
+        return True
+
+    if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+        # Da co launcher dang quan ly server/frontend, khong start them tien trinh moi.
+        open_app()
+        return False
+
+    return True
+
+
+def is_port_open(port, host="127.0.0.1"):
+    try:
+        with socket.create_connection((host, port), timeout=0.35):
+            return True
+    except OSError:
+        return False
+
+
+def start_backend():
+    global go_process
+
+    # Neu backend da lang nghe cong 11000 thi khong start them server-go.exe.
+    if is_port_open(BACKEND_PORT):
+        go_process = None
+        return
+
+    # Start server-go.exe in its directory
+    server_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "server-go")
+    exe_path = os.path.join(server_dir, "server-go.exe")
+    if os.path.exists(exe_path):
+        go_process = subprocess.Popen(
+            [exe_path],
+            cwd=server_dir,
             creationflags=subprocess.CREATE_NO_WINDOW
         )
-        npm_process.terminate()
-        npm_process.wait()
-    # Also taskkill server-go.exe to make sure it's dead
-    subprocess.run(
-        ["taskkill", "/F", "/IM", "server-go.exe"],
+
+
+def start_frontend():
+    global npm_process
+
+    # Neu Vite da lang nghe cong 5173 thi khong start them npm run dev.
+    if is_port_open(FRONTEND_PORT):
+        npm_process = None
+        return
+
+    # Start npm run dev in client directory
+    client_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "client")
+    npm_process = subprocess.Popen(
+        ["cmd", "/c", "npm run dev"],
+        cwd=client_dir,
         creationflags=subprocess.CREATE_NO_WINDOW
     )
+
+
+def terminate_process(process):
+    if not process:
+        return
+
+    try:
+        process.terminate()
+        process.wait(timeout=3)
+    except Exception:
+        pass
+
+
+def clean_up():
+    global go_process, npm_process
+
+    terminate_process(go_process)
+    terminate_process(npm_process)
+    go_process = None
+    npm_process = None
+
 
 def exit_application(icon, item):
     icon.stop()
     clean_up()
+
 
 def restart_application(icon, item):
     icon.stop()
@@ -102,6 +158,7 @@ def restart_application(icon, item):
         creationflags=subprocess.CREATE_NO_WINDOW
     )
     sys.exit(0)
+
 
 def create_tray_icon():
     icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "IconMonViewPhone.png")
@@ -131,7 +188,11 @@ def create_tray_icon():
     icon = TrayIcon(APP_NAME, image, APP_NAME, menu)
     return icon
 
+
 def main():
+    if not acquire_single_instance_lock():
+        return
+
     start_backend()
     start_frontend()
     
@@ -142,6 +203,7 @@ def main():
     
     icon = create_tray_icon()
     icon.run()
+
 
 if __name__ == "__main__":
     # Ensure working directory is the script directory
