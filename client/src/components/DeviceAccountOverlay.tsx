@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings } from 'lucide-react';
-import { getNearbyAccountState, hasNearbyRelevantAccount } from '@/lib/deviceAccountNearby';
+import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount } from '@/lib/deviceAccountNearby';
 import { 
   getDeviceAccountData, 
   saveDeviceAccountData, 
@@ -240,6 +240,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 }) {
   const [data, setData] = useState(initialData);
   const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
+  const [showBellTooltip, setShowBellTooltip] = useState(false);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -310,6 +311,11 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const panelHasNearbyRelevantAccount = useMemo(() => {
     if (activeTab !== 'wechat') return false;
     return hasNearbyRelevantAccount(groupAccounts.map(x => x.account));
+  }, [activeTab, groupAccounts]);
+
+  const panelHasNearbyEligibleAccount = useMemo(() => {
+    if (activeTab !== 'wechat') return false;
+    return hasNearbyEligibleAccount(groupAccounts.map(x => x.account));
   }, [activeTab, groupAccounts]);
 
   // Auto-open dropdown khi filter Nearby People bật
@@ -826,33 +832,43 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     <div className="dav-panel" onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}>
       <div className="dav-panel-header">
         <div className="dav-panel-title-left">
-          <span className="dav-order">{order.toString().padStart(2, '0')}</span>
+          <span className={`dav-order ${panelHasNearbyEligibleAccount ? 'dav-order-nearby-eligible' : ''}`}>
+            {order.toString().padStart(2, '0')}
+          </span>
           <span 
             className="dav-status-dot" 
             style={{ background: headerDotBg }} 
           />
           {deviceNoticeStatus !== 'none' && (
-            <button
-              type="button"
-              className="dav-bell-btn"
-              title={noticeTooltipText}
-              onClick={handleNoticeIconClick}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Bell 
-                size={13} 
-                color={deviceNoticeStatus === 'expired' ? 'var(--md-danger)' : 'var(--md-warning)'} 
-                className={deviceNoticeStatus === 'expired' ? "dav-bell-expired animate-pulse" : ""} 
-              />
-            </button>
+            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="dav-bell-btn"
+                onMouseEnter={() => setShowBellTooltip(true)}
+                onMouseLeave={() => setShowBellTooltip(false)}
+                onClick={handleNoticeIconClick}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Bell 
+                  size={13} 
+                  color={deviceNoticeStatus === 'expired' ? 'var(--md-danger)' : 'var(--md-warning)'} 
+                  className={deviceNoticeStatus === 'expired' ? "dav-bell-expired animate-pulse" : ""} 
+                />
+              </button>
+              {showBellTooltip && (
+                <div className="dav-bell-tooltip">
+                  {noticeTooltipText}
+                </div>
+              )}
+            </div>
           )}
         </div>
 

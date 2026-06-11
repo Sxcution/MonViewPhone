@@ -50,3 +50,8 @@ export function getNearestNearbyHours(accounts: Account[], now = Date.now()): nu
 
   return nearest;
 }
+
+export function hasNearbyEligibleAccount(accounts: Account[], now = Date.now()): boolean {
+  return accounts.some(acc => getNearbyAccountState(acc, now) === 'eligible');
+}
+

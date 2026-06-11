@@ -1,4 +1,7 @@
 - Đã loại bỏ hoàn toàn việc tìm kiếm/lọc theo Model máy thiết bị khỏi chức năng Tìm kiếm Quản lý tài khoản (Quản lý tài khoản).
 - Thêm cơ chế lọc sạch các phần tử null/undefined trong danh sách tài khoản để tránh lỗi crash JS làm mờ/ẩn tất cả thiết bị trên Grid khi tìm kiếm.
 - Cập nhật placeholder chỉ dẫn tìm kiếm thành "Tìm theo Tên, Nickname, SĐT, Email, Ghi chú...".
+- Đổi màu số máy trong Overlay Account (phần `.dav-order` nằm trong `DeviceAccountPanel`) thành màu xanh dương khi có bất kỳ tài khoản WeChat nào trong panel đó đủ điều kiện Active Nearby People (eligible). Mặc định số máy là màu trắng bình thường.
+- Cập nhật tooltip cảnh báo thông báo (warning bell) trên header của `DeviceAccountPanel` hiển thị ngay lập tức không có delay khi hover chuột.
+- Cập nhật tệp `naming_registry.json` và `project_structure.md` để đồng bộ các hằng số, lớp CSS và biến trạng thái mới.
 - Chạy `npm run build` thành công trên frontend.

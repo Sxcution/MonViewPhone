@@ -9112,7 +9112,35 @@ textarea:focus,
 .dav-order {
   font-weight: bold;
   font-size: 16px;
+  color: #ffffff;
+}
+
+.dav-order.nearby-eligible,
+.dav-order-nearby-eligible {
   color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.75);
+  text-shadow: 0 0 8px rgba(59, 130, 246, 0.45);
+}
+
+.dav-bell-tooltip {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  background: var(--md-card, #1e1e1e);
+  border: 1px solid var(--md-border, rgba(255, 255, 255, 0.15));
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--md-text, #ffffff);
+  font-size: 12px;
+  white-space: pre-line;
+  z-index: 1000;
+  box-shadow: var(--md-shadow-panel, 0 4px 12px rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+  min-width: max-content;
+  max-width: 280px;
+  font-weight: normal;
+  text-align: left;
 }
 
 .dav-udid {
