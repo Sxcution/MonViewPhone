@@ -50,6 +50,7 @@ export interface BaseAccount {
   status: AccountStatus;
   notice: AccountNotice | null;
   appType?: 'main' | 'clone' | 'secure' | 'shelter';
+  dieAt?: number | null;
 }
 
 export interface WeChatAccount extends BaseAccount {
@@ -161,6 +162,7 @@ export function createNewAccount(isWeChat: boolean): Account {
     note: '',
     status: 'Live',
     notice: null,
+    dieAt: null,
   };
   
   if (isWeChat) {

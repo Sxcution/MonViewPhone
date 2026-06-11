@@ -12,3 +12,7 @@
 - Thay đổi màu sắc của icon QR Code và số lượt quét mã QR thành màu trắng khi tài khoản vẫn đủ điều kiện quét (< 3 lượt).
 - Cập nhật tệp `naming_registry.json` và `project_structure.md` để đồng bộ các hằng số, lớp CSS và biến trạng thái mới.
 - Chạy `npm run build` thành công trên frontend.
+- Di chuyển hiển thị số ngày đã Die (dạng `Die: X ngày`) xuống ngay bên dưới dòng ngày tạo "Đã tạo: ...".
+- Bỏ chữ "Còn/còn" tại các trạng thái đếm ngược (QR countdown, thông báo, Nearby countdown).
+- Chặn modal Quản lý tài khoản kéo lọt lên trên màn hình bằng cách clamp vị trí (đảm bảo `top >= 12px` và header luôn nhìn thấy được), tự động sửa lỗi vị trí khi load từ localStorage hoặc thay đổi kích thước màn hình, và hỗ trợ nhấp đúp vào header để reset vị trí về trung tâm màn hình.
+- Xác thực và chạy `npm run build` thành công trên frontend.

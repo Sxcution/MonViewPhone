@@ -102,6 +102,27 @@ function getRelativeTimeStr(createdAt: number) {
   return `${totalDays} ngày`;
 }
 
+function getElapsedDaysSince(ts?: number | null): number {
+  if (!ts) return 0;
+  return Math.max(0, Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24)));
+}
+
+function clampDavPanelPosition(pos: { x: number; y: number }, panel?: HTMLElement | null) {
+  const margin = 12;
+  const minVisibleHeader = 56;
+
+  const panelWidth = panel?.offsetWidth || 900;
+  const panelHeight = panel?.offsetHeight || 600;
+
+  const maxX = Math.max(margin, window.innerWidth - Math.min(panelWidth, window.innerWidth - margin * 2) - margin);
+  const maxY = Math.max(margin, window.innerHeight - minVisibleHeader);
+
+  return {
+    x: Math.min(Math.max(pos.x, margin), maxX),
+    y: Math.min(Math.max(pos.y, margin), maxY),
+  };
+}
+
 function computeBadges(acc: Account, isWeChat: boolean) {
   const badges: { label: string; color: string }[] = [];
   
@@ -549,7 +570,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     const diffMs = nextScanDate - Date.now();
     if (diffMs > 0) {
       const remainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      qrCountdownText = `(Còn ${remainingDays} ngày)`;
+      qrCountdownText = `(${remainingDays} ngày)`;
     }
   }
 
@@ -662,6 +683,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
         [activeTab]: (data.platforms[activeTab] || []).map(a => {
           if (a.id === id) {
             const updated = { ...a, ...updates };
+            if (updates.status === 'Die' && a.status !== 'Die') {
+              updated.dieAt = Date.now();
+            }
+            if (updates.status && updates.status !== 'Die') {
+              updated.dieAt = null;
+            }
             if (updates.status === 'Risk' && a.status !== 'Risk' && updates.notice === undefined) {
               const startDate = Date.now();
               const dueDate = startDate + 30 * 24 * 60 * 60 * 1000;
@@ -1239,7 +1266,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       <>
                         <MapPin size={13} color="#eab308" style={{ flexShrink: 0 }} />
                         <span style={{ color: '#eab308', fontSize: '11px', fontWeight: '500' }}>
-                          Còn {nearbyDays} ngày
+                          {nearbyDays} ngày
                         </span>
                       </>
                     ) : (
@@ -1261,7 +1288,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 <span className="muted" style={{ color: '#666', fontStyle: 'italic', fontSize: '11px' }}>Chưa đặt thông báo</span>
               ) : (
                 <span style={{ color: noticeStatus === 'expired' ? '#ef4444' : '#eab308', fontWeight: noticeStatus === 'expired' ? 'bold' : '500' }}>
-                  {selectedAccount.notice?.title} {noticeStatus === 'expired' ? ': đã đến hạn' : `: còn ${remainingDays} ngày`}
+                  {selectedAccount.notice?.title} {noticeStatus === 'expired' ? ': đã đến hạn' : `: ${remainingDays} ngày`}
                 </span>
               )}
             </div>
@@ -1307,6 +1334,13 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 </span>
               )}
             </div>
+            {selectedAccount.status === 'Die' && selectedAccount.dieAt ? (
+              <div className="dav-centered-row dav-die-age-row">
+                <span className="dav-die-age-text">
+                  Die: {getElapsedDaysSince(selectedAccount.dieAt)} ngày
+                </span>
+              </div>
+            ) : null}
           </div>
         )}
       </div>
@@ -1688,6 +1722,7 @@ export function DeviceAccountOverlay({
 }: DeviceAccountOverlayProps) {
   const [vault, setVault] = useState<VaultData>(() => loadDeviceAccountVault());
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const floatingPanelRef = useRef<HTMLDivElement | null>(null);
 
   const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
   const [showAddPlatformModal, setShowAddPlatformModal] = useState(false);
@@ -1749,10 +1784,11 @@ export function DeviceAccountOverlay({
       if (!dragStartRef.current) return;
       const dx = moveEvent.clientX - dragStartRef.current.x;
       const dy = moveEvent.clientY - dragStartRef.current.y;
-      const newPos = {
+      const rawPos = {
         x: dragStartRef.current.panelX + dx,
         y: dragStartRef.current.panelY + dy,
       };
+      const newPos = clampDavPanelPosition(rawPos, panel);
       setDragPos(newPos);
       localStorage.setItem('monviewphone:dav-drag-pos', JSON.stringify(newPos));
     };
@@ -1766,6 +1802,30 @@ export function DeviceAccountOverlay({
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   };
+
+  useEffect(() => {
+    if (!open || !dragPos) return;
+
+    requestAnimationFrame(() => {
+      const fixed = clampDavPanelPosition(dragPos, floatingPanelRef.current);
+      if (fixed.x !== dragPos.x || fixed.y !== dragPos.y) {
+        setDragPos(fixed);
+        localStorage.setItem('monviewphone:dav-drag-pos', JSON.stringify(fixed));
+      }
+    });
+  }, [open, dragPos]);
+
+  useEffect(() => {
+    const onResize = () => {
+      if (!dragPos) return;
+      const fixed = clampDavPanelPosition(dragPos, floatingPanelRef.current);
+      setDragPos(fixed);
+      localStorage.setItem('monviewphone:dav-drag-pos', JSON.stringify(fixed));
+    };
+
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [dragPos]);
 
   useEffect(() => {
     if (!platformCtxMenu) return;
@@ -1972,8 +2032,21 @@ export function DeviceAccountOverlay({
   return ReactDOM.createPortal(
     <>
       <div className={`dav-overlay ${open ? 'is-open' : 'is-hidden'}`}>
-      <div className="dav-floating-panel" style={dragPos ? { position: 'absolute', left: `${dragPos.x}px`, top: `${dragPos.y}px`, transform: 'none' } : {}}>
-        <div className="dav-floating-header" onMouseDown={handleHeaderMouseDown}>
+      <div 
+        ref={floatingPanelRef}
+        className="dav-floating-panel" 
+        style={dragPos ? { position: 'absolute', left: `${dragPos.x}px`, top: `${dragPos.y}px`, transform: 'none' } : {}}
+      >
+        <div 
+          className="dav-floating-header" 
+          onMouseDown={handleHeaderMouseDown}
+          onDoubleClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragPos(null);
+            localStorage.removeItem('monviewphone:dav-drag-pos');
+          }}
+        >
           <div className="dav-floating-title-left">
             <span className="dav-floating-title">Quản lý tài khoản</span>
           </div>
