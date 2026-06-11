@@ -9265,8 +9265,8 @@ select.dav-input {
 
 .dav-ctx-menu {
   position: fixed;
-  background: #252525;
-  border: 1px solid #333;
+  background: #252525 !important;
+  border: 1px solid #333 !important;
   border-radius: 8px;
   padding: 6px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
@@ -9337,7 +9337,7 @@ select.dav-input {
 .dav-ctx-submenu {
   display: none;
   position: absolute;
-  left: calc(100% - 13px);
+  left: calc(100% - 15px);
   top: -6px;
   background: #252525;
   border: 1px solid #333;

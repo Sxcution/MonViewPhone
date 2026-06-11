@@ -406,59 +406,96 @@ export function DeviceAccountPanel({
   // Actions
   const handleAddAccount = () => {
     const newAcc = createNewAccount(isWeChat);
-    const newData = { ...data };
-    newData.platforms[activeTab] = [...(newData.platforms[activeTab] || []), newAcc];
-    newData.selectedAccountByPlatform[activeTab] = newAcc.id;
+    const newData = {
+      ...data,
+      platforms: {
+        ...data.platforms,
+        [activeTab]: [...(data.platforms[activeTab] || []), newAcc]
+      },
+      selectedAccountByPlatform: {
+        ...data.selectedAccountByPlatform,
+        [activeTab]: newAcc.id
+      }
+    };
     updateData(newData);
   };
 
   const handleAddAccountWithType = (type: 'main' | 'clone' | 'secure' | 'shelter') => {
     const newAcc = createNewAccount(isWeChat);
     newAcc.appType = type;
-    const newData = { ...data };
-    newData.platforms[activeTab] = [...(newData.platforms[activeTab] || []), newAcc];
-    newData.selectedAccountByPlatform[activeTab] = newAcc.id;
+    const newData = {
+      ...data,
+      platforms: {
+        ...data.platforms,
+        [activeTab]: [...(data.platforms[activeTab] || []), newAcc]
+      },
+      selectedAccountByPlatform: {
+        ...data.selectedAccountByPlatform,
+        [activeTab]: newAcc.id
+      }
+    };
     updateData(newData);
   };
 
   const handleUpdateAccount = (id: string, updates: Partial<Account>) => {
-    const newData = { ...data };
-    newData.platforms[activeTab] = newData.platforms[activeTab].map(a => {
-      if (a.id === id) {
-        const updated = { ...a, ...updates };
-        if (updates.status === 'Risk' && a.status !== 'Risk' && updates.notice === undefined) {
-          const startDate = Date.now();
-          const dueDate = startDate + 30 * 24 * 60 * 60 * 1000;
-          updated.notice = {
-            title: 'Account Risk',
-            content: 'Account Risk',
-            days: 30,
-            startDate,
-            dueDate
-          };
-        } else if (updates.status && updates.status !== 'Risk' && a.status === 'Risk' && a.notice?.title === 'Account Risk') {
-          updated.notice = null;
-        }
-        return updated;
+    const newData = {
+      ...data,
+      platforms: {
+        ...data.platforms,
+        [activeTab]: (data.platforms[activeTab] || []).map(a => {
+          if (a.id === id) {
+            const updated = { ...a, ...updates };
+            if (updates.status === 'Risk' && a.status !== 'Risk' && updates.notice === undefined) {
+              const startDate = Date.now();
+              const dueDate = startDate + 30 * 24 * 60 * 60 * 1000;
+              updated.notice = {
+                title: 'Account Risk',
+                content: 'Account Risk',
+                days: 30,
+                startDate,
+                dueDate
+              };
+            } else if (updates.status && updates.status !== 'Risk' && a.status === 'Risk' && a.notice?.title === 'Account Risk') {
+              updated.notice = null;
+            }
+            return updated;
+          }
+          return a;
+        })
       }
-      return a;
-    });
+    };
     updateData(newData);
   };
 
   const handleDeleteAccount = (id: string) => {
-    const newData = { ...data };
-    newData.platforms[activeTab] = newData.platforms[activeTab].filter(a => a.id !== id);
-    if (newData.selectedAccountByPlatform[activeTab] === id) {
-      newData.selectedAccountByPlatform[activeTab] = newData.platforms[activeTab][0]?.id;
-    }
+    const nextList = (data.platforms[activeTab] || []).filter(a => a.id !== id);
+    const nextSelectedId = data.selectedAccountByPlatform[activeTab] === id
+      ? (nextList[0]?.id || '')
+      : (data.selectedAccountByPlatform[activeTab] || '');
+
+    const newData = {
+      ...data,
+      platforms: {
+        ...data.platforms,
+        [activeTab]: nextList
+      },
+      selectedAccountByPlatform: {
+        ...data.selectedAccountByPlatform,
+        [activeTab]: nextSelectedId
+      }
+    };
     updateData(newData);
     setCtxMenu(null);
   };
 
   const handleSetMain = (id: string) => {
-    const newData = { ...data };
-    newData.selectedAccountByPlatform[activeTab] = id;
+    const newData = {
+      ...data,
+      selectedAccountByPlatform: {
+        ...data.selectedAccountByPlatform,
+        [activeTab]: id
+      }
+    };
     updateData(newData);
     setCtxMenu(null);
   };
