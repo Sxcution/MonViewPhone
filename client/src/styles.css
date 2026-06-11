@@ -3,6 +3,20 @@
   --config-width: 260px;
   --sidebar-total: 0px;
 
+  /* === THEME INSPECTOR DEFAULT VARIABLES === */
+  --mvp-button-bg: rgba(255, 255, 255, 0.055);
+  --mvp-input-bg: rgba(255, 255, 255, 0.055);
+  --mvp-grid-item-bg: rgba(15, 20, 32, 0.85);
+  --mvp-grid-item-active-bg: rgba(59, 130, 246, 0.18);
+  --mvp-menu-item-bg: transparent;
+  --mvp-automation-surface: #1f1f1f;
+  --mvp-automation-header: #242424;
+  --mvp-automation-block: #202020;
+  --mvp-automation-table-cell: #202020;
+  --mvp-sync-card: var(--md-card);
+  --mvp-sync-header: var(--md-surface-2);
+  --mvp-sync-row: transparent;
+
   /* === DESIGN TOKENS — Dark Gray Theme (chuẩn theo context menu) === */
   --bg-base: #181818;
   /* Nền toàn app */
@@ -10262,4 +10276,92 @@ input[type=number] {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 12px;
+}
+
+/* === Theme Inspector CSS Override Bindings === */
+.automationContent {
+  background: var(--mvp-automation-surface) !important;
+}
+
+.automationHeader {
+  background: var(--mvp-automation-header) !important;
+}
+
+.automationProfileBlock,
+.automationDeviceBlock,
+.automationCoordinateRow,
+.automationCoordinateContext {
+  background: var(--mvp-automation-block) !important;
+}
+
+.automationMacroTable th,
+.automationMacroTable td,
+.automationSavedTable th,
+.automationSavedTable td {
+  background: var(--mvp-automation-table-cell) !important;
+}
+
+.automationBtn,
+.automationCoordinateBtn,
+.automationArrowBtn,
+.automationProfileNameBtn,
+.automationProfileActionBtn,
+.automationProfileMacroBtn,
+.automationProfileIconBtn,
+.automationSavedMacroBtn,
+.automationDetailsBtn,
+.rcpMiniBtn,
+.rcpIconBtn,
+.rcpStepBtn,
+.rcpToggleBtn,
+.btn-pin,
+.btn-setting,
+.rb-btn,
+.modalBtn {
+  background-color: var(--mvp-button-bg) !important;
+}
+
+.automationDelayInput,
+.automationNoteInput,
+.automationActionSelect,
+.syncTimeInput,
+.modalInput,
+.confirmInput,
+.rcpSearch,
+.cp-search {
+  background-color: var(--mvp-input-bg) !important;
+}
+
+.rcpGridItem,
+.rcpSavedGroupBtn,
+.rcpGroupDeviceItem {
+  background: var(--mvp-grid-item-bg) !important;
+}
+
+.rcpGridItem.on,
+.rcpSavedGroupBtn.active,
+.rcpSavedGroupBtn.focused {
+  background: var(--mvp-grid-item-active-bg) !important;
+}
+
+.syncTimeCard {
+  background: var(--mvp-sync-card) !important;
+}
+
+.syncTimeHeader {
+  background: var(--mvp-sync-header) !important;
+}
+
+.syncTimeRow {
+  background: var(--mvp-sync-row) !important;
+}
+
+.contextMenuPanel,
+.automationContextMenuPanel,
+.automationMacroCtxPanel,
+.automationRowDelayCtxPanel,
+.automationMacroSortMenu,
+.dav-ctx-menu,
+.vsp-ctx-menu {
+  background: var(--md-card) !important;
 }
