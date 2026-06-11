@@ -16,6 +16,7 @@ type ViewerSidePanelProps = {
   currentOrder?: number;
   onChangeOrder?: (udid: string, newIndex: number) => void;
   onCloseViewer: () => void;
+  connectSelection?: Set<string>;
 };
 type AdbLogEntry = { id: number; time: string; command: string; output: string; success: boolean };
 type ToastMsg = { id: number; text: string; type: 'ok' | 'err' };
@@ -55,7 +56,7 @@ const LS_PRESET_COLORS = 'vsp_preset_colors';
 function loadJson<T>(key: string, def: T): T { try { return JSON.parse(localStorage.getItem(key) || '') ?? def; } catch { return def; } }
 function saveJson(key: string, v: any) { localStorage.setItem(key, JSON.stringify(v)); }
 
-export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseViewer }: ViewerSidePanelProps) {
+export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseViewer, connectSelection }: ViewerSidePanelProps) {
   const { wsServer } = useServer();
   const { t } = useI18n();
 
@@ -168,12 +169,12 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
   };
 
   // Push file via HTTP API
-  const pushFileToDevice = async (file: File, remotePath: string) => {
+  const pushFileToDevice = async (targetUdid: string, file: File, remotePath: string) => {
     const buf = await file.arrayBuffer();
     const base = httpBase(wsServer);
     const res = await fetch(`${base}api/goog/device/push-file`, {
       method: 'POST',
-      headers: { 'X-UDID': udid, 'X-Remote-Path': encodeURIComponent(remotePath), 'Content-Type': 'application/octet-stream' },
+      headers: { 'X-UDID': targetUdid, 'X-Remote-Path': encodeURIComponent(remotePath), 'Content-Type': 'application/octet-stream' },
       body: buf,
     });
     const json = await res.json().catch(() => ({}));
@@ -188,6 +189,26 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
     const files = Array.from(fileList);
     e.target.value = '';
     console.log('[VSP] APK files selected:', files.length);
+
+    const targets = connectSelection && connectSelection.has(udid)
+      ? Array.from(connectSelection)
+      : [udid];
+
+    const runWithConcurrency = async <T,>(
+      items: T[],
+      limit: number,
+      worker: (item: T, index: number) => Promise<void>
+    ) => {
+      let nextIndex = 0;
+      const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (nextIndex < items.length) {
+          const index = nextIndex++;
+          await worker(items[index], index);
+        }
+      });
+      await Promise.all(workers);
+    };
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       setApkStatus(`Đang upload ${file.name}...`);
@@ -195,15 +216,31 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
         console.log('[VSP] Uploading APK:', file.name, 'size:', file.size, 'wsServer:', wsServer, 'udid:', udid);
         const saved = await installApk(wsServer, udid, file);
         console.log('[VSP] Uploaded OK, filePath:', saved);
-        if (selectedProfile > 0) {
-          setApkStatus(`Đang cài vào user ${selectedProfile}...`);
-          await installApkToUser(wsServer, udid, saved, selectedProfile);
+
+        setApkStatus(`Đang cài đặt ${file.name} trên ${targets.length} thiết bị...`);
+        let failed = 0;
+        let lastErrorMsg = '';
+
+        await runWithConcurrency(targets, 8, async (targetUdid) => {
+          try {
+            if (selectedProfile > 0) {
+              await installApkToUser(wsServer, targetUdid, saved, selectedProfile);
+            } else {
+              await installUploadedApk(wsServer, targetUdid, saved);
+            }
+          } catch (err: any) {
+            failed++;
+            lastErrorMsg = err?.message || 'Lỗi';
+          }
+        });
+
+        if (failed === 0) {
+          setApkStatus(`✅ Đã cài: ${file.name} trên ${targets.length} thiết bị`);
+          showToast(`✅ APK: ${file.name}`, 'ok');
         } else {
-          setApkStatus('Đang cài đặt...');
-          await installUploadedApk(wsServer, udid, saved);
+          setApkStatus(`❌ Lỗi cài ${file.name} trên ${failed}/${targets.length} thiết bị. Lỗi: ${lastErrorMsg}`);
+          showToast(`❌ APK: ${lastErrorMsg}`, 'err');
         }
-        setApkStatus(`✅ Đã cài: ${file.name}`);
-        showToast(`✅ APK: ${file.name}`, 'ok');
       } catch (err: any) {
         console.error('[VSP] APK install error:', err);
         const msg = err?.message || 'Cài APK thất bại';
@@ -211,7 +248,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
         showToast(`❌ APK: ${msg}`, 'err');
       }
     }
-  }, [wsServer, udid, selectedProfile]);
+  }, [wsServer, udid, selectedProfile, connectSelection]);
 
   // File Import - multi file
   const handleFileImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -220,6 +257,26 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
     const files = Array.from(fileList);
     e.target.value = '';
     console.log('[VSP] Import files selected:', files.length, 'profile:', selectedProfile);
+
+    const targets = connectSelection && connectSelection.has(udid)
+      ? Array.from(connectSelection)
+      : [udid];
+
+    const runWithConcurrency = async <T,>(
+      items: T[],
+      limit: number,
+      worker: (item: T, index: number) => Promise<void>
+    ) => {
+      let nextIndex = 0;
+      const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (nextIndex < items.length) {
+          const index = nextIndex++;
+          await worker(items[index], index);
+        }
+      });
+      await Promise.all(workers);
+    };
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       setImportStatus(`Đang đẩy ${file.name}... (${i + 1}/${files.length})`);
@@ -236,9 +293,25 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
           ? `/storage/emulated/${selectedProfile}/${folder}/${file.name}` 
           : `/sdcard/${folder}/${file.name}`;
         
-        await pushFileToDevice(file, targetPath);
-        setImportStatus(`✅ Đã đẩy: ${file.name}`);
-        showToast(`✅ Push: ${file.name}`, 'ok');
+        let failed = 0;
+        let lastErrorMsg = '';
+
+        await runWithConcurrency(targets, 8, async (targetUdid) => {
+          try {
+            await pushFileToDevice(targetUdid, file, targetPath);
+          } catch (err: any) {
+            failed++;
+            lastErrorMsg = err?.message || 'Lỗi';
+          }
+        });
+
+        if (failed === 0) {
+          setImportStatus(`✅ Đã đẩy: ${file.name} lên ${targets.length} thiết bị`);
+          showToast(`✅ Push: ${file.name}`, 'ok');
+        } else {
+          setImportStatus(`❌ Lỗi đẩy ${file.name} trên ${failed}/${targets.length} thiết bị. Lỗi: ${lastErrorMsg}`);
+          showToast(`❌ Push: ${lastErrorMsg}`, 'err');
+        }
       } catch (err: any) {
         console.error('[VSP] Push error:', err);
         const msg = err?.message || 'Lỗi';
@@ -246,7 +319,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
         showToast(`❌ Push: ${msg}`, 'err');
       }
     }
-  }, [wsServer, udid, selectedProfile]);
+  }, [wsServer, udid, selectedProfile, connectSelection]);
 
   // File Export
   const handleExport = useCallback(async () => {
@@ -273,16 +346,51 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
     if (!cmd.trim()) return;
     setAdbRunning(true);
     setCmdHistory(prev => { const next = [cmd, ...prev.filter(c => c !== cmd)].slice(0, 50); saveJson(LS_CMD_HISTORY, next); return next; });
+
+    const targets = connectSelection && connectSelection.has(udid)
+      ? Array.from(connectSelection)
+      : [udid];
+
+    let mainResult: any = null;
+    let mainError: any = null;
+
+    const runWithConcurrency = async <T,>(
+      items: T[],
+      limit: number,
+      worker: (item: T, index: number) => Promise<void>
+    ) => {
+      let nextIndex = 0;
+      const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (nextIndex < items.length) {
+          const index = nextIndex++;
+          await worker(items[index], index);
+        }
+      });
+      await Promise.all(workers);
+    };
+
+    await runWithConcurrency(targets, 8, async (targetUdid) => {
+      try {
+        const result = await runAdbCommandApi(wsServer, targetUdid, cmd);
+        if (targetUdid === udid) {
+          mainResult = result;
+        }
+      } catch (err: any) {
+        if (targetUdid === udid) {
+          mainError = err;
+        }
+      }
+    });
+
     const id = ++logIdRef.current;
     const time = new Date().toLocaleTimeString('vi-VN');
-    try {
-      const result = await runAdbCommandApi(wsServer, udid, cmd);
-      setAdbLogs(prev => [...prev, { id, time, command: cmd, output: result.output, success: result.success }]);
-    } catch (err: any) {
-      setAdbLogs(prev => [...prev, { id, time, command: cmd, output: err?.message || 'Error', success: false }]);
+    if (mainError) {
+      setAdbLogs(prev => [...prev, { id, time, command: cmd, output: mainError?.message || 'Error', success: false }]);
+    } else if (mainResult) {
+      setAdbLogs(prev => [...prev, { id, time, command: cmd, output: mainResult.output, success: mainResult.success }]);
     }
     setAdbRunning(false);
-  }, [wsServer, udid]);
+  }, [wsServer, udid, connectSelection]);
 
   const handleAdbSubmit = () => { if (adbCommand.trim()) { executeAdbCommand(adbCommand.trim()); setAdbCommand(''); } };
 

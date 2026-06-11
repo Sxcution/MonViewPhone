@@ -1696,7 +1696,24 @@ export function App() {
     async (commands: string[]) => {
       const targets = quickCommandTargets()
       if (!targets.length) return
-      for (const udid of targets) {
+
+      // Helper function for bounded concurrency
+      const runWithConcurrency = async <T,>(
+        items: T[],
+        limit: number,
+        worker: (item: T, index: number) => Promise<void>
+      ) => {
+        let nextIndex = 0
+        const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+          while (nextIndex < items.length) {
+            const index = nextIndex++
+            await worker(items[index], index)
+          }
+        })
+        await Promise.all(workers)
+      }
+
+      await runWithConcurrency(targets, 8, async (udid) => {
         for (const command of commands) {
           try {
             await runAdbCommandApi(wsServer, udid, command)
@@ -1704,7 +1721,7 @@ export function App() {
             // ignore quick action failures; server returns output in UI logs elsewhere.
           }
         }
-      }
+      })
     },
     [quickCommandTargets, wsServer]
   )
@@ -2449,7 +2466,42 @@ export function App() {
       screenOff: {
         label: 'Power key',
         icon: <MonitorOff size={15} strokeWidth={1.8} />,
-        run: () => runQuickAdbCommands(['adb shell input keyevent 26'])
+        run: async () => {
+          const targets = quickCommandTargets()
+          if (!targets.length) return
+
+          // Helper function for bounded concurrency
+          const runWithConcurrency = async <T,>(
+            items: T[],
+            limit: number,
+            worker: (item: T, index: number) => Promise<void>
+          ) => {
+            let nextIndex = 0
+            const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+              while (nextIndex < items.length) {
+                const index = nextIndex++
+                await worker(items[index], index)
+              }
+            })
+            await Promise.all(workers)
+          }
+
+          await runWithConcurrency(targets, 8, async (udid) => {
+            const resolved = getTargetsByUdids([udid])
+            if (resolved.length > 0 && resolved[0].ws && resolved[0].ws.readyState === WebSocket.OPEN) {
+              try {
+                const down = encodeKeycodeMessage(KeyEventAction.DOWN, 26)
+                const up = encodeKeycodeMessage(KeyEventAction.UP, 26)
+                resolved[0].ws.send(down)
+                resolved[0].ws.send(up)
+              } catch {
+                await runAdbCommandApi(wsServer, udid, 'adb shell input keyevent 26')
+              }
+            } else {
+              await runAdbCommandApi(wsServer, udid, 'adb shell input keyevent 26')
+            }
+          })
+        }
       },
       mute: {
         label: 'Tắt tiếng',
@@ -2499,7 +2551,7 @@ export function App() {
         run: () => setAutomationOpen(true)
       }
     }),
-    [runQuickAdbCommands, runDisplayPowerForTargets, quickCommandTargets, t]
+    [runQuickAdbCommands, runDisplayPowerForTargets, quickCommandTargets, getTargetsByUdids, wsServer, t]
   )
 
   {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */ }
@@ -3611,6 +3663,7 @@ export function App() {
                 udid={viewerUdid}
                 wsServer={wsServer}
                 onClose={() => setViewerUdid(null)}
+                connectSelection={connectSelection}
                 currentOrder={
                   viewerUdid
                     ? getTileNumber(

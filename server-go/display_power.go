@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"server-go/adb"
 )
@@ -56,6 +57,11 @@ func handleDisplayPower(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+var (
+	pushedHelpersMutex sync.Mutex
+	pushedHelpers      = make(map[string]bool)
+)
+
 func setDisplayPower(udid string, mode string, displayIndex int) (string, string, error) {
 	sdkOut, _ := adb.Shell(udid, "getprop ro.build.version.sdk")
 	sdk, _ := strconv.Atoi(strings.TrimSpace(sdkOut))
@@ -64,8 +70,7 @@ func setDisplayPower(udid string, mode string, displayIndex int) (string, string
 	out, err := runDisplayPowerHelper(udid, mode, displayIndex)
 
 	if mode == "on" {
-		adb.Shell(udid, "input keyevent 224")
-		adb.Shell(udid, "wm dismiss-keyguard")
+		adb.Shell(udid, "input keyevent 224 && wm dismiss-keyguard")
 	}
 
 	if err == nil {
@@ -94,8 +99,18 @@ func runDisplayPowerHelper(udid string, mode string, displayIndex int) (string, 
 	}
 
 	remoteJar := "/data/local/tmp/monview-display-power.jar"
-	if out, err := adb.Command("-s", udid, "push", localJar, remoteJar); err != nil {
-		return out, fmt.Errorf("push display power helper failed: %w", err)
+	
+	pushedHelpersMutex.Lock()
+	alreadyPushed := pushedHelpers[udid]
+	pushedHelpersMutex.Unlock()
+
+	if !alreadyPushed {
+		if out, err := adb.Command("-s", udid, "push", localJar, remoteJar); err != nil {
+			return out, fmt.Errorf("push display power helper failed: %w", err)
+		}
+		pushedHelpersMutex.Lock()
+		pushedHelpers[udid] = true
+		pushedHelpersMutex.Unlock()
 	}
 
 	cmd := fmt.Sprintf(

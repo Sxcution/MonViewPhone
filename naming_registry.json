@@ -229,7 +229,9 @@
       "platform_ctx_menu": "platformCtxMenu",
       "pending_delete_platform": "pendingDeletePlatform",
       "drag_pos": "dragPos",
-      "device_notice_status": "deviceNoticeStatus"
+      "device_notice_status": "deviceNoticeStatus",
+      "pushed_helpers": "pushedHelpers",
+      "run_with_concurrency": "runWithConcurrency"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

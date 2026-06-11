@@ -15,7 +15,7 @@ Removed legacy layers:
 - Old root launcher scripts.
 
 ## Frontend
-- `client/src/App.tsx`: Main UI, device grid, right control panel, group filtering, stream settings, quick controls, context menus, global device actions, Middle Mouse Button (MMB) toggle handler, Sync Time hotkey binding setting, online/all device display filters, and global device account search & statistics filtering.
+- `client/src/App.tsx`: Main UI, device grid, right control panel, group filtering, stream settings, quick controls, context menus, global device actions, Middle Mouse Button (MMB) toggle handler, Sync Time hotkey binding setting, online/all device display filters, global device account search & statistics filtering, parallel quick ADB command execution with bounded concurrency, and WebSocket-based Power key optimization.
 - `client/src/components/DeviceViewer.tsx`: Expanded single-device viewer, supports Middle Mouse Button click to close and return to grid.
 - `client/src/components/ViewerSidePanel.tsx`: Viewer-side controls for profiles, APK install, file import/export, and ADB commands.
 - `client/src/components/SyncPanel.tsx`: Device synchronization UI.
@@ -39,9 +39,9 @@ Removed legacy layers:
 - `client/src/styles.css`: Main application styling. Defines design tokens, layout styles, and the standardized, unified CSS overlay confirm modal styling system.
 - [NEW] [deviceAccountNearby.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/deviceAccountNearby.ts): Centralized helper for Nearby People logic. Exports `getNearbyAccountState()` (returns `'eligible'`, `'upcoming'`, or `'none'`), `hasNearbyRelevantAccount()`, and `getNearestNearbyHours()`. Uses 3-day window for upcoming state. Imported by both App.tsx and DeviceAccountOverlay.tsx.
 - `client/public/audio/`: Directory containing static audio assets, including `notification_new.mp3` for the default alert sound.
-
-
-## Go Backend
+- 
+- 
+- ## Go Backend
 - `server-go/main.go`: HTTP/WebSocket entry point and CORS setup.
 - `server-go/rest.go`: REST endpoints used by the frontend, including profile listing, APK install, file import/export, and ADB command execution.
 - `server-go/adb/`: ADB helpers and device tracker.
@@ -55,7 +55,7 @@ Removed legacy layers:
 - [MODIFY] [main.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/main.go) & [rest.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/rest.go): Added the `/api/goog/device/set-wallpaper` endpoint to push the helper JAR and image, then run `app_process` to silently apply the generated wallpaper.
 - [NEW] [DisplayPower.java](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/displaypower/helper/src/com/monviewphone/displaypower/DisplayPower.java): Java source file compiled into a dex-based JAR helper running on the device via `app_process` to control display power modes using the `SurfaceControl` API.
 - [NEW] [build-helper.ps1](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/displaypower/helper/build-helper.ps1): Build script to compile and package the display power helper JAR.
-- [NEW] [display_power.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/display_power.go): Go backend service file implementing the `/api/goog/device/display-power` endpoint.
+- [NEW] [display_power.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/display_power.go): Go backend service file implementing the `/api/goog/device/display-power` endpoint, including caching of the helper JAR per device and optimized single-shell-call command execution.
 - [MODIFY] [main.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/main.go): Registered the `/api/goog/device/display-power` route.
 - [NEW] [build-scrcpy-server.ps1](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/build-scrcpy-server.ps1): PowerShell script to recompile and package scrcpy-server.jar from decompiled sources after patching reflection signatures.
 - [MODIFY] [scrcpy-server.jar](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/scrcpy-server.jar): Patched scrcpy server JAR containing the updated ClipboardManager class supporting Android 12+ / Pixel ROM clipboard signatures.

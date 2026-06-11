@@ -28,6 +28,7 @@ type Props = {
   wsServer: string;
   currentOrder?: number;
   onChangeOrder?: (udid: string, newIndex: number) => void;
+  connectSelection?: Set<string>;
 };
 
 type ViewerTab = 'view' | 'files' | 'apps' | 'shell';
@@ -91,7 +92,7 @@ type PreviewState =
  * - Fixes aspect ratio (no stretch)
  * - Adds per-device Files + Apps panels
  */
-const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChangeOrder }: Props) => {
+const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChangeOrder, connectSelection }: Props) => {
   const { androidDeviceMap, listDir, pullFile, pushFile } = useServer();
   const { getCanvasForUdid, getInputTargetsForSource, selectOnly } = useActive();
 
@@ -635,6 +636,7 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
       currentOrder={currentOrder}
       onChangeOrder={onChangeOrder}
       onCloseViewer={onClose}
+      connectSelection={connectSelection}
     />
     </>
   );
