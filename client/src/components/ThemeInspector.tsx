@@ -43,6 +43,10 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
   const [colorPickerValue, setColorPickerValue] = useState('#000000');
 
   const hoveredTargetRef = useRef<HTMLElement | null>(null);
+  const hoverStateRef = useRef<HoverState | null>(null);
+
+  const rafRef = useRef<number | null>(null);
+  const lastPointerRef = useRef<PointerEvent | null>(null);
 
   // Sync color picker with text input
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,52 +75,74 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
     };
   }, []);
 
-  // Cleanup hover target class
-  const cleanupHoverTarget = () => {
+  function cleanupHoverClassOnly() {
     if (hoveredTargetRef.current) {
       hoveredTargetRef.current.classList.remove('themeInspectorHoverTarget');
       hoveredTargetRef.current = null;
     }
+  }
+
+  function clearHoverState() {
+    cleanupHoverClassOnly();
+    hoverStateRef.current = null;
     setHoverState(null);
-  };
+  }
 
   // Handle pointermove, pointerdown, contextmenu
   useEffect(() => {
     if (!enabled) {
-      cleanupHoverTarget();
+      clearHoverState();
       return;
     }
 
     const handlePointerMove = (e: PointerEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target) return;
+      const target = e.target as HTMLElement | null;
+      if (!target || target.closest('.themeInspectorRoot')) {
+        clearHoverState();
+        return;
+      }
 
-      const role = getThemeRoleForElement(target);
-      if (role) {
-        const matchedEl = target.closest(role.selector) as HTMLElement || target;
+      lastPointerRef.current = e;
+      if (rafRef.current !== null) return;
+      
+      rafRef.current = window.requestAnimationFrame(() => {
+        rafRef.current = null;
+        const evt = lastPointerRef.current;
+        if (!evt) return;
 
-        if (hoveredTargetRef.current !== matchedEl) {
-          if (hoveredTargetRef.current) {
-            hoveredTargetRef.current.classList.remove('themeInspectorHoverTarget');
-          }
-          matchedEl.classList.add('themeInspectorHoverTarget');
-          hoveredTargetRef.current = matchedEl;
+        const currentTarget = evt.target as HTMLElement | null;
+        if (!currentTarget || currentTarget.closest('.themeInspectorRoot')) {
+          clearHoverState();
+          return;
         }
 
-        const computed = window.getComputedStyle(matchedEl);
-        const rawColor = computed.getPropertyValue(role.property) || '';
-        const hexColor = rgbToHex(rawColor);
+        const match = getThemeRoleForElement(currentTarget);
+        if (match) {
+          const { role, element: matchedEl } = match;
 
-        setHoverState({
-          x: e.clientX,
-          y: e.clientY,
-          role,
-          currentColor: hexColor,
-          target: matchedEl
-        });
-      } else {
-        cleanupHoverTarget();
-      }
+          if (hoveredTargetRef.current !== matchedEl) {
+            cleanupHoverClassOnly();
+            matchedEl.classList.add('themeInspectorHoverTarget');
+            hoveredTargetRef.current = matchedEl;
+          }
+
+          const computed = window.getComputedStyle(matchedEl);
+          const rawColor = computed.getPropertyValue(role.property) || '';
+          const hexColor = rgbToHex(rawColor);
+
+          const nextHoverState = {
+            x: evt.clientX,
+            y: evt.clientY,
+            role,
+            currentColor: hexColor,
+            target: matchedEl
+          };
+          hoverStateRef.current = nextHoverState;
+          setHoverState(nextHoverState);
+        } else {
+          clearHoverState();
+        }
+      });
     };
 
     const handlePointerDown = (e: PointerEvent) => {
@@ -125,24 +151,25 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
         return;
       }
 
-      if (hoverState) {
+      const currentHover = hoverStateRef.current;
+      if (currentHover) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
 
         setEditingRole({
-          role: hoverState.role,
-          currentColor: hoverState.currentColor
+          role: currentHover.role,
+          currentColor: currentHover.currentColor
         });
         const currentOverrides = loadThemeOverrides();
-        const activeColor = currentOverrides[hoverState.role.cssVar] || hoverState.currentColor;
+        const activeColor = currentOverrides[currentHover.role.cssVar] || currentHover.currentColor;
         setNewColorText(activeColor);
         const normalized = normalizeHexColor(activeColor);
         if (normalized) {
           setColorPickerValue(normalized);
         }
 
-        cleanupHoverTarget();
+        clearHoverState();
       }
     };
 
@@ -163,9 +190,14 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
       window.removeEventListener('pointermove', handlePointerMove, true);
       window.removeEventListener('pointerdown', handlePointerDown, true);
       window.removeEventListener('contextmenu', handleContextMenu, true);
-      cleanupHoverTarget();
+      
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      cleanupHoverClassOnly();
     };
-  }, [enabled, hoverState]);
+  }, [enabled]);
 
   // Keyboard handler for Escape keys
   useEffect(() => {
@@ -195,6 +227,9 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
     return () => {
       if (hoveredTargetRef.current) {
         hoveredTargetRef.current.classList.remove('themeInspectorHoverTarget');
+      }
+      if (rafRef.current !== null) {
+        window.cancelAnimationFrame(rafRef.current);
       }
     };
   }, []);

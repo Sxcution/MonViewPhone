@@ -147,7 +147,12 @@ export function clearThemeOverrides(): void {
   applyThemeOverrides({});
 }
 
-export function getThemeRoleForElement(el: HTMLElement): ThemeColorRole | null {
+export type ThemeColorMatch = {
+  role: ThemeColorRole;
+  element: HTMLElement;
+};
+
+export function getThemeRoleForElement(el: HTMLElement): ThemeColorMatch | null {
   if (el.closest('.themeInspectorRoot')) {
     return null;
   }
@@ -161,7 +166,7 @@ export function getThemeRoleForElement(el: HTMLElement): ThemeColorRole | null {
     for (const role of COLOR_ROLES) {
       try {
         if (current.matches(role.selector)) {
-          return role;
+          return { role, element: current };
         }
       } catch (err) {
         // selector might not match on this node type
