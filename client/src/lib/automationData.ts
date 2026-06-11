@@ -95,6 +95,8 @@ export type MacroPlaybackProgressDetail = {
   startedAt: number;
   replayAppId?: string;
   replayActionId?: string;
+  currentStep?: number;
+  totalSteps?: number;
 };
 
 export type MacroPlaybackStopDetail = {

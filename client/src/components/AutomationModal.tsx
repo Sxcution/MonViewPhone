@@ -6,6 +6,7 @@ import {
   ChevronUp,
   CirclePlus,
   Clock3,
+  Copy,
   FolderOpen,
   Info,
   Pencil,
@@ -1007,6 +1008,25 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     setRowDelayCtxMenu(null);
   }, []);
 
+  const copyRow = useCallback((rowId: string) => {
+    setRows(prev => {
+      const index = prev.findIndex(row => row.id === rowId);
+      if (index < 0) return prev;
+      const original = prev[index];
+      const copied: AutomationMacroRow = {
+        ...original,
+        id: makeId('step'),
+        targetUdids: Array.isArray(original.targetUdids) ? [...original.targetUdids] : [],
+        note: original.note ?? '',
+      };
+      const next = [...prev];
+      next.splice(index + 1, 0, copied);
+      setMacroStatus(`Đã nhân bản step ${index + 1}`);
+      return next;
+    });
+    setRowDelayCtxMenu(null);
+  }, []);
+
   const moveRow = useCallback((sourceId: string, targetId: string, placement: 'before' | 'after') => {
     if (sourceId === targetId) return;
     setRows(prev => {
@@ -1262,11 +1282,15 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         return;
       }
       updateRunningMacroUdids(targetUdidsList, true);
-      updatePlaybackProgress({ id: playbackId, running: true, title: playbackTitle, udids: targetUdidsList, startedAt });
+      const totalSteps = runnableRows.length;
+      updatePlaybackProgress({ id: playbackId, running: true, title: playbackTitle, udids: targetUdidsList, startedAt, currentStep: 0, totalSteps });
       const currentMacroSyncSettings = normalizeSyncMacroSettings(syncMacroSettings);
-      for (const row of runnableRows) {
+      for (let stepIdx = 0; stepIdx < runnableRows.length; stepIdx++) {
         if (controller.signal.aborted) break;
-        await runMacroRow(targets, row, controller, currentMacroSyncSettings, setMacroStatus);
+        await runMacroRow(targets, runnableRows[stepIdx], controller, currentMacroSyncSettings, setMacroStatus);
+        if (!controller.signal.aborted) {
+          updatePlaybackProgress({ id: playbackId, running: true, title: playbackTitle, udids: targetUdidsList, startedAt, currentStep: stepIdx + 1, totalSteps });
+        }
       }
       setStatus(controller.signal.aborted ? 'Đã dừng phát' : 'Đã phát xong');
     } finally {
@@ -1274,7 +1298,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
       if (manualPlaybackIdRef.current === playbackId) manualPlaybackIdRef.current = null;
       playbackControllersRef.current.delete(playbackId);
       updateRunningMacroUdids(targetUdidsList, false);
-      updatePlaybackProgress({ id: playbackId, running: false, title: playbackTitle, udids: targetUdidsList, startedAt });
+      updatePlaybackProgress({ id: playbackId, running: false, title: playbackTitle, udids: targetUdidsList, startedAt, currentStep: runnableRows.length, totalSteps: runnableRows.length });
     }
   }, [currentMacroName, getTargetsByUdids, playing, rows, runMacroRow, selectedUdids, selectedRecordDevice, syncMacroSettings, updatePlaybackProgress, updateRunningMacroUdids]);
 
@@ -1326,6 +1350,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     playbackControllersRef.current.set(playbackId, controller);
     const startedAt = Date.now();
     let progressStarted = false;
+    let maxSteps = 0;
 
     try {
       /* ── thu thập group metadata (targets + rows + syncSettings) ── */
@@ -1381,8 +1406,19 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         setStatus(parts.length ? `Không có macro hợp lệ | ${parts.join(' | ')}` : `Không có macro hợp lệ để chạy cho ${action.name}`);
         return;
       }
+      maxSteps = Math.max(0, ...groups.map(g => g.runnableRows.length));
       progressStarted = true;
-      updatePlaybackProgress({ id: playbackId, running: true, title: action.name, udids: targetUdidsList, startedAt, replayAppId: appId, replayActionId: actionId });
+      updatePlaybackProgress({
+        id: playbackId,
+        running: true,
+        title: action.name,
+        udids: targetUdidsList,
+        startedAt,
+        replayAppId: appId,
+        replayActionId: actionId,
+        currentStep: 0,
+        totalSteps: maxSteps
+      });
 
       /* ── chọn sync settings chung (ưu tiên cái có delayEnabled) ── */
       const syncSettings = groups.find(g => g.syncSettings.delayEnabled)?.syncSettings
@@ -1393,9 +1429,6 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
       updateRunningMacroUdids(allUdids, true);
 
       try {
-        /* ── interleaved execution: mỗi step, tất cả máy xếp chung hàng ── */
-        const maxSteps = Math.max(0, ...groups.map(g => g.runnableRows.length));
-
         for (let stepIdx = 0; stepIdx < maxSteps; stepIdx++) {
           if (controller.signal.aborted) break;
 
@@ -1472,6 +1505,19 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
           });
 
           await Promise.all(promises);
+          if (!controller.signal.aborted) {
+            updatePlaybackProgress({
+              id: playbackId,
+              running: true,
+              title: action.name,
+              udids: targetUdidsList,
+              startedAt,
+              replayAppId: appId,
+              replayActionId: actionId,
+              currentStep: stepIdx + 1,
+              totalSteps: maxSteps
+            });
+          }
         }
       } finally {
         updateRunningMacroUdids(allUdids, false);
@@ -1492,7 +1538,17 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
     } finally {
       playbackControllersRef.current.delete(playbackId);
       if (progressStarted) {
-        updatePlaybackProgress({ id: playbackId, running: false, title: action.name, udids: targetUdidsList, startedAt, replayAppId: appId, replayActionId: actionId });
+        updatePlaybackProgress({
+          id: playbackId,
+          running: false,
+          title: action.name,
+          udids: targetUdidsList,
+          startedAt,
+          replayAppId: appId,
+          replayActionId: actionId,
+          currentStep: maxSteps,
+          totalSteps: maxSteps
+        });
       }
     }
   }, [deviceByUdid, getTargetsByUdids, recordTargetUdid, selectedUdids, updatePlaybackProgress, updateRunningMacroUdids]);
@@ -2208,6 +2264,14 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                 <X size={14} /><span>Tắt random delay</span>
               </button>
             ) : null}
+            <button type='button' className='automationContextMenuItem dropdown-item'
+              onPointerDown={e => {
+                e.preventDefault(); e.stopPropagation();
+                copyRow(row.id);
+              }}
+            >
+              <Copy size={14} /><span>Copy Step</span>
+            </button>
             <div className='automationContextMenuDivider' />
             <button type='button' className='automationContextMenuItem automationContextMenuDanger dropdown-item'
               onPointerDown={e => {

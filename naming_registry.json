@@ -138,7 +138,9 @@
       "mxh_filter_overlay_inner": "mxh-filter-overlay-inner",
       "mxh_filter_x": "mxh-filter-x",
       "mxh_filter_none": "mxh-filter-none",
-      "tile_account_inner": "tile-account-inner"
+      "tile_account_inner": "tile-account-inner",
+      "macro_playback_close_btn": "macroPlaybackCloseBtn",
+      "macro_playback_stop_btn": "macroPlaybackStopBtn"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -195,6 +197,9 @@
       "automation_quick_slots_v1": "automationQuickSlotsV1",
       "macro_status": "macroStatus",
       "auto_physical_screen_off": "autoPhysicalScreenOff",
+      "macro_playback_items": "macroPlaybackItems",
+      "macro_playback_expanded": "macroPlaybackExpanded",
+      "macro_playback_position": "macroPlaybackPosition",
       "device_account_overlay_open": "deviceAccountOverlayOpen",
       "device_account_overlay_mounted": "deviceAccountOverlayMounted",
       "dav_search": "davSearch",
@@ -282,7 +287,8 @@
       "delete_macro_impl": "deleteMacroImpl",
       "open_rename_action": "openRenameAction",
       "emit_automation_click": "emitAutomationClick",
-      "emit_automation_swipe": "emitAutomationSwipe"
+      "emit_automation_swipe": "emitAutomationSwipe",
+      "copy_row": "copyRow"
     }
   },
   "key_codes": {

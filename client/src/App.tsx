@@ -4079,7 +4079,11 @@ export function App() {
               {macroPlaybackItems.map(item => (
                 <div key={item.id} className={`macroPlaybackItem${!item.running ? ' finished' : ''}`}>
                   <div className='macroPlaybackItemText'>
-                    <span>{item.running ? 'Đang chạy:' : 'Hoàn tất:'}</span>
+                    <span>
+                      {item.running
+                        ? (item.totalSteps !== undefined ? `Đang chạy (${item.currentStep ?? 0}/${item.totalSteps}):` : 'Đang chạy:')
+                        : (item.totalSteps !== undefined ? `Hoàn tất (${item.totalSteps}/${item.totalSteps}):` : 'Hoàn tất:')}
+                    </span>
                     <strong>{item.title}</strong>
                     <small>{formatPlaybackElapsed(item.startedAt)}</small>
                   </div>

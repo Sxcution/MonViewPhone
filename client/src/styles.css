@@ -6,7 +6,7 @@
   /* === DESIGN TOKENS — Dark Gray Theme (chuẩn theo context menu) === */
   --bg-base: #181818;
   /* Nền toàn app */
-  --bg-panel: #202020;
+  --bg-panel: #212123;
   /* Panel, sidebar, modal */
   --bg-hover: #2a2a2a;
   /* Hover state */
@@ -60,7 +60,7 @@
   --md-shadow-panel: 0 18px 48px rgba(0, 0, 0, .38);
 
   --bg-base: var(--md-bg);
-  --bg-panel: var(--md-card);
+  --bg-panel: #212123;
   --bg-hover: rgba(255, 255, 255, .09);
   --bg-input: rgba(255, 255, 255, .055);
   --bg-deep: var(--md-bg-soft);
@@ -5467,7 +5467,7 @@ input[type="number"] {
 /* 1. Định nghĩa chuẩn lại bộ biến nếu chưa có (Backup) */
 :root {
   --bg-base: var(--md-bg);
-  --bg-panel: var(--md-card);
+  --bg-panel: #212123;
   --bg-hover: rgba(255, 255, 255, .09);
   --text-main: var(--md-text);
   --text-muted: var(--md-muted);
