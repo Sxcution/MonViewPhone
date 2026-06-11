@@ -4,6 +4,10 @@ import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, Acti
 import { 
   getDeviceAccountData, 
   saveDeviceAccountData, 
+  loadDeviceAccountVault,
+  getDeviceAccountDataFromVault,
+  VaultData,
+  DeviceAccountData,
   PlatformType, 
   Account, 
   WeChatAccount, 
@@ -33,6 +37,32 @@ const ACCOUNT_STATUS_COLORS: Record<string, string> = {
   'Verify': '#eab308',
   'Risk': '#f97316',
   'Unverified': '#64748b'
+};
+
+const formatDatePickerMask = (val: string): string => {
+  const clean = val.replace(/\D/g, '').slice(0, 8);
+  if (clean.length > 4) {
+    return `${clean.slice(0, 2)}/${clean.slice(2, 4)}/${clean.slice(4)}`;
+  }
+  if (clean.length > 2) {
+    return `${clean.slice(0, 2)}/${clean.slice(2)}`;
+  }
+  return clean;
+};
+
+const parseDateDDMMYYYY = (val: string): number | null => {
+  const parts = val.split('/');
+  if (parts.length !== 3) return null;
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1; // 0-indexed
+  const year = parseInt(parts[2], 10);
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+
+  const d = new Date(year, month, day);
+  if (d.getFullYear() === year && d.getMonth() === month && d.getDate() === day) {
+    return d.getTime();
+  }
+  return null;
 };
 
 // --- Format Utilities ---
@@ -112,13 +142,14 @@ function getAppTypeLabel(type?: 'main' | 'clone' | 'secure' | 'shelter') {
 }
 
 // --- Device Panel Component ---
-export function DeviceAccountPanel({ 
+export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({ 
   udid, 
   order, 
   model, 
   isOnline,
   filterSearch,
-  orderMap
+  orderMap,
+  initialData
 }: { 
   udid: string; 
   order: number; 
@@ -126,22 +157,26 @@ export function DeviceAccountPanel({
   isOnline: boolean;
   filterSearch: string;
   orderMap: Map<string, number>;
+  initialData: DeviceAccountData;
 }) {
-  const [data, setData] = useState(() => getDeviceAccountData(udid));
+  const [data, setData] = useState(initialData);
   const [activeTab, setActiveTab] = useState<PlatformType>(data.defaultPlatform || 'wechat');
   const [ctxMenu, setCtxMenu] = useState<{ x: number, y: number, accountId: string } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [activeLevel1, setActiveLevel1] = useState<'tai_khoan' | 'trang_thai' | 'nearby' | 'quet_qr' | null>(null);
   const [activeLevel2, setActiveLevel2] = useState<string | null>(null);
   
-  // Load account data reactive update listener
+  // Sync state data when initialData prop changes (synchronized from parent vault update)
   useEffect(() => {
-    const handleAccountUpdate = () => {
-      setData(getDeviceAccountData(udid));
-    };
-    window.addEventListener('device-account-updated', handleAccountUpdate);
-    return () => window.removeEventListener('device-account-updated', handleAccountUpdate);
-  }, [udid]);
+    setData(initialData);
+  }, [initialData]);
+
+  // Keep default platform tab sync if tab settings changed externally
+  useEffect(() => {
+    if (initialData.defaultPlatform && initialData.defaultPlatform !== activeTab) {
+      setActiveTab(initialData.defaultPlatform);
+    }
+  }, [initialData.defaultPlatform, activeTab]);
 
   // Load savedGroups and reactive listener
   const [savedGroups, setSavedGroups] = useState<{ name: string, udids: string[] }[]>(() => {
@@ -359,15 +394,27 @@ export function DeviceAccountPanel({
   const [editNoticeDays, setEditNoticeDays] = useState('');
   const [showNameStatusDropdown, setShowNameStatusDropdown] = useState(false);
   const [showDateInput, setShowDateInput] = useState(false);
+  const [dateText, setDateText] = useState('');
 
   // Sync edit state when selected account changes
   useEffect(() => {
     if (selectedAccount) {
       setEditNoticeTitle(selectedAccount.notice?.title || '');
       setEditNoticeDays(selectedAccount.notice?.days?.toString() || '');
+      
+      let initialText = '';
+      if (selectedAccount.createdAt) {
+        const d = new Date(selectedAccount.createdAt);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        initialText = `${day}/${month}/${year}`;
+      }
+      setDateText(initialText);
     } else {
       setEditNoticeTitle('');
       setEditNoticeDays('');
+      setDateText('');
     }
     setShowNoticeEdit(false);
     setShowNameStatusDropdown(false);
@@ -471,6 +518,30 @@ export function DeviceAccountPanel({
       }
     };
     updateData(newData);
+  };
+
+  const handleDateSubmit = (textVal: string) => {
+    if (!selectedAccount) return;
+    const trimmed = textVal.trim();
+    if (!trimmed) {
+      handleUpdateAccount(selectedAccount.id, { createdAt: null });
+    } else {
+      const ts = parseDateDDMMYYYY(trimmed);
+      if (ts !== null) {
+        handleUpdateAccount(selectedAccount.id, { createdAt: ts });
+      } else {
+        let originalText = '';
+        if (selectedAccount.createdAt) {
+          const d = new Date(selectedAccount.createdAt);
+          const day = String(d.getDate()).padStart(2, '0');
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const year = d.getFullYear();
+          originalText = `${day}/${month}/${year}`;
+        }
+        setDateText(originalText);
+      }
+    }
+    setShowDateInput(false);
   };
 
   const handleDeleteAccount = (id: string) => {
@@ -965,20 +1036,32 @@ export function DeviceAccountPanel({
               )}
             </div>
 
-            {/* Ngày tạo */}
+            {/* input_created_at : Nhập ngày tạo tài khoản */}
             <div className="dav-centered-row">
               {!selectedAccount.createdAt || showDateInput ? (
                 <input 
-                  type="date"
+                  type="text"
                   className="dav-centered-input" 
-                  style={{ fontSize: '10px', width: 'auto', padding: 0, color: '#fff' }}
-                  value={selectedAccount.createdAt ? new Date(selectedAccount.createdAt).toISOString().split('T')[0] : ''} 
-                  onChange={e => {
-                    const val = e.target.value ? new Date(e.target.value).getTime() : null;
-                    handleUpdateAccount(selectedAccount.id, { createdAt: val });
-                    setShowDateInput(false);
+                  style={{ fontSize: '10px', width: '90px', padding: 0, color: '#fff', textAlign: 'center', background: 'transparent', border: 'none' }}
+                  placeholder="DD/MM/YYYY"
+                  value={dateText}
+                  onChange={e => setDateText(formatDatePickerMask(e.target.value))}
+                  onBlur={e => handleDateSubmit(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleDateSubmit(dateText);
+                    if (e.key === 'Escape') {
+                      let originalText = '';
+                      if (selectedAccount.createdAt) {
+                        const d = new Date(selectedAccount.createdAt);
+                        const day = String(d.getDate()).padStart(2, '0');
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        const year = d.getFullYear();
+                        originalText = `${day}/${month}/${year}`;
+                      }
+                      setDateText(originalText);
+                      setShowDateInput(false);
+                    }
                   }}
-                  onBlur={() => setShowDateInput(false)}
                   autoFocus={showDateInput}
                 />
               ) : (
@@ -1002,7 +1085,7 @@ export function DeviceAccountPanel({
       {ctxMenu && ReactDOM.createPortal(
         <div 
           ref={menuRef} 
-          className="dav-ctx-menu contextMenuPanel" 
+          className={`dav-ctx-menu contextMenuPanel ${ctxMenu.x > window.innerWidth - 380 ? 'direction-left' : ''}`} 
           style={{ left: ctxMenu.x, top: ctxMenu.y }} 
           onClick={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
@@ -1258,7 +1341,7 @@ export function DeviceAccountPanel({
       {accountActionMenu && ReactDOM.createPortal(
         <div
           ref={accountActionMenuRef}
-          className="dav-ctx-menu contextMenuPanel dav-account-action-menu"
+          className={`dav-ctx-menu contextMenuPanel dav-account-action-menu ${accountActionMenu.x > window.innerWidth - 380 ? 'direction-left' : ''}`}
           style={{ left: accountActionMenu.x, top: accountActionMenu.y }}
           onClick={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
@@ -1342,7 +1425,7 @@ export function DeviceAccountPanel({
       )}
     </div>
   );
-}
+});
 
 
 
@@ -1355,8 +1438,19 @@ export function DeviceAccountOverlay({
   androidDeviceMap
 }: DeviceAccountOverlayProps) {
   const [search, setSearch] = useState('');
+  const [vault, setVault] = useState<VaultData>(() => loadDeviceAccountVault());
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle ESC
+  // Sync vault state when updates occur (one listener for all panels)
+  useEffect(() => {
+    const handleAccountUpdate = () => {
+      setVault(loadDeviceAccountVault());
+    };
+    window.addEventListener('device-account-updated', handleAccountUpdate);
+    return () => window.removeEventListener('device-account-updated', handleAccountUpdate);
+  }, []);
+
+  // Handle ESC key to close
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1366,10 +1460,18 @@ export function DeviceAccountOverlay({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
 
-  if (!open) return null;
+  // Auto-focus search input when opened
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }, 50);
+    }
+  }, [open]);
 
   return ReactDOM.createPortal(
-    <div className="dav-overlay">
+    <div className={`dav-overlay ${open ? 'is-open' : 'is-hidden'}`}>
       <div className="dav-header">
         <div className="dav-header-left">
           <h2 className="dav-title">Kho tài khoản thiết bị</h2>
@@ -1379,11 +1481,11 @@ export function DeviceAccountOverlay({
           <div className="dav-search-box">
             <Search size={16} />
             <input 
+              ref={searchInputRef}
               type="text" 
               placeholder="Tìm theo UDID, Tên, Số thứ tự, Số điện thoại..." 
               value={search}
               onChange={e => setSearch(e.target.value)}
-              autoFocus
             />
           </div>
         </div>
@@ -1401,6 +1503,7 @@ export function DeviceAccountOverlay({
             const meta = androidDeviceMap[udid];
             const model = meta ? [meta.manufacturer, meta['ro.product.model']].filter(Boolean).join(' ') : '';
             const isOnline = connectedUdids.has(udid);
+            const initialData = getDeviceAccountDataFromVault(vault, udid);
             return (
               <DeviceAccountPanel 
                 key={udid} 
@@ -1410,6 +1513,7 @@ export function DeviceAccountOverlay({
                 isOnline={isOnline}
                 filterSearch={search}
                 orderMap={orderMap}
+                initialData={initialData}
               />
             );
           })}

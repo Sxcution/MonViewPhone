@@ -38,8 +38,16 @@ function TileComponent({
     onDragEnd,
     showAccountOverlay = false,
     orderMap,
+    accountData,
 }: TileProps) {
     const { t } = useI18n();
+    const [accountOverlayMounted, setAccountOverlayMounted] = useState(false);
+
+    useEffect(() => {
+        if (showAccountOverlay) {
+            setAccountOverlayMounted(true);
+        }
+    }, [showAccountOverlay]);
     const {
         activeUdid,
         registerDevice,
@@ -355,16 +363,22 @@ function TileComponent({
 
                         {videoFrame}
 
-                        {showAccountOverlay && (
-                            <div className="tile-account-overlay" onMouseDown={e => e.stopPropagation()}>
-                                <DeviceAccountPanel
-                                    udid={udid}
-                                    order={order ?? 0}
-                                    model={modelName}
-                                    isOnline={!isDisconnected}
-                                    filterSearch=""
-                                    orderMap={orderMap || new Map()}
-                                />
+                        {accountOverlayMounted && (
+                            <div 
+                                className={`tile-account-overlay ${showAccountOverlay ? 'is-open' : 'is-hidden'}`} 
+                                onMouseDown={e => e.stopPropagation()}
+                            >
+                                {accountData && (
+                                    <DeviceAccountPanel
+                                        udid={udid}
+                                        order={order ?? 0}
+                                        model={modelName}
+                                        isOnline={!isDisconnected}
+                                        filterSearch=""
+                                        orderMap={orderMap || new Map()}
+                                        initialData={accountData}
+                                    />
+                                )}
                             </div>
                         )}
 

@@ -76,9 +76,8 @@ export function saveDeviceAccountVault(data: VaultData): void {
   }
 }
 
-export function getDeviceAccountData(udid: string): DeviceAccountData {
-  const vault = loadDeviceAccountVault();
-  if (vault.devices[udid]) {
+export function getDeviceAccountDataFromVault(vault: VaultData, udid: string): DeviceAccountData {
+  if (vault && vault.devices && vault.devices[udid]) {
     // Ensure all platform keys exist
     const device = vault.devices[udid];
     if (!device.platforms) device.platforms = { wechat: [], line: [], tantan: [], telegram: [], other: [] };
@@ -104,6 +103,11 @@ export function getDeviceAccountData(udid: string): DeviceAccountData {
     },
     updatedAt: Date.now(),
   };
+}
+
+export function getDeviceAccountData(udid: string): DeviceAccountData {
+  const vault = loadDeviceAccountVault();
+  return getDeviceAccountDataFromVault(vault, udid);
 }
 
 export function saveDeviceAccountData(udid: string, data: DeviceAccountData): void {

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
+import { loadDeviceAccountVault, getDeviceAccountDataFromVault, type VaultData } from '@/lib/deviceAccountVault'
 import { readPageParams } from '@/lib/params'
 import { useServer } from '@/context/ServerContext'
 import { Tile } from '@/components/Tile'
@@ -275,6 +276,23 @@ type ConfirmState = {
 
 export function App() {
   const [deviceAccountOverlayOpen, setDeviceAccountOverlayOpen] = useState(false)
+  const [deviceAccountOverlayMounted, setDeviceAccountOverlayMounted] = useState(false)
+  const [vault, setVault] = useState<VaultData>(() => loadDeviceAccountVault())
+
+  useEffect(() => {
+    if (deviceAccountOverlayOpen) {
+      setDeviceAccountOverlayMounted(true)
+    }
+  }, [deviceAccountOverlayOpen])
+
+  useEffect(() => {
+    const handleAccountUpdate = () => {
+      setVault(loadDeviceAccountVault())
+    }
+    window.addEventListener('device-account-updated', handleAccountUpdate)
+    return () => window.removeEventListener('device-account-updated', handleAccountUpdate)
+  }, [])
+
   useEffect(() => {
     (window as any).__disableDirectKeyboard = deviceAccountOverlayOpen;
     return () => {
@@ -1885,12 +1903,27 @@ export function App() {
     const handleDeviceAccountOverlayHotkey = (e: KeyboardEvent) => {
       const active = document.activeElement as HTMLElement | null
 
+      const isHoveringPhone =
+        document.querySelector('.tile:hover') !== null ||
+        document.querySelector('.viewerCanvas:hover') !== null ||
+        document.querySelector('#viewerPanel:hover') !== null
+
+      const isCanvasFocused =
+        active &&
+        (active.tagName === 'CANVAS' || active.classList.contains('viewerCanvas'))
+
+      if (isHoveringPhone || isCanvasFocused) {
+        return
+      }
+
       if (
         active &&
         (
           ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) ||
           active.isContentEditable
-        )
+        ) &&
+        !active.closest('.dav-overlay') &&
+        !active.closest('.tile-account-overlay')
       ) {
         return
       }
@@ -1925,7 +1958,7 @@ export function App() {
         capture: true,
       } as any)
     }
-  }, [])
+  }, [deviceAccountOverlayOpen])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -2522,6 +2555,7 @@ export function App() {
                     onDragEnd={() => setDraggingTile(null)}
                     showAccountOverlay={deviceAccountOverlayOpen}
                     orderMap={orderMap}
+                    accountData={getDeviceAccountDataFromVault(vault, udid)}
                   />
                 </div>
               );

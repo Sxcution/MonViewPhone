@@ -128,7 +128,10 @@
       "dav_platform_trigger": "dav-platform-trigger",
       "dav_platform_menu": "dav-platform-menu",
       "dav_platform_menu_item": "dav-platform-menu-item",
-      "dav_account_action_menu": "dav-account-action-menu"
+      "dav_account_action_menu": "dav-account-action-menu",
+      "is_hidden": "is-hidden",
+      "column_resizer": "column-resizer",
+      "macro_panel_resizer": "macro-panel-resizer"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -185,7 +188,8 @@
       "automation_quick_slots_v1": "automationQuickSlotsV1",
       "macro_status": "macroStatus",
       "auto_physical_screen_off": "autoPhysicalScreenOff",
-      "device_account_overlay_open": "deviceAccountOverlayOpen"
+      "device_account_overlay_open": "deviceAccountOverlayOpen",
+      "device_account_overlay_mounted": "deviceAccountOverlayMounted"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

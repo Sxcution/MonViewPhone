@@ -1,4 +1,5 @@
 import type { StreamConfig } from '@/lib/config';
+import type { DeviceAccountData } from '@/lib/deviceAccountVault';
 
 export type StreamReloadOptions = {
     silent?: boolean;
@@ -29,5 +30,6 @@ export type TileProps = {
     onDragEnd?: () => void;
     showAccountOverlay?: boolean;
     orderMap?: Map<string, number>;
+    accountData?: DeviceAccountData;
 };
 

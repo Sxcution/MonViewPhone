@@ -6379,7 +6379,7 @@ button:focus-visible {
 
 .automationTables {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 128px;
+  grid-template-columns: minmax(0, 1fr) 220px;
   gap: 0;
   min-height: 310px;
 }
@@ -6421,31 +6421,44 @@ button:focus-visible {
   text-align: left;
 }
 
-.automationMacroTable th:nth-child(1),
-.automationMacroTable td:nth-child(1) {
+.automationMacroTable th:nth-child(1) {
   width: 50px;
+}
+
+.automationMacroTable td:nth-child(1) {
   text-align: center;
 }
 
-.automationMacroTable th:nth-child(2),
+.automationMacroTable th:nth-child(2) {
+  width: 75px;
+}
+
 .automationMacroTable td:nth-child(2) {
-  width: 150px;
-}
-
-.automationMacroTable th:nth-child(3),
-.automationMacroTable td:nth-child(3) {
-  width: 112px;
   text-align: center;
 }
 
-.automationMacroTable th:nth-child(4),
-.automationMacroTable td:nth-child(4) {
-  width: 130px;
+.automationMacroTable th:nth-child(3) {
+  width: 85px;
 }
 
-.automationMacroTable th:nth-child(5),
-.automationMacroTable td:nth-child(5) {
+.automationMacroTable td:nth-child(3) {
+  text-align: center;
+}
+
+.automationMacroTable th:nth-child(4) {
   width: auto;
+}
+
+.automationMacroTable th:nth-child(5) {
+  width: 90px;
+}
+
+.automationMacroTable th:nth-child(1),
+.automationMacroTable th:nth-child(2),
+.automationMacroTable th:nth-child(3),
+.automationMacroTable th:nth-child(4),
+.automationMacroTable th:nth-child(5) {
+  text-align: center;
 }
 
 .automationDetailsCell {
@@ -6491,7 +6504,7 @@ button:focus-visible {
 .automationActionSelect,
 .automationDelayInput,
 .automationNoteInput {
-  width: 100%;
+  width: 90%;
   height: 24px;
   padding: 2px 6px;
   color: #f8fafc;
@@ -6505,6 +6518,8 @@ button:focus-visible {
   background: #252525;
   border-color: #3d3d3d;
   font-weight: 650;
+  text-align: center;
+  text-align-last: center;
 }
 
 .automationDelayCell {
@@ -6657,7 +6672,7 @@ button:focus-visible {
 
 .automationCoordinateTables {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 128px;
+  grid-template-columns: minmax(0, 1fr) 4px 220px;
   gap: 0;
   flex: 1;
   min-height: 0;
@@ -8927,6 +8942,10 @@ textarea:focus,
   color: #fff;
 }
 
+.is-hidden {
+  display: none !important;
+}
+
 .dav-header {
   display: flex;
   justify-content: space-between;
@@ -9552,6 +9571,15 @@ select.dav-input {
   z-index: 10001;
 }
 
+.dav-ctx-menu.direction-left {
+  transform: translateX(-100%);
+}
+
+.dav-ctx-menu.direction-left .dav-ctx-submenu {
+  left: auto;
+  right: calc(100% - 15px);
+}
+
 .tile-account-overlay {
   position: absolute;
   top: 0;
@@ -9859,4 +9887,33 @@ input[type=number] {
   text-align: center;
   outline: none;
   cursor: pointer;
+}
+
+.column-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 10;
+}
+
+.column-resizer:hover {
+  background: rgba(13, 110, 253, 0.4);
+}
+
+.macro-panel-resizer {
+  width: 4px;
+  cursor: col-resize;
+  background: #3a3a3a;
+  position: relative;
+  z-index: 10;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.macro-panel-resizer:hover {
+  background: #0d6efd;
 }

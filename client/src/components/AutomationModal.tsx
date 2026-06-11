@@ -528,7 +528,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   const [rows, setRows] = useState<AutomationMacroRow[]>([]);
   const [recording, setRecording] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [showProfileSection, setShowProfileSection] = useState(true);
+  const [showProfileSection, setShowProfileSection] = useState(false);
   const [deviceAssigningProfileId, setDeviceAssigningProfileId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [macroStatus, setMacroStatus] = useState<string | null>(null);
@@ -557,6 +557,100 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
 
   // Settings Panel state
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+
+  // Resizable table columns and File Macro panel
+  const [colWidths, setColWidths] = useState<{
+    step: number;
+    action: number;
+    delay: number;
+    details: number;
+    note: number;
+  }>(() => {
+    try {
+      const saved = localStorage.getItem('automationMacroColWidthsV1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          typeof parsed.step === 'number' &&
+          typeof parsed.action === 'number' &&
+          typeof parsed.delay === 'number' &&
+          typeof parsed.details === 'number' &&
+          typeof parsed.note === 'number'
+        ) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return {
+      step: 50,
+      action: 75,
+      delay: 85,
+      details: 180,
+      note: 90,
+    };
+  });
+
+  const [fileMacroWidth, setFileMacroWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('automationFileMacroWidthV1');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (Number.isFinite(parsed) && parsed > 50) return parsed;
+      }
+    } catch {}
+    return 220;
+  });
+
+  const startResize = useCallback((e: React.MouseEvent, colKey: 'step' | 'action' | 'delay' | 'details' | 'note') => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = colWidths[colKey];
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      setColWidths(prev => {
+        const next = {
+          ...prev,
+          [colKey]: Math.max(30, startWidth + deltaX)
+        };
+        try {
+          localStorage.setItem('automationMacroColWidthsV1', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, [colWidths]);
+
+  const startFileMacroResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = fileMacroWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const nextWidth = Math.max(100, startWidth - deltaX);
+      setFileMacroWidth(nextWidth);
+      try {
+        localStorage.setItem('automationFileMacroWidthV1', String(nextWidth));
+      } catch {}
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, [fileMacroWidth]);
 
   const recordingRef = useRef(false);
   const recordTargetRef = useRef<string | null>(null);
@@ -1931,10 +2025,33 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                   </div>
                 ) : null}
 
-                <div className='automationCoordinateTables'>
+                <div className='automationCoordinateTables' style={{ gridTemplateColumns: `minmax(0, 1fr) 4px ${fileMacroWidth}px` }}>
                   <div className='automationMainTableWrap'>
                     <table className='table table-dark table-sm automationMacroTable'>
-                      <thead><tr><th>Step</th><th>Action</th><th>Delay (ms)</th><th>Details</th><th>Note</th></tr></thead>
+                      <thead>
+                        <tr>
+                          <th style={{ width: colWidths.step, position: 'relative' }}>
+                            Step
+                            <div className="column-resizer" onMouseDown={e => startResize(e, 'step')} />
+                          </th>
+                          <th style={{ width: colWidths.action, position: 'relative', textAlign: 'center' }}>
+                            Action
+                            <div className="column-resizer" onMouseDown={e => startResize(e, 'action')} />
+                          </th>
+                          <th style={{ width: colWidths.delay, position: 'relative', textAlign: 'center' }}>
+                            Delay (ms)
+                            <div className="column-resizer" onMouseDown={e => startResize(e, 'delay')} />
+                          </th>
+                          <th style={{ width: colWidths.details, position: 'relative', textAlign: 'center' }}>
+                            Details
+                            <div className="column-resizer" onMouseDown={e => startResize(e, 'details')} />
+                          </th>
+                          <th style={{ width: colWidths.note, position: 'relative', textAlign: 'center' }}>
+                            Note
+                            <div className="column-resizer" onMouseDown={e => startResize(e, 'note')} />
+                          </th>
+                        </tr>
+                      </thead>
                       <tbody>
                         {rows.map((row, i) => (
                           <tr
@@ -2013,6 +2130,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                       </tbody>
                     </table>
                   </div>
+                  <div className="macro-panel-resizer" onMouseDown={startFileMacroResize} title="Kéo để chỉnh độ rộng File Macro" />
                   <div className='automationSavedTableWrap'>
                     <table className='table table-dark table-sm automationSavedTable'>
                       <thead><tr><th className='automationSavedHeaderCell'>
