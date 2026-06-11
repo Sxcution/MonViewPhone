@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings } from 'lucide-react';
-import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount } from '@/lib/deviceAccountNearby';
+import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby';
 import { 
   getDeviceAccountData, 
   saveDeviceAccountData, 
@@ -240,7 +240,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 }) {
   const [data, setData] = useState(initialData);
   const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
-  const [showBellTooltip, setShowBellTooltip] = useState(false);
+  const [bellTooltip, setBellTooltip] = useState<{ x: number; y: number } | null>(null);
+  const [hiddenIdentityFields, setHiddenIdentityFields] = useState<Record<string, boolean>>({});
+  const [pendingDeleteAccount, setPendingDeleteAccount] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -316,6 +318,11 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const panelHasNearbyEligibleAccount = useMemo(() => {
     if (activeTab !== 'wechat') return false;
     return hasNearbyEligibleAccount(groupAccounts.map(x => x.account));
+  }, [activeTab, groupAccounts]);
+
+  const panelNearbyAccountState = useMemo(() => {
+    if (activeTab !== 'wechat') return 'none';
+    return getNearbyAccountGroupState(groupAccounts.map(x => x.account));
   }, [activeTab, groupAccounts]);
 
   // Auto-open dropdown khi filter Nearby People bật
@@ -455,6 +462,20 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const selectedAccountId = data.selectedAccountByPlatform[activeTab];
   let selectedAccount = activeAccounts.find(a => a.id === selectedAccountId) || activeAccounts[0];
 
+  const getIdentityKey = (field: 'nickname' | 'phone' | 'email') =>
+    `${selectedAccount?.id || 'none'}:${field}`;
+
+  const isIdentityHidden = (field: 'nickname' | 'phone' | 'email') =>
+    !!hiddenIdentityFields[getIdentityKey(field)];
+
+  const toggleIdentityHidden = (field: 'nickname' | 'phone' | 'email') => {
+    if (!selectedAccount) return;
+    setHiddenIdentityFields(prev => ({
+      ...prev,
+      [getIdentityKey(field)]: !prev[getIdentityKey(field)],
+    }));
+  };
+
   const isOverOneYear = useMemo(() => {
     if (!selectedAccount) return false;
     if (selectedAccount.isOneYearOld) return true;
@@ -463,17 +484,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     return (Date.now() - selectedAccount.createdAt) >= oneYearMs;
   }, [selectedAccount]);
 
-  const headerDotBg = useMemo(() => {
-    if (!selectedAccount) {
-      return isOnline ? 'var(--md-success)' : 'var(--md-danger)';
-    }
-    if (selectedAccount.status === 'Die') return 'var(--md-danger)';
-    if (selectedAccount.status === 'Risk') return 'var(--md-warning)';
-    if (!isOverOneYear) {
-      return '#ffffff';
-    }
-    return 'var(--md-success)';
-  }, [selectedAccount, isOnline, isOverOneYear]);
+
 
   const totalAccounts = Object.values(data.platforms).reduce((acc, curr) => acc + curr.length, 0);
   const isWeChat = activeTab === 'wechat';
@@ -835,17 +846,14 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           <span className={`dav-order ${panelHasNearbyEligibleAccount ? 'dav-order-nearby-eligible' : ''}`}>
             {order.toString().padStart(2, '0')}
           </span>
-          <span 
-            className="dav-status-dot" 
-            style={{ background: headerDotBg }} 
-          />
           {deviceNoticeStatus !== 'none' && (
-            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <>
               <button
                 type="button"
                 className="dav-bell-btn"
-                onMouseEnter={() => setShowBellTooltip(true)}
-                onMouseLeave={() => setShowBellTooltip(false)}
+                onMouseEnter={(e) => setBellTooltip({ x: e.clientX, y: e.clientY })}
+                onMouseMove={(e) => setBellTooltip({ x: e.clientX, y: e.clientY })}
+                onMouseLeave={() => setBellTooltip(null)}
                 onClick={handleNoticeIconClick}
                 style={{
                   background: 'transparent',
@@ -854,7 +862,10 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  lineHeight: 1,
+                  height: 16,
+                  width: 16
                 }}
               >
                 <Bell 
@@ -863,12 +874,19 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   className={deviceNoticeStatus === 'expired' ? "dav-bell-expired animate-pulse" : ""} 
                 />
               </button>
-              {showBellTooltip && (
-                <div className="dav-bell-tooltip">
+              {bellTooltip && noticeTooltipText && ReactDOM.createPortal(
+                <div
+                  className="dav-bell-tooltip-floating"
+                  style={{
+                    left: bellTooltip.x,
+                    top: bellTooltip.y,
+                  }}
+                >
                   {noticeTooltipText}
-                </div>
+                </div>,
+                document.body
               )}
-            </div>
+            </>
           )}
         </div>
 
@@ -876,7 +894,11 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           <div className="dav-title-dropdown-wrap" ref={accountTitleDropdownRef}>
             <button
               type="button"
-              className={`dav-total-badge ${showBlueNearby ? 'nearby-active' : ''}`}
+              className={[
+                'dav-total-badge',
+                panelNearbyAccountState === 'eligible' ? 'nearby-eligible' : '',
+                panelNearbyAccountState === 'upcoming' ? 'nearby-upcoming' : '',
+              ].filter(Boolean).join(' ')}
               title="Tong so tai khoan tren dien thoai nay"
               onClick={(e) => {
                 e.preventDefault();
@@ -919,41 +941,6 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     </button>
                   ))
                 )}
-              </div>
-            )}
-          </div>
-
-          <div className="dav-platform-dropdown-wrap" ref={platformDropdownRef}>
-            <button
-              type="button"
-              className={`dav-platform-trigger ${activeTab === 'wechat' ? 'wechat' : ''}`}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setPlatformDropdownOpen(v => !v);
-                setAccountTitleDropdownOpen(false);
-              }}
-            >
-              {activePlatformLabel}
-            </button>
-            {platformDropdownOpen && (
-              <div className="dav-platform-menu contextMenuPanel">
-                {platforms.map(p => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`dav-platform-menu-item ${activeTab === p.id ? 'active' : ''} ${p.id === 'wechat' ? 'wechat' : ''}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setActiveTab(p.id);
-                      updateData({ ...data, defaultPlatform: p.id });
-                      setPlatformDropdownOpen(false);
-                    }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
               </div>
             )}
           </div>
@@ -1130,43 +1117,100 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
             {/* Biệt danh (Nickname) */}
             <div className="dav-input-wrapper">
-              <span style={{ color: '#888', userSelect: 'none', fontSize: '13px', fontWeight: 'bold', marginLeft: '2px' }}>@</span>
+              <span 
+                className="dav-identity-toggle"
+                title={isIdentityHidden('nickname') ? 'Hiện biệt danh' : 'Ẩn biệt danh'}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleIdentityHidden('nickname');
+                }}
+                style={{ color: '#888', userSelect: 'none', fontSize: '13px', fontWeight: 'bold', marginLeft: '2px', cursor: 'pointer' }}
+              >
+                @
+              </span>
               <input 
                 className="dav-transparent-input" 
                 style={{ color: '#fff' }}
                 placeholder="Biệt danh"
-                value={selectedAccount.nickname || ''} 
-                onChange={e => handleUpdateAccount(selectedAccount.id, { nickname: e.target.value })} 
+                readOnly={isIdentityHidden('nickname')}
+                value={
+                  isIdentityHidden('nickname') && selectedAccount.nickname
+                    ? '••••••'
+                    : selectedAccount.nickname || ''
+                }
+                onChange={e => {
+                  if (isIdentityHidden('nickname')) return;
+                  handleUpdateAccount(selectedAccount.id, { nickname: e.target.value });
+                }} 
               />
             </div>
 
             {/* Số điện thoại */}
             <div className="dav-input-wrapper">
-              <Phone size={12} color="#ec4899" style={{ flexShrink: 0 }} />
+              <span
+                className="dav-identity-toggle"
+                title={isIdentityHidden('phone') ? 'Hiện số điện thoại' : 'Ẩn số điện thoại'}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleIdentityHidden('phone');
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
+              >
+                <Phone size={12} color="#ec4899" style={{ flexShrink: 0 }} />
+              </span>
               <input 
                 className="dav-transparent-input" 
                 placeholder="Số điện thoại"
-                value={selectedAccount.phone || ''} 
-                onChange={e => handleUpdateAccount(selectedAccount.id, { phone: e.target.value })} 
+                readOnly={isIdentityHidden('phone')}
+                value={
+                  isIdentityHidden('phone') && selectedAccount.phone
+                    ? '••••••'
+                    : selectedAccount.phone || ''
+                }
+                onChange={e => {
+                  if (isIdentityHidden('phone')) return;
+                  handleUpdateAccount(selectedAccount.id, { phone: e.target.value });
+                }} 
               />
             </div>
 
             {/* Email */}
             <div className="dav-input-wrapper">
-              <Mail size={12} color="#9ca3af" style={{ flexShrink: 0 }} />
+              <span
+                className="dav-identity-toggle"
+                title={isIdentityHidden('email') ? 'Hiện email' : 'Ẩn email'}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleIdentityHidden('email');
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
+              >
+                <Mail size={12} color="#9ca3af" style={{ flexShrink: 0 }} />
+              </span>
               <input 
                 className="dav-transparent-input" 
                 placeholder="Địa chỉ Email"
-                value={selectedAccount.email || ''} 
-                onChange={e => handleUpdateAccount(selectedAccount.id, { email: e.target.value })} 
+                readOnly={isIdentityHidden('email')}
+                value={
+                  isIdentityHidden('email') && selectedAccount.email
+                    ? '••••••'
+                    : selectedAccount.email || ''
+                }
+                onChange={e => {
+                  if (isIdentityHidden('email')) return;
+                  handleUpdateAccount(selectedAccount.id, { email: e.target.value });
+                }} 
               />
             </div>
 
             {/* Hàng QR Code & Nearby People */}
             <div className="dav-stats-row">
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <QrCode size={13} color="#22c55e" style={{ flexShrink: 0 }} />
-                <span style={{ fontWeight: 'bold', color: (selectedAccount.scanCount || 0) >= 3 ? '#ef4444' : '#22c55e' }}>
+                <QrCode size={13} color="#ffffff" style={{ flexShrink: 0 }} />
+                <span style={{ fontWeight: 'bold', color: (selectedAccount.scanCount || 0) >= 3 ? '#ef4444' : '#ffffff' }}>
                   {selectedAccount.scanCount || 0}/3
                 </span>
                 {qrCountdownText && (
@@ -1485,11 +1529,53 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              handleDeleteAccount(selectedAccount.id);
+              setPendingDeleteAccount({
+                id: selectedAccount.id,
+                name: selectedAccount.name || selectedAccount.phone || selectedAccount.nickname || 'Không tên'
+              });
+              setCtxMenu(null);
             }}
           >
             <Trash2 size={16} /> Xoá tài khoản
           </button>
+        </div>,
+        document.body
+      )}
+
+      {pendingDeleteAccount && ReactDOM.createPortal(
+        <div className="confirmOverlay" style={{ zIndex: 29000, background: 'transparent' }} onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}>
+          <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480, zIndex: 29001 }} onPointerDown={e => e.stopPropagation()}>
+            <div className="confirmTitle">Xác nhận xoá tài khoản</div>
+            <div className="confirmText">
+              Bạn có chắc chắn muốn xoá tài khoản <strong>{pendingDeleteAccount.name}</strong>?
+              Hành động này sẽ xoá toàn bộ dữ liệu tài khoản và không thể hoàn tác.
+            </div>
+            <div className="confirmActions">
+              <button 
+                type="button" 
+                className="modalBtn" 
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setPendingDeleteAccount(null);
+                }}
+              >
+                Huỷ
+              </button>
+              <button 
+                type="button" 
+                className="modalBtnDanger" 
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleDeleteAccount(pendingDeleteAccount.id);
+                  setPendingDeleteAccount(null);
+                }}
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
         </div>,
         document.body
       )}

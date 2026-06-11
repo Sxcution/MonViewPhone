@@ -2,6 +2,13 @@
 - Thêm cơ chế lọc sạch các phần tử null/undefined trong danh sách tài khoản để tránh lỗi crash JS làm mờ/ẩn tất cả thiết bị trên Grid khi tìm kiếm.
 - Cập nhật placeholder chỉ dẫn tìm kiếm thành "Tìm theo Tên, Nickname, SĐT, Email, Ghi chú...".
 - Đổi màu số máy trong Overlay Account (phần `.dav-order` nằm trong `DeviceAccountPanel`) thành màu xanh dương khi có bất kỳ tài khoản WeChat nào trong panel đó đủ điều kiện Active Nearby People (eligible). Mặc định số máy là màu trắng bình thường.
-- Cập nhật tooltip cảnh báo thông báo (warning bell) trên header của `DeviceAccountPanel` hiển thị ngay lập tức không có delay khi hover chuột.
+- Cập nhật tooltip cảnh báo thông báo (warning bell) trên header của `DeviceAccountPanel` hiển thị ngay lập tức không có delay khi hover chuột và đi theo vị trí của con trỏ chuột sử dụng Portal.
+- Loại bỏ menu dropdown chọn WeChat/Nhóm WeChat trên header của từng DeviceAccountPanel để tối ưu hóa không gian.
+- Loại bỏ chấm trạng thái kế bên số máy trên header từng DeviceAccountPanel.
+- Tích hợp tính năng ẩn/hiện thông tin nhạy cảm (biệt danh, SĐT, email) khi nhấp chuột vào icon/badge định danh tương ứng, đồng thời khóa nhập liệu (`readOnly`) khi đang ở trạng thái ẩn để tránh lỗi ghi đè dữ liệu.
+- Cập nhật màu sắc của badge đếm số tài khoản (`.dav-total-badge`) tự động chuyển màu dựa theo trạng thái Nearby của toàn bộ tài khoản WeChat trong panel (xanh nếu có tài khoản eligible, cam nếu chỉ có tài khoản upcoming, mặc định nếu không có) với giao diện nền trong suốt, viền in đậm và chữ in đậm.
+- Sửa lỗi căn lề của biểu tượng chuông thông báo trên tiêu đề panel giúp giữ nguyên chiều cao chuẩn của header khi có/không có cảnh báo.
+- Thêm modal Portal xác nhận "Huỷ/Xác nhận xoá tài khoản" để tránh click nhầm trong menu ngữ cảnh.
+- Thay đổi màu sắc của icon QR Code và số lượt quét mã QR thành màu trắng khi tài khoản vẫn đủ điều kiện quét (< 3 lượt).
 - Cập nhật tệp `naming_registry.json` và `project_structure.md` để đồng bộ các hằng số, lớp CSS và biến trạng thái mới.
 - Chạy `npm run build` thành công trên frontend.

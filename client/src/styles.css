@@ -9115,32 +9115,37 @@ textarea:focus,
   color: #ffffff;
 }
 
-.dav-order.nearby-eligible,
-.dav-order-nearby-eligible {
+.dav-order.dav-order-nearby-eligible {
   color: #3b82f6;
   border-color: rgba(59, 130, 246, 0.75);
   text-shadow: 0 0 8px rgba(59, 130, 246, 0.45);
 }
 
-.dav-bell-tooltip {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 6px;
+.dav-bell-tooltip-floating {
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 10px));
+  max-width: 260px;
+  white-space: pre-line;
+  pointer-events: none;
+  z-index: 32000;
   background: var(--md-card, #1e1e1e);
   border: 1px solid var(--md-border, rgba(255, 255, 255, 0.15));
   border-radius: 6px;
   padding: 6px 10px;
   color: var(--md-text, #ffffff);
   font-size: 12px;
-  white-space: pre-line;
-  z-index: 1000;
   box-shadow: var(--md-shadow-panel, 0 4px 12px rgba(0, 0, 0, 0.5));
-  pointer-events: none;
-  min-width: max-content;
-  max-width: 280px;
-  font-weight: normal;
   text-align: left;
+  font-weight: normal;
+}
+
+.dav-identity-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.dav-identity-toggle:hover {
+  filter: brightness(1.25);
 }
 
 .dav-udid {
@@ -9179,7 +9184,7 @@ textarea:focus,
 .dav-total-badge {
   background: var(--md-muted-2);
   color: #fff;
-  border: none;
+  border: 1px solid transparent;
   font-size: 11px;
   font-weight: bold;
   width: 18px;
@@ -9197,6 +9202,22 @@ textarea:focus,
 
 .dav-total-badge:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+.dav-total-badge.nearby-eligible {
+  color: #3b82f6;
+  border: 2px solid #3b82f6;
+  font-weight: 800;
+  background: transparent !important;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.35);
+}
+
+.dav-total-badge.nearby-upcoming {
+  color: #f97316;
+  border: 2px solid #f97316;
+  font-weight: 800;
+  background: transparent !important;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.35);
 }
 
 .dav-tabs {
@@ -10309,10 +10330,7 @@ input[type=number] {
   color: #60a5fa;
 }
 
-.dav-total-badge.nearby-active {
-  background: #3b82f6 !important;
-  color: #fff !important;
-}
+/* nearby-active style removed in favor of eligible/upcoming */
 
 /* === Theme Inspector Mode === */
 .themeInspectorHoverTarget {

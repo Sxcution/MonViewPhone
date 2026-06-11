@@ -55,3 +55,15 @@ export function hasNearbyEligibleAccount(accounts: Account[], now = Date.now()):
   return accounts.some(acc => getNearbyAccountState(acc, now) === 'eligible');
 }
 
+export function getNearbyAccountGroupState(accounts: Account[], now = Date.now()): NearbyAccountState {
+  let hasUpcoming = false;
+
+  for (const acc of accounts) {
+    const state = getNearbyAccountState(acc, now);
+    if (state === 'eligible') return 'eligible';
+    if (state === 'upcoming') hasUpcoming = true;
+  }
+
+  return hasUpcoming ? 'upcoming' : 'none';
+}
+
