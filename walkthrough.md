@@ -16,3 +16,9 @@
 - Bỏ chữ "Còn/còn" tại các trạng thái đếm ngược (QR countdown, thông báo, Nearby countdown).
 - Chặn modal Quản lý tài khoản kéo lọt lên trên màn hình bằng cách clamp vị trí (đảm bảo `top >= 12px` và header luôn nhìn thấy được), tự động sửa lỗi vị trí khi load từ localStorage hoặc thay đổi kích thước màn hình, và hỗ trợ nhấp đúp vào header để reset vị trí về trung tâm màn hình.
 - Xác thực và chạy `npm run build` thành công trên frontend.
+- Cập nhật màu sắc tên tài khoản trong danh sách badge đếm số tài khoản và context menu "Tài Khoản" theo các điều kiện:
+  - Account `Die` -> đỏ `#ef4444`
+  - Account `Risk` -> cam `#f97316`
+  - Account không Die/Risk, trên 1 năm tuổi -> xanh lá `#22c55e`
+  - Account không Die/Risk, dưới 1 năm tuổi hoặc chưa có ngày tạo -> trắng `#ffffff`
+- Xác thực và chạy `npm run build` thành công trên frontend.

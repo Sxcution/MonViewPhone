@@ -107,6 +107,21 @@ function getElapsedDaysSince(ts?: number | null): number {
   return Math.max(0, Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24)));
 }
 
+function getAccountListNameColor(account: Account): string {
+  if (account.status === 'Die') return '#ef4444';
+  if (account.status === 'Risk') return '#f97316';
+
+  const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+  const isOverOneYear = !!(
+    account.isOneYearOld ||
+    (account.createdAt && Date.now() - account.createdAt >= oneYearMs)
+  );
+
+  if (isOverOneYear) return '#22c55e';
+
+  return '#ffffff';
+}
+
 function clampDavPanelPosition(pos: { x: number; y: number }, panel?: HTMLElement | null) {
   const margin = 12;
   const minVisibleHeader = 56;
@@ -960,7 +975,16 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       }}
                     >
                       <span className={`dav-account-state-dot ${getAccountStatusClass(account)}`} />
-                      <span className="dav-title-account-name" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                      <span
+                        className="dav-title-account-name"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          color: getAccountListNameColor(account),
+                          fontWeight: selectedAccount?.id === account.id ? 700 : 500,
+                        }}
+                      >
                         {account.name || account.phone || account.nickname || 'Không tên'}
                         {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
                         {renderAppTypeIcon(account.appType)}
@@ -1379,7 +1403,15 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       setCtxMenu(null);
                     }}
                   >
-                    <span style={{ fontWeight: a.id === selectedAccount.id ? 'bold' : 'normal', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                    <span
+                      style={{
+                        fontWeight: a.id === selectedAccount.id ? 'bold' : 'normal',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '2px',
+                        color: getAccountListNameColor(a),
+                      }}
+                    >
                       {a.name || a.phone || a.nickname || 'Tài khoản'}
                       {renderAppTypeIcon(a.appType)}
                     </span>
