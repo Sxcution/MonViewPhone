@@ -147,3 +147,29 @@ Chúng tôi đã hoàn thành quá trình chuyển đổi toàn diện để bi�
      - Khi xoá/thiếu `settings.json`, API GET `/api/goog/device/settings` vẫn tự động dựng đầy đủ `tileOrder`, `tileOrderNumbers` và account vault từ SQLite.
      - Tệp `settings.json` hoàn toàn sạch sẽ, không còn chứa các trường dữ liệu lớn hoặc nhạy cảm của tài khoản và thứ tự hiển thị sau khi cập nhật order.
      - Launcher khởi động và tự repair dữ liệu thành công không gặp lỗi chặn đứng.
+
+## Cập nhật định dạng thời gian đếm ngược dưới 1 ngày
+
+Chúng tôi đã cập nhật giao diện đếm ngược trong Overlay Account để thân thiện hơn với người dùng khi thời gian còn lại ngắn:
+
+1. **Hiển thị theo giờ khi thời gian < 24 giờ**:
+   - Thêm hàm helper `formatCountdown` trong [DeviceAccountOverlay.tsx](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/DeviceAccountOverlay.tsx) để tự động chuyển sang hiển thị định dạng giờ (ví dụ: `23 giờ`, `22 giờ`...) nếu thời gian còn lại dưới 1 ngày (24 giờ), thay vì hiển thị tròn số "1 ngày" như trước đây. Nếu thời gian lớn hơn hoặc bằng 24 giờ, định dạng hiển thị vẫn giữ nguyên là `X ngày`.
+
+2. **Áp dụng cho các thành phần**:
+   - **Thông báo**: Khi thời gian đến hạn thông báo dưới 24 giờ, hiển thị số giờ còn lại (ví dụ: `: 15 giờ`).
+   - **Quét QR**: Khi thời gian đếm ngược lượt quét QR dưới 24 giờ, hiển thị số giờ (ví dụ: `(8 giờ)`).
+   - **Đủ điều kiện Active Nearby People**: Khi thời gian đếm ngược chờ đủ điều kiện Nearby People dưới 24 giờ, hiển thị số giờ (ví dụ: `20 giờ`).
+
+3. **Kết quả kiểm thử**:
+   - Đã biên dịch thành công 100% frontend (`npm run build`). Giao diện đếm ngược đã sẵn sàng hoạt động mượt mà.
+
+## Điều chỉnh vị trí nút Setting trong Sidebar cấu hình bên phải
+
+Chúng tôi đã thực hiện thay đổi layout để nút Setting nằm ở vị trí hợp lý hơn:
+
+1. **Di chuyển nút System Settings sát lề phải**:
+   - Cập nhật cả 2 khối định nghĩa CSS `.btn-setting` trong tệp [styles.css](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/styles.css) từ `left: 58px` sang `right: 12px; left: auto;`.
+   - Giúp nút ghim gờ (Pin) giữ nguyên vị trí ở góc trên bên trái, còn nút bánh răng Setting (mở cài đặt hệ thống) được đẩy sang sát góc trên bên phải của bảng cấu hình bên phải (`rightConfigPanel`).
+
+2. **Kết quả**:
+   - Biên dịch frontend thành công 100% (`npm run build`). Nút Setting đã được dịch chuyển sang sát lề phải chuẩn xác, tạo giao diện cân đối và thoáng mắt.

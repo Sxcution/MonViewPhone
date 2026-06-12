@@ -4698,7 +4698,8 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 }
 
 .btn-setting {
-  left: 58px;
+  right: 12px;
+  left: auto;
 }
 
 .rightConfigPanel {
@@ -4889,7 +4890,8 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 }
 
 .btn-setting {
-  left: 58px;
+  right: 12px;
+  left: auto;
 }
 
 .rightConfigPanel {

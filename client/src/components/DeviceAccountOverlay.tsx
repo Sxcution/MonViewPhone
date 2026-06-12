@@ -103,6 +103,16 @@ function getRelativeTimeStr(createdAt: number) {
   return `${totalDays} ngày`;
 }
 
+function formatCountdown(diffMs: number): string {
+  if (diffMs <= 0) return '0 giờ';
+  const hours = Math.ceil(diffMs / (1000 * 60 * 60));
+  if (hours < 24) {
+    return `${hours} giờ`;
+  }
+  const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  return `${days} ngày`;
+}
+
 function getElapsedDaysSince(ts?: number | null): number {
   if (!ts) return 0;
   return Math.max(0, Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24)));
@@ -589,7 +599,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   // Notice countdown calculation
   const notice = selectedAccount?.notice;
   let noticeStatus: 'none' | 'counting' | 'expired' = 'none';
-  let remainingDays = 0;
+  let noticeCountdownText = '';
 
   if (notice && notice.dueDate) {
     const diffMs = notice.dueDate - Date.now();
@@ -597,7 +607,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       noticeStatus = 'expired';
     } else {
       noticeStatus = 'counting';
-      remainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      noticeCountdownText = formatCountdown(diffMs);
     }
   }
 
@@ -645,8 +655,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     const nextScanDate = selectedAccount.lastScanDate + 30 * 24 * 60 * 60 * 1000;
     const diffMs = nextScanDate - Date.now();
     if (diffMs > 0) {
-      const remainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      qrCountdownText = `(${remainingDays} ngày)`;
+      qrCountdownText = `(${formatCountdown(diffMs)})`;
     }
   }
 
@@ -1366,22 +1375,22 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 if (!isWeChat || !selectedAccount) return null;
                 // Điều kiện bắt buộc: tài khoản phải đủ 1 năm tuổi mới hiển thị Nearby
                 if (!isEligibleNearby) return null;
-                const nearbyDays = selectedAccount.nearbyPeopleDueDate
-                  ? Math.ceil((selectedAccount.nearbyPeopleDueDate - Date.now()) / (1000 * 60 * 60 * 24))
+                const diffMs = selectedAccount.nearbyPeopleDueDate
+                  ? selectedAccount.nearbyPeopleDueDate - Date.now()
                   : 0;
 
                 // Hide icon if remaining days > 7
-                if (selectedAccount.nearbyPeopleDueDate && nearbyDays > 7) {
+                if (selectedAccount.nearbyPeopleDueDate && diffMs > 7 * 24 * 60 * 60 * 1000) {
                   return null;
                 }
 
                 return (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {selectedAccount.nearbyPeopleDueDate && nearbyDays > 0 ? (
+                    {selectedAccount.nearbyPeopleDueDate && diffMs > 0 ? (
                       <>
                         <MapPin size={13} color="#eab308" style={{ flexShrink: 0 }} />
                         <span style={{ color: '#eab308', fontSize: '11px', fontWeight: '500' }}>
-                          {nearbyDays} ngày
+                          {formatCountdown(diffMs)}
                         </span>
                       </>
                     ) : (
@@ -1403,7 +1412,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 <span className="muted" style={{ color: '#666', fontStyle: 'italic', fontSize: '11px' }}>Chưa đặt thông báo</span>
               ) : (
                 <span style={{ color: noticeStatus === 'expired' ? '#ef4444' : '#eab308', fontWeight: noticeStatus === 'expired' ? 'bold' : '500' }}>
-                  {selectedAccount.notice?.title} {noticeStatus === 'expired' ? ': đã đến hạn' : `: ${remainingDays} ngày`}
+                  {selectedAccount.notice?.title} {noticeStatus === 'expired' ? ': đã đến hạn' : `: ${noticeCountdownText}`}
                 </span>
               )}
             </div>
