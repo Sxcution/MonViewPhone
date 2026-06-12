@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -546,53 +547,84 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodGet {
 		data, err := os.ReadFile(settingsFile)
-		if err != nil {
-			if os.IsNotExist(err) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("{}"))
-				return
-			}
-			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
-			return
-		}
 		var settings map[string]interface{}
-		if err := json.Unmarshal(data, &settings); err == nil {
-			if vaultRaw, ok, err := loadDeviceAccountVaultFromDB(); err != nil {
+		if err != nil {
+			if !os.IsNotExist(err) {
 				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
 				return
-			} else if ok {
-				settings[deviceAccountVaultKey] = vaultRaw
-				settings["monviewphone:device-account-db"] = "data/Data.db"
-				
-				// Auto-repair logic for tileOrderNumbers from device_order
-				shouldRepair := false
-				if settings["tileOrderNumbers"] == nil {
-					shouldRepair = true
-				} else {
-					strRaw, isStr := settings["tileOrderNumbers"].(string)
-					if isStr {
-						var parsed map[string]interface{}
-						if err := json.Unmarshal([]byte(strRaw), &parsed); err == nil && len(parsed) < 35 {
-							shouldRepair = true
-						}
-					}
-				}
+			}
+			settings = make(map[string]interface{})
+		} else {
+			if err := json.Unmarshal(data, &settings); err != nil {
+				settings = make(map[string]interface{})
+			}
+		}
 
-				if shouldRepair {
-					orderDB, err := getDeviceOrderFromDB()
-					if err == nil && len(orderDB) > 0 {
-						if b, err := json.Marshal(orderDB); err == nil {
-							settings["tileOrderNumbers"] = string(b)
-						}
-					}
-				}
+		if vaultRaw, ok, err := loadDeviceAccountVaultFromDB(); err == nil && ok {
+			settings[deviceAccountVaultKey] = vaultRaw
+			settings["monviewphone:device-account-db"] = "data/Data.db"
+		}
 
-				if body, err := json.Marshal(settings); err == nil {
-					data = body
+		orderDB, err := getDeviceOrderFromDB()
+		if err == nil && len(orderDB) > 0 {
+			// 1. Repair tileOrderNumbers
+			shouldRepairOrderNumbers := false
+			if settings["tileOrderNumbers"] == nil {
+				shouldRepairOrderNumbers = true
+			} else if strRaw, isStr := settings["tileOrderNumbers"].(string); isStr {
+				var parsed map[string]interface{}
+				if err := json.Unmarshal([]byte(strRaw), &parsed); err != nil || len(parsed) < 35 {
+					shouldRepairOrderNumbers = true
+				}
+			} else {
+				shouldRepairOrderNumbers = true
+			}
+			if shouldRepairOrderNumbers {
+				if b, err := json.Marshal(orderDB); err == nil {
+					settings["tileOrderNumbers"] = string(b)
+				}
+			}
+
+			// 2. Repair tileOrder
+			shouldRepairTileOrder := false
+			if settings["tileOrder"] == nil {
+				shouldRepairTileOrder = true
+			} else if strRaw, isStr := settings["tileOrder"].(string); isStr {
+				var parsed []interface{}
+				if err := json.Unmarshal([]byte(strRaw), &parsed); err != nil || len(parsed) < 35 {
+					shouldRepairTileOrder = true
+				}
+			} else {
+				shouldRepairTileOrder = true
+			}
+			if shouldRepairTileOrder {
+				type udidOrder struct {
+					udid string
+					ord  int
+				}
+				var list []udidOrder
+				for udid, ord := range orderDB {
+					list = append(list, udidOrder{udid: udid, ord: ord})
+				}
+				sort.Slice(list, func(i, j int) bool {
+					return list[i].ord < list[j].ord
+				})
+				var sortedUDIDs []string
+				for _, item := range list {
+					sortedUDIDs = append(sortedUDIDs, item.udid)
+				}
+				if b, err := json.Marshal(sortedUDIDs); err == nil {
+					settings["tileOrder"] = string(b)
 				}
 			}
 		}
+
+		if body, err := json.Marshal(settings); err == nil {
+			data = body
+		} else {
+			data = []byte("{}")
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(data)
@@ -796,23 +828,6 @@ func handleDeviceOrder(w http.ResponseWriter, r *http.Request) {
 		if err := updateDeviceOrderInDB(req.OrderNumbers); err != nil {
 			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
 			return
-		}
-
-		// Also update settings.json
-		settingsFile := filepath.Join(".", "settings.json")
-		existingData, err := os.ReadFile(settingsFile)
-		var settings map[string]interface{}
-		if err == nil {
-			_ = json.Unmarshal(existingData, &settings)
-		}
-		if settings == nil {
-			settings = make(map[string]interface{})
-		}
-		if b, err := json.Marshal(req.OrderNumbers); err == nil {
-			settings["tileOrderNumbers"] = string(b)
-		}
-		if body, err := json.Marshal(settings); err == nil {
-			os.WriteFile(settingsFile, body, 0644)
 		}
 
 		writeJSON(w, http.StatusOK, jsonResponse{"success": true})

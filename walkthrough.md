@@ -126,20 +126,24 @@ Chúng tôi đã hoàn thành quá trình chuyển đổi toàn diện để bi�
    - Đăng ký endpoint `/api/goog/device/order` (GET/POST) để lưu trữ trực tiếp số thứ tự máy của thiết bị vào cột `device_order` trong bảng `devices`.
 
 3. **Chuyển `/api/goog/device/settings` thành Compatibility Endpoint**:
-   - Cập nhật handler GET `/api/goog/device/settings` để tự động dựng dữ liệu account vault và `tileOrderNumbers` trực tiếp từ SQLite trước khi gửi về client, giúp các luồng cũ không bị gián đoạn.
+   - Cập nhật handler GET `/api/goog/device/settings` để tự động dựng dữ liệu account vault, `tileOrder` và `tileOrderNumbers` trực tiếp từ SQLite trước khi gửi về client (kể cả khi file `settings.json` hoàn toàn không tồn tại hoặc bị lỗi).
    - Cập nhật POST `/api/goog/device/settings` loại bỏ hoàn toàn các trường dữ liệu `monviewphone:device-account-vault` và `tileOrderNumbers` ra khỏi tệp `settings.json` khi ghi đè, đồng thời điều hướng việc lưu trữ các khoá này sang DB.
 
 4. **Đồng bộ phía Frontend (`client/`)**:
    - Cập nhật `client/src/lib/backendSettings.ts` để `saveDeviceAccountVaultToBackend` gửi yêu cầu POST trực tiếp đến endpoint chuyên biệt `/api/goog/device/account-vault` thay vì API cấu hình chung.
-   - Điều chỉnh logic khởi động trong `client/src/main.tsx` để luôn ghi đè và đồng bộ dữ liệu `localStorage` từ backend settings (không so sánh số lượng tài khoản WeChat để tránh cache cũ trong trình duyệt ghi đè ngược làm hỏng DB).
+   - Điều chỉnh logic khởi động trong `client/src/main.tsx` để luôn ghi đè và đồng bộ dữ liệu `localStorage` từ backend settings.
+   - Nới lỏng kiểm tra `tileOrder`/`tileOrderNumbers` trong `main.tsx` (`validateBackendSettings`): Không coi việc thiếu/sai độ dài các trường này là lỗi chết làm crash app nếu cơ sở dữ liệu tài khoản (`vaultResult.valid`) khoẻ mạnh và có thể repair được.
 
 5. **Launcher Preflight Auto-Repair (`run.pyw`)**:
-   - Sửa đổi kịch bản kiểm tra an toàn dữ liệu trước khi mở app: Bỏ chặn khởi động app chỉ vì thiếu `tileOrderNumbers` trong `settings.json`.
-   - Nếu phát hiện thiếu thứ tự hiển thị thiết bị, launcher sẽ tự động gọi API `/api/goog/device/order` để backend tự động repair dựa trên dữ liệu thiết bị trong SQLite và cho phép ứng dụng khởi động bình thường.
+   - Sửa đổi kịch bản kiểm tra an toàn dữ liệu trước khi mở app: Chỉ chặn ứng dụng khi thông tin cốt lõi thất bại (devices < 35, WeChat accounts < 104 hoặc mất Emma Zhao).
+   - Không còn coi việc thiếu `tileOrder`/`tileOrderNumbers` là lỗi chết chặn app.
 
-6. **Kết quả kiểm thử**:
+6. **Loại bỏ ghi ngược từ API Order**:
+   - Cập nhật `/api/goog/device/order` POST trong [rest.go](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/rest.go) không ghi ngược trường `tileOrderNumbers` vào `settings.json` nữa.
+
+7. **Kết quả kiểm thử**:
    - Đã biên dịch thành công 100% frontend (`npm run build`) và backend Go (`go build -o server-go.exe`).
-   - Chạy kịch bản tích hợp `test_repair_and_sync.py` và `test_launcher_preflight.py` thành công tốt đẹp:
-     - Tệp `settings.json` hoàn toàn sạch sẽ, không còn chứa các trường dữ liệu lớn hoặc nhạy cảm của tài khoản và thứ tự hiển thị.
-     - Dữ liệu tài khoản (Emma Zhao, WeChat) được đọc/ghi trực tiếp và an toàn từ `Data.db`.
+   - Chạy kịch bản tích hợp `test_fallback.py` và `test_launcher_preflight.py` thành công tốt đẹp:
+     - Khi xoá/thiếu `settings.json`, API GET `/api/goog/device/settings` vẫn tự động dựng đầy đủ `tileOrder`, `tileOrderNumbers` và account vault từ SQLite.
+     - Tệp `settings.json` hoàn toàn sạch sẽ, không còn chứa các trường dữ liệu lớn hoặc nhạy cảm của tài khoản và thứ tự hiển thị sau khi cập nhật order.
      - Launcher khởi động và tự repair dữ liệu thành công không gặp lỗi chặn đứng.

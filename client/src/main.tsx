@@ -104,30 +104,50 @@ function validateBackendSettings(settings: any) {
 
   const tileOrderStr = settings['tileOrder'];
   if (!tileOrderStr) {
-    return { valid: false, reason: 'Missing tileOrder key' };
-  }
-  let tileOrder;
-  try {
-    tileOrder = JSON.parse(tileOrderStr);
-  } catch (e: any) {
-    return { valid: false, reason: `tileOrder is not valid JSON: ${e.message}` };
-  }
-  if (!Array.isArray(tileOrder) || tileOrder.length < 35) {
-    return { valid: false, reason: `tileOrder length is ${tileOrder ? tileOrder.length : 0} (expected >= 35)` };
+    if (!vaultResult.valid) {
+      return { valid: false, reason: 'Missing tileOrder key' };
+    }
+    console.warn('Missing tileOrder key, but vault is healthy. Proceeding...');
+  } else {
+    let tileOrder;
+    try {
+      tileOrder = JSON.parse(tileOrderStr);
+      if (!Array.isArray(tileOrder) || tileOrder.length < 35) {
+        if (!vaultResult.valid) {
+          return { valid: false, reason: `tileOrder length is ${tileOrder ? tileOrder.length : 0} (expected >= 35)` };
+        }
+        console.warn(`tileOrder length is ${tileOrder ? tileOrder.length : 0} (expected >= 35), but vault is healthy. Proceeding...`);
+      }
+    } catch (e: any) {
+      if (!vaultResult.valid) {
+        return { valid: false, reason: `tileOrder is not valid JSON: ${e.message}` };
+      }
+      console.warn(`tileOrder is not valid JSON: ${e.message}, but vault is healthy. Proceeding...`);
+    }
   }
 
   const tileOrderNumbersStr = settings['tileOrderNumbers'];
   if (!tileOrderNumbersStr) {
-    return { valid: false, reason: 'Missing tileOrderNumbers key' };
-  }
-  let tileOrderNumbers;
-  try {
-    tileOrderNumbers = JSON.parse(tileOrderNumbersStr);
-  } catch (e: any) {
-    return { valid: false, reason: `tileOrderNumbers is not valid JSON: ${e.message}` };
-  }
-  if (!tileOrderNumbers || typeof tileOrderNumbers !== 'object' || Object.keys(tileOrderNumbers).length < 35) {
-    return { valid: false, reason: `tileOrderNumbers keys length is ${tileOrderNumbers ? Object.keys(tileOrderNumbers).length : 0} (expected >= 35)` };
+    if (!vaultResult.valid) {
+      return { valid: false, reason: 'Missing tileOrderNumbers key' };
+    }
+    console.warn('Missing tileOrderNumbers key, but vault is healthy. Proceeding...');
+  } else {
+    let tileOrderNumbers;
+    try {
+      tileOrderNumbers = JSON.parse(tileOrderNumbersStr);
+      if (!tileOrderNumbers || typeof tileOrderNumbers !== 'object' || Object.keys(tileOrderNumbers).length < 35) {
+        if (!vaultResult.valid) {
+          return { valid: false, reason: `tileOrderNumbers keys length is ${tileOrderNumbers ? Object.keys(tileOrderNumbers).length : 0} (expected >= 35)` };
+        }
+        console.warn(`tileOrderNumbers keys length is ${tileOrderNumbers ? Object.keys(tileOrderNumbers).length : 0} (expected >= 35), but vault is healthy. Proceeding...`);
+      }
+    } catch (e: any) {
+      if (!vaultResult.valid) {
+        return { valid: false, reason: `tileOrderNumbers is not valid JSON: ${e.message}` };
+      }
+      console.warn(`tileOrderNumbers is not valid JSON: ${e.message}, but vault is healthy. Proceeding...`);
+    }
   }
 
   return { valid: true };
