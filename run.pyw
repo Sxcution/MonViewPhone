@@ -13,12 +13,47 @@ from pystray import Icon as TrayIcon, Menu as TrayMenu, MenuItem as TrayMenuItem
 
 # Global references to the subprocesses
 go_process = None
+vite_process = None
+chrome_process = None
+current_mode = None
 instance_mutex = None
 
 APP_NAME = "MonViewPhone"
 BASE_URL = "http://localhost:11000/"
+NORMAL_URL = "http://localhost:11000/"
+DEV_URL = "http://localhost:5173/"
 BACKEND_PORT = 11000
+VITE_PORT = 5173
+LAUNCHER_CONFIG_FILE = "launcher_config.json"
+CHROME_PROFILE_DIR = "chrome-profile"
 APP_MUTEX_NAME = r"Local\MonViewPhone_SingleInstance"
+
+
+def load_launcher_mode():
+    try:
+        if os.path.exists(LAUNCHER_CONFIG_FILE):
+            with open(LAUNCHER_CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                mode = data.get("mode")
+                if mode in ["normal", "dev"]:
+                    return mode
+    except Exception:
+        pass
+    return "normal"
+
+
+def save_launcher_mode(mode):
+    try:
+        with open(LAUNCHER_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump({"mode": mode}, f, indent=2)
+    except Exception as e:
+        print(f"Failed to save launcher config: {e}")
+
+
+def get_app_url(mode):
+    if mode == "dev":
+        return DEV_URL
+    return NORMAL_URL
 
 
 def show_error_message(title, message):
@@ -124,33 +159,71 @@ def verify_data_safety():
         return False, f"Lỗi xảy ra trong quá trình verify dữ liệu: {e}"
 
 
-def open_app(icon=None, item=None):
-    # Try opening with Chrome app mode
-    try:
-        chrome_paths = [
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-            "chrome"
-        ]
-        opened = False
-        for path in chrome_paths:
+def close_app_window():
+    global chrome_process
+    if chrome_process:
+        try:
+            chrome_process.terminate()
+            chrome_process.wait(timeout=2)
+        except Exception:
             try:
-                subprocess.Popen(
-                    [path, f"--app={BASE_URL}"],
-                    creationflags=subprocess.CREATE_NO_WINDOW
-                )
-                opened = True
-                break
-            except FileNotFoundError:
-                continue
+                chrome_process.kill()
+            except Exception:
+                pass
+        chrome_process = None
         
-        if not opened:
-            subprocess.Popen(
-                ["cmd", "/c", f"start chrome --app={BASE_URL}"],
+    try:
+        ps_command = (
+            f"Get-CimInstance Win32_Process -Filter \"name = 'chrome.exe'\" | "
+            f"Where-Object {{ $_.CommandLine -like '*{CHROME_PROFILE_DIR}*' }} | "
+            f"ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"
+        )
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_command],
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+    except Exception as e:
+        print(f"Fallback close window failed: {e}")
+
+
+def open_app(icon=None, item=None, mode=None):
+    global chrome_process, current_mode
+    if mode is None:
+        mode = current_mode or load_launcher_mode()
+        
+    url = get_app_url(mode)
+    close_app_window()
+    
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    profile_dir = os.path.join(project_root, CHROME_PROFILE_DIR)
+    
+    chrome_paths = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        "chrome"
+    ]
+    opened = False
+    for path in chrome_paths:
+        try:
+            chrome_process = subprocess.Popen(
+                [path, f"--user-data-dir={profile_dir}", f"--app={url}"],
                 creationflags=subprocess.CREATE_NO_WINDOW
             )
-    except Exception:
-        webbrowser.open(BASE_URL)
+            opened = True
+            break
+        except FileNotFoundError:
+            continue
+            
+    if not opened:
+        try:
+            chrome_process = subprocess.Popen(
+                ["cmd", "/c", "start", "chrome", f"--user-data-dir={profile_dir}", f"--app={url}"],
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+        except Exception:
+            webbrowser.open(url)
 
 
 def acquire_single_instance_lock():
@@ -212,9 +285,89 @@ def terminate_process(process):
         pass
 
 
+def start_vite_dev_server():
+    global vite_process
+    
+    if is_port_open(VITE_PORT):
+        return True
+        
+    client_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "client")
+    
+    # Try npm run dev
+    try:
+        vite_process = subprocess.Popen(
+            ["cmd", "/c", "npm", "run", "dev"],
+            cwd=client_dir,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+    except Exception as e:
+        print(f"Failed to start Vite with npm: {e}")
+        try:
+            vite_process = subprocess.Popen(
+                ["cmd", "/c", "npm.cmd", "run", "dev"],
+                cwd=client_dir,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+        except Exception as e2:
+            print(f"Failed to start Vite with npm.cmd: {e2}")
+            show_error_message(
+                "Lỗi khởi động Vite",
+                f"Không thể khởi chạy npm run dev. Lỗi: {e2}"
+            )
+            return False
+            
+    # Wait for port 5173 to be open
+    vite_ready = False
+    for _ in range(40):
+        if is_port_open(VITE_PORT):
+            vite_ready = True
+            break
+        time.sleep(0.5)
+        
+    if not vite_ready:
+        show_error_message(
+            "Lỗi khởi động",
+            "Không thể khởi động Dev Mode / Vite ở cổng 5173"
+        )
+        return False
+        
+    return True
+
+
+def stop_vite_dev_server():
+    global vite_process
+    
+    if vite_process:
+        try:
+            vite_process.terminate()
+            vite_process.wait(timeout=2)
+        except Exception:
+            try:
+                vite_process.kill()
+            except Exception:
+                pass
+        vite_process = None
+        
+    try:
+        ps_command = (
+            "Get-CimInstance Win32_Process -Filter \"name = 'node.exe'\" | "
+            "Where-Object { $_.CommandLine -like '*vite*' -and ($_.CommandLine -like '*client*' -or $_.CommandLine -like '*MonViewPhone*') } | "
+            "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+        )
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_command],
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+    except Exception as e:
+        print(f"Fallback stop vite server failed: {e}")
+
+
 def clean_up():
     global go_process
-
+    close_app_window()
+    stop_vite_dev_server()
     terminate_process(go_process)
     go_process = None
 
@@ -234,6 +387,38 @@ def restart_application(icon, item):
         creationflags=subprocess.CREATE_NO_WINDOW
     )
     sys.exit(0)
+
+
+def switch_mode(icon, mode):
+    global current_mode
+    
+    if mode == "normal":
+        dist_html = os.path.join(os.path.dirname(os.path.abspath(__file__)), "client", "dist", "index.html")
+        if not os.path.exists(dist_html):
+            show_error_message(
+                "Chưa build frontend",
+                "Chưa build frontend. Vui lòng chạy:\n\ncd client && npm run build\n\ntrước khi khởi động ở Normal Mode."
+            )
+            return
+
+    if mode == current_mode:
+        close_app_window()
+        ensure_mode_ready(mode)
+        open_app(mode=mode)
+        return
+
+    save_launcher_mode(mode)
+    current_mode = mode
+
+    close_app_window()
+
+    if mode == "normal":
+        stop_vite_dev_server()
+    else:
+        start_vite_dev_server()
+
+    ensure_mode_ready(mode)
+    open_app(mode=mode)
 
 
 def create_tray_icon():
@@ -257,6 +442,21 @@ def create_tray_icon():
 
     menu = TrayMenu(
         TrayMenuItem("Open", open_app, default=True),
+        TrayMenuItem(
+            "Khởi chạy mode",
+            TrayMenu(
+                TrayMenuItem(
+                    "Dev Mode",
+                    lambda icon, item: switch_mode(icon, "dev"),
+                    checked=lambda item: current_mode == "dev"
+                ),
+                TrayMenuItem(
+                    "Normal Mode",
+                    lambda icon, item: switch_mode(icon, "normal"),
+                    checked=lambda item: current_mode == "normal"
+                ),
+            )
+        ),
         TrayMenuItem("Restart", restart_application),
         TrayMenuItem("Exit", exit_application)
     )
@@ -265,19 +465,7 @@ def create_tray_icon():
     return icon
 
 
-def main():
-    if not acquire_single_instance_lock():
-        return
-
-    # Check index.html build first
-    dist_html = os.path.join(os.path.dirname(os.path.abspath(__file__)), "client", "dist", "index.html")
-    if not os.path.exists(dist_html):
-        show_error_message(
-            "Chưa build frontend",
-            "Chưa build frontend. Vui lòng chạy:\n\ncd client && npm run build\n\ntrước khi khởi động ứng dụng."
-        )
-        sys.exit(1)
-
+def ensure_mode_ready(mode):
     start_backend()
     
     # Wait for backend to listen
@@ -293,6 +481,35 @@ def main():
             "Lỗi khởi động",
             "Không thể kết nối đến server-go.exe ở cổng 11000 sau 15 giây."
         )
+        return False
+
+    if mode == "normal":
+        stop_vite_dev_server()
+    elif mode == "dev":
+        if not start_vite_dev_server():
+            return False
+            
+    return True
+
+
+def main():
+    global current_mode
+    if not acquire_single_instance_lock():
+        return
+
+    current_mode = load_launcher_mode()
+
+    # Check index.html build first (only in normal mode)
+    if current_mode == "normal":
+        dist_html = os.path.join(os.path.dirname(os.path.abspath(__file__)), "client", "dist", "index.html")
+        if not os.path.exists(dist_html):
+            show_error_message(
+                "Chưa build frontend",
+                "Chưa build frontend. Vui lòng chạy:\n\ncd client && npm run build\n\ntrước khi khởi động ứng dụng."
+            )
+            sys.exit(1)
+
+    if not ensure_mode_ready(current_mode):
         sys.exit(1)
 
     # Perform data safety check
@@ -306,7 +523,7 @@ def main():
         sys.exit(1)
 
     # Open Chrome App
-    open_app()
+    open_app(mode=current_mode)
     
     icon = create_tray_icon()
     icon.run()

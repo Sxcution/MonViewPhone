@@ -199,3 +199,24 @@ Chúng tôi đã tách nút điều khiển gộp trước đây thành hai nút
 5. **Kết quả**:
    - Đã gỡ bỏ state trung gian không cần thiết (`physicalScreenButtonMode`).
    - Biên dịch thành công 100% cả frontend (`npm run build`) và backend Go (`go build ./...`). Giao diện Quick Controls hiển thị 2 nút riêng biệt đúng chuẩn.
+
+## Tối ưu hóa thực thi đồng thời (Concurrency) cho các Quick/Global Actions
+
+Chúng tôi đã loại bỏ hoàn toàn các cơ chế giới hạn luồng, hàng chờ (batching/queue/concurrency limit 8) hoặc vòng lặp chạy tuần tự trên các nhóm thiết bị để toàn bộ thiết bị nhận lệnh đồng thời ngay lập tức:
+
+1. **Loại bỏ giới hạn luồng & Tuần tự hóa**:
+   - Thay thế helper `runWithConcurrency(..., 8)` và vòng lặp `for...of` tuần tự bằng `Promise.allSettled` trên toàn bộ các phương thức hành động nhóm.
+   - Các hành động được tối ưu bao gồm:
+     * `runQuickAdbCommands`: Thực thi các nút tắt nhanh (Tắt tiếng, Mở âm thanh, Max âm lượng...).
+     * `runPhysicalScreenOffWithStayAwake`: Lệnh tắt màn hình vật lý + Stay Awake đồng loạt.
+     * `runStayAwakeForTargets`: Lệnh Stay Awake đồng loạt.
+     * Quick action `Bật màn hình` (`physicalScreenOn`): Bật màn hình vật lý đồng loạt.
+     * Quick action `Power key` (`screenOff`): Gửi tín hiệu nút nguồn (thử qua socket trước, adb fallback sau) đồng loạt.
+     * `runGlobalAdbCommand`: Chạy lệnh ADB tuỳ chỉnh do user nhập cho tất cả thiết bị được chọn.
+     * `handleSetWallpaperForDevices`: Tạo và đặt hình nền hiển thị số máy đồng loạt.
+
+2. **Đảm bảo thứ tự lệnh trong từng thiết bị đơn lẻ**:
+   - Mặc dù chạy đồng thời trên các thiết bị khác nhau, thứ tự thực thi của các câu lệnh bên trong cùng một thiết bị vẫn được bảo đảm tuần tự để giữ đúng logic hoạt động (ví dụ: Mở âm thanh phải tắt DND trước rồi mới set volume; Tắt màn hình vật lý phải bật Stay Awake trước rồi mới display off).
+
+3. **Kết quả**:
+   - Đã biên dịch thành công 100% frontend (`npm run build`) và backend Go. Toàn bộ thiết bị được chọn sẽ phản hồi đồng thời ngay lập tức khi click nút.

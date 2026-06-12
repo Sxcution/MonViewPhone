@@ -330,6 +330,7 @@
     "app_icon_png": "assets/IconMonViewPhone.png",
     "app_icon_ico": "assets/IconMonViewPhone.ico",
     "favicon_ico": "client/public/favicon.ico",
-    "favicon_png": "client/public/favicon.png"
+    "favicon_png": "client/public/favicon.png",
+    "launcher_config": "launcher_config.json"
   }
 }

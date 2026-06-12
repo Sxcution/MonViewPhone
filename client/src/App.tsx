@@ -1733,31 +1733,17 @@ export function App() {
       const targets = quickCommandTargets()
       if (!targets.length) return
 
-      // Helper function for bounded concurrency
-      const runWithConcurrency = async <T,>(
-        items: T[],
-        limit: number,
-        worker: (item: T, index: number) => Promise<void>
-      ) => {
-        let nextIndex = 0
-        const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-          while (nextIndex < items.length) {
-            const index = nextIndex++
-            await worker(items[index], index)
+      await Promise.allSettled(
+        targets.map(async (udid) => {
+          for (const command of commands) {
+            try {
+              await runAdbCommandApi(wsServer, udid, command)
+            } catch {
+              // ignore quick action failures; server returns output in UI logs elsewhere.
+            }
           }
         })
-        await Promise.all(workers)
-      }
-
-      await runWithConcurrency(targets, 8, async (udid) => {
-        for (const command of commands) {
-          try {
-            await runAdbCommandApi(wsServer, udid, command)
-          } catch {
-            // ignore quick action failures; server returns output in UI logs elsewhere.
-          }
-        }
-      })
+      )
     },
     [quickCommandTargets, wsServer]
   )
@@ -1767,13 +1753,16 @@ export function App() {
   const runStayAwakeForTargets = useCallback(
     async (targets: string[]) => {
       if (!targets.length) return
-      for (const udid of targets) {
-        await runAdbCommandApi(
-          wsServer,
-          udid,
-          'adb shell settings put global stay_on_while_plugged_in 7'
+
+      await Promise.allSettled(
+        targets.map((udid) =>
+          runAdbCommandApi(
+            wsServer,
+            udid,
+            'adb shell settings put global stay_on_while_plugged_in 7'
+          )
         )
-      }
+      )
     },
     [wsServer]
   )
@@ -1782,32 +1771,35 @@ export function App() {
   const runPhysicalScreenOffWithStayAwake = useCallback(
     async (targets: string[]) => {
       if (!targets.length) return
-      for (const udid of targets) {
-        try {
-          await runAdbCommandApi(
-            wsServer,
-            udid,
-            'adb shell settings put global stay_on_while_plugged_in 7'
-          )
-        } catch (err) {
-          console.warn('[stay-awake] failed', udid, err)
-        }
 
-        try {
-          const d = androidDeviceMap[udid]
-          if (d) {
-            const sdk = parseInt(d['ro.build.version.sdk'] || '0', 10)
-            const isAndroid15 = sdk >= 35 || d['ro.build.version.release'] === '15'
-            if (isAndroid15 || udid === 'R3CR200MXTR' || udid === 'RFCRB1CQ2VE') {
-              console.warn('[display-power] skipped physical off for Android 15 / blocked udid', udid)
-              continue
-            }
+      await Promise.allSettled(
+        targets.map(async (udid) => {
+          try {
+            await runAdbCommandApi(
+              wsServer,
+              udid,
+              'adb shell settings put global stay_on_while_plugged_in 7'
+            )
+          } catch (err) {
+            console.warn('[stay-awake] failed', udid, err)
           }
-          await setDeviceDisplayPower(wsServer, udid, 'off')
-        } catch (err) {
-          console.warn('[display-power] physical off failed', udid, err)
-        }
-      }
+
+          try {
+            const d = androidDeviceMap[udid]
+            if (d) {
+              const sdk = parseInt(d['ro.build.version.sdk'] || '0', 10)
+              const isAndroid15 = sdk >= 35 || d['ro.build.version.release'] === '15'
+              if (isAndroid15 || udid === 'R3CR200MXTR' || udid === 'RFCRB1CQ2VE') {
+                console.warn('[display-power] skipped physical off for Android 15 / blocked udid', udid)
+                return
+              }
+            }
+            await setDeviceDisplayPower(wsServer, udid, 'off')
+          } catch (err) {
+            console.warn('[display-power] physical off failed', udid, err)
+          }
+        })
+      )
     },
     [wsServer, androidDeviceMap]
   )
@@ -1900,28 +1892,30 @@ export function App() {
       if (!udids.length) return
       setGlobalAdbStatus(`Đang đặt hình nền cho ${udids.length} thiết bị...`)
       try {
-        for (const udid of udids) {
-          const num = getTileNumber(udid, 0)
-          const padded = String(num).padStart(2, '0')
-          
-          const canvas = document.createElement('canvas')
-          canvas.width = 1080
-          canvas.height = 1920
-          const ctx = canvas.getContext('2d')
-          if (ctx) {
-            ctx.fillStyle = '#000000'
-            ctx.fillRect(0, 0, canvas.width, canvas.height)
+        await Promise.allSettled(
+          udids.map(async (udid) => {
+            const num = getTileNumber(udid, 0)
+            const padded = String(num).padStart(2, '0')
             
-            ctx.fillStyle = '#2BD03C'
-            ctx.font = 'bold 450px Roboto, sans-serif'
-            ctx.textAlign = 'center'
-            ctx.textBaseline = 'middle'
-            ctx.fillText(padded, canvas.width / 2, canvas.height / 2)
-            
-            const base64Image = canvas.toDataURL('image/png')
-            await setDeviceWallpaper(wsServer, udid, base64Image)
-          }
-        }
+            const canvas = document.createElement('canvas')
+            canvas.width = 1080
+            canvas.height = 1920
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+              ctx.fillStyle = '#000000'
+              ctx.fillRect(0, 0, canvas.width, canvas.height)
+              
+              ctx.fillStyle = '#2BD03C'
+              ctx.font = 'bold 450px Roboto, sans-serif'
+              ctx.textAlign = 'center'
+              ctx.textBaseline = 'middle'
+              ctx.fillText(padded, canvas.width / 2, canvas.height / 2)
+              
+              const base64Image = canvas.toDataURL('image/png')
+              await setDeviceWallpaper(wsServer, udid, base64Image)
+            }
+          })
+        )
         setGlobalAdbStatus('Đã đặt hình nền xong')
       } catch (err: any) {
         setGlobalAdbStatus(`Lỗi đặt hình nền: ${err?.message || err}`)
@@ -1936,17 +1930,29 @@ export function App() {
       .split(/\r?\n/)
       .map(cmd => cmd.trim())
       .filter(Boolean)
+
     const targets = quickCommandTargets()
     if (!commands.length || !targets.length) return
+
     setGlobalAdbRunning(true)
-    setGlobalAdbStatus(`Đang chạy ADB trên ${targets.length} thiết bị...`)
+    setGlobalAdbStatus(`Đang chạy ADB đồng thời trên ${targets.length} thiết bị...`)
+
     try {
-      for (const udid of targets) {
-        for (const command of commands) {
-          await runAdbCommandApi(wsServer, udid, command)
-        }
+      const results = await Promise.allSettled(
+        targets.map(async (udid) => {
+          for (const command of commands) {
+            await runAdbCommandApi(wsServer, udid, command)
+          }
+        })
+      )
+
+      const failedCount = results.filter(r => r.status === 'rejected').length
+      if (failedCount > 0) {
+        setGlobalAdbStatus(`Đã chạy ADB xong, ${failedCount}/${targets.length} thiết bị có lỗi`)
+      } else {
+        setGlobalAdbStatus('Đã chạy lệnh ADB xong')
       }
-      setGlobalAdbStatus('Đã chạy lệnh ADB xong')
+
       setGlobalAdbCommand('')
       setGlobalAdbOpen(false)
     } catch (err: any) {
@@ -2500,9 +2506,9 @@ export function App() {
           if (!targets.length) return
           setGlobalAdbStatus(`Đang bật màn hình vật lý cho ${targets.length} thiết bị...`)
           try {
-            for (const udid of targets) {
-              await setDeviceDisplayPower(wsServer, udid, 'on')
-            }
+            await Promise.allSettled(
+              targets.map((udid) => setDeviceDisplayPower(wsServer, udid, 'on'))
+            )
             setGlobalAdbStatus(`Đã bật màn hình vật lý cho ${targets.length} thiết bị`)
           } catch (err: any) {
             setGlobalAdbStatus(`Lỗi bật màn hình vật lý: ${err?.message || err}`)
@@ -2531,37 +2537,24 @@ export function App() {
           const targets = quickCommandTargets()
           if (!targets.length) return
 
-          // Helper function for bounded concurrency
-          const runWithConcurrency = async <T,>(
-            items: T[],
-            limit: number,
-            worker: (item: T, index: number) => Promise<void>
-          ) => {
-            let nextIndex = 0
-            const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-              while (nextIndex < items.length) {
-                const index = nextIndex++
-                await worker(items[index], index)
+          await Promise.allSettled(
+            targets.map(async (udid) => {
+              const resolved = getTargetsByUdids([udid])
+              if (resolved.length > 0 && resolved[0].ws && resolved[0].ws.readyState === WebSocket.OPEN) {
+                try {
+                  const down = encodeKeycodeMessage(KeyEventAction.DOWN, 26)
+                  const up = encodeKeycodeMessage(KeyEventAction.UP, 26)
+                  resolved[0].ws.send(down)
+                  resolved[0].ws.send(up)
+                  return
+                } catch {
+                  await runAdbCommandApi(wsServer, udid, 'adb shell input keyevent 26')
+                  return
+                }
               }
-            })
-            await Promise.all(workers)
-          }
-
-          await runWithConcurrency(targets, 8, async (udid) => {
-            const resolved = getTargetsByUdids([udid])
-            if (resolved.length > 0 && resolved[0].ws && resolved[0].ws.readyState === WebSocket.OPEN) {
-              try {
-                const down = encodeKeycodeMessage(KeyEventAction.DOWN, 26)
-                const up = encodeKeycodeMessage(KeyEventAction.UP, 26)
-                resolved[0].ws.send(down)
-                resolved[0].ws.send(up)
-              } catch {
-                await runAdbCommandApi(wsServer, udid, 'adb shell input keyevent 26')
-              }
-            } else {
               await runAdbCommandApi(wsServer, udid, 'adb shell input keyevent 26')
-            }
-          })
+            })
+          )
         }
       },
       mute: {
