@@ -567,6 +567,40 @@ export function App() {
     saveHotkeySettingToBackend('monviewphone:device-account-hotkey', newHotkey);
   }, []);
 
+  // ===== OVERLAY HEADER HOTKEY =====
+  // Hotkey này toggle deviceAccountOverlayOpen (bảng overlay nổi trên từng tile)
+  const [overlayHeaderHotkey, setOverlayHeaderHotkey] = useState(() => localStorage.getItem('monviewphone:overlay-header-hotkey') || '');
+
+  const handleOverlayHeaderHotkeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const lowerKey = e.key.toLowerCase();
+    if (['control', 'alt', 'shift', 'meta'].includes(lowerKey)) {
+      return;
+    }
+
+    const parts: string[] = [];
+    if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
+    if (e.altKey) parts.push('Alt');
+    if (e.shiftKey) parts.push('Shift');
+
+    let keyName = e.key;
+    if (keyName === ' ') {
+      keyName = 'Space';
+    } else if (keyName.length === 1) {
+      keyName = keyName.toUpperCase();
+    } else {
+      keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
+    }
+    parts.push(keyName);
+
+    const newHotkey = parts.join('+');
+    setOverlayHeaderHotkey(newHotkey);
+    localStorage.setItem('monviewphone:overlay-header-hotkey', newHotkey);
+    saveHotkeySettingToBackend('monviewphone:overlay-header-hotkey', newHotkey);
+  }, []);
+
   // ===== SYNC TIME HOTKEY STATES & GLOBAL LISTENER =====
   const [syncTimeHotkey, setSyncTimeHotkey] = useState(() => localStorage.getItem('monviewphone:sync-time-hotkey') || '');
   const [hotkeySectionOpen, setHotkeySectionOpen] = useState(false);
@@ -2200,6 +2234,52 @@ export function App() {
       } as any)
     }
   }, [deviceAccountOverlayOpen, accountManagerOpen])
+
+  // ===== OVERLAY HEADER HOTKEY LISTENER =====
+  // Toggle alwaysShowHeader (nút "Overlay Header" trong modal Quản lý tài khoản)
+  // Cùng logic với button toggle trong DeviceAccountOverlay.tsx: flip localStorage + dispatch event
+  useEffect(() => {
+    const handleOverlayHeaderHotkey = (e: KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement | null;
+
+      // Bỏ qua khi đang hover/focus trên phone tile
+      const isHoveringPhone =
+        document.querySelector('.tile:hover') !== null ||
+        document.querySelector('.viewerCanvas:hover') !== null ||
+        document.querySelector('#viewerPanel:hover') !== null;
+
+      const isCanvasFocused =
+        active &&
+        (active.tagName === 'CANVAS' || active.classList.contains('viewerCanvas'));
+
+      if (isHoveringPhone || isCanvasFocused) return;
+
+      // Bỏ qua khi focus vào input thường (ngoài overlay)
+      if (
+        active &&
+        (['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) || active.isContentEditable) &&
+        !active.closest('.dav-overlay') &&
+        !active.closest('.tile-account-overlay')
+      ) {
+        return;
+      }
+
+      const hotkeyStr = localStorage.getItem('monviewphone:overlay-header-hotkey') || '';
+      if (hotkeyStr && matchesHotkey(e, hotkeyStr)) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Toggle alwaysShowHeader: đọc giá trị hiện tại, flip, lưu, dispatch event
+        const current = localStorage.getItem('monviewphone:dav-always-show-header') === 'true';
+        const nextVal = !current;
+        localStorage.setItem('monviewphone:dav-always-show-header', String(nextVal));
+        saveBackendSetting('monviewphone:dav-always-show-header', String(nextVal));
+        window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+      }
+    };
+
+    window.addEventListener('keydown', handleOverlayHeaderHotkey, { capture: true, passive: false });
+    return () => window.removeEventListener('keydown', handleOverlayHeaderHotkey, { capture: true } as any);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -3893,6 +3973,54 @@ export function App() {
                       )}
                     </div>
 
+                    {/* Overlay Header hotkey row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: '220px' }}>
+                      <div style={{ fontSize: 12, color: 'var(--md-muted)', marginRight: 4 }}>
+                        Overlay Header:
+                      </div>
+                      <input
+                        id="input_overlay_header_hotkey"
+                        type="text"
+                        placeholder="Nhấn tổ hợp phím..."
+                        readOnly
+                        value={overlayHeaderHotkey}
+                        onKeyDown={handleOverlayHeaderHotkeyInputKeyDown}
+                        style={{
+                          background: '#0a0a0a',
+                          color: 'var(--md-info)',
+                          border: '1px solid #444',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          fontSize: 12,
+                          width: 140,
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          outline: 'none',
+                        }}
+                      />
+                      {overlayHeaderHotkey && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOverlayHeaderHotkey('');
+                            localStorage.removeItem('monviewphone:overlay-header-hotkey');
+                            saveHotkeySettingToBackend('monviewphone:overlay-header-hotkey', '');
+                          }}
+                          style={{
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '6px',
+                            color: '#ff8080',
+                            padding: '6px 10px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Xoá
+                        </button>
+                      )}
+                    </div>
 
                   </div>
 

@@ -42,7 +42,7 @@ export interface AccountNotice {
   startDate?: number | null;
 }
 
-export type AccountHistoryAction = 'Live' | 'Die' | 'Risk' | 'Open Nearby' | 'Open Nearby People' | 'Risk Nearby';
+export type AccountHistoryAction = 'Live' | 'Die' | 'Risk' | 'Open Nearby' | 'Open Nearby People' | 'Risk Nearby' | 'Login';
 
 export interface AccountHistoryEntry {
   id: string;

@@ -2,7 +2,7 @@ import type { Account, WeChatAccount } from '@/lib/deviceAccountVault';
 
 export type NearbyAccountState = 'eligible' | 'upcoming' | 'none';
 
-export const NEARBY_UPCOMING_DAYS = 3;
+export const NEARBY_UPCOMING_DAYS = 7;
 export const NEARBY_ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 export const NEARBY_UPCOMING_MS = NEARBY_UPCOMING_DAYS * 24 * 60 * 60 * 1000;
 

@@ -9641,7 +9641,7 @@ select.dav-input {
   border-radius: 8px;
   padding: 6px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-  z-index: 10000;
+  z-index: 25000 !important;
   min-width: 160px;
   display: flex;
   flex-direction: column;
@@ -9920,6 +9920,155 @@ select.dav-input {
 .tile-account-overlay.is-header-only .dav-header-name-wrapper .header-name-input,
 .tile-account-overlay.is-header-only .dav-header-name-wrapper .header-name-display {
   font-size: 11px !important;
+}
+
+/* --- Overlay Header: Ẩn số máy --- */
+.tile-account-overlay.is-header-only.header-hide-order .dav-order {
+  display: none !important;
+}
+
+/* --- Overlay Header: Nền tối giản (chỉ nền sau nội dung) --- */
+.tile-account-overlay.is-header-only.header-minimal-bg {
+  background: transparent !important;
+  border-bottom: none !important;
+  height: 32px !important;
+  overflow: visible !important;
+}
+
+/* Header trở thành container định vị tuyệt đối */
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-panel-header {
+  background: transparent !important;
+  height: 32px !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  overflow: visible !important;
+}
+
+/* Badge số tài khoản: sát trái */
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-panel-title-left {
+  position: absolute !important;
+  left: 4px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  z-index: 1 !important;
+  overflow: visible !important;
+}
+
+/* Ẩn dav-order trong title-left (chỉ giữ badge số TK) */
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-panel-title-left .dav-order {
+  background: #000 !important;
+  border-radius: 4px !important;
+  padding: 1px 4px !important;
+}
+
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-total-badge {
+  background: #000 !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  
+  /* Giảm kích thước nền đen tối đa để ôm sát chữ số */
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+}
+
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-total-badge.nearby-eligible,
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-total-badge.nearby-upcoming {
+  background: #000 !important;
+}
+
+/* Tên tài khoản: căn giữa tuyệt đối */
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-header-name-wrapper {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  flex: none !important;
+  max-width: 55% !important;
+  min-width: 0 !important;
+  background: #000 !important;
+  border-radius: 4px !important;
+  padding: 1px 3px !important;
+  z-index: 1 !important;
+  overflow: visible !important;
+}
+
+/* Không thu nhỏ tên tài khoản khi bật Nền tối giản */
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-header-name-wrapper .header-name-input,
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-header-name-wrapper .header-name-display {
+  font-size: 13px !important;
+}
+
+/* Bell badge thông báo: sát phải */
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-panel-title-right {
+  position: absolute !important;
+  right: 4px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 1 !important;
+  overflow: visible !important;
+}
+
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-bell-btn {
+  background: #000 !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  
+  /* Đè lại kích thước mặc định để không bị thu nhỏ */
+  height: 24px !important;
+  width: 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-bell-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+/* --- Fix hiển thị Dropdown khi bật Nền tối giản --- */
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-title-account-dropdown {
+  position: absolute !important;
+  top: 100% !important;
+  left: 0 !important;
+  right: auto !important;
+  width: 220px !important;
+  max-height: 250px !important;
+  overflow-y: auto !important;
+  margin-top: 8px !important;
+  z-index: 21000 !important;
+  background: var(--md-card) !important;
+  border: 1px solid var(--md-border) !important;
+  box-shadow: var(--md-shadow-panel) !important;
+  border-radius: var(--md-radius-sm, 8px) !important;
+}
+
+.tile-account-overlay.is-header-only.header-minimal-bg .dav-name-status-dropdown {
+  position: absolute !important;
+  top: 100% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  margin-top: 8px !important;
+  z-index: 21000 !important;
+  background: var(--md-card) !important;
+  border: 1px solid var(--md-border) !important;
+  box-shadow: var(--md-shadow-panel) !important;
+  border-radius: var(--md-radius-sm, 8px) !important;
+  min-width: 110px !important;
+}
+
+/* Tăng z-index của overlay khi có dropdown mở để hiển thị đè lên các tile xung quanh */
+.tile-account-overlay.is-header-only.header-minimal-bg:has(.dav-title-account-dropdown),
+.tile-account-overlay.is-header-only.header-minimal-bg:has(.dav-name-status-dropdown) {
+  z-index: 20000 !important;
 }
 
 /* --- Header Name Input styles --- */

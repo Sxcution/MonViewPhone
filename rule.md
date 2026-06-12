@@ -288,6 +288,13 @@ All UI lists, grids, or containers that display dynamic data (such as profile li
 - Use a container with a fixed or maximum height (`height` or `max-height`).
 - Use `display: flex` and `flex-direction: column` on the column/panel wrappers, and set `height: 100%` on these column wrappers if they reside within grid cells or flex cells.
 - Set `flex: 1; min-height: 0; overflow-y: auto;` on the list/grid content wrappers to force scrollbars to appear and prevent them from stretching their parent containers.
+
+### 13. Tooltip Display Rules
+
+All tooltips in the application must follow these rules:
+- They must display immediately on hover without any delay.
+- Use custom floating tooltips (such as portals with `.dav-bell-tooltip-floating` style that follow the mouse cursor) instead of browser-native `title` attribute tooltips to ensure a premium UI/UX experience.
+
 ## Scrcpy Server Build Rules
 
 Thu m?c server-go/scrcpy-decompiled l� source code Java c� ch?a do?n code ClipboardManager.java d� du?c fix tham s? deviceId + Looper c?a Android 14. 

@@ -155,6 +155,104 @@ function formatCountdown(diffMs: number): string {
   return `${days} ngày`;
 }
 
+const getLocalDateString = (timestamp: number) => {
+  const d = new Date(timestamp);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const getCalendarDaysDiff = (ts1: number, ts2: number) => {
+  const d1 = new Date(getLocalDateString(ts1));
+  const d2 = new Date(getLocalDateString(ts2));
+  const diffTime = d2.getTime() - d1.getTime();
+  return Math.round(diffTime / (1000 * 60 * 60 * 24));
+};
+
+const countConsecutiveDays = (startDateStr: string, allDates: string[]) => {
+  let count = 0;
+  const current = new Date(startDateStr);
+  while (true) {
+    const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+    if (allDates.includes(dateStr)) {
+      count++;
+      current.setDate(current.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return count;
+};
+
+const formatStreakDays = (totalDays: number): string => {
+  if (totalDays < 30) {
+    return `${totalDays} ngày`;
+  }
+  
+  const years = Math.floor(totalDays / 365);
+  const remDays = totalDays % 365;
+  const months = Math.floor(remDays / 30);
+  const days = remDays % 30;
+  
+  let result = '';
+  if (years > 0) {
+    result += `${years}N`;
+  }
+  if (months > 0) {
+    result += `${months}T`;
+  }
+  if (days > 0) {
+    result += `${days}n`;
+  }
+  return result;
+};
+
+function renderLoginStreakDot(account: Account) {
+  const loginDates = Array.from(new Set(
+    (account.history || [])
+      .filter(h => h.action === 'Login')
+      .map(h => getLocalDateString(h.timestamp))
+  )).sort();
+
+  const todayStr = getLocalDateString(Date.now());
+  const yesterdayStr = getLocalDateString(Date.now() - 24 * 60 * 60 * 1000);
+
+  let showDot = false;
+  let dotColor = 'white';
+  let tooltipText = '';
+  let streakDays = 0;
+
+  if (loginDates.includes(todayStr)) {
+    showDot = true;
+    streakDays = countConsecutiveDays(todayStr, loginDates);
+    dotColor = streakDays >= 3 ? 'green' : 'white';
+    tooltipText = `Đăng nhập vào hôm nay: ${formatStreakDays(streakDays)}`;
+  } else if (loginDates.includes(yesterdayStr)) {
+    showDot = true;
+    streakDays = countConsecutiveDays(yesterdayStr, loginDates);
+    dotColor = streakDays >= 3 ? 'green' : 'white';
+    tooltipText = `Đăng nhập vào ngày trước: ${formatStreakDays(streakDays)}`;
+  }
+
+  if (!showDot) {
+    return null;
+  }
+
+  return (
+    <span 
+      className={`dav-account-state-dot streak-${dotColor}`}
+      style={{
+        width: '6px',
+        height: '6px',
+        borderRadius: '50%',
+        flexShrink: 0,
+        backgroundColor: dotColor === 'green' ? '#22c55e' : '#ffffff',
+        display: 'inline-block',
+        marginRight: '6px',
+        cursor: 'pointer'
+      }}
+    />
+  );
+}
+
 function getElapsedDaysSince(ts?: number | null): number {
   if (!ts) return 0;
   return Math.max(0, Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24)));
@@ -298,11 +396,38 @@ function renderNearbyAccountIcon(account: Account) {
   }
 
   if (state === 'upcoming') {
-    return (
-      <span title="Còn tối đa 3 ngày để hiển thị Nearby People" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, marginLeft: 4 }}>
-        <MapPin size={13} color="#f97316" />
-      </span>
-    );
+    const wc = account as WeChatAccount;
+    if (wc.nearbyPeopleDueDate) {
+      const diffMs = wc.nearbyPeopleDueDate - Date.now();
+      let text = '';
+      if (diffMs > 0) {
+        if (diffMs >= 24 * 60 * 60 * 1000) {
+          const days = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+          text = `${days} ngày`;
+        } else {
+          const hours = Math.ceil(diffMs / (60 * 60 * 1000));
+          text = `${hours} Giờ`;
+        }
+      }
+      return (
+        <span 
+          title={`Còn ${text} để hiển thị Nearby People`} 
+          style={{ 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            flexShrink: 0, 
+            marginLeft: 4,
+            gap: '2px',
+            fontSize: '9px',
+            color: '#f97316',
+            fontWeight: 'bold'
+          }}
+        >
+          <MapPin size={13} color="#f97316" />
+          <span>{text}</span>
+        </span>
+      );
+    }
   }
 
   return null;
@@ -549,6 +674,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     }
   }, [nearbyAutoOpenEnabled, activeTab, panelHasNearbyRelevantAccount]);
   const [accountActionMenu, setAccountActionMenu] = useState<{ x: number; y: number; sourceUdid: string; account: Account } | null>(null);
+  const [accountHoverTooltip, setAccountHoverTooltip] = useState<{ x: number; y: number; account: Account } | null>(null);
   const accountActionMenuRef = useRef<HTMLDivElement>(null);
   const moveInputRef = useRef<HTMLInputElement>(null);
   const [moveModal, setMoveModal] = useState<{ sourceUdid: string, account: Account } | null>(null);
@@ -777,7 +903,13 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const noticeTooltipText = useMemo(() => {
     return accountsWithNotices.map(acc => {
       const accName = acc.name || acc.phone || acc.nickname || 'Không tên';
-      return `${accName} : ${acc.notice?.title || ''}`;
+      const title = acc.notice?.title || '';
+      if (acc.notice?.dueDate) {
+        const diffMs = acc.notice.dueDate - Date.now();
+        const timeStr = diffMs <= 0 ? 'đã đến hạn' : formatCountdown(diffMs);
+        return `${accName} : ${title} (${timeStr})`;
+      }
+      return `${accName} : ${title}`;
     }).join('\n');
   }, [accountsWithNotices]);
 
@@ -1013,8 +1145,34 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   };
 
   const handleSetMain = (id: string) => {
+    const today = Date.now();
+    const todayStr = getLocalDateString(today);
+
+    const updatedPlatforms = { ...data.platforms };
+    if (updatedPlatforms[activeTab]) {
+      updatedPlatforms[activeTab] = updatedPlatforms[activeTab].map(acc => {
+        if (acc.id === id) {
+          const history = acc.history || [];
+          const alreadyLoggedInToday = history.some(
+            h => h.action === 'Login' && getLocalDateString(h.timestamp) === todayStr
+          );
+          if (!alreadyLoggedInToday) {
+            return {
+              ...acc,
+              history: [
+                ...history,
+                { id: generateHistoryId(), action: 'Login' as AccountHistoryAction, timestamp: today }
+              ]
+            };
+          }
+        }
+        return acc;
+      });
+    }
+
     const newData = {
       ...data,
+      platforms: updatedPlatforms,
       selectedAccountByPlatform: {
         ...data.selectedAccountByPlatform,
         [activeTab]: id
@@ -1091,6 +1249,28 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     return true; // Đủ 1 năm, chưa bật Nearby -> xanh dương
   }, [selectedAccount, activeTab, isEligibleNearby]);
 
+  const getAccountStatusTooltip = (acc: Account | null) => {
+    if (!acc) return undefined;
+    if (acc.status === 'Die') {
+      if (acc.dieAt) {
+        return `Tài khoản đã Die : ${getElapsedDaysSince(acc.dieAt)} Ngày`;
+      }
+      return 'Tài khoản đã Die';
+    }
+    if (acc.status === 'Risk') {
+      if (acc.notice?.dueDate) {
+        const diffMs = acc.notice.dueDate - Date.now();
+        const days = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+        return `Tài khoản risk: ${days} Ngày`;
+      }
+      return 'Tài khoản risk';
+    }
+    if (acc.status === 'Unverified') {
+      return 'Tài khoản chưa Verify';
+    }
+    return undefined;
+  };
+
   const shieldColor = useMemo(() => {
     if (!selectedAccount) return '#fff';
     if (selectedAccount.status === 'Unverified') {
@@ -1140,7 +1320,17 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           className="dav-panel-title-left"
           onMouseDown={handleOpenViewerMiddleClick}
           onAuxClick={handleOpenViewerAuxClick}
-          title="Click con lăn để mở màn hình lớn"
+          onMouseEnter={(e) => {
+            if (selectedAccount) {
+              setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
+            }
+          }}
+          onMouseMove={(e) => {
+            if (selectedAccount) {
+              setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
+            }
+          }}
+          onMouseLeave={() => setAccountHoverTooltip(null)}
         >
           <span className={`dav-order ${panelHasNearbyEligibleAccount ? 'dav-order-nearby-eligible' : ''}`}>
             {order.toString().padStart(2, '0')}
@@ -1153,13 +1343,23 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 panelNearbyAccountState === 'eligible' ? 'nearby-eligible' : '',
                 panelNearbyAccountState === 'upcoming' ? 'nearby-upcoming' : '',
               ].filter(Boolean).join(' ')}
-              title="Tong so tai khoan tren dien thoai nay"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 setAccountTitleDropdownOpen(v => !v);
                 setPlatformDropdownOpen(false);
               }}
+              onMouseEnter={(e) => {
+                if (selectedAccount) {
+                  setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
+                }
+              }}
+              onMouseMove={(e) => {
+                if (selectedAccount) {
+                  setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
+                }
+              }}
+              onMouseLeave={() => setAccountHoverTooltip(null)}
             >
               {totalAccounts}
             </button>
@@ -1173,7 +1373,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       key={account.id}
                       type="button"
                       className={`dav-title-account-item ${selectedAccount?.id === account.id ? 'active' : ''}`}
-                      title={account.wechatLaunchProfile ? `Đã set: User ${account.wechatLaunchProfile.userId} - ${account.wechatLaunchProfile.name} / ${getAppTypeLabel(account.wechatLaunchProfile.appType)}` : undefined}
+                      onMouseEnter={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account })}
+                      onMouseMove={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account })}
+                      onMouseLeave={() => setAccountHoverTooltip(null)}
                       onMouseDown={(e) => {
                         if (e.button === 1) {
                           e.preventDefault();
@@ -1219,7 +1421,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                         setAccountActionMenu({ x: e.clientX, y: e.clientY, sourceUdid: accUdid, account });
                       }}
                     >
-                      <span className={`dav-account-state-dot ${getAccountStatusClass(account)}`} />
+                      {renderLoginStreakDot(account)}
                       <span
                         className="dav-title-account-name"
                         style={{
@@ -1231,12 +1433,13 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                         }}
                       >
                         {account.name || account.phone || account.nickname || 'Không tên'}
-                        {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
                         {renderUnverifiedIcon(account)}
                         {renderAccountNoticeIcon(account)}
                         {renderAppTypeIcon(account.appType)}
+                        {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
                         {account.wechatLaunchProfile && (
                           <span 
+                            title={`Đã set: User ${account.wechatLaunchProfile.userId} - ${account.wechatLaunchProfile.name} / ${getAppTypeLabel(account.wechatLaunchProfile.appType)}`}
                             style={{ 
                               fontSize: '8px', 
                               background: 'rgba(34, 197, 94, 0.2)', 
@@ -1244,7 +1447,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                               padding: '1px 4px', 
                               borderRadius: '4px',
                               marginLeft: '4px',
-                              fontWeight: 'bold'
+                              fontWeight: 'bold',
+                              cursor: 'pointer'
                             }}
                           >
                             U{account.wechatLaunchProfile.userId}
@@ -1262,19 +1466,42 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
         {selectedAccount && (
           <div className="dav-header-name-wrapper">
             {showAccountOverlay && (
-              <Shield 
-                size={12} 
-                color={shieldColor} 
-                style={{ flexShrink: 0, cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowNameStatusDropdown(!showNameStatusDropdown);
+              <span 
+                style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+                onMouseEnter={(e) => {
+                  if (selectedAccount) {
+                    setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
+                  }
                 }}
-              />
+                onMouseMove={(e) => {
+                  if (selectedAccount) {
+                    setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
+                  }
+                }}
+                onMouseLeave={() => setAccountHoverTooltip(null)}
+              >
+                <Shield 
+                  size={12} 
+                  color={shieldColor} 
+                  style={{ cursor: 'pointer' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowNameStatusDropdown(!showNameStatusDropdown);
+                  }}
+                />
+              </span>
             )}
             <div 
               className="header-name-display-wrapper"
               onClick={handleNameClick}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setAccountActionMenu({ x: e.clientX, y: e.clientY, sourceUdid: udid, account: selectedAccount });
+              }}
+              onMouseEnter={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount })}
+              onMouseMove={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount })}
+              onMouseLeave={() => setAccountHoverTooltip(null)}
             >
               <span 
                 className="header-name-display"
@@ -1404,12 +1631,84 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   style={{
                     left: bellTooltip.x,
                     top: bellTooltip.y,
+                    transform: bellTooltip.y < 160 ? 'translate(-50%, 15px)' : undefined
                   }}
                 >
                   {noticeTooltipText}
                 </div>,
                 document.body
               )}
+              {accountHoverTooltip && (() => {
+                const acc = accountHoverTooltip.account;
+                const loginHistory = (acc.history || []).filter(h => h.action === 'Login');
+                
+                let line1 = '';
+                if (loginHistory.length === 0) {
+                  line1 = 'Offline: Chưa từng đăng nhập';
+                } else {
+                  const lastLoginTs = Math.max(...loginHistory.map(h => h.timestamp));
+                  const diffDays = getCalendarDaysDiff(lastLoginTs, Date.now());
+                  
+                  const lastLoginDate = new Date(lastLoginTs);
+                  const day = String(lastLoginDate.getDate()).padStart(2, '0');
+                  const month = String(lastLoginDate.getMonth() + 1).padStart(2, '0');
+                  const year = lastLoginDate.getFullYear();
+                  const currentYear = new Date().getFullYear();
+                  const formattedLastLogin = year === currentYear ? `${day}/${month}` : `${day}/${month}/${year}`;
+                  
+                  const todayStr = getLocalDateString(Date.now());
+                  const yesterdayStr = getLocalDateString(Date.now() - 24 * 60 * 60 * 1000);
+                  const loginDates = Array.from(new Set(
+                    loginHistory.map(h => getLocalDateString(h.timestamp))
+                  )).sort();
+
+                  if (diffDays === 0) {
+                    const streakDays = countConsecutiveDays(todayStr, loginDates);
+                    line1 = `Online: Hôm nay (${formatStreakDays(streakDays)})`;
+                  } else if (diffDays === 1) {
+                    const streakDays = countConsecutiveDays(yesterdayStr, loginDates);
+                    line1 = `Online: Hôm qua (${formatStreakDays(streakDays)})`;
+                  } else if (diffDays >= 2 && diffDays <= 7) {
+                    line1 = `Offline: ${diffDays} ngày (Online lần cuối: ${formattedLastLogin})`;
+                  } else {
+                    line1 = `Offline: Online lần cuối: ${formattedLastLogin}`;
+                  }
+                }
+
+                const statusTooltip = getAccountStatusTooltip(acc);
+                let noticeTooltip = '';
+                if (acc.notice) {
+                  const title = acc.notice.title || '';
+                  if (acc.notice.dueDate) {
+                    const diffMs = acc.notice.dueDate - Date.now();
+                    const timeStr = diffMs <= 0 ? 'đã đến hạn' : formatCountdown(diffMs);
+                    noticeTooltip = `Thông báo: ${title} (${timeStr})`;
+                  } else {
+                    noticeTooltip = `Thông báo: ${title}`;
+                  }
+                }
+
+                const details: string[] = [];
+                if (statusTooltip) details.push(statusTooltip);
+                if (noticeTooltip) details.push(noticeTooltip);
+                
+                const detailsText = details.join('\n');
+                const fullTooltipText = detailsText ? `${line1}\n${detailsText}` : line1;
+
+                return ReactDOM.createPortal(
+                  <div
+                    className="dav-bell-tooltip-floating"
+                    style={{
+                      left: accountHoverTooltip.x,
+                      top: accountHoverTooltip.y,
+                      transform: accountHoverTooltip.y < 160 ? 'translate(-50%, 15px)' : undefined
+                    }}
+                  >
+                    {fullTooltipText}
+                  </div>,
+                  document.body
+                );
+              })()}
             </>
           )}
         </div>
@@ -1759,10 +2058,10 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                         }}
                       >
                         {a.name || a.phone || a.nickname || 'Tài khoản'}
-                        {activeTab === 'wechat' && renderNearbyAccountIcon(a)}
                         {renderUnverifiedIcon(a)}
                         {renderAccountNoticeIcon(a)}
                         {renderAppTypeIcon(a.appType)}
+                        {activeTab === 'wechat' && renderNearbyAccountIcon(a)}
                       </span>
                       <div className={`dav-ctx-submenu ${activeLevel3 === a.id ? 'is-open' : ''}`}>
                         <button
@@ -2222,13 +2521,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              setMoveModal({ sourceUdid: accountActionMenu.sourceUdid, account: accountActionMenu.account });
-              setMoveError('');
+              const textToCopy = accountActionMenu.account.nickname || '';
+              navigator.clipboard.writeText(textToCopy);
               setAccountActionMenu(null);
-              setAccountTitleDropdownOpen(false);
             }}
           >
-            Di chuyen tai khoan
+            Copy ID ( User name)
           </button>
 
           {activeTab === 'wechat' && (
@@ -2330,6 +2628,21 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               ))}
             </div>
           </div>
+
+          <button
+            type="button"
+            className="dav-ctx-item"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMoveModal({ sourceUdid: accountActionMenu.sourceUdid, account: accountActionMenu.account });
+              setMoveError('');
+              setAccountActionMenu(null);
+              setAccountTitleDropdownOpen(false);
+            }}
+          >
+            Di chuyển tài khoản
+          </button>
         </div>,
         document.body
       )}
@@ -2465,6 +2778,10 @@ export function DeviceAccountOverlay({
   const [hideQR, setHideQR] = useState(() => localStorage.getItem('monviewphone:dav-hide-qr') === 'true');
   const [hideCreatedAt, setHideCreatedAt] = useState(() => localStorage.getItem('monviewphone:dav-hide-created-at') === 'true');
   const [alwaysShowHeader, setAlwaysShowHeader] = useState(() => localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
+  // Ẩn số máy (dav-order) khi Overlay Header mode
+  const [headerHideOrder, setHeaderHideOrder] = useState(() => localStorage.getItem('monviewphone:dav-header-hide-order') === 'true');
+  // Chế độ nền tối thiểu (chỉ nền sau nội dung) khi Overlay Header
+  const [headerMinimalBg, setHeaderMinimalBg] = useState(() => localStorage.getItem('monviewphone:dav-header-minimal-bg') === 'true');
 
   useEffect(() => {
     const handleSettingsUpdate = () => {
@@ -2473,6 +2790,8 @@ export function DeviceAccountOverlay({
       setHideQR(localStorage.getItem('monviewphone:dav-hide-qr') === 'true');
       setHideCreatedAt(localStorage.getItem('monviewphone:dav-hide-created-at') === 'true');
       setAlwaysShowHeader(localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
+      setHeaderHideOrder(localStorage.getItem('monviewphone:dav-header-hide-order') === 'true');
+      setHeaderMinimalBg(localStorage.getItem('monviewphone:dav-header-minimal-bg') === 'true');
     };
     window.addEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
     return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
@@ -3049,7 +3368,7 @@ export function DeviceAccountOverlay({
             </div>
 
             <div className="dav-settings-section">
-              <div className="dav-settings-section-title">Ẩn/Hiển</div>
+              <div className="dav-settings-section-title">Ẩn trong Panel</div>
 
               {/* btn_dav_settings_hide_phone : Bật/Tắt ẩn số điện thoại */}
               <div className="dav-settings-toggle-row">
@@ -3113,6 +3432,58 @@ export function DeviceAccountOverlay({
                     type="button"
                     className={`dav-toggle-switch ${hideCreatedAt ? 'on' : ''}`}
                     onClick={() => updateHideSetting('monviewphone:dav-hide-created-at', !hideCreatedAt, setHideCreatedAt)}
+                  >
+                    <div className="dav-toggle-knob" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Overlay Header settings */}
+            <div className="dav-settings-section">
+              <div className="dav-settings-section-title">Overlay Header</div>
+              <div style={{ fontSize: 11, color: 'var(--md-muted)', marginBottom: 8 }}>Áp dụng khi Overlay Header đang bật</div>
+
+              {/* btn_dav_settings_header_hide_order : Ẩn số máy trên header strip */}
+              <div className="dav-settings-toggle-row">
+                <span className="dav-settings-toggle-label">Ẩn số máy</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: headerHideOrder ? 'var(--md-info)' : 'var(--md-muted)' }}>
+                    {headerHideOrder ? 'On' : 'Off'}
+                  </span>
+                  <button
+                    type="button"
+                    className={`dav-toggle-switch ${headerHideOrder ? 'on' : ''}`}
+                    onClick={() => {
+                      const next = !headerHideOrder;
+                      setHeaderHideOrder(next);
+                      localStorage.setItem('monviewphone:dav-header-hide-order', String(next));
+                      saveBackendSetting('monviewphone:dav-header-hide-order', String(next));
+                      window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+                    }}
+                  >
+                    <div className="dav-toggle-knob" />
+                  </button>
+                </div>
+              </div>
+
+              {/* btn_dav_settings_header_minimal_bg : Nền tối thiểu - chỉ sau nội dung */}
+              <div className="dav-settings-toggle-row" style={{ marginTop: 8 }}>
+                <span className="dav-settings-toggle-label">Hiển thị: Nền tối giản</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: headerMinimalBg ? 'var(--md-info)' : 'var(--md-muted)' }}>
+                    {headerMinimalBg ? 'On' : 'Off'}
+                  </span>
+                  <button
+                    type="button"
+                    className={`dav-toggle-switch ${headerMinimalBg ? 'on' : ''}`}
+                    onClick={() => {
+                      const next = !headerMinimalBg;
+                      setHeaderMinimalBg(next);
+                      localStorage.setItem('monviewphone:dav-header-minimal-bg', String(next));
+                      saveBackendSetting('monviewphone:dav-header-minimal-bg', String(next));
+                      window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+                    }}
                   >
                     <div className="dav-toggle-knob" />
                   </button>

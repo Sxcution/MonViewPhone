@@ -262,6 +262,201 @@ Chúng tôi đã bổ sung các submenu phân loại tài khoản (Main, Clone, 
 2. **Submenu Phân Loại Trên Card Tài Khoản Đang Chọn**:
    - Thêm trực tiếp tuỳ chọn **Phân Loại** vào menu ngữ cảnh chính (khi click chuột phải vào card tài khoản đang chọn).
    - Menu con này cho phép người dùng đổi nhanh phân loại của tài khoản hiện tại mà không cần phải tìm kiếm và hover vào tài khoản đó trong danh sách `Tài Khoản`.
+   - Cập nhật hàm `saveDeviceAccountVault` trong [client/src/lib/deviceAccountVault.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/deviceAccountVault.ts) để ghi dữ liệu vào cả `localStorage` làm cache và tự động gọi API POST đồng bộ lên backend ngay lập tức.
+   - Giữ nguyên cơ chế `setInterval` trong `client/src/main.tsx` để làm lớp đồng bộ dự phòng phụ cho các trạng thái khác, không sửa đổi/bỏ đi trong bước này. (Đã được nâng cấp triệt để ở bước sau).
+
+3. **Kiểm thử tự động và biên dịch**:
+   - Biên dịch frontend (`npm run build`) và backend Go (`go build -o server-go.exe`) đều thành công 100%.
+   - Chạy kịch bản test tự động `test_backend_guard.py` thành công:
+     - Thử gửi dữ liệu chứa 70 tài khoản WeChat -> bị từ chối với HTTP 400 (Chính xác).
+     - Thử gửi dữ liệu thiếu Emma Zhao -> bị từ chối với HTTP 400 (Chính xác).
+     - Thêm tài khoản test mới thành công, kiểm tra dữ liệu trên SQLite lưu thành công (106 accounts).
+     - Xoá tài khoản test thành công, dữ liệu khôi phục về 105 accounts.
+
+## Hoàn thiện cơ chế Explicit Save và Loại bỏ sync ngầm (setInterval)
+
+Chúng tôi đã chuyển hoàn toàn cơ chế đồng bộ dữ liệu của MonViewPhone sang mô hình **Explicit Save (Lưu tường minh)** 100%, đồng thời loại bỏ hoàn toàn vòng lặp quét định kỳ (`setInterval`) ở frontend:
+
+1. **Chuẩn hoá helper ở Client (`client/src/lib/backendSettings.ts`)**:
+   - Khắc phục lỗi dependency vòng (circular import) bằng cách sử dụng `import type { VaultData }` từ `deviceAccountVault.ts`.
+   - Viết các hàm helper đồng bộ an toàn:
+     - `saveBackendSetting(key, value)` và `saveBackendSettings(patch)`: Kiểm tra kỹ key rỗng, value null/undefined. Chỉ cho phép giá trị rỗng cho các key trong allowlist (`syncTimeHotkey`, `monviewphone:sync-time-hotkey`, `monviewphone:device-account-hotkey`).
+     - `saveTileOrderToBackend(value)`: Đảm bảo payload là mảng có độ dài >= 35.
+     - `saveTileOrderNumbersToBackend(value)`: Đảm bảo payload là đối tượng có số lượng keys >= 35.
+     - `saveAutomationSettingToBackend`, `saveVisualAlertSettingToBackend`, `saveSyncTimeSettingToBackend`, `saveHotkeySettingToBackend`: Kiểm tra chặt chẽ các key hợp lệ trước khi cho phép gửi POST lên backend.
+
+2. **Áp dụng Explicit Save cho các nhóm chức năng**:
+   - **Thứ tự thiết bị (Tile Order)**: Tích hợp `saveTileOrderToBackend` và `saveTileOrderNumbersToBackend` vào các `useEffect` của `client/src/store/useTileOrder.ts` ngay khi ghi `localStorage`.
+   - **Tự động hoá (Automation)**: Cập nhật `saveSavedMacros`, `saveAppActions`, `saveDeviceProfiles` trong `client/src/lib/automationData.ts` và `saveAutomationSettings` trong `client/src/components/AutomationModal.tsx`, `client/src/components/AutomationPanel.tsx` để đồng bộ trực tiếp lên backend.
+   - **Thời gian đồng bộ (Sync Time/Sync Macro)**: Cập nhật `saveSyncTimeSettings` trong `client/src/lib/syncTimeSettings.ts` và `saveSyncMacroSettings` trong `client/src/lib/syncMacroSettings.ts` để đồng bộ ngay lập tức.
+   - **Visual Alert**: Cập nhật `saveVisualAlertConfig` trong `client/src/lib/visualAlertEngine.ts` để đồng bộ cấu hình vùng quét lên backend.
+   - **Tổ hợp phím (Hotkey)**: Cập nhật các hàm gán phím nóng và xoá phím nóng trong `client/src/App.tsx` để đồng bộ tức thì lên backend (hỗ trợ lưu giá trị rỗng khi xoá).
+
+3. **Gia cố bảo vệ phía Backend (`server-go/rest.go`)**:
+   - Nâng cấp handler `/api/goog/device/settings` phương thức `POST`:
+     - Chặn payload rỗng `{}`.
+     - Chặn key rỗng hoặc giá trị null.
+     - Nếu POST chứa `tileOrder`, kiểm tra định dạng mảng và độ dài >= 35.
+     - Nếu POST chứa `tileOrderNumbers`, kiểm tra định dạng map và số lượng keys >= 35.
+     - Đảm bảo merge cấu hình cũ và patch mới an toàn, không làm mất các trường cấu hình khác.
+
+4. **Ngắt bỏ hoàn toàn vòng lặp quét sync ngầm (`client/src/main.tsx`)**:
+   - Loại bỏ hoàn toàn hằng số `SYNCED_KEYS`, đối tượng cache `lastSyncedValues` và vòng lặp `setInterval(..., 1500)`.
+   - Giữ lại đầy đủ cơ chế tải cấu hình ban đầu từ backend (bootstrap settings), kiểm tra an toàn dữ liệu đầu vào (validateBackendSettings), và ghi đè an toàn vào `localStorage` lúc tải trang.
+
+5. **Kiểm thử tự động**:
+   - Biên dịch thành công 100% frontend (`npm run build`) và backend Go.
+   - Chạy kiểm thử tự động thành công 100% các trường hợp: chặn payload rỗng, chặn key rỗng/null, chặn tileOrder/tileOrderNumbers thiếu máy (<35), kiểm tra lưu và xoá hotkey thành công.
+
+## Di chuyển dữ liệu sang Data.db làm Source of Truth duy nhất
+
+Chúng tôi đã hoàn thành quá trình chuyển đổi toàn diện để biến cơ sở dữ liệu `server-go/data/Data.db` thành nguồn dữ liệu đáng tin cậy duy nhất (Source of Truth) cho thông tin tài khoản và thứ tự hiển thị của thiết bị:
+
+1. **Chuẩn hoá SQLite Schema & Bảo vệ thứ tự máy (`server-go/account_db.go`)**:
+   - Bỏ lệnh `DELETE FROM devices` trong quá trình đồng bộ `syncDeviceAccountVaultToDB` nhằm bảo toàn cột `device_order` (thứ tự hiển thị số máy) tránh bị mất mát khi lưu tài khoản.
+   - Thêm cơ chế tự động sửa lỗi (auto-repair) trong `getDeviceOrderFromDB`: Nếu thứ tự thiết bị thiếu, tự động đánh số tuần tự `1..N` theo danh sách UDID hiện có trong cơ sở dữ liệu và cập nhật lại vào DB.
+
+2. **Triển khai API đồng bộ Database trực tiếp (`server-go/rest.go` & `main.go`)**:
+   - Đăng ký endpoint `/api/goog/device/account-vault` (GET/POST) thực hiện việc đọc/ghi dữ liệu account vault trực tiếp từ cơ sở dữ liệu SQLite, tích hợp cơ chế bảo vệ backend chặn hạ cấp (Refuse downgrade) dưới 35 thiết bị, dưới 104 WeChat accounts hoặc mất Emma Zhao.
+   - Đăng ký endpoint `/api/goog/device/order` (GET/POST) để lưu trữ trực tiếp số thứ tự máy của thiết bị vào cột `device_order` trong bảng `devices`.
+
+3. **Chuyển `/api/goog/device/settings` thành Compatibility Endpoint**:
+   - Cập nhật handler GET `/api/goog/device/settings` để tự động dựng dữ liệu account vault, `tileOrder` và `tileOrderNumbers` trực tiếp từ SQLite trước khi gửi về client (kể cả khi file `settings.json` hoàn toàn không tồn tại hoặc bị lỗi).
+   - Cập nhật POST `/api/goog/device/settings` loại bỏ hoàn toàn các trường dữ liệu `monviewphone:device-account-vault` và `tileOrderNumbers` ra khỏi tệp `settings.json` khi ghi đè, đồng thời điều hướng việc lưu trữ các khoá này sang DB.
+
+4. **Đồng bộ phía Frontend (`client/`)**:
+   - Cập nhật `client/src/lib/backendSettings.ts` để `saveDeviceAccountVaultToBackend` gửi yêu cầu POST trực tiếp đến endpoint chuyên biệt `/api/goog/device/account-vault` thay vì API cấu hình chung.
+   - Điều chỉnh logic khởi động trong `client/src/main.tsx` để luôn ghi đè và đồng bộ dữ liệu `localStorage` từ backend settings.
+   - Nới lỏng kiểm tra `tileOrder`/`tileOrderNumbers` trong `main.tsx` (`validateBackendSettings`): Không coi việc thiếu/sai độ dài các trường này là lỗi chết làm crash app nếu cơ sở dữ liệu tài khoản (`vaultResult.valid`) khoẻ mạnh và có thể repair được.
+
+5. **Launcher Preflight Auto-Repair (`run.pyw`)**:
+   - Sửa đổi kịch bản kiểm tra an toàn dữ liệu trước khi mở app: Chỉ chặn ứng dụng khi thông tin cốt lõi thất bại (devices < 35, WeChat accounts < 104 hoặc mất Emma Zhao).
+   - Không còn coi việc thiếu `tileOrder`/`tileOrderNumbers` là lỗi chết chặn app.
+
+6. **Loại bỏ ghi ngược từ API Order**:
+   - Cập nhật `/api/goog/device/order` POST trong [rest.go](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/rest.go) không ghi ngược trường `tileOrderNumbers` vào `settings.json` nữa.
+
+7. **Kết quả kiểm thử**:
+   - Đã biên dịch thành công 100% frontend (`npm run build`) và backend Go (`go build -o server-go.exe`).
+   - Chạy kịch bản tích hợp `test_fallback.py` và `test_launcher_preflight.py` thành công tốt đẹp:
+     - Khi xoá/thiếu `settings.json`, API GET `/api/goog/device/settings` vẫn tự động dựng đầy đủ `tileOrder`, `tileOrderNumbers` và account vault từ SQLite.
+     - Tệp `settings.json` hoàn toàn sạch sẽ, không còn chứa các trường dữ liệu lớn hoặc nhạy cảm của tài khoản và thứ tự hiển thị sau khi cập nhật order.
+     - Launcher khởi động và tự repair dữ liệu thành công không gặp lỗi chặn đứng.
+
+## Cập nhật định dạng thời gian đếm ngược dưới 1 ngày
+
+Chúng tôi đã cập nhật giao diện đếm ngược trong Overlay Account để thân thiện hơn với người dùng khi thời gian còn lại ngắn:
+
+1. **Hiển thị theo giờ khi thời gian < 24 giờ**:
+   - Thêm hàm helper `formatCountdown` trong [DeviceAccountOverlay.tsx](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/DeviceAccountOverlay.tsx) để tự động chuyển sang hiển thị định dạng giờ (ví dụ: `23 giờ`, `22 giờ`...) nếu thời gian còn lại dưới 1 ngày (24 giờ), thay vì hiển thị tròn số "1 ngày" như trước đây. Nếu thời gian lớn hơn hoặc bằng 24 giờ, định dạng hiển thị vẫn giữ nguyên là `X ngày`.
+
+2. **Áp dụng cho các thành phần**:
+   - **Thông báo**: Khi thời gian đến hạn thông báo dưới 24 giờ, hiển thị số giờ còn lại (ví dụ: `: 15 giờ`).
+   - **Quét QR**: Khi thời gian đếm ngược lượt quét QR dưới 24 giờ, hiển thị số giờ (ví dụ: `(8 giờ)`).
+   - **Đủ điều kiện Active Nearby People**: Khi thời gian đếm ngược chờ đủ điều kiện Nearby People dưới 24 giờ, hiển thị số giờ (ví dụ: `20 giờ`).
+
+3. **Kết quả kiểm thử**:
+   - Đã biên dịch thành công 100% frontend (`npm run build`). Giao diện đếm ngược đã sẵn sàng hoạt động mượt mà.
+
+## Điều chỉnh vị trí nút Setting trong Sidebar cấu hình bên phải
+
+Chúng tôi đã thực hiện thay đổi layout để nút Setting nằm ở vị trí hợp lý hơn:
+
+1. **Di chuyển nút System Settings sát lề phải**:
+   - Cập nhật cả 2 khối định nghĩa CSS `.btn-setting` trong tệp [styles.css](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/styles.css) từ `left: 58px` sang `right: 12px; left: auto;`.
+   - Giúp nút ghim gờ (Pin) giữ nguyên vị trí ở góc trên bên trái, còn nút bánh răng Setting (mở cài đặt hệ thống) được đẩy sang sát góc trên bên phải của bảng cấu hình bên phải (`rightConfigPanel`).
+
+2. **Kết quả**:
+   - Biên dịch frontend thành công 100% (`npm run build`). Nút Setting đã được dịch chuyển sang sát lề phải chuẩn xác, tạo giao diện cân đối và thoáng mắt.
+
+## Tách nút Quick Controls "Bật/Tắt màn hình vật lý" thành 2 nút riêng biệt
+
+Chúng tôi đã tách nút điều khiển gộp trước đây thành hai nút độc lập để tăng tính kiểm soát và tránh nhầm lẫn trạng thái:
+
+1. **Tách các Action Id & Cập nhật Di cư (Migration) cấu hình**:
+   - Loại bỏ `physicalScreenToggle` trong [App.tsx](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/App.tsx).
+   - Thêm 2 Id mới là `physicalScreenOn` và `physicalScreenOff`.
+   - Cập nhật hàm `loadQuickActionOrder()` tự động nhận diện nếu cấu hình cũ của người dùng trong `localStorage` có chứa `physicalScreenToggle`, hệ thống sẽ tự động tách nó ra và điền 2 nút mới vào vị trí tương ứng mà không làm ảnh hưởng đến thứ tự các nút khác.
+
+2. **Cài đặt Nút "Bật Màn Hình" (`physicalScreenOn`)**:
+   - Label: `Bật màn hình`
+   - Icon: Biểu tượng `Monitor` (Màn hình bật) được import từ `lucide-react`.
+   - Chức năng: Chỉ thực hiện bật màn hình vật lý của các thiết bị được chọn (gọi `setDeviceDisplayPower(..., 'on')`), không kích hoạt Stay Awake và không tự đổi trạng thái nút.
+
+3. **Cài đặt Nút "Tắt Màn Hình" (`physicalScreenOff`)**:
+   - Label: `Tắt màn hình`
+   - Icon: Biểu tượng `MonitorOff` (Màn hình tắt).
+   - Chức năng: Chạy adb lệnh bật Stay Awake trước (`stay_on_while_plugged_in 7`), sau đó gọi lệnh tắt màn hình vật lý (thông qua hàm helper `runPhysicalScreenOffWithStayAwake(targets)`).
+
+4. **Bảo toàn cơ chế tự động**:
+   - Giữ nguyên cơ chế tự động tắt màn hình + stay awake khi cắm thiết bị hoặc app load (`autoScreenPrepare` dùng `useEffect`).
+
+5. **Kết quả**:
+   - Đã gỡ bỏ state trung gian không cần thiết (`physicalScreenButtonMode`).
+   - Biên dịch thành công 100% cả frontend (`npm run build`) và backend Go (`go build ./...`). Giao diện Quick Controls hiển thị 2 nút riêng biệt đúng chuẩn.
+
+## Tối ưu hóa thực thi đồng thời (Concurrency) cho các Quick/Global Actions
+
+Chúng tôi đã loại bỏ hoàn toàn các cơ chế giới hạn luồng, hàng chờ (batching/queue/concurrency limit 8) hoặc vòng lặp chạy tuần tự trên các nhóm thiết bị để toàn bộ thiết bị nhận lệnh đồng thời ngay lập tức:
+
+1. **Loại bỏ giới hạn luồng & Tuần tự hóa**:
+   - Thay thế helper `runWithConcurrency(..., 8)` và vòng lặp `for...of` tuần tự bằng `Promise.allSettled` trên toàn bộ các phương thức hành động nhóm.
+   - Các hành động được tối ưu bao gồm:
+     * `runQuickAdbCommands`: Thực thi các nút tắt nhanh (Tắt tiếng, Mở âm thanh, Max âm lượng...).
+     * `runPhysicalScreenOffWithStayAwake`: Lệnh tắt màn hình vật lý + Stay Awake đồng loạt.
+     * `runStayAwakeForTargets`: Lệnh Stay Awake đồng loạt.
+     * Quick action `Bật màn hình` (`physicalScreenOn`): Bật màn hình vật lý đồng loạt.
+     * Quick action `Power key` (`screenOff`): Gửi tín hiệu nút nguồn (thử qua socket trước, adb fallback sau) đồng loạt.
+     * `runGlobalAdbCommand`: Chạy lệnh ADB tuỳ chỉnh do user nhập cho tất cả thiết bị được chọn.
+     * `handleSetWallpaperForDevices`: Tạo và đặt hình nền hiển thị số máy đồng loạt.
+
+2. **Đảm bảo thứ tự lệnh trong từng thiết bị đơn lẻ**:
+   - Mặc dù chạy đồng thời trên các thiết bị khác nhau, thứ tự thực thi của các câu lệnh bên trong cùng một thiết bị vẫn được bảo đảm tuần tự để giữ đúng logic hoạt động (ví dụ: Mở âm thanh phải tắt DND trước rồi mới set volume; Tắt màn hình vật lý phải bật Stay Awake trước rồi mới display off).
+
+3. **Kết quả**:
+   - Đã biên dịch thành công 100% frontend (`npm run build`) và backend Go. Toàn bộ thiết bị được chọn sẽ phản hồi đồng thời ngay lập tức khi click nút.
+
+## Tính năng Luôn hiện Header và Di chuyển Tên tài khoản lên Header của Panel Quản lý tài khoản
+
+Chúng tôi đã bổ sung tuỳ chọn "Luôn hiện Header" và di chuyển ô nhập Tên tài khoản WeChat lên thanh Header của overlay thiết bị:
+
+1. **Tuỳ chọn "Luôn hiện Header" (Header Always On)**:
+   - Thêm toggle cấu hình **Luôn hiện Header** vào trong modal **Cài đặt Quản lý tài khoản** (mục **Ẩn/Hiển**).
+   - Thiết lập key cấu hình kỹ thuật chuẩn `alwaysShowHeader` (được lưu và đồng bộ dưới khoá `'monviewphone:dav-always-show-header'`).
+   - Cập nhật [Tile.tsx](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/tile/Tile.tsx) lắng nghe sự kiện thay đổi cài đặt ẩn/hiển để mount overlay và thiết lập CSS class động: `.tile-account-overlay.is-header-only`.
+   - Cập nhật [styles.css](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/styles.css) để khi ở chế độ `.is-header-only`, overlay sẽ chỉ có chiều cao cố định `28px` bám ở trên cùng và ẩn phần thân `.dav-panel-body` đi.
+   - **Đồng bộ hiển thị Dropdown khi overlay ẩn**: Thiết lập `overflow: visible !important` cho cả `.tile-account-overlay.is-header-only` và `.dav-panel` để khi người dùng click vào tên hoặc badge ở header, dropdown danh sách tài khoản vẫn hiển thị nổi lên phía trên màn hình scrcpy thay vì bị che khuất. Vùng màn hình scrcpy phía dưới vẫn nhận tương tác chuột bình thường từ người dùng.
+
+2. **Di chuyển và tối ưu hóa tương tác Tên tài khoản trên Header**:
+   - Di chuyển ô nhập tên tài khoản (kèm icon `Shield` bảo mật và dropdown đổi trạng thái tài khoản) từ thân card `.dav-account-card` (trong `.dav-panel-body`) lên thanh tiêu đề `.dav-panel-header`, nằm giữa tiêu đề máy bên trái và nút danh sách tài khoản bên phải.
+   - Loại bỏ ô nhập tên tài khoản cũ trong `.dav-account-card` để tránh trùng lặp.
+   - Thêm kiểu dáng CSS (`.dav-header-name-wrapper` và `.header-name-input`) hiển thị trong suốt, không viền, tự động co giãn (`flex: 1`) và thu nhỏ chữ khi ở trên tile thiết bị.
+   - *Ẩn icon Shield*: Icon hình khiên bảo mật (`Shield`) chỉ hiển thị khi Overlay đang mở (`showAccountOverlay === true`), tức là khi tắt/thu nhỏ overlay về chế độ `Header Always On` thì icon Shield sẽ tự động ẩn đi để tránh rối mắt trên tile.
+   - *Căn giữa Tên tài khoản*: Thiết lập `.dav-header-name-wrapper` sử dụng `justify-content: center` và `.header-name-input`, `.header-name-display` sử dụng `text-align: center` để căn lề giữa tuyệt đối cho tên và ô nhập.
+   - *Hiển thị Badge Location (MapPin)*: Hiển thị biểu tượng Location trực tiếp bên cạnh tên tài khoản trên header khi tài khoản đang chọn là WeChat (màu xanh dương `#3b82f6` nếu đủ điều kiện, màu cam `#f97316` nếu gần đủ điều kiện / upcoming tối đa 3 ngày).
+   - *Click 1 lần (Single-click)*: Kích hoạt hiển thị dropdown danh sách tài khoản ngay lập tức (không bị delay 250ms).
+   - *Click 2 lần (Double-click)*: Mở chế độ chỉnh sửa tên tài khoản trực tiếp (inline input editor) lập tức và tự động đóng dropdown danh sách tài khoản, hoàn thành chỉnh sửa khi nhấn `Enter` hoặc di chuột ra ngoài (`onBlur`).
+   - *Bỏ tiêu đề dropdown*: Loại bỏ dòng chữ tiêu đề `"Tai khoan nhom hien tai"` trong dropdown danh sách tài khoản để hiển thị danh sách các tài khoản gọn gàng và trực quan hơn.
+
+3. **Đồng bộ và Kiểm thử**:
+   - Đăng ký khoá `'monviewphone:dav-always-show-header'` vào danh sách `configKeysToSync` trong `main.tsx` để đồng bộ an toàn qua backend `settings.json`.
+   - Cập nhật hằng số, lớp CSS và biến trạng thái mới vào [naming_registry.json](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/naming_registry.json) và [project_structure.md](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/project_structure.md).
+   - Chạy `npm run build` biên dịch thành công 100% frontend mà không có lỗi.
+
+## Thêm Submenu Phân Loại Cho Các Tài Khoản Đã Tạo Sẵn
+
+Chúng tôi đã bổ sung các submenu phân loại tài khoản (Main, Clone, Secure Folder, Shelter) cho các tài khoản đã tạo sẵn ở mọi vị trí tương tác context menu để nâng cao trải nghiệm người dùng:
+
+1. **Submenu Phân Loại Trong Danh Sách Tài Khoản (`Tài Khoản`)**:
+   - Thay đổi cấu trúc menu danh sách tài khoản đã tạo sẵn trong submenu **Tài Khoản** của menu ngữ cảnh chính.
+   - Khi hover vào một tài khoản đã tạo sẵn trong danh sách, một submenu mới sẽ mở ra hiển thị hai tuỳ chọn:
+     - **Chọn tài khoản này**: Đặt tài khoản đó làm tài khoản chính cho thiết bị (`handleSetMain`).
+     - **Phân loại**: Khi hover vào đây, một sub-submenu (Level 4) sẽ mở ra hiển thị các tuỳ chọn phân loại tương ứng: **Main**, **Clone**, **Secure Folder**, **Shelter**.
+   - Việc tách riêng hai hành động giúp người dùng thao tác trực quan, tránh việc vô tình chọn tài khoản làm chính khi đang muốn đổi phân loại và ngược lại.
+
+2. **Submenu Phân Loại Trên Card Tài Khoản Đang Chọn**:
+- Thêm trực tiếp tuỳ chọn **Phân Loại** vào menu ngữ cảnh chính (khi click chuột phải vào card tài khoản đang chọn).
+   - Menu con này cho phép người dùng đổi nhanh phân loại của tài khoản hiện tại mà không cần phải tìm kiếm và hover vào tài khoản đó trong danh sách `Tài Khoản`.
 
 3. **Submenu Phân Loại Trong Menu Ngữ Cảnh Dropdown Tiêu Đề**:
    - Bổ sung tuỳ chọn **Phân loại** vào menu ngữ cảnh `accountActionMenu` (khi click chuột phải vào tài khoản trong dropdown danh sách tài khoản ở header của thiết bị).
@@ -271,3 +466,94 @@ Chúng tôi đã bổ sung các submenu phân loại tài khoản (Main, Clone, 
    - Cấu trúc lại các biến trạng thái submenu React (`showClassificationSubmenu` và `activeLevel4`) đảm bảo được reset sạch sẽ khi đóng menu ngữ cảnh để tránh lỗi giao diện.
    - Thêm hằng số vào `naming_registry.json` và cập nhật thông tin trong `project_structure.md`.
    - Biên dịch thành công 100% frontend bằng lệnh `npm run build`.
+
+## Sửa Lỗi Giao Diện Nền Tối Giản (Minimal Background)
+
+Chúng tôi đã khắc phục toàn bộ các lỗi hiển thị liên quan đến chế độ **Nền tối giản** (khi `header-minimal-bg` được bật) trên tiêu đề thiết bị:
+
+1. **Sửa lỗi hiển thị Dropdown & Context Menu**:
+   - Dropdown danh sách tài khoản (`.dav-title-account-dropdown`) và dropdown trạng thái tên (`.dav-name-status-dropdown`) được định vị lại bằng toạ độ tuyệt đối và chiều rộng cố định thích hợp (`220px` và `110px` tương ứng) thay vì bị co hẹp theo kích thước của badge số tài khoản.
+   - Tự động tăng `z-index` lên `20000 !important` cho `.tile-account-overlay` của thiết bị khi có bất kỳ dropdown nào mở bên trong (sử dụng selector `:has()`), đảm bảo các dropdown luôn nổi trên các tile thiết bị xung quanh.
+   - **Tooltip thông báo hướng xuống cho hàng trên cùng**: Cấu trúc lại Portal hiển thị tooltip nội dung thông báo. Nếu tọa độ Y của chuột/chuông `< 160px` (xác định động các tiêu đề thiết bị nằm ở hàng trên cùng của view), tooltip sẽ tự động đảo hướng hiển thị xuống **phía dưới** con trỏ chuột thay vì hiển thị phía trên, tránh bị che khuất hoặc tràn ra ngoài mép màn hình của trình duyệt.
+   - **Sửa bug Context Menu hiển thị dưới Dropdown**: Tăng `z-index` của `.dav-ctx-menu` (context menu được Portal vẽ ra bên ngoài body khi nhấp chuột phải) lên `25000 !important` (từ `10000`) để nó luôn hiển thị trên tất cả các tile và dropdown khác (kể cả tile có `z-index: 20000`).
+
+2. **Giữ nguyên kích thước chuẩn (Không thu nhỏ)**:
+   - Badge số tài khoản (`.dav-total-badge`), tên tài khoản (`.dav-header-name-wrapper`) và nút chuông thông báo (`.dav-bell-btn`) được giữ nguyên kích thước lớn chuẩn khi bật Nền tối giản (không bị thu nhỏ lại kích thước 11px / 18px như ở chế độ có nền thông thường).
+   - Tăng nhẹ chiều cao của header Nền tối giản lên `32px !important` (thay vì `28px`) để các phần tử kích thước lớn này được hiển thị cân đối và không bị chen chúc hay tràn viền.
+
+3. **Sửa lỗi viền ô vuông của Badge số tài khoản**:
+   - Loại bỏ quy tắc ghi đè `border-radius: 4px` của chế độ tối giản trên `.dav-total-badge`, phục hồi lại viền tròn hoàn hảo (`border-radius: 50% !important`) và loại bỏ padding thừa (`padding: 0 !important`).
+   - **Giảm kích thước nền đen của Badge tối đa**: Điều chỉnh kích thước của badge tròn `.dav-total-badge` thành `width: 20px !important; height: 20px !important; min-width: 20px !important; font-size: 12px !important` khi bật Nền tối giản để phần nền đen ôm sát khít lấy con số bên trong một cách tinh gọn nhất mà không làm thay đổi viền tròn.
+   - Đồng bộ hóa thiết kế bằng cách áp dụng viền tròn (`border-radius: 50% !important`) và loại bỏ padding cho nút chuông thông báo `.dav-bell-btn` để có vẻ ngoài đồng điệu, cao cấp.
+   - Giảm padding của `.dav-header-name-wrapper` xuống tối đa (`padding: 1px 3px !important;`) để phần nền đen ôm khít tên tài khoản một cách tinh giản nhất.
+   - Áp dụng các token màu chuẩn (`var(--md-card)`, `var(--md-border)`, `var(--md-shadow-panel)`) cho các dropdown mới được cấu trúc lại, tuyệt đối không dùng mã màu xám hardcode.
+
+4. **Xác thực & Biên dịch**:
+   - Chạy lệnh `npm run build` biên dịch thành công 100% frontend mà không có lỗi.
+
+## Cập Nhật Sao Chép, Cảnh Báo Trạng Thái Và Đếm Ngược Gần Đủ Điều Kiện Nearby
+
+Chúng tôi đã bổ sung và tối ưu hóa các tương tác quản lý tài khoản sau:
+
+1. **Thao Tác Copy ID (User name) & Sắp Xếp Context Menu**:
+   - Thêm tuỳ chọn **Copy ID ( User name)** lên đầu danh sách của menu ngữ cảnh tài khoản (nhấp chuột phải vào tài khoản ở dropdown tiêu đề). Khi nhấp vào, biệt danh (`nickname`) của tài khoản đó sẽ được tự động sao chép vào Clipboard hệ thống.
+   - Di chuyển tuỳ chọn **Di chuyển tài khoản** (trước đây ghi sai chính tả là "Di chuyen tai khoan") xuống dưới cùng của menu và cập nhật tên hiển thị chuẩn tiếng Việt có dấu.
+
+2. **Cập Nhật Tooltip Trạng Thái**:
+   - Gắn tooltip (`title`) cho cả biểu tượng hình Khiên bảo mật (`Shield`) và dòng chữ hiển thị tên tài khoản ở header.
+   - **Tài khoản Risk**: Tooltip hiển thị dạng `"Tài khoản risk: xx Ngày"` (với `xx` là số ngày đếm ngược lấy từ notice tự động của Risk).
+   - **Tài khoản Die**: Tooltip hiển thị dạng `"Tài khoản đã Die : xx Ngày"` (được tính toán từ mốc thời gian `dieAt`).
+
+3. **Cải Tiến Hiển Thị Đếm Ngược Nearby People**:
+   - **Tăng ngưỡng đếm ngược lên 7 ngày**: Tăng khoảng thời gian phát hiện trạng thái gần đủ điều kiện (`upcoming`) lên tối đa `7 ngày` (tăng từ 3 ngày) trong helper `deviceAccountNearby.ts`.
+   - **Sắp xếp lại vị trí các biểu tượng**: Chuyển vị trí hiển thị icon Location (MapPin) ra **sau cùng của tất cả các icon khác** (sau cả AppType icon).
+   - **Định dạng thời gian đếm ngược**:
+     - Hiển thị `"X ngày"` (ví dụ: `MapPin 6 ngày`) nếu thời gian đếm ngược $\ge 24$ giờ.
+     - Tự động chuyển sang định dạng `"X Giờ"` (chỉ hiển thị giờ, không hiển thị phút, ví dụ: `MapPin 23 Giờ`) nếu thời gian còn lại dưới 1 ngày (24 giờ) để đảm bảo thông tin ngắn gọn, trực quan.
+
+4. **Xác thực & Biên dịch**:
+   - Chạy lệnh `npm run build` biên dịch thành công 100% frontend mà không có bất kỳ lỗi TS/Vite nào.
+
+## Tích hợp Chấm Tròn Đăng Nhập Liên Tục (Streak) & Mở Nhanh Context Menu Trên Header
+
+Chúng tôi đã thực hiện các thay đổi sau để cải tiến logic hiển thị chấm tròn trạng thái và bổ sung tương tác mở nhanh menu trên Header:
+
+1. **Logic Chấm Tròn Đăng Nhập Liên Tục (Streak)**:
+   - Thêm `'Login'` vào danh sách hành động lịch sử tài khoản (`AccountHistoryAction`) trong [deviceAccountVault.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/deviceAccountVault.ts).
+   - Cập nhật hàm `handleSetMain` trong [DeviceAccountOverlay.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/DeviceAccountOverlay.tsx) để tự động thêm bản ghi lịch sử hành động `'Login'` kèm theo thời gian hiện tại vào lịch sử của tài khoản được chọn, nếu ngày hôm nay (tính theo giờ địa phương) tài khoản đó chưa được ghi nhận đăng nhập.
+   - Thay thế chấm tròn trạng thái cũ bên cạnh tên tài khoản trong dropdown thành chấm tròn đăng nhập liên tục:
+     - **Chấm tròn màu trắng**: Xuất hiện nếu tài khoản đã đăng nhập trong hôm nay hoặc hôm qua nhưng liên tục dưới 3 ngày.
+     - **Chấm tròn màu xanh lá**: Xuất hiện nếu tài khoản đã đăng nhập liên tục từ 3 ngày trở lên.
+     - **Không hiển thị**: Ẩn hoàn toàn chấm tròn nếu cả hôm nay và hôm qua tài khoản đều không được đăng nhập.
+     - **Tooltip chỉ dẫn**: Di chuột vào chấm tròn hiển thị:
+       - Nếu đã đăng nhập hôm nay: `"Đăng nhập vào hôm nay: X ngày"` (ví dụ: `"Đăng nhập vào hôm nay: 2 ngày"`).
+       - Nếu chưa đăng nhập hôm nay nhưng hôm qua có: `"Đăng nhập vào ngày trước: X ngày"`.
+     - **Định dạng số ngày rút gọn**: Khi đếm ngày đăng nhập liên tục lên đến hàng tháng, hàng năm:
+       - Định dạng bình thường dưới 30 ngày (ví dụ: `2 ngày`).
+       - Định dạng rút gọn khi đạt từ 30 ngày trở lên: 1 tháng 2 ngày $\rightarrow$ `1T2n`; 1 năm 2 tháng 2 ngày $\rightarrow$ `1N2T2n` (áp dụng theo thuật toán năm `365 ngày` và tháng `30 ngày`).
+
+2. **Hỗ Trợ Mở Nhanh Context Menu Trực Tiếp Trên Header**:
+   - Thêm sự kiện `onContextMenu` vào `header-name-display-wrapper` hiển thị tên tài khoản ở header của thiết bị.
+   - Khi chuột phải vào tên tài khoản trên header, menu hành động tài khoản (bao gồm sao chép nickname, gán profile Android, phân loại, di chuyển tài khoản) sẽ được hiển thị ngay lập tức dựa trên thông tin tài khoản được chọn và UDID của thiết bị, mà không cần người dùng phải click mở dropdown danh sách tài khoản trước.
+
+3. **Gộp Tooltip Dòng Tài Khoản & Chuyển Sang Chữ Online/Offline**:
+   - Chuyển đổi toàn bộ tooltip tĩnh trên dòng hiển thị tên tài khoản ở header (`header-name-display-wrapper`) và các item trong dropdown (`dav-title-account-item`) thành cơ chế **tooltip nổi tức thì (floating hover tooltip)** đi theo vị trí con trỏ chuột, không delay và có màu nền đồng bộ giống hệt tooltip của chuông thông báo (sử dụng Portal và class `.dav-bell-tooltip-floating`).
+   - Loại bỏ chữ "Đăng nhập" và chuyển đổi sang cách hiển thị "Online/Offline" ngắn gọn hơn:
+     - **Hàng 1 (Đăng nhập / Streak / Offline)**:
+       - Hôm nay: `"Online: Hôm nay (X ngày)"` (với X là streak liên tục).
+       - Hôm qua: `"Online: Hôm qua (X ngày)"` (với X là streak liên tục).
+       - Từ 2 đến 7 ngày không đăng nhập: `"Offline: X ngày (Online lần cuối: Ngày/Tháng)"`.
+       - Trên 7 ngày không đăng nhập: `"Offline: Online lần cuối: Ngày/Tháng"`.
+       - Lọc bỏ số năm khi hiển thị ngày tháng cùng năm hiện tại (ví dụ: `10/06`). Chỉ hiển thị năm khi lần đăng nhập cuối cùng thuộc năm trước (ví dụ: `10/12/2025`).
+     - **Hàng 2 (Cảnh báo trạng thái tài khoản)**:
+       - Tự động lấy logic tooltip cảnh báo có sẵn (Die, Risk, Unverified) từ `getAccountStatusTooltip` và ghép thành hàng thứ 2 trong tooltip nổi gộp chung.
+   - Di dời tooltip `"Đã set: User X..."` từ button cha của item dropdown sang gắn **riêng vào badge user (`U{userId}`)** để tránh đè lấp lên tooltip nổi chính của dòng tài khoản.
+
+4. **Quy Tắc Tooltip và Tinh Chỉnh Khác**:
+   - Bổ sung quy tắc vào [rule.md](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/rule.md#L291-L297): tất cả tooltip trong ứng dụng phải hiển thị tức thì, không delay, và ưu tiên sử dụng tooltip nổi tùy biến thay vì `title` mặc định của trình duyệt để có trải nghiệm UI/UX tốt nhất.
+   - Loại bỏ thuộc tính `title="Click con lăn để mở màn hình lớn"` ở container `.dav-panel-title-left` (khoảng dòng 1323) và `title="Tong so tai khoan..."` ở `.dav-total-badge` để tránh việc các tooltip mặc định của trình duyệt xuất hiện gây đè lấp, rối mắt khi người dùng di chuột chuẩn bị thao tác.
+   - Áp dụng tooltip nổi của tài khoản hoạt động cho toàn bộ vùng tiêu đề thiết bị (bao gồm số thứ tự `.dav-panel-title-left`, badge số tài khoản `.dav-total-badge`, và icon Shield bảo mật `.dav-header-name-wrapper`) thông qua các sự kiện hover (`onMouseEnter`, `onMouseMove`, `onMouseLeave`), đảm bảo khi người dùng hover vào bất cứ vùng nào trên header thiết bị đều nhìn thấy tooltip nổi của tài khoản.
+   - Loại bỏ biểu tượng dấu chấm hỏi `?` ngay con trỏ chuột khi hover vào badge user `U{userId}` bằng cách thay thế kiểu cursor từ `help` thành `pointer`.
+
+5. **Xác thực & Biên dịch**:
+   - Chạy lệnh `npm run build` biên dịch thành công 100% frontend mà không có bất kỳ lỗi TS/Vite nào.

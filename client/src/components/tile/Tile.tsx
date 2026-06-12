@@ -48,6 +48,8 @@ function TileComponent({
     const [accountOverlayMounted, setAccountOverlayMounted] = useState(false);
     const [tileTab, setTileTab] = useState<string>('wechat');
     const [alwaysShowHeader, setAlwaysShowHeader] = useState(() => localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
+    const [headerHideOrder, setHeaderHideOrder] = useState(() => localStorage.getItem('monviewphone:dav-header-hide-order') === 'true');
+    const [headerMinimalBg, setHeaderMinimalBg] = useState(() => localStorage.getItem('monviewphone:dav-header-minimal-bg') === 'true');
 
     useEffect(() => {
         if (accountData?.defaultPlatform) {
@@ -58,6 +60,8 @@ function TileComponent({
     useEffect(() => {
         const handleSettingsUpdate = () => {
             setAlwaysShowHeader(localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
+            setHeaderHideOrder(localStorage.getItem('monviewphone:dav-header-hide-order') === 'true');
+            setHeaderMinimalBg(localStorage.getItem('monviewphone:dav-header-minimal-bg') === 'true');
         };
         window.addEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
         return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
@@ -390,7 +394,7 @@ function TileComponent({
 
                         {accountOverlayMounted && (
                             <div 
-                                className={`tile-account-overlay ${showAccountOverlay ? 'is-open' : (alwaysShowHeader ? 'is-header-only' : 'is-hidden')} ${isFilteredOut ? 'mxh-filtered-out' : ''}`} 
+                                className={`tile-account-overlay ${showAccountOverlay ? 'is-open' : (alwaysShowHeader ? 'is-header-only' : 'is-hidden')} ${isFilteredOut ? 'mxh-filtered-out' : ''} ${alwaysShowHeader && !showAccountOverlay && headerHideOrder ? 'header-hide-order' : ''} ${alwaysShowHeader && !showAccountOverlay && headerMinimalBg ? 'header-minimal-bg' : ''}`} 
                                 onMouseDown={e => e.stopPropagation()}
                             >
                                 {isFilteredOut && showAccountOverlay && (
