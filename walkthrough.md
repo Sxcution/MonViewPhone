@@ -173,3 +173,29 @@ Chúng tôi đã thực hiện thay đổi layout để nút Setting nằm ở v
 
 2. **Kết quả**:
    - Biên dịch frontend thành công 100% (`npm run build`). Nút Setting đã được dịch chuyển sang sát lề phải chuẩn xác, tạo giao diện cân đối và thoáng mắt.
+
+## Tách nút Quick Controls "Bật/Tắt màn hình vật lý" thành 2 nút riêng biệt
+
+Chúng tôi đã tách nút điều khiển gộp trước đây thành hai nút độc lập để tăng tính kiểm soát và tránh nhầm lẫn trạng thái:
+
+1. **Tách các Action Id & Cập nhật Di cư (Migration) cấu hình**:
+   - Loại bỏ `physicalScreenToggle` trong [App.tsx](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/App.tsx).
+   - Thêm 2 Id mới là `physicalScreenOn` và `physicalScreenOff`.
+   - Cập nhật hàm `loadQuickActionOrder()` tự động nhận diện nếu cấu hình cũ của người dùng trong `localStorage` có chứa `physicalScreenToggle`, hệ thống sẽ tự động tách nó ra và điền 2 nút mới vào vị trí tương ứng mà không làm ảnh hưởng đến thứ tự các nút khác.
+
+2. **Cài đặt Nút "Bật Màn Hình" (`physicalScreenOn`)**:
+   - Label: `Bật màn hình`
+   - Icon: Biểu tượng `Monitor` (Màn hình bật) được import từ `lucide-react`.
+   - Chức năng: Chỉ thực hiện bật màn hình vật lý của các thiết bị được chọn (gọi `setDeviceDisplayPower(..., 'on')`), không kích hoạt Stay Awake và không tự đổi trạng thái nút.
+
+3. **Cài đặt Nút "Tắt Màn Hình" (`physicalScreenOff`)**:
+   - Label: `Tắt màn hình`
+   - Icon: Biểu tượng `MonitorOff` (Màn hình tắt).
+   - Chức năng: Chạy adb lệnh bật Stay Awake trước (`stay_on_while_plugged_in 7`), sau đó gọi lệnh tắt màn hình vật lý (thông qua hàm helper `runPhysicalScreenOffWithStayAwake(targets)`).
+
+4. **Bảo toàn cơ chế tự động**:
+   - Giữ nguyên cơ chế tự động tắt màn hình + stay awake khi cắm thiết bị hoặc app load (`autoScreenPrepare` dùng `useEffect`).
+
+5. **Kết quả**:
+   - Đã gỡ bỏ state trung gian không cần thiết (`physicalScreenButtonMode`).
+   - Biên dịch thành công 100% cả frontend (`npm run build`) và backend Go (`go build ./...`). Giao diện Quick Controls hiển thị 2 nút riêng biệt đúng chuẩn.

@@ -66,6 +66,7 @@ import {
   ChevronUp,
   Clock3,
   MonitorOff,
+  Monitor,
   Pin,
   PinOff,
   Package,
@@ -208,7 +209,8 @@ function httpApiUrl(wsServer: string, path: string): string {
 
 // type_QuickActionId : Định nghĩa các id phím tắt nhanh
 type QuickActionId =
-  | 'physicalScreenToggle'
+  | 'physicalScreenOn'
+  | 'physicalScreenOff'
   | 'screenOff'
   | 'mute'
   | 'soundOn'
@@ -218,7 +220,8 @@ type QuickActionId =
 
 // DEFAULT_QUICK_ACTION_ORDER : Thứ tự mặc định các phím tắt nhanh
 const DEFAULT_QUICK_ACTION_ORDER: QuickActionId[] = [
-  'physicalScreenToggle',
+  'physicalScreenOn',
+  'physicalScreenOff',
   'screenOff',
   'mute',
   'soundOn',
@@ -234,17 +237,34 @@ function loadQuickActionOrder(): QuickActionId[] {
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return DEFAULT_QUICK_ACTION_ORDER
     
-    // Bỏ các ID cũ
-    const oldIds = new Set(['physicalScreenOff', 'physicalScreenOn', 'stayAwakeOn'])
-    const filtered = parsed.filter(id => !oldIds.has(id))
-    
-    const hadOld = parsed.some(id => oldIds.has(id))
-    if (hadOld && !filtered.includes('physicalScreenToggle')) {
-      filtered.push('physicalScreenToggle')
+    const parsedIds = parsed as string[]
+    const expanded: string[] = []
+
+    for (const id of parsedIds) {
+      if (id === 'physicalScreenToggle') {
+        if (!expanded.includes('physicalScreenOn')) expanded.push('physicalScreenOn')
+        if (!expanded.includes('physicalScreenOff')) expanded.push('physicalScreenOff')
+        continue
+      }
+
+      if (id === 'stayAwakeOn') {
+        if (!expanded.includes('physicalScreenOff')) expanded.push('physicalScreenOff')
+        continue
+      }
+
+      expanded.push(id)
     }
 
-    const allowed = new Set(DEFAULT_QUICK_ACTION_ORDER)
-    const out = filtered.filter((id): id is QuickActionId => allowed.has(id))
+    const allowed = new Set<string>(DEFAULT_QUICK_ACTION_ORDER)
+    const filtered = expanded.filter((id): id is QuickActionId => allowed.has(id))
+    
+    const out: QuickActionId[] = []
+    for (const id of filtered) {
+      if (!out.includes(id)) {
+        out.push(id)
+      }
+    }
+    
     for (const id of DEFAULT_QUICK_ACTION_ORDER) {
       if (!out.includes(id)) out.push(id)
     }
@@ -1742,8 +1762,6 @@ export function App() {
     [quickCommandTargets, wsServer]
   )
 
-  // state_physicalScreenButtonMode : Trạng thái nút bật/tắt màn hình ('on' | 'off')
-  const [physicalScreenButtonMode, setPhysicalScreenButtonMode] = useState<'on' | 'off'>('on')
 
   // callback_runStayAwakeForTargets : Chạy stay awake cho danh sách thiết bị
   const runStayAwakeForTargets = useCallback(
@@ -2474,33 +2492,35 @@ export function App() {
 
   const quickActions = useMemo(
     () => ({
-      physicalScreenToggle: {
-        label: physicalScreenButtonMode === 'on' ? (t('Bật màn hình') || 'Bật màn hình') : (t('Tắt màn hình') || 'Tắt màn hình'),
+      physicalScreenOn: {
+        label: t('Bật màn hình') || 'Bật Màn Hình',
+        icon: <Monitor size={15} strokeWidth={1.8} />,
+        run: async () => {
+          const targets = quickCommandTargets()
+          if (!targets.length) return
+          setGlobalAdbStatus(`Đang bật màn hình vật lý cho ${targets.length} thiết bị...`)
+          try {
+            for (const udid of targets) {
+              await setDeviceDisplayPower(wsServer, udid, 'on')
+            }
+            setGlobalAdbStatus(`Đã bật màn hình vật lý cho ${targets.length} thiết bị`)
+          } catch (err: any) {
+            setGlobalAdbStatus(`Lỗi bật màn hình vật lý: ${err?.message || err}`)
+          }
+        }
+      },
+      physicalScreenOff: {
+        label: t('Tắt màn hình') || 'Tắt Màn Hình',
         icon: <MonitorOff size={15} strokeWidth={1.8} />,
         run: async () => {
           const targets = quickCommandTargets()
           if (!targets.length) return
-
-          if (physicalScreenButtonMode === 'on') {
-            setGlobalAdbStatus(`Đang bật màn hình vật lý cho ${targets.length} thiết bị...`)
-            try {
-              for (const udid of targets) {
-                await setDeviceDisplayPower(wsServer, udid, 'on')
-              }
-              setPhysicalScreenButtonMode('off')
-              setGlobalAdbStatus(`Đã bật màn hình vật lý cho ${targets.length} thiết bị`)
-            } catch (err: any) {
-              setGlobalAdbStatus(`Lỗi bật màn hình vật lý: ${err?.message || err}`)
-            }
-          } else {
-            setGlobalAdbStatus(`Đang tắt màn hình vật lý và bật Stay Awake cho ${targets.length} thiết bị...`)
-            try {
-              await runPhysicalScreenOffWithStayAwake(targets)
-              setPhysicalScreenButtonMode('on')
-              setGlobalAdbStatus(`Đã tắt màn hình vật lý + Stay Awake cho ${targets.length} thiết bị`)
-            } catch (err: any) {
-              setGlobalAdbStatus(`Lỗi tắt màn hình vật lý / Stay Awake: ${err?.message || err}`)
-            }
+          setGlobalAdbStatus(`Đang tắt màn hình vật lý và bật Stay Awake cho ${targets.length} thiết bị...`)
+          try {
+            await runPhysicalScreenOffWithStayAwake(targets)
+            setGlobalAdbStatus(`Đã tắt màn hình vật lý + Stay Awake cho ${targets.length} thiết bị`)
+          } catch (err: any) {
+            setGlobalAdbStatus(`Lỗi tắt màn hình vật lý / Stay Awake: ${err?.message || err}`)
           }
         }
       },
@@ -2587,7 +2607,7 @@ export function App() {
         run: () => setAutomationOpen(true)
       }
     }),
-    [runQuickAdbCommands, physicalScreenButtonMode, runPhysicalScreenOffWithStayAwake, quickCommandTargets, getTargetsByUdids, wsServer, t]
+    [runQuickAdbCommands, runPhysicalScreenOffWithStayAwake, quickCommandTargets, getTargetsByUdids, wsServer, t]
   )
 
   {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */ }
