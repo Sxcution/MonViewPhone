@@ -479,3 +479,57 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 	}
 	return string(bytes), true, nil
 }
+
+func getDeviceOrderFromDB() (map[string]int, error) {
+	db, err := openDeviceAccountDB()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	rows, err := db.Query("SELECT udid, device_order FROM devices WHERE device_order IS NOT NULL")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	order := make(map[string]int)
+	for rows.Next() {
+		var udid string
+		var deviceOrder int
+		if err := rows.Scan(&udid, &deviceOrder); err != nil {
+			return nil, err
+		}
+		order[udid] = deviceOrder
+	}
+	return order, nil
+}
+
+func updateDeviceOrderInDB(order map[string]int) error {
+	db, err := openDeviceAccountDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for udid, deviceOrder := range order {
+		_, err := tx.Exec(`
+			INSERT INTO devices (udid, device_order, updated_at) 
+			VALUES (?, ?, CURRENT_TIMESTAMP)
+			ON CONFLICT(udid) DO UPDATE SET 
+				device_order = excluded.device_order,
+				updated_at = excluded.updated_at
+		`, udid, deviceOrder)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}

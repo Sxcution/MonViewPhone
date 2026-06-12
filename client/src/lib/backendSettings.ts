@@ -187,9 +187,28 @@ export async function saveTileOrderNumbersToBackend(value: string): Promise<bool
       console.error(`[BackendSettings] Refusing to save tileOrderNumbers: keys length ${Object.keys(obj).length} < 35`);
       return false;
     }
-    return await saveBackendSetting('tileOrderNumbers', value);
+    
+    // Call the new dedicated device order API
+    const { wsServer } = readPageParams();
+    const url = new URL(wsServer);
+    url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:';
+    url.pathname = '/api/goog/device/order';
+    url.search = '';
+    url.hash = '';
+
+    const res = await fetch(url.toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderNumbers: obj })
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP status ${res.status}`);
+    }
+    
+    return true;
   } catch (e) {
-    console.error('[BackendSettings] Failed to parse tileOrderNumbers JSON:', e);
+    console.error('[BackendSettings] Failed to parse tileOrderNumbers JSON or save order:', e);
     return false;
   }
 }

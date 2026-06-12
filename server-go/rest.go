@@ -564,6 +564,30 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			} else if ok {
 				settings[deviceAccountVaultKey] = vaultRaw
 				settings["monviewphone:device-account-db"] = "data/Data.db"
+				
+				// Auto-repair logic for tileOrderNumbers from device_order
+				shouldRepair := false
+				if settings["tileOrderNumbers"] == nil {
+					shouldRepair = true
+				} else {
+					strRaw, isStr := settings["tileOrderNumbers"].(string)
+					if isStr {
+						var parsed map[string]interface{}
+						if err := json.Unmarshal([]byte(strRaw), &parsed); err == nil && len(parsed) < 35 {
+							shouldRepair = true
+						}
+					}
+				}
+
+				if shouldRepair {
+					orderDB, err := getDeviceOrderFromDB()
+					if err == nil && len(orderDB) > 0 {
+						if b, err := json.Marshal(orderDB); err == nil {
+							settings["tileOrderNumbers"] = string(b)
+						}
+					}
+				}
+
 				if body, err := json.Marshal(settings); err == nil {
 					data = body
 				}
@@ -698,6 +722,55 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
 			return
 		}
+		writeJSON(w, http.StatusOK, jsonResponse{"success": true})
+		return
+	}
+
+	writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
+}
+
+func handleDeviceOrder(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		order, err := getDeviceOrderFromDB()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "orderNumbers": order})
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var req struct {
+			OrderNumbers map[string]int `json:"orderNumbers"`
+		}
+		if err := readJSON(r, &req); err != nil {
+			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid request parameters"})
+			return
+		}
+
+		if err := updateDeviceOrderInDB(req.OrderNumbers); err != nil {
+			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
+			return
+		}
+
+		// Also update settings.json
+		settingsFile := filepath.Join(".", "settings.json")
+		existingData, err := os.ReadFile(settingsFile)
+		var settings map[string]interface{}
+		if err == nil {
+			_ = json.Unmarshal(existingData, &settings)
+		}
+		if settings == nil {
+			settings = make(map[string]interface{})
+		}
+		if b, err := json.Marshal(req.OrderNumbers); err == nil {
+			settings["tileOrderNumbers"] = string(b)
+		}
+		if body, err := json.Marshal(settings); err == nil {
+			os.WriteFile(settingsFile, body, 0644)
+		}
+
 		writeJSON(w, http.StatusOK, jsonResponse{"success": true})
 		return
 	}

@@ -100,15 +100,13 @@ def verify_data_safety():
                 pass
 
         # Check conditions
-        passed = (
+        core_passed = (
             device_count >= 35 and 
             wechat_account_count >= 104 and 
-            has_emma_zhao and 
-            tile_order_ok and 
-            tile_order_numbers_ok
+            has_emma_zhao
         )
         
-        if not passed:
+        if not core_passed or not tile_order_ok:
             err_msg = (
                 "DATA SAFETY CHECK FAILED - không mở app để tránh ghi đè dữ liệu!\n\n"
                 f"- Số thiết bị trong vault: {device_count} (Yêu cầu >= 35)\n"
@@ -119,6 +117,66 @@ def verify_data_safety():
                 "Vui lòng tắt launcher, restore lại settings.json / Data.db từ thư mục Backup mới nhất trước khi chạy lại."
             )
             return False, err_msg
+            
+        if not tile_order_numbers_ok:
+            print("[Auto-Repair] tileOrderNumbers missing or incomplete. Rebuilding from DB or vault...")
+            
+            # Fetch device order from DB if possible
+            order_data = {}
+            try:
+                req_db = urllib.request.Request(f"{BASE_URL}api/goog/device/order", headers={'User-Agent': 'MonViewPhone-Launcher'})
+                with urllib.request.urlopen(req_db, timeout=2) as response:
+                    if response.status == 200:
+                        resp_json = json.loads(response.read().decode('utf-8'))
+                        order_data = resp_json.get("orderNumbers", {})
+            except Exception as e:
+                print(f"[Auto-Repair] Could not fetch DB order: {e}")
+                
+            repaired_numbers = {}
+            used_numbers = set(order_data.values()) if order_data else set()
+            
+            # Fill from DB
+            for udid in devices.keys():
+                if udid in order_data and order_data[udid] > 0:
+                    repaired_numbers[udid] = order_data[udid]
+            
+            # Fill remaining from tileOrder or sequential
+            candidate = 1
+            if tile_order_ok and isinstance(tile_order, list):
+                for udid in tile_order:
+                    if udid in devices and udid not in repaired_numbers:
+                        while candidate in used_numbers:
+                            candidate += 1
+                        repaired_numbers[udid] = candidate
+                        used_numbers.add(candidate)
+            
+            # Fill any other remaining
+            for udid in devices.keys():
+                if udid not in repaired_numbers:
+                    while candidate in used_numbers:
+                        candidate += 1
+                    repaired_numbers[udid] = candidate
+                    used_numbers.add(candidate)
+            
+            repaired_count = len(repaired_numbers)
+            print(f"[Auto-Repair] repaired count {repaired_count}/{device_count}")
+            
+            if repaired_count >= 35:
+                try:
+                    payload = json.dumps({"orderNumbers": repaired_numbers}).encode('utf-8')
+                    req_post = urllib.request.Request(f"{BASE_URL}api/goog/device/order", data=payload, headers={'Content-Type': 'application/json'})
+                    with urllib.request.urlopen(req_post, timeout=2) as response:
+                        if response.status == 200:
+                            print("[Auto-Repair] Successfully saved repaired tileOrderNumbers to DB and settings.")
+                except Exception as e:
+                    print(f"[Auto-Repair] Failed to save repaired numbers: {e}")
+                
+                show_error_message(
+                    "Auto-Repair Successful",
+                    f"tileOrderNumbers missing.\nRebuilding from DB/tileOrder...\nRepaired count {repaired_count}/{device_count}.\nApp allowed to start."
+                )
+            else:
+                return False, f"DATA SAFETY CHECK FAILED - Auto-repair failed (count {repaired_count} < 35)"
             
         return True, ""
     except Exception as e:
