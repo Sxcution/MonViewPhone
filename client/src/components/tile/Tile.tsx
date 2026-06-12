@@ -415,6 +415,7 @@ function TileComponent({
                                             nearbyAutoOpenEnabled={nearbyAutoOpenEnabled}
                                             onOpenDeviceViewer={onOpenDeviceViewer}
                                             showAccountOverlay={showAccountOverlay}
+                                            alwaysShowHeader={alwaysShowHeader}
                                         />
                                     </div>
                                 )}

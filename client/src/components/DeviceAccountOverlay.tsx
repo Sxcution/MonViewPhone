@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom';
 import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, ShieldAlert, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings, History } from 'lucide-react';
 import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby';
 import { saveBackendSetting } from '@/lib/backendSettings';
+import { useServer } from '@/context/ServerContext';
+import { listUserProfiles, runAdbCommandApi } from '@/lib/serverApi';
 import { 
   getDeviceAccountData, 
   saveDeviceAccountData, 
@@ -18,7 +20,8 @@ import {
   createNewAccount,
   getSavedPlatforms,
   saveSavedPlatforms,
-  saveDeviceAccountVault
+  saveDeviceAccountVault,
+  WechatLaunchProfile
 } from '@/lib/deviceAccountVault';
 
 type DeviceAccountOverlayProps = {
@@ -224,15 +227,16 @@ function computeBadges(acc: Account, isWeChat: boolean) {
   return badges;
 }
 
-function getAppTypeLabel(type?: 'main' | 'clone' | 'secure' | 'shelter') {
+function getAppTypeLabel(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unknown') {
   if (type === 'clone') return 'Clone';
   if (type === 'secure') return 'Secure Folder';
   if (type === 'shelter') return 'Shelter';
+  if (type === 'unknown') return 'Unknown';
   return 'Main';
 }
 
-function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter') {
-  if (!type || type === 'main') return null;
+function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unknown') {
+  if (!type || type === 'main' || type === 'unknown') return null;
   
   if (type === 'shelter') {
     return (
@@ -346,6 +350,23 @@ function renderUnverifiedIcon(account: Account) {
   );
 }
 
+function getAppTypeFromProfile(userId: number, name: string): 'main' | 'shelter' | 'clone' | 'secure' | 'unknown' {
+  if (userId === 0 || name.toLowerCase().includes('owner')) {
+    return 'main';
+  }
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes('work profile') || lowerName.includes('shelter')) {
+    return 'shelter';
+  }
+  if (lowerName.includes('dual_app') || lowerName.includes('dual') || lowerName.includes('clone')) {
+    return 'clone';
+  }
+  if (lowerName.includes('secure folder') || lowerName.includes('secure')) {
+    return 'secure';
+  }
+  return 'unknown';
+}
+
 // --- Device Panel Component ---
 export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({ 
   udid, 
@@ -358,7 +379,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   setActiveTab,
   nearbyAutoOpenEnabled,
   onOpenDeviceViewer,
-  showAccountOverlay = false
+  showAccountOverlay = false,
+  alwaysShowHeader = false
 }: { 
   udid: string; 
   order: number; 
@@ -371,7 +393,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   nearbyAutoOpenEnabled?: boolean;
   onOpenDeviceViewer?: (udid: string) => void;
   showAccountOverlay?: boolean;
+  alwaysShowHeader?: boolean;
 }) {
+  const { wsServer } = useServer();
   const [data, setData] = useState(initialData);
   const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
   const [bellTooltip, setBellTooltip] = useState<{ x: number; y: number } | null>(null);
@@ -379,6 +403,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [pendingDeleteAccount, setPendingDeleteAccount] = useState<{ id: string; name: string } | null>(null);
   const [historyModalAccountId, setHistoryModalAccountId] = useState<string | null>(null);
   const [pendingResetHistoryAccount, setPendingResetHistoryAccount] = useState<Account | null>(null);
+  const [deviceProfiles, setDeviceProfiles] = useState<{ id: number; name: string }[]>([]);
+  const [showSetSubmenu, setShowSetSubmenu] = useState(false);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -533,6 +559,22 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [moveModal, setMoveModal] = useState<{ sourceUdid: string, account: Account } | null>(null);
   const [targetOrderStr, setTargetOrderStr] = useState('');
   const [moveError, setMoveError] = useState('');
+
+  useEffect(() => {
+    if (accountActionMenu) {
+      listUserProfiles(wsServer, accountActionMenu.sourceUdid)
+        .then(profiles => {
+          setDeviceProfiles(profiles);
+        })
+        .catch(err => {
+          console.error('[DeviceAccountPanel] Failed to load user profiles:', err);
+          setDeviceProfiles([{ id: 0, name: 'Owner' }]);
+        });
+    } else {
+      setDeviceProfiles([]);
+      setShowSetSubmenu(false);
+    }
+  }, [accountActionMenu, wsServer]);
 
   useEffect(() => {
     if (!accountTitleDropdownOpen && !platformDropdownOpen && !accountActionMenu) return;
@@ -1105,11 +1147,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 {groupAccounts.length === 0 ? (
                   <div className="dav-title-empty">Khong co tai khoan</div>
                 ) : (
-                  groupAccounts.map(({ udid: accUdid, account }) => (
+                   groupAccounts.map(({ udid: accUdid, account }) => (
                     <button
                       key={account.id}
                       type="button"
                       className={`dav-title-account-item ${selectedAccount?.id === account.id ? 'active' : ''}`}
+                      title={account.wechatLaunchProfile ? `Đã set: User ${account.wechatLaunchProfile.userId} - ${account.wechatLaunchProfile.name} / ${getAppTypeLabel(account.wechatLaunchProfile.appType)}` : undefined}
                       onMouseDown={(e) => {
                         if (e.button === 1) {
                           e.preventDefault();
@@ -1129,6 +1172,25 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                         e.stopPropagation();
                         handleSetMain(account.id);
                         setAccountTitleDropdownOpen(false);
+
+                        // Auto-open WeChat app under set profile
+                        const canAutoOpen = 
+                          activeTab === 'wechat' &&
+                          alwaysShowHeader === true &&
+                          showAccountOverlay === false;
+                        
+                        if (canAutoOpen && account.wechatLaunchProfile && typeof account.wechatLaunchProfile.userId === 'number') {
+                          const cmd = `am start --user ${account.wechatLaunchProfile.userId} -n com.tencent.mm/com.tencent.mm.ui.LauncherUI`;
+                          runAdbCommandApi(wsServer, accUdid, cmd)
+                            .then(res => {
+                              if (!res.success) {
+                                console.warn('[DeviceAccountPanel] Failed to auto-open WeChat via ADB:', res.output);
+                              }
+                            })
+                            .catch(err => {
+                              console.warn('[DeviceAccountPanel] Error calling auto-open WeChat ADB:', err);
+                            });
+                        }
                       }}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -1152,6 +1214,21 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                         {renderUnverifiedIcon(account)}
                         {renderAccountNoticeIcon(account)}
                         {renderAppTypeIcon(account.appType)}
+                        {account.wechatLaunchProfile && (
+                          <span 
+                            style={{ 
+                              fontSize: '8px', 
+                              background: 'rgba(34, 197, 94, 0.2)', 
+                              color: '#22c55e', 
+                              padding: '1px 4px', 
+                              borderRadius: '4px',
+                              marginLeft: '4px',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            U{account.wechatLaunchProfile.userId}
+                          </span>
+                        )}
                       </span>
                     </button>
                   ))
@@ -2068,6 +2145,69 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           >
             Di chuyen tai khoan
           </button>
+
+          {activeTab === 'wechat' && (
+            <div 
+              className="dav-ctx-submenu-container"
+              onMouseEnter={() => setShowSetSubmenu(true)}
+              onMouseLeave={() => setShowSetSubmenu(false)}
+            >
+              <button
+                type="button"
+                className="dav-ctx-item dav-ctx-has-sub"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowSetSubmenu(v => !v);
+                }}
+              >
+                Đã set
+              </button>
+              <div className={`dav-ctx-submenu ${showSetSubmenu ? 'is-open' : ''}`}>
+                {deviceProfiles.length === 0 ? (
+                  <div className="dav-ctx-item" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+                    Đang tải...
+                  </div>
+                ) : (
+                  deviceProfiles.map(profile => {
+                    const appType = getAppTypeFromProfile(profile.id, profile.name);
+                    const label = `User ${profile.id} - ${profile.name} / ${getAppTypeLabel(appType)}`;
+                    const isAssigned = accountActionMenu.account.wechatLaunchProfile?.userId === profile.id;
+                    return (
+                      <button
+                        key={profile.id}
+                        type="button"
+                        className={`dav-ctx-item ${isAssigned ? 'active' : ''}`}
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          const launch: WechatLaunchProfile = {
+                            userId: profile.id,
+                            name: profile.name,
+                            appType: appType,
+                            packageName: 'com.tencent.mm',
+                            activityName: 'com.tencent.mm.ui.LauncherUI',
+                            assignedAt: Date.now()
+                          };
+
+                          handleUpdateAccount(accountActionMenu.account.id, {
+                            appType: appType,
+                            wechatLaunchProfile: launch
+                          });
+
+                          setAccountActionMenu(null);
+                          setAccountTitleDropdownOpen(false);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
         </div>,
         document.body
       )}

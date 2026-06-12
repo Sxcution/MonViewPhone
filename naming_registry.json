@@ -260,7 +260,8 @@
       "hide_email": "monviewphone:dav-hide-email",
       "hide_qr": "monviewphone:dav-hide-qr",
       "hide_created_at": "monviewphone:dav-hide-created-at",
-      "always_show_header": "monviewphone:dav-always-show-header"
+      "always_show_header": "monviewphone:dav-always-show-header",
+      "wechat_launch_profile": "wechatLaunchProfile"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

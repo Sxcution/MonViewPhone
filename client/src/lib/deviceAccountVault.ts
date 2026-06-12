@@ -50,6 +50,15 @@ export interface AccountHistoryEntry {
   timestamp: number;
 }
 
+export interface WechatLaunchProfile {
+  userId: number;
+  name: string;
+  appType: 'main' | 'shelter' | 'clone' | 'secure' | 'unknown';
+  packageName: 'com.tencent.mm';
+  activityName: 'com.tencent.mm.ui.LauncherUI';
+  assignedAt: number;
+}
+
 export interface BaseAccount {
   id: string;
   name: string;
@@ -60,8 +69,9 @@ export interface BaseAccount {
   status: AccountStatus;
   notice: AccountNotice | null;
   history?: AccountHistoryEntry[];
-  appType?: 'main' | 'clone' | 'secure' | 'shelter';
+  appType?: 'main' | 'clone' | 'secure' | 'shelter' | 'unknown';
   dieAt?: number | null;
+  wechatLaunchProfile?: WechatLaunchProfile;
 }
 
 export interface WeChatAccount extends BaseAccount {

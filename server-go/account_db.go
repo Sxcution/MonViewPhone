@@ -30,6 +30,15 @@ type accountHistoryEntry struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
+type wechatLaunchProfile struct {
+	UserID       int    `json:"userId"`
+	Name         string `json:"name"`
+	AppType      string `json:"appType"`
+	PackageName  string `json:"packageName"`
+	ActivityName string `json:"activityName"`
+	AssignedAt   int64  `json:"assignedAt"`
+}
+
 type deviceAccount struct {
 	ID                  string                `json:"id"`
 	Name                string                `json:"name"`
@@ -52,6 +61,7 @@ type deviceAccount struct {
 	DashboardAccountID  *int                  `json:"dashboardAccountId,omitempty"`
 	DashboardCardName   string                `json:"dashboardCardName,omitempty"`
 	DashboardCardID     *int                  `json:"dashboardCardId,omitempty"`
+	WechatLaunchProfile *wechatLaunchProfile  `json:"wechatLaunchProfile,omitempty"`
 }
 
 type deviceAccountData struct {
@@ -122,6 +132,7 @@ func initDeviceAccountDB(db *sql.DB) error {
 			source_account_id TEXT,
 			source_card_name TEXT,
 			source_card_id TEXT,
+			wechat_launch_profile_json TEXT,
 			imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (udid) REFERENCES devices(udid) ON DELETE CASCADE
@@ -133,6 +144,10 @@ func initDeviceAccountDB(db *sql.DB) error {
 		return err
 	}
 	_, err = db.Exec(`ALTER TABLE accounts ADD COLUMN history_json TEXT`)
+	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+		return err
+	}
+	_, err = db.Exec(`ALTER TABLE accounts ADD COLUMN wechat_launch_profile_json TEXT`)
 	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
 		return err
 	}
@@ -282,8 +297,8 @@ func syncDeviceAccountVaultToDB(raw string) error {
 			id, udid, platform, name, nickname, phone, email, note, status, app_type,
 			notice_json, history_json, created_at_ms, verify_status, phone_region, scan_count,
 			last_scan_date_ms, nearby_people_enabled, nearby_people_due_date_ms,
-			source, source_account_id, source_card_name, source_card_id, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+			source, source_account_id, source_card_name, source_card_id, wechat_launch_profile_json, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`)
 	if err != nil {
 		return err
@@ -329,6 +344,14 @@ func syncDeviceAccountVaultToDB(raw string) error {
 				if account.DashboardCardID != nil {
 					dashboardCardID = sql.NullString{String: strconv.Itoa(*account.DashboardCardID), Valid: true}
 				}
+				wechatLaunchProfileJSON := sql.NullString{}
+				if account.WechatLaunchProfile != nil {
+					bytes, err := json.Marshal(account.WechatLaunchProfile)
+					if err != nil {
+						return err
+					}
+					wechatLaunchProfileJSON = sql.NullString{String: string(bytes), Valid: true}
+				}
 				if _, err := insertAccount.Exec(
 					account.ID,
 					udid,
@@ -353,6 +376,7 @@ func syncDeviceAccountVaultToDB(raw string) error {
 					dashboardAccountID,
 					sqlNullString(account.DashboardCardName),
 					dashboardCardID,
+					wechatLaunchProfileJSON,
 				); err != nil {
 					return err
 				}
@@ -391,7 +415,7 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 			a.app_type, a.notice_json, a.history_json, a.created_at_ms, a.verify_status, a.phone_region,
 			a.scan_count, a.last_scan_date_ms, a.nearby_people_enabled, a.nearby_people_due_date_ms,
 			a.source, a.source_account_id, a.source_card_name, a.source_card_id,
-			d.display_name
+			d.display_name, a.wechat_launch_profile_json
 		FROM accounts a
 		LEFT JOIN devices d ON d.udid = a.udid
 		ORDER BY d.device_order ASC, a.platform ASC, a.imported_at ASC, a.id ASC
@@ -412,13 +436,14 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 			scanCount, nearbyPeopleEnabled                                 int
 			source, sourceAccountID, sourceCardName, sourceCardID          sql.NullString
 			displayName                                                    sql.NullString
+			wechatLaunchProfileRaw                                         sql.NullString
 		)
 		if err := rows.Scan(
 			&id, &udid, &platform, &name, &nickname, &phone, &email, &note, &status,
 			&appType, &noticeRaw, &historyRaw, &createdAt, &verifyStatus, &phoneRegion,
 			&scanCount, &lastScanDate, &nearbyPeopleEnabled, &nearbyPeopleDueDate,
 			&source, &sourceAccountID, &sourceCardName, &sourceCardID,
-			&displayName,
+			&displayName, &wechatLaunchProfileRaw,
 		); err != nil {
 			return "", false, err
 		}
@@ -459,6 +484,15 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 				log.Printf("[account-db] invalid history_json for account %s: %v", id, err)
 			}
 		}
+		var wLaunchProfile *wechatLaunchProfile
+		if wechatLaunchProfileRaw.Valid && wechatLaunchProfileRaw.String != "" {
+			parsed := wechatLaunchProfile{}
+			if err := json.Unmarshal([]byte(wechatLaunchProfileRaw.String), &parsed); err == nil {
+				wLaunchProfile = &parsed
+			} else {
+				log.Printf("[account-db] invalid wechat_launch_profile_json for account %s: %v", id, err)
+			}
+		}
 
 		account := deviceAccount{
 			ID:                  id,
@@ -480,6 +514,7 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 			NearbyPeopleDueDate: nullableInt64(nearbyPeopleDueDate),
 			ImportedFrom:        nullableString(source),
 			DashboardCardName:   nullableString(sourceCardName),
+			WechatLaunchProfile: wLaunchProfile,
 		}
 		if sourceAccountID.Valid {
 			if value, err := strconv.Atoi(sourceAccountID.String); err == nil {
