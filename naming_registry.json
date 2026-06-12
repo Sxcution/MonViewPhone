@@ -167,7 +167,13 @@
       "is_filter_matched_blue": "is-filter-matched-blue",
       "is_filter_matched_orange": "is-filter-matched-orange",
       "is_filter_matched_red": "is-filter-matched-red",
-      "is_filter_matched_yellow": "is-filter-matched-yellow"
+      "is_filter_matched_yellow": "is-filter-matched-yellow",
+      "dav_daily_reminder_tooltip": "dav-daily-reminder-tooltip",
+      "dav_daily_reminder_row": "dav-daily-reminder-row",
+      "dav_daily_reminder_name": "dav-daily-reminder-name",
+      "dav_daily_reminder_text": "dav-daily-reminder-text",
+      "dav_daily_reminder_close": "dav-daily-reminder-close",
+      "dav_form_input": "dav-form-input"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -261,10 +267,15 @@
       "hide_qr": "monviewphone:dav-hide-qr",
       "hide_created_at": "monviewphone:dav-hide-created-at",
       "always_show_header": "monviewphone:dav-always-show-header",
+      "hide_name": "monviewphone:dav-hide-name",
       "wechat_launch_profile": "wechatLaunchProfile",
       "active_level_3": "activeLevel3",
       "active_level_4": "activeLevel4",
-      "show_classification_submenu": "showClassificationSubmenu"
+      "show_classification_submenu": "showClassificationSubmenu",
+      "edit_notice_time": "editNoticeTime",
+      "current_time": "currentTime",
+      "dismissed_reminders": "dismissedReminders",
+      "active_daily_reminders": "activeDailyReminders"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

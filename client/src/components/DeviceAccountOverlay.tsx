@@ -167,6 +167,30 @@ const getCalendarDaysDiff = (ts1: number, ts2: number) => {
   return Math.round(diffTime / (1000 * 60 * 60 * 24));
 };
 
+const getFloatingTooltipStyle = (x: number, y: number) => {
+  const screenWidth = window.innerWidth;
+  let tx = '-50%';
+  let ty = 'calc(-100% - 10px)';
+  
+  // Dynamic threshold to avoid overflowing the left/right screen boundaries
+  const threshold = Math.min(250, screenWidth / 2 - 20);
+  if (x < threshold) {
+    tx = '15px';
+  } else if (x > screenWidth - threshold) {
+    tx = 'calc(-100% - 15px)';
+  }
+  
+  if (y < 160) {
+    ty = '15px';
+  }
+  
+  return {
+    left: x,
+    top: y,
+    transform: `translate(${tx}, ${ty})`
+  };
+};
+
 const countConsecutiveDays = (startDateStr: string, allDates: string[]) => {
   let count = 0;
   const current = new Date(startDateStr);
@@ -546,6 +570,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [hideEmail, setHideEmail] = useState(() => localStorage.getItem('monviewphone:dav-hide-email') === 'true');
   const [hideQR, setHideQR] = useState(() => localStorage.getItem('monviewphone:dav-hide-qr') === 'true');
   const [hideCreatedAt, setHideCreatedAt] = useState(() => localStorage.getItem('monviewphone:dav-hide-created-at') === 'true');
+  const [hideName, setHideName] = useState(() => localStorage.getItem('monviewphone:dav-hide-name') === 'true');
 
   useEffect(() => {
     const handleHideSettingsUpdate = () => {
@@ -553,6 +578,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       setHideEmail(localStorage.getItem('monviewphone:dav-hide-email') === 'true');
       setHideQR(localStorage.getItem('monviewphone:dav-hide-qr') === 'true');
       setHideCreatedAt(localStorage.getItem('monviewphone:dav-hide-created-at') === 'true');
+      setHideName(localStorage.getItem('monviewphone:dav-hide-name') === 'true');
     };
     window.addEventListener('monviewphone:dav-hide-settings-changed', handleHideSettingsUpdate);
     return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleHideSettingsUpdate);
@@ -675,11 +701,14 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   }, [nearbyAutoOpenEnabled, activeTab, panelHasNearbyRelevantAccount]);
   const [accountActionMenu, setAccountActionMenu] = useState<{ x: number; y: number; sourceUdid: string; account: Account } | null>(null);
   const [accountHoverTooltip, setAccountHoverTooltip] = useState<{ x: number; y: number; account: Account } | null>(null);
+  const [badgeHoverTooltip, setBadgeHoverTooltip] = useState<{ x: number; y: number } | null>(null);
   const accountActionMenuRef = useRef<HTMLDivElement>(null);
   const moveInputRef = useRef<HTMLInputElement>(null);
   const [moveModal, setMoveModal] = useState<{ sourceUdid: string, account: Account } | null>(null);
   const [targetOrderStr, setTargetOrderStr] = useState('');
   const [moveError, setMoveError] = useState('');
+  const [noticeEditModal, setNoticeEditModal] = useState<{ sourceUdid: string, account: Account } | null>(null);
+  const [noticeError, setNoticeError] = useState('');
 
   useEffect(() => {
     if (moveModal) {
@@ -947,15 +976,60 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [showNoticeEdit, setShowNoticeEdit] = useState(false);
   const [editNoticeTitle, setEditNoticeTitle] = useState('');
   const [editNoticeDays, setEditNoticeDays] = useState('');
+  const [editNoticeTime, setEditNoticeTime] = useState('');
   const [showNameStatusDropdown, setShowNameStatusDropdown] = useState(false);
   const [showDateInput, setShowDateInput] = useState(false);
   const [dateText, setDateText] = useState('');
+
+  // Daily reminder state and clock update
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [dismissedReminders, setDismissedReminders] = useState<{ [accountId: string]: string }>(() => {
+    try {
+      const saved = localStorage.getItem('monviewphone:dismissed-reminders');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const dismissReminder = (accountId: string) => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+    const next = { ...dismissedReminders, [accountId]: todayStr };
+    setDismissedReminders(next);
+    localStorage.setItem('monviewphone:dismissed-reminders', JSON.stringify(next));
+  };
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // activeDailyReminders : Danh sách tài khoản đang đến giờ nhắc nhở hàng ngày
+  const activeDailyReminders = useMemo(() => {
+    const now = currentTime;
+    const nowHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const todayStr = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+
+    return accountsWithNotices.filter(acc => {
+      const notice = acc.notice;
+      if (!notice || !notice.dueDate || notice.dueDate <= Date.now()) return false;
+      const reminderTime = (notice as any).dailyReminderTime;
+      if (!reminderTime) return false;
+      if (nowHHMM < reminderTime) return false;
+      if (dismissedReminders[acc.id] === todayStr) return false;
+      return true;
+    });
+  }, [accountsWithNotices, currentTime, dismissedReminders]);
 
   // Sync edit state when selected account changes
   useEffect(() => {
     if (selectedAccount) {
       setEditNoticeTitle(selectedAccount.notice?.title || '');
       setEditNoticeDays(selectedAccount.notice?.days?.toString() || '');
+      setEditNoticeTime((selectedAccount.notice as any)?.dailyReminderTime || '');
       
       let initialText = '';
       if (selectedAccount.createdAt) {
@@ -969,11 +1043,13 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     } else {
       setEditNoticeTitle('');
       setEditNoticeDays('');
+      setEditNoticeTime('');
       setDateText('');
     }
     setShowNoticeEdit(false);
     setShowNameStatusDropdown(false);
     setShowDateInput(false);
+    setNoticeError('');
   }, [selectedAccount]);
 
   // Close name status dropdown on outside click
@@ -992,7 +1068,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
   const handleSaveNotice = () => {
     const daysNum = parseInt(editNoticeDays, 10);
-    if (!editNoticeTitle || isNaN(daysNum) || daysNum <= 0) {
+    if (!editNoticeTitle.trim() || isNaN(daysNum) || daysNum <= 0) {
+      setNoticeError('Vui lòng nhập đầy đủ nội dung và số ngày hợp lệ (>0).');
       return;
     }
     const startDate = Date.now();
@@ -1000,13 +1077,15 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
     handleUpdateAccount(selectedAccount.id, {
       notice: {
-        title: editNoticeTitle,
-        content: editNoticeTitle,
+        title: editNoticeTitle.trim(),
+        content: editNoticeTitle.trim(),
         days: daysNum,
         startDate,
-        dueDate
+        dueDate,
+        dailyReminderTime: editNoticeTime || undefined
       } as any
     });
+    setNoticeError('');
     setShowNoticeEdit(false);
   };
 
@@ -1014,6 +1093,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     handleUpdateAccount(selectedAccount.id, { notice: null });
     setEditNoticeTitle('');
     setEditNoticeDays('');
+    setEditNoticeTime('');
+    setNoticeError('');
     setShowNoticeEdit(false);
   };
 
@@ -1320,17 +1401,6 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           className="dav-panel-title-left"
           onMouseDown={handleOpenViewerMiddleClick}
           onAuxClick={handleOpenViewerAuxClick}
-          onMouseEnter={(e) => {
-            if (selectedAccount) {
-              setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
-            }
-          }}
-          onMouseMove={(e) => {
-            if (selectedAccount) {
-              setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
-            }
-          }}
-          onMouseLeave={() => setAccountHoverTooltip(null)}
         >
           <span className={`dav-order ${panelHasNearbyEligibleAccount ? 'dav-order-nearby-eligible' : ''}`}>
             {order.toString().padStart(2, '0')}
@@ -1343,23 +1413,15 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 panelNearbyAccountState === 'eligible' ? 'nearby-eligible' : '',
                 panelNearbyAccountState === 'upcoming' ? 'nearby-upcoming' : '',
               ].filter(Boolean).join(' ')}
+              onMouseEnter={(e) => setBadgeHoverTooltip({ x: e.clientX, y: e.clientY })}
+              onMouseMove={(e) => setBadgeHoverTooltip({ x: e.clientX, y: e.clientY })}
+              onMouseLeave={() => setBadgeHoverTooltip(null)}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 setAccountTitleDropdownOpen(v => !v);
                 setPlatformDropdownOpen(false);
               }}
-              onMouseEnter={(e) => {
-                if (selectedAccount) {
-                  setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
-                }
-              }}
-              onMouseMove={(e) => {
-                if (selectedAccount) {
-                  setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
-                }
-              }}
-              onMouseLeave={() => setAccountHoverTooltip(null)}
             >
               {totalAccounts}
             </button>
@@ -1395,6 +1457,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                         e.stopPropagation();
                         handleSetMain(account.id);
                         setAccountTitleDropdownOpen(false);
+                        setAccountHoverTooltip(null);
 
                         // Auto-open WeChat app under set profile
                         const canAutoOpen = 
@@ -1467,18 +1530,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           <div className="dav-header-name-wrapper">
             {showAccountOverlay && (
               <span 
+                title={getAccountStatusTooltip(selectedAccount)}
                 style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
-                onMouseEnter={(e) => {
-                  if (selectedAccount) {
-                    setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
-                  }
-                }}
-                onMouseMove={(e) => {
-                  if (selectedAccount) {
-                    setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount });
-                  }
-                }}
-                onMouseLeave={() => setAccountHoverTooltip(null)}
               >
                 <Shield 
                   size={12} 
@@ -1503,12 +1556,14 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               onMouseMove={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account: selectedAccount })}
               onMouseLeave={() => setAccountHoverTooltip(null)}
             >
-              <span 
-                className="header-name-display"
-                style={{ color: nameColor, fontWeight: 'bold' }}
-              >
-                {selectedAccount.name || 'Tên tài khoản'}
-              </span>
+              {!hideName && (
+                <span 
+                  className="header-name-display"
+                  style={{ color: nameColor, fontWeight: 'bold' }}
+                >
+                  {selectedAccount.name || 'Tên tài khoản'}
+                </span>
+              )}
               {activeTab === 'wechat' && renderNearbyAccountIcon(selectedAccount)}
             </div>
             
@@ -1608,7 +1663,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           </div>
         )}
 
-        <div className="dav-panel-title-right">
+        <div className="dav-panel-title-right" style={{ position: 'relative' }}>
           {deviceNoticeStatus !== 'none' && (
             <>
               <button
@@ -1628,17 +1683,41 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               {bellTooltip && noticeTooltipText && ReactDOM.createPortal(
                 <div
                   className="dav-bell-tooltip-floating"
-                  style={{
-                    left: bellTooltip.x,
-                    top: bellTooltip.y,
-                    transform: bellTooltip.y < 160 ? 'translate(-50%, 15px)' : undefined
-                  }}
+                  style={getFloatingTooltipStyle(bellTooltip.x, bellTooltip.y)}
                 >
                   {noticeTooltipText}
                 </div>,
                 document.body
               )}
-              {accountHoverTooltip && (() => {
+            </>
+          )}
+          {/* dav-daily-reminder-tooltip : Tooltip nhắc nhở hàng ngày */}
+          {activeDailyReminders.length > 0 && (
+            <div className="dav-daily-reminder-tooltip">
+              {activeDailyReminders.map(acc => {
+                const accName = acc.name || acc.phone || acc.nickname || 'Không tên';
+                const accNameColor = getAccountListNameColor(acc);
+                return (
+                  <div key={acc.id} className="dav-daily-reminder-row">
+                    <span className="dav-daily-reminder-name" style={{ color: accNameColor }}>{accName}</span>
+                    <span className="dav-daily-reminder-text">: {acc.notice?.title || ''}</span>
+                  </div>
+                );
+              })}
+              <button 
+                type="button"
+                className="dav-daily-reminder-close"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  activeDailyReminders.forEach(acc => dismissReminder(acc.id));
+                }}
+              >
+                Đóng
+              </button>
+            </div>
+          )}
+          {accountHoverTooltip && (() => {
                 const acc = accountHoverTooltip.account;
                 const loginHistory = (acc.history || []).filter(h => h.action === 'Login');
                 
@@ -1692,25 +1771,74 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 if (statusTooltip) details.push(statusTooltip);
                 if (noticeTooltip) details.push(noticeTooltip);
                 
-                const detailsText = details.join('\n');
-                const fullTooltipText = detailsText ? `${line1}\n${detailsText}` : line1;
+                const accName = acc.name || acc.phone || acc.nickname || 'Không tên';
+                const nameColor = getAccountListNameColor(acc);
 
                 return ReactDOM.createPortal(
                   <div
                     className="dav-bell-tooltip-floating"
                     style={{
-                      left: accountHoverTooltip.x,
-                      top: accountHoverTooltip.y,
-                      transform: accountHoverTooltip.y < 160 ? 'translate(-50%, 15px)' : undefined
+                      ...getFloatingTooltipStyle(accountHoverTooltip.x, accountHoverTooltip.y),
+                      whiteSpace: 'pre-line'
                     }}
                   >
-                    {fullTooltipText}
+                    <div style={{ color: nameColor, fontWeight: 'bold', marginBottom: '4px' }}>
+                      {accName}
+                    </div>
+                    <div>{line1}</div>
+                    {details.map((detail, idx) => (
+                      <div key={idx} style={{ marginTop: '2px' }}>{detail}</div>
+                    ))}
                   </div>,
                   document.body
                 );
               })()}
-            </>
-          )}
+              {badgeHoverTooltip && (() => {
+                const tooltipRows = groupAccounts.map(({ account }) => {
+                  const name = account.name || account.phone || account.nickname || 'Không tên';
+                  const nameColor = getAccountListNameColor(account);
+                  
+                  if (account.status === 'Die') {
+                    return (
+                      <div key={account.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+                        <span style={{ color: nameColor, fontWeight: 'bold' }}>{name}</span>
+                        <span>: Die</span>
+                      </div>
+                    );
+                  }
+                  
+                  const parts: string[] = [];
+                  
+                  if (activeTab === 'wechat') {
+                    const nbState = getNearbyAccountState(account);
+                    if (nbState === 'eligible') {
+                      parts.push('📍 Đủ điều kiện');
+                    } else if (nbState === 'upcoming' && account.nearbyPeopleDueDate) {
+                      const diffMs = account.nearbyPeopleDueDate - Date.now();
+                      const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                      parts.push(`📍 ${days} ngày`);
+                    }
+                  }
+                  
+                  const detailsText = parts.join(' - ');
+                  return (
+                    <div key={account.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+                      <span style={{ color: nameColor, fontWeight: 'bold' }}>{name}</span>
+                      {detailsText && <span>: {detailsText}</span>}
+                    </div>
+                  );
+                });
+
+                return ReactDOM.createPortal(
+                  <div
+                    className="dav-bell-tooltip-floating"
+                    style={getFloatingTooltipStyle(badgeHoverTooltip.x, badgeHoverTooltip.y)}
+                  >
+                    {tooltipRows.length > 0 ? tooltipRows : 'Tổng số tài khoản trên điện thoại này'}
+                  </div>,
+                  document.body
+                );
+              })()}
         </div>
       </div>
       <div className="dav-panel-body">
@@ -1722,33 +1850,64 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             </button>
           </div>
         ) : showNoticeEdit ? (
-          /* page_notice_edit : Giao diện cài đặt thông báo */
           <div className="dav-notice-edit-form" onContextMenu={e => e.stopPropagation()}>
-            <div className="dav-edit-header" style={{ justifyContent: 'center' }}>
-              <span>Cài đặt thông báo</span>
+            <div className="dav-edit-header" style={{ display: 'flex', alignItems: 'center', width: '100%', borderBottom: '1px solid var(--md-border)', paddingBottom: '6px', marginBottom: '8px', justifyContent: 'flex-start' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '11px', color: 'var(--md-text)' }}>
+                Cài đặt thông báo: <span style={{ fontWeight: 'bold', color: '#fff' }}>{selectedAccount.name || selectedAccount.phone || selectedAccount.nickname || 'Không tên'}</span>
+              </span>
             </div>
             
-            <div className="dav-field-row">
-              <span className="dav-field-label">Nội dung</span>
-              <input 
-                className="dav-input" 
-                placeholder="Ví dụ: WeChat hỗ trợ" 
-                value={editNoticeTitle} 
-                onChange={e => setEditNoticeTitle(e.target.value)} 
-                autoFocus
-              />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Nội dung</span>
+                <input 
+                  className="dav-input dav-form-input" 
+                  placeholder="( Vui lòng nhập )" 
+                  value={editNoticeTitle} 
+                  onChange={e => {
+                    setEditNoticeTitle(e.target.value);
+                    setNoticeError('');
+                  }} 
+                  autoFocus
+                />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Số ngày đếm ngược</span>
+                  <input 
+                    type="number"
+                    className="dav-input dav-form-input" 
+                    placeholder="Số ngày" 
+                    value={editNoticeDays} 
+                    onChange={e => {
+                      setEditNoticeDays(e.target.value);
+                      setNoticeError('');
+                    }} 
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Nhắc nhở hàng ngày</span>
+                  <input 
+                    type="time"
+                    lang="vi-VN"
+                    step="60"
+                    className="dav-input dav-form-input" 
+                    value={editNoticeTime} 
+                    onChange={e => {
+                      setEditNoticeTime(e.target.value);
+                      setNoticeError('');
+                    }} 
+                  />
+                </div>
+              </div>
             </div>
-            
-            <div className="dav-field-row">
-              <span className="dav-field-label">Số ngày</span>
-              <input 
-                type="number"
-                className="dav-input" 
-                placeholder="Số ngày đếm ngược (VD: 3)" 
-                value={editNoticeDays} 
-                onChange={e => setEditNoticeDays(e.target.value)} 
-              />
-            </div>
+
+            {noticeError && (
+              <div style={{ fontSize: '11px', color: 'var(--md-danger)', textAlign: 'center', marginTop: '8px' }}>
+                {noticeError}
+              </div>
+            )}
             
             <div className="dav-edit-actions">
               <button 
@@ -1758,6 +1917,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   e.preventDefault();
                   e.stopPropagation();
                   setShowNoticeEdit(false);
+                  setNoticeError('');
                 }}
               >
                 Hủy
@@ -2529,6 +2689,25 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             Copy ID ( User name)
           </button>
 
+          <button
+            type="button"
+            className="dav-ctx-item"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setNoticeEditModal({ sourceUdid: accountActionMenu.sourceUdid, account: accountActionMenu.account });
+              setEditNoticeTitle(accountActionMenu.account.notice?.title || '');
+              setEditNoticeDays(accountActionMenu.account.notice?.days?.toString() || '');
+              setEditNoticeTime((accountActionMenu.account.notice as any)?.dailyReminderTime || '');
+              setNoticeError('');
+              setAccountActionMenu(null);
+              setAccountTitleDropdownOpen(false);
+              setAccountHoverTooltip(null);
+            }}
+          >
+            Thông báo
+          </button>
+
           {activeTab === 'wechat' && (
             <div 
               className="dav-ctx-submenu-container"
@@ -2718,6 +2897,156 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
         </div>,
         document.body
       )}
+
+      {/* Notice Edit Modal Portal */}
+      {noticeEditModal && ReactDOM.createPortal(
+        <div 
+          className="confirmOverlay" 
+          onClick={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}
+          style={{ zIndex: 28000 }}
+        >
+          <div 
+            className="confirmPanel confirmPanel--compact" 
+            style={{ minWidth: '360px' }}
+            onMouseDown={e => e.stopPropagation()}
+            onPointerDown={e => e.stopPropagation()}
+          >
+            <div className="confirmTitle" style={{ display: 'flex', alignItems: 'center', width: '100%', borderBottom: '1px solid var(--md-border)', paddingBottom: '6px', marginBottom: '8px', justifyContent: 'flex-start' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--md-text)' }}>
+                Cài đặt thông báo: <span style={{ fontWeight: 'bold', color: '#fff' }}>{noticeEditModal.account.name || noticeEditModal.account.phone || noticeEditModal.account.nickname || 'Không tên'}</span>
+              </span>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px', width: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Nội dung</span>
+                <input 
+                  className="dav-input dav-form-input" 
+                  placeholder="( Vui lòng nhập )" 
+                  value={editNoticeTitle} 
+                  onChange={e => {
+                    setEditNoticeTitle(e.target.value);
+                    setNoticeError('');
+                  }} 
+                  autoFocus
+                />
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Số ngày đếm ngược</span>
+                  <input 
+                    type="number"
+                    className="dav-input dav-form-input" 
+                    placeholder="Số ngày" 
+                    value={editNoticeDays} 
+                    onChange={e => {
+                      setEditNoticeDays(e.target.value);
+                      setNoticeError('');
+                    }} 
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Nhắc nhở hàng ngày</span>
+                  <input 
+                    type="time"
+                    lang="vi-VN"
+                    step="60"
+                    className="dav-input dav-form-input" 
+                    value={editNoticeTime} 
+                    onChange={e => {
+                      setEditNoticeTime(e.target.value);
+                      setNoticeError('');
+                    }} 
+                  />
+                </div>
+              </div>
+
+              {noticeError && (
+                <span style={{ fontSize: '11px', color: 'var(--md-danger)', textAlign: 'center', marginTop: '4px' }}>
+                  {noticeError}
+                </span>
+              )}
+            </div>
+
+            <div className="confirmActions" style={{ display: 'flex', gap: '8px', marginTop: '15px' }}>
+              <button 
+                type="button"
+                className="modalBtn" 
+                style={{ flex: 1 }}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setNoticeEditModal(null);
+                  setEditNoticeTitle('');
+                  setEditNoticeDays('');
+                  setEditNoticeTime('');
+                  setNoticeError('');
+                }}
+              >
+                Hủy
+              </button>
+              {noticeEditModal.account.notice && (
+                <button 
+                  type="button"
+                  className="modalBtnDanger" 
+                  style={{ flex: 1 }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleUpdateAccount(noticeEditModal.account.id, { notice: null });
+                    setNoticeEditModal(null);
+                    setEditNoticeTitle('');
+                    setEditNoticeDays('');
+                    setEditNoticeTime('');
+                    setNoticeError('');
+                  }}
+                >
+                  Xóa
+                </button>
+              )}
+              <button 
+                type="button"
+                className="modalBtnPrimary" 
+                style={{ flex: 1 }}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  const daysNum = parseInt(editNoticeDays, 10);
+                  if (!editNoticeTitle.trim() || isNaN(daysNum) || daysNum <= 0) {
+                    setNoticeError('Vui lòng nhập đầy đủ nội dung và số ngày hợp lệ (>0).');
+                    return;
+                  }
+                  
+                  const startDate = Date.now();
+                  handleUpdateAccount(noticeEditModal.account.id, {
+                    notice: {
+                      title: editNoticeTitle.trim(),
+                      content: editNoticeTitle.trim(),
+                      dueDate: startDate + daysNum * 24 * 60 * 60 * 1000,
+                      days: daysNum,
+                      startDate,
+                      dailyReminderTime: editNoticeTime || undefined
+                    } as any
+                  });
+                  
+                  setNoticeEditModal(null);
+                  setEditNoticeTitle('');
+                  setEditNoticeDays('');
+                  setEditNoticeTime('');
+                  setNoticeError('');
+                }}
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 });
@@ -2778,6 +3107,7 @@ export function DeviceAccountOverlay({
   const [hideQR, setHideQR] = useState(() => localStorage.getItem('monviewphone:dav-hide-qr') === 'true');
   const [hideCreatedAt, setHideCreatedAt] = useState(() => localStorage.getItem('monviewphone:dav-hide-created-at') === 'true');
   const [alwaysShowHeader, setAlwaysShowHeader] = useState(() => localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
+  const [hideName, setHideName] = useState(() => localStorage.getItem('monviewphone:dav-hide-name') === 'true');
   // Ẩn số máy (dav-order) khi Overlay Header mode
   const [headerHideOrder, setHeaderHideOrder] = useState(() => localStorage.getItem('monviewphone:dav-header-hide-order') === 'true');
   // Chế độ nền tối thiểu (chỉ nền sau nội dung) khi Overlay Header
@@ -2792,6 +3122,7 @@ export function DeviceAccountOverlay({
       setAlwaysShowHeader(localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
       setHeaderHideOrder(localStorage.getItem('monviewphone:dav-header-hide-order') === 'true');
       setHeaderMinimalBg(localStorage.getItem('monviewphone:dav-header-minimal-bg') === 'true');
+      setHideName(localStorage.getItem('monviewphone:dav-hide-name') === 'true');
     };
     window.addEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
     return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
@@ -3113,6 +3444,30 @@ export function DeviceAccountOverlay({
                 }}
               >
                 <div className="dav-toggle-knob" style={{ width: 12, height: 12, top: 2, left: alwaysShowHeader ? 18 : 2 }} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 12 }}>
+              <span style={{ fontSize: 11, color: 'var(--md-muted)', userSelect: 'none' }}>Ẩn Tên</span>
+              <button
+                type="button"
+                className={`dav-toggle-switch ${hideName ? 'on' : ''}`}
+                style={{ width: 34, height: 18 }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const nextVal = !hideName;
+                  setHideName(nextVal);
+                  localStorage.setItem('monviewphone:dav-hide-name', String(nextVal));
+                  saveBackendSetting('monviewphone:dav-hide-name', String(nextVal));
+                  window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+                }}
+                onDoubleClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                <div className="dav-toggle-knob" style={{ width: 12, height: 12, top: 2, left: hideName ? 18 : 2 }} />
               </button>
             </div>
           </div>
@@ -3459,6 +3814,29 @@ export function DeviceAccountOverlay({
                       setHeaderHideOrder(next);
                       localStorage.setItem('monviewphone:dav-header-hide-order', String(next));
                       saveBackendSetting('monviewphone:dav-header-hide-order', String(next));
+                      window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+                    }}
+                  >
+                    <div className="dav-toggle-knob" />
+                  </button>
+                </div>
+              </div>
+
+              {/* btn_dav_settings_hide_name : Bật/Tắt ẩn tên */}
+              <div className="dav-settings-toggle-row" style={{ marginTop: 8 }}>
+                <span className="dav-settings-toggle-label">Ẩn tên</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: hideName ? 'var(--md-info)' : 'var(--md-muted)' }}>
+                    {hideName ? 'On' : 'Off'}
+                  </span>
+                  <button
+                    type="button"
+                    className={`dav-toggle-switch ${hideName ? 'on' : ''}`}
+                    onClick={() => {
+                      const next = !hideName;
+                      setHideName(next);
+                      localStorage.setItem('monviewphone:dav-hide-name', String(next));
+                      saveBackendSetting('monviewphone:dav-hide-name', String(next));
                       window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
                     }}
                   >

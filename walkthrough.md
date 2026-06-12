@@ -551,9 +551,81 @@ Chúng tôi đã thực hiện các thay đổi sau để cải tiến logic hi�
 
 4. **Quy Tắc Tooltip và Tinh Chỉnh Khác**:
    - Bổ sung quy tắc vào [rule.md](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/rule.md#L291-L297): tất cả tooltip trong ứng dụng phải hiển thị tức thì, không delay, và ưu tiên sử dụng tooltip nổi tùy biến thay vì `title` mặc định của trình duyệt để có trải nghiệm UI/UX tốt nhất.
-   - Loại bỏ thuộc tính `title="Click con lăn để mở màn hình lớn"` ở container `.dav-panel-title-left` (khoảng dòng 1323) và `title="Tong so tai khoan..."` ở `.dav-total-badge` để tránh việc các tooltip mặc định của trình duyệt xuất hiện gây đè lấp, rối mắt khi người dùng di chuột chuẩn bị thao tác.
-   - Áp dụng tooltip nổi của tài khoản hoạt động cho toàn bộ vùng tiêu đề thiết bị (bao gồm số thứ tự `.dav-panel-title-left`, badge số tài khoản `.dav-total-badge`, và icon Shield bảo mật `.dav-header-name-wrapper`) thông qua các sự kiện hover (`onMouseEnter`, `onMouseMove`, `onMouseLeave`), đảm bảo khi người dùng hover vào bất cứ vùng nào trên header thiết bị đều nhìn thấy tooltip nổi của tài khoản.
+   - Loại bỏ thuộc tính `title="Click con lăn để mở màn hình lớn"` ở container `.dav-panel-title-left` (khoảng dòng 1323) để tránh việc tooltip mặc định của trình duyệt xuất hiện gây đè lấp, rối mắt khi người dùng di chuột chuẩn bị thao tác con lăn.
    - Loại bỏ biểu tượng dấu chấm hỏi `?` ngay con trỏ chuột khi hover vào badge user `U{userId}` bằng cách thay thế kiểu cursor từ `help` thành `pointer`.
+   - **Tự động căn lề chống tràn màn hình**: Triển khai hàm helper `getFloatingTooltipStyle` tự động tính toán vị trí hiển thị và thuộc tính `transform` cho cả 3 tooltip nổi (`bellTooltip`, `accountHoverTooltip`, `badgeHoverTooltip`) dựa trên tọa độ X/Y của con trỏ chuột. Nếu chuột nằm sát mép trái (`x < 150`), tooltip tự động đẩy lệch hẳn sang bên phải; nếu chuột nằm sát mép phải (`x > screenWidth - 180`), tooltip tự động đẩy lệch hẳn sang bên trái để không bao giờ bị tràn ra ngoài màn hình máy tính.
 
-5. **Xác thực & Biên dịch**:
+5. **Tooltip Nổi Cho Badge Tài Khoản (.dav-total-badge)**:
+   - Loại bỏ tooltip `title` tĩnh trên nút badge tổng số tài khoản `.dav-total-badge`.
+   - Thiết lập Portal và state `badgeHoverTooltip` hiển thị tooltip nổi không delay đi theo con trỏ chuột khi hover vào `.dav-total-badge`.
+   - Định dạng nội dung tooltip hiển thị danh sách tất cả tài khoản của thiết bị (mỗi tài khoản 1 dòng):
+     - Đối với tài khoản hoạt động (`Live`, `Risk`, `Verify`, `Unverified`): `"Tên tài khoản: 📍 Đủ điều kiện"` (nếu đủ điều kiện Nearby) hoặc `"Tên tài khoản: 📍 X ngày"` (nếu gần đến ngày Nearby). Phần thông tin Thông báo (Notice) đã được loại bỏ khỏi đây do nút chuông thông báo đã sở hữu tooltip độc lập.
+     - Đối với tài khoản đã chết (`Die`): `"Tên tài khoản: Die"`.
+   - Thay đổi cơ chế render của cả hai Portal tooltip nổi (`accountHoverTooltip` và `badgeHoverTooltip`) sang JSX để **tô màu sắc cho tên tài khoản** khớp 100% với quy tắc hiển thị trên giao diện (ví dụ: xanh dương cho eligible, đỏ cho Die, cam cho Risk, vàng cho Unverified, xanh lá cho tài khoản > 1 năm, trắng cho tài khoản < 1 năm).
+
+6. **Xác thực & Biên dịch**:
    - Chạy lệnh `npm run build` biên dịch thành công 100% frontend mà không có bất kỳ lỗi TS/Vite nào.
+
+## Tối Ưu Hóa Vị Trí Tooltip Chống Tràn Màn Hình
+
+Chúng tôi đã thực hiện thay đổi sau để tối ưu hóa việc hiển thị các tooltip nổi:
+
+1. **Cải Tiến Hàm getFloatingTooltipStyle**:
+   - Thay đổi các ngưỡng tĩnh `x < 150` và `x > screenWidth - 180` thành ngưỡng động thông minh dựa trên độ rộng màn hình (mặc định là `250px` hoặc tự động giảm xuống bằng một nửa chiều rộng màn hình trừ đi 20px nếu cửa sổ rất nhỏ).
+   - Khi hover vào badge tổng số tài khoản (`badgeHoverTooltip`) ở các title sát màn hình bên trái, tooltip (danh sách tài khoản) sẽ tự động hiển thị lệch sang bên phải của con trỏ chuột thay vì bị tràn hoặc cắt mất ở mép trái màn hình.
+   - Khi hover vào badge thông báo (`bellTooltip`) ở các title sát màn hình bên phải, tooltip cảnh báo sẽ tự động hiển thị lệch sang bên trái của con trỏ chuột thay vì bị tràn ở mép phải màn hình.
+   - Tương tự, tooltip của dòng tài khoản (`accountHoverTooltip`) cũng thừa hưởng cơ chế căn lề động này.
+
+2. **Xác thực & Biên dịch**:
+   - Chạy lệnh `npm run build` biên dịch thành công 100% frontend mà không có bất kỳ lỗi TS/Vite nào.
+
+## Bổ Sung Toggle "Ẩn Tên" Trực Tiếp Trên Header
+
+Chúng tôi đã bổ sung nút toggle "Ẩn Tên" (Hide Name) để phục vụ cho các trường hợp ghi hình/chụp ảnh màn hình cần bảo mật thông tin tài khoản:
+
+1. **Giao diện & Tương tác**:
+   - Thêm toggle switch **Ẩn Tên** (kèm trạng thái On/Off) ngay bên cạnh toggle **Overlay Header** trên thanh tiêu đề của bảng điều khiển nổi ("Quản lý tài khoản").
+   - Đồng thời bổ sung một cấu hình **Ẩn tên** tương ứng trong cài đặt chính (dưới mục Overlay Header) để đồng bộ hóa.
+
+2. **Logic & Đồng bộ hóa**:
+   - Lưu trạng thái toggle vào localStorage qua khóa `monviewphone:dav-hide-name` và gửi cài đặt lên backend thông qua hàm `saveBackendSetting`.
+   - Đồng bộ hóa trạng thái qua CustomEvent `monviewphone:dav-hide-settings-changed` để tất cả các thiết bị (`DeviceAccountPanel` trên từng `Tile`) nhận biết tức thời sự thay đổi.
+
+3. **Ẩn hiển thị trên Header**:
+   - Khi toggle **Ẩn Tên** ở trạng thái **ON**, phần hiển thị tên tài khoản ở Overlay Header của mỗi thiết bị (`header-name-display`) sẽ được ẩn hoàn toàn (render rỗng), giúp bảo vệ danh tính tài khoản nhưng vẫn giữ nguyên icon location/trạng thái kế bên và cho phép hover hiển thị tooltip hoặc click/right-click để mở dropdown/menu.
+
+4. **Xác thực & Biên dịch**:
+   - Chạy lệnh `npm run build` biên dịch thành công 100% frontend mà không có lỗi.
+
+## Sửa Lỗi Tooltip Bị Treo Khi Chọn Tài Khoản Từ Dropdown
+
+Chúng tôi đã sửa lỗi khi người dùng click chọn một tài khoản từ dropdown khiến dropdown unmount ngay lập tức và làm tooltip hover bị treo:
+
+1. **Nguyên nhân**:
+   - Khi click chọn một tài khoản, click handler của dropdown item gọi `setAccountTitleDropdownOpen(false)` và `e.stopPropagation()` để đóng menu ngay lập tức. Điều này làm unmount toàn bộ danh sách dropdown items trong khi con trỏ chuột vẫn đang nằm trên item đó.
+   - Do phần tử DOM bị unmount đột ngột, trình duyệt không thể bắn sự kiện `mouseleave` lên phần tử đó nữa, dẫn đến việc `setAccountHoverTooltip(null)` không được kích hoạt và làm tooltip bị treo vĩnh viễn trên màn hình.
+
+2. **Cách khắc phục**:
+   - Bổ sung lệnh gọi trực tiếp `setAccountHoverTooltip(null)` ngay trong click handler (`onClick`) của dropdown item `.dav-title-account-item` trước khi tiến hành đóng dropdown và khởi chạy ứng dụng WeChat.
+   - Cơ chế này đảm bảo tooltip nổi được dọn dẹp sạch sẽ ngay khi sự kiện click diễn ra mà không phụ thuộc vào sự kiện `mouseleave`.
+
+3. **Xác thực**:
+   - Chạy lệnh `npm run build` biên dịch thành công 100% không có lỗi.
+
+## Thêm Tùy Chọn "Thông báo" Vào Context Menu Tài Khoản
+
+Chúng tôi đã bổ sung tùy chọn **Thông báo** vào menu chuột phải của tài khoản (cả ở danh sách dropdown và tên tài khoản trên header):
+
+1. **Giao diện Menu**:
+   - Thêm nút **Thông báo** (Notice) nằm ngay dưới dòng **Copy ID ( User name)** trong context menu tài khoản.
+
+2. **Hộp Thoại Cài Đặt (Modal Portal)**:
+   - Khi click chọn **Thông báo**, một hộp thoại tùy chỉnh (`noticeEditModal`) dạng Portal sẽ được mở ra ở vị trí chính giữa màn hình (đè lên trên tất cả các lớp khác bằng `zIndex: 28000`).
+   - Cho phép người dùng chỉnh sửa trực tiếp nội dung thông báo (`Nội dung`) và số ngày đếm ngược (`Số ngày đếm ngược`) của tài khoản được chọn, tương tự như form chỉnh sửa thông báo ở phần thân panel.
+   - Hộp thoại cung cấp đầy đủ các nút **Hủy**, **Xóa** (chỉ hiển thị nếu tài khoản đang có thông báo) và **Xác nhận**.
+
+3. **Cơ Chế Báo Lỗi Trực Quan (Không Dùng Alert Native)**:
+   - Sử dụng biến state `noticeError` hiển thị lỗi nhập liệu trực tiếp dưới dạng văn bản màu đỏ trong modal khi người dùng bỏ trống nội dung hoặc nhập số ngày không hợp lệ, tuyệt đối không sử dụng alert mặc định của trình duyệt theo đúng quy định.
+
+4. **Xác thực**:
+   - Chạy lệnh `npm run build` biên dịch thành công 100% không có lỗi.
