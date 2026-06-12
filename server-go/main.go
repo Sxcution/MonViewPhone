@@ -274,6 +274,9 @@ func main() {
 			case "/api/goog/device/order":
 				handleDeviceOrder(w, r)
 				return
+			case "/api/goog/device/account-vault":
+				handleAccountVault(w, r)
+				return
 			case "/api/goog/device/set-wallpaper":
 				handleSetWallpaper(w, r)
 				return

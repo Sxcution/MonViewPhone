@@ -46,8 +46,9 @@ Removed legacy layers:
 
 - ## Go Backend
 - `server-go/main.go`: HTTP/WebSocket entry point, CORS setup, and serves React static files from `client/dist` (including SPA routing fallback).
-- [MODIFY] [rest.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/rest.go): REST endpoints used by the frontend, including profile listing, APK install, file import/export, and ADB command execution. Modified settings endpoint POST handler to run a database-level safety check prior to writing account configurations.
-- [NEW] [account_db.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/account_db.go): SQLite database layer for device accounts (mapped to Data.db). Implements database initialization, syncing client vaults to SQLite tables, and the safety guard validator `validateNewVaultAgainstDB` to refuse saving downgrades (checks devices >= 35, WeChat accounts >= 104, has Emma Zhao).
+- [MODIFY] [rest.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/rest.go): REST endpoints used by the frontend, including profile listing, APK install, file import/export, and ADB command execution. Added explicit DB-backed endpoints `/api/goog/device/account-vault` and `/api/goog/device/order` with safety guard logic, and refactored `/api/goog/device/settings` to act as a pure compatibility wrapper that reads state from DB and does not save account or order data back to settings.json.
+- [MODIFY] [account_db.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/account_db.go): SQLite database layer for device accounts (mapped to Data.db). Implements database initialization, syncing client vaults to SQLite tables without destroying `device_order`, safety guard validator `validateNewVaultAgainstDB`, and auto-repairing missing device orders.
+- [MODIFY] [main.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/main.tsx): App entry point. Refactored startup synchronization logic to always hydrate browser localStorage cache from backend database state, ensuring backend Data.db remains the sole source of truth.
 - `server-go/adb/`: ADB helpers and device tracker.
 - `server-go/scrcpy/`: Scrcpy server launch/config helpers.
 - `server-go/websocket/`: Device-list and stream proxy WebSocket handlers.

@@ -250,9 +250,6 @@ func syncDeviceAccountVaultToDB(raw string) error {
 	if _, err := tx.Exec("DELETE FROM accounts"); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("DELETE FROM devices"); err != nil {
-		return err
-	}
 
 	insertDevice, err := tx.Prepare(`
 		INSERT INTO devices (udid, display_name, updated_at)
@@ -502,6 +499,54 @@ func getDeviceOrderFromDB() (map[string]int, error) {
 		}
 		order[udid] = deviceOrder
 	}
+	
+	// Check total devices
+	var totalDevices int
+	_ = db.QueryRow("SELECT COUNT(*) FROM devices").Scan(&totalDevices)
+	
+	if len(order) < totalDevices && totalDevices > 0 {
+		// Repair
+		repairRows, err := db.Query("SELECT udid FROM devices")
+		if err == nil {
+			idx := 1
+			for repairRows.Next() {
+				var u string
+				if err := repairRows.Scan(&u); err == nil {
+					if _, exists := order[u]; !exists {
+						order[u] = idx
+						idx++
+					} else {
+						// Ensure index pushes past existing
+						if order[u] >= idx {
+							idx = order[u] + 1
+						}
+					}
+				}
+			}
+			repairRows.Close()
+			
+			// Re-number empty ones
+			idx = 1
+			for _, v := range order {
+				if v > idx {
+					idx = v + 1
+				}
+			}
+			repairRows, _ = db.Query("SELECT udid FROM devices")
+			for repairRows.Next() {
+				var u string
+				_ = repairRows.Scan(&u)
+				if _, ok := order[u]; !ok {
+					order[u] = idx
+					idx++
+				}
+			}
+			repairRows.Close()
+			
+			updateDeviceOrderInDB(order)
+		}
+	}
+	
 	return order, nil
 }
 

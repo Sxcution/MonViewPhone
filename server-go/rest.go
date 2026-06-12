@@ -686,10 +686,19 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 
 		// Merge new keys from temp into settings
 		for k, v := range temp {
-			settings[k] = v
+			if k != deviceAccountVaultKey && k != "tileOrderNumbers" {
+				settings[k] = v
+			}
 		}
 
 		incomingVaultRaw, hasIncomingVault := temp[deviceAccountVaultKey].(string)
+		
+		if incomingOrderNumbersRaw, ok := temp["tileOrderNumbers"].(string); ok {
+			var orderMap map[string]int
+			if err := json.Unmarshal([]byte(incomingOrderNumbersRaw), &orderMap); err == nil && len(orderMap) >= 35 {
+				_ = updateDeviceOrderInDB(orderMap)
+			}
+		}
 		if hasIncomingVault {
 			if err := syncDeviceAccountVaultToDB(incomingVaultRaw); err != nil {
 				writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to sync device account DB: " + err.Error()})
@@ -712,7 +721,15 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		body, err = json.Marshal(settings)
+		// Prepare settings to save to settings.json - exclude vault and tileOrderNumbers
+		saveSettings := make(map[string]interface{})
+		for k, v := range settings {
+			if k != deviceAccountVaultKey && k != "tileOrderNumbers" {
+				saveSettings[k] = v
+			}
+		}
+
+		body, err = json.Marshal(saveSettings)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
 			return
@@ -749,6 +766,33 @@ func handleDeviceOrder(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if len(req.OrderNumbers) == 0 {
+			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "orderNumbers cannot be empty"})
+			return
+		}
+
+		for k, v := range req.OrderNumbers {
+			if k == "" {
+				writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "UDID key cannot be empty"})
+				return
+			}
+			if v <= 0 {
+				writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Order value must be > 0"})
+				return
+			}
+		}
+
+		db, err := openDeviceAccountDB()
+		if err == nil {
+			var dbDevices int
+			_ = db.QueryRow("SELECT COUNT(*) FROM devices").Scan(&dbDevices)
+			db.Close()
+			if dbDevices >= 35 && len(req.OrderNumbers) < 35 {
+				writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Cannot downgrade orderNumbers below 35"})
+				return
+			}
+		}
+
 		if err := updateDeviceOrderInDB(req.OrderNumbers); err != nil {
 			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
 			return
@@ -769,6 +813,56 @@ func handleDeviceOrder(w http.ResponseWriter, r *http.Request) {
 		}
 		if body, err := json.Marshal(settings); err == nil {
 			os.WriteFile(settingsFile, body, 0644)
+		}
+
+		writeJSON(w, http.StatusOK, jsonResponse{"success": true})
+		return
+	}
+
+	writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
+}
+
+func handleAccountVault(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		vaultRaw, ok, err := loadDeviceAccountVaultFromDB()
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
+			return
+		}
+		if !ok {
+			writeJSON(w, http.StatusNotFound, jsonResponse{"success": false, "error": "Vault not found in DB"})
+			return
+		}
+		var vault map[string]interface{}
+		json.Unmarshal([]byte(vaultRaw), &vault)
+		writeJSON(w, http.StatusOK, map[string]interface{}{"success": true, "vault": vault})
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		var req struct {
+			Vault map[string]interface{} `json:"vault"`
+		}
+		if err := readJSON(r, &req); err != nil {
+			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid request parameters"})
+			return
+		}
+		
+		vaultBytes, err := json.Marshal(req.Vault)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid vault JSON"})
+			return
+		}
+		vaultStr := string(vaultBytes)
+		
+		if err := validateNewVaultAgainstDB(vaultStr); err != nil {
+			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": err.Error()})
+			return
+		}
+		
+		if err := syncDeviceAccountVaultToDB(vaultStr); err != nil {
+			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
+			return
 		}
 
 		writeJSON(w, http.StatusOK, jsonResponse{"success": true})

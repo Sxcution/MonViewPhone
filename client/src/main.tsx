@@ -195,12 +195,6 @@ async function syncSettingsWithBackend(): Promise<boolean> {
     // Populate localStorage with backend keys
     for (const [key, val] of Object.entries(data)) {
       if (typeof val === 'string') {
-        if (key === 'monviewphone:device-account-vault') {
-          if (localWechatCount > backendWechatCount) {
-            console.warn(`Local vault has more accounts (${localWechatCount}) than backend (${backendWechatCount}). Skipping overwrite.`);
-            continue;
-          }
-        }
         localStorage.setItem(key, val);
       }
     }

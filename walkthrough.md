@@ -109,6 +109,37 @@ Chúng tôi đã chuyển hoàn toàn cơ chế đồng bộ dữ liệu của M
    - Loại bỏ hoàn toàn hằng số `SYNCED_KEYS`, đối tượng cache `lastSyncedValues` và vòng lặp `setInterval(..., 1500)`.
    - Giữ lại đầy đủ cơ chế tải cấu hình ban đầu từ backend (bootstrap settings), kiểm tra an toàn dữ liệu đầu vào (validateBackendSettings), và ghi đè an toàn vào `localStorage` lúc tải trang.
 
-5. **Kết quả kiểm thử**:
+5. **Kiểm thử tự động**:
    - Biên dịch thành công 100% frontend (`npm run build`) và backend Go.
    - Chạy kiểm thử tự động thành công 100% các trường hợp: chặn payload rỗng, chặn key rỗng/null, chặn tileOrder/tileOrderNumbers thiếu máy (<35), kiểm tra lưu và xoá hotkey thành công.
+
+## Di chuyển dữ liệu sang Data.db làm Source of Truth duy nhất
+
+Chúng tôi đã hoàn thành quá trình chuyển đổi toàn diện để biến cơ sở dữ liệu `server-go/data/Data.db` thành nguồn dữ liệu đáng tin cậy duy nhất (Source of Truth) cho thông tin tài khoản và thứ tự hiển thị của thiết bị:
+
+1. **Chuẩn hoá SQLite Schema & Bảo vệ thứ tự máy (`server-go/account_db.go`)**:
+   - Bỏ lệnh `DELETE FROM devices` trong quá trình đồng bộ `syncDeviceAccountVaultToDB` nhằm bảo toàn cột `device_order` (thứ tự hiển thị số máy) tránh bị mất mát khi lưu tài khoản.
+   - Thêm cơ chế tự động sửa lỗi (auto-repair) trong `getDeviceOrderFromDB`: Nếu thứ tự thiết bị thiếu, tự động đánh số tuần tự `1..N` theo danh sách UDID hiện có trong cơ sở dữ liệu và cập nhật lại vào DB.
+
+2. **Triển khai API đồng bộ Database trực tiếp (`server-go/rest.go` & `main.go`)**:
+   - Đăng ký endpoint `/api/goog/device/account-vault` (GET/POST) thực hiện việc đọc/ghi dữ liệu account vault trực tiếp từ cơ sở dữ liệu SQLite, tích hợp cơ chế bảo vệ backend chặn hạ cấp (Refuse downgrade) dưới 35 thiết bị, dưới 104 WeChat accounts hoặc mất Emma Zhao.
+   - Đăng ký endpoint `/api/goog/device/order` (GET/POST) để lưu trữ trực tiếp số thứ tự máy của thiết bị vào cột `device_order` trong bảng `devices`.
+
+3. **Chuyển `/api/goog/device/settings` thành Compatibility Endpoint**:
+   - Cập nhật handler GET `/api/goog/device/settings` để tự động dựng dữ liệu account vault và `tileOrderNumbers` trực tiếp từ SQLite trước khi gửi về client, giúp các luồng cũ không bị gián đoạn.
+   - Cập nhật POST `/api/goog/device/settings` loại bỏ hoàn toàn các trường dữ liệu `monviewphone:device-account-vault` và `tileOrderNumbers` ra khỏi tệp `settings.json` khi ghi đè, đồng thời điều hướng việc lưu trữ các khoá này sang DB.
+
+4. **Đồng bộ phía Frontend (`client/`)**:
+   - Cập nhật `client/src/lib/backendSettings.ts` để `saveDeviceAccountVaultToBackend` gửi yêu cầu POST trực tiếp đến endpoint chuyên biệt `/api/goog/device/account-vault` thay vì API cấu hình chung.
+   - Điều chỉnh logic khởi động trong `client/src/main.tsx` để luôn ghi đè và đồng bộ dữ liệu `localStorage` từ backend settings (không so sánh số lượng tài khoản WeChat để tránh cache cũ trong trình duyệt ghi đè ngược làm hỏng DB).
+
+5. **Launcher Preflight Auto-Repair (`run.pyw`)**:
+   - Sửa đổi kịch bản kiểm tra an toàn dữ liệu trước khi mở app: Bỏ chặn khởi động app chỉ vì thiếu `tileOrderNumbers` trong `settings.json`.
+   - Nếu phát hiện thiếu thứ tự hiển thị thiết bị, launcher sẽ tự động gọi API `/api/goog/device/order` để backend tự động repair dựa trên dữ liệu thiết bị trong SQLite và cho phép ứng dụng khởi động bình thường.
+
+6. **Kết quả kiểm thử**:
+   - Đã biên dịch thành công 100% frontend (`npm run build`) và backend Go (`go build -o server-go.exe`).
+   - Chạy kịch bản tích hợp `test_repair_and_sync.py` và `test_launcher_preflight.py` thành công tốt đẹp:
+     - Tệp `settings.json` hoàn toàn sạch sẽ, không còn chứa các trường dữ liệu lớn hoặc nhạy cảm của tài khoản và thứ tự hiển thị.
+     - Dữ liệu tài khoản (Emma Zhao, WeChat) được đọc/ghi trực tiếp và an toàn từ `Data.db`.
+     - Launcher khởi động và tự repair dữ liệu thành công không gặp lỗi chặn đứng.

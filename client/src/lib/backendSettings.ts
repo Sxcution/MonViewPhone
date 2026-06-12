@@ -139,14 +139,22 @@ export async function saveDeviceAccountVaultToBackend(vault: VaultData): Promise
     return;
   }
 
-  const settingsUrl = getSettingsUrl();
-  const rawVault = JSON.stringify(vault);
+  const { wsServer } = readPageParams();
+  let urlStr = 'http://localhost:11000/api/goog/device/account-vault';
+  try {
+    const url = new URL(wsServer);
+    url.protocol = url.protocol === 'wss:' ? 'https:' : 'http:';
+    url.pathname = '/api/goog/device/account-vault';
+    url.search = '';
+    url.hash = '';
+    urlStr = url.toString();
+  } catch(e) {}
 
   try {
-    const res = await fetch(settingsUrl, {
+    const res = await fetch(urlStr, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 'monviewphone:device-account-vault': rawVault })
+      body: JSON.stringify({ vault: vault })
     });
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
