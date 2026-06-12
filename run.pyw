@@ -8,8 +8,19 @@ import subprocess
 import urllib.request
 import json
 import webbrowser
+import traceback
+from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 from pystray import Icon as TrayIcon, Menu as TrayMenu, MenuItem as TrayMenuItem
+
+
+def log_message(message):
+    try:
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "launcher.log")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
+    except Exception:
+        pass
 
 # Global references to the subprocesses
 go_process = None
@@ -64,6 +75,7 @@ def show_error_message(title, message):
 
 
 def verify_data_safety():
+    log_message("verify_data_safety start")
     url = f"{BASE_URL}api/goog/device/settings"
     try:
         # Give Go server a bit of time to respond, up to 15 retries
@@ -78,16 +90,19 @@ def verify_data_safety():
             except Exception:
                 time.sleep(0.5)
         else:
+            log_message("verify_data_safety end: connection failed")
             return False, "Không thể kết nối đến backend server để kiểm tra dữ liệu."
         
         # Check keys
         vault_str = data.get("monviewphone:device-account-vault")
         if not vault_str:
+            log_message("verify_data_safety end: missing vault key")
             return False, "Thiếu trường dữ liệu tài khoản (monviewphone:device-account-vault) trên server."
             
         try:
             vault = json.loads(vault_str)
         except Exception as e:
+            log_message(f"verify_data_safety end: vault decode failed: {e}")
             return False, f"Không thể giải mã JSON vault: {e}"
             
         devices = vault.get("devices", {})
@@ -149,13 +164,16 @@ def verify_data_safety():
                 f"- Tìm thấy Emma Zhao: {'CÓ' if has_emma_zhao else 'KHÔNG'}\n\n"
                 "Vui lòng tắt launcher, restore lại settings.json / Data.db từ thư mục Backup mới nhất trước khi chạy lại."
             )
+            log_message(f"verify_data_safety end: safety check failed (devices={device_count}, wechat={wechat_account_count})")
             return False, err_msg
             
         if not tile_order_ok or not tile_order_numbers_ok:
             print("[Auto-Repair] tileOrder or tileOrderNumbers missing/incomplete. Backend will repair on load.")
             
+        log_message("verify_data_safety end: success")
         return True, ""
     except Exception as e:
+        log_message(f"verify_data_safety end: error {e}")
         return False, f"Lỗi xảy ra trong quá trình verify dữ liệu: {e}"
 
 
@@ -188,11 +206,11 @@ def close_app_window():
         print(f"Fallback close window failed: {e}")
 
 
-def open_app(icon=None, item=None, mode=None):
+def open_app(icon=None, item=None):
     global chrome_process, current_mode
-    if mode is None:
-        mode = current_mode or load_launcher_mode()
+    mode = current_mode or load_launcher_mode()
         
+    log_message(f"open_app start (mode={mode})")
     url = get_app_url(mode)
     close_app_window()
     
@@ -222,8 +240,12 @@ def open_app(icon=None, item=None, mode=None):
                 ["cmd", "/c", "start", "chrome", f"--user-data-dir={profile_dir}", f"--app={url}"],
                 creationflags=subprocess.CREATE_NO_WINDOW
             )
-        except Exception:
+            opened = True
+        except Exception as e:
+            log_message(f"Failed to spawn chrome via cmd fallback: {e}")
             webbrowser.open(url)
+            
+    log_message(f"open_app end (opened={opened})")
 
 
 def acquire_single_instance_lock():
@@ -404,7 +426,7 @@ def switch_mode(icon, mode):
     if mode == current_mode:
         close_app_window()
         ensure_mode_ready(mode)
-        open_app(mode=mode)
+        open_app()
         return
 
     save_launcher_mode(mode)
@@ -418,7 +440,13 @@ def switch_mode(icon, mode):
         start_vite_dev_server()
 
     ensure_mode_ready(mode)
-    open_app(mode=mode)
+    
+    try:
+        icon.menu = create_tray_icon().menu
+    except Exception as e:
+        log_message(f"Failed to update menu in switch_mode: {e}")
+
+    open_app()
 
 
 def create_tray_icon():
@@ -426,46 +454,62 @@ def create_tray_icon():
     image = None
     if os.path.exists(icon_path):
         try:
-            image = Image.open(icon_path)
+            image = Image.open(icon_path).convert("RGBA")
+            image.thumbnail((64, 64))
         except Exception as e:
-            print(f"Failed to load tray icon image: {e}")
+            log_message(f"Failed to load tray icon image: {e}")
 
     if image is None:
-        width, height = 64, 64
-        image = Image.new('RGB', (width, height), color='#2596be')
-        draw = ImageDraw.Draw(image)
         try:
-            font = ImageFont.truetype("arial.ttf", 40)
-            draw.text((15, 8), "P", fill="#ffffff", font=font)
-        except Exception:
-            draw.text((15, 10), "P", fill="#ffffff")
+            width, height = 64, 64
+            image = Image.new('RGBA', (width, height), color='#2596be')
+            draw = ImageDraw.Draw(image)
+            try:
+                font = ImageFont.truetype("arial.ttf", 40)
+                draw.text((15, 8), "P", fill="#ffffff", font=font)
+            except Exception:
+                draw.text((15, 10), "P", fill="#ffffff")
+        except Exception as e:
+            log_message(f"Failed to create fallback image: {e}")
 
-    menu = TrayMenu(
-        TrayMenuItem("Open", open_app, default=True),
-        TrayMenuItem(
-            "Khởi chạy mode",
-            TrayMenu(
-                TrayMenuItem(
-                    "Dev Mode",
-                    lambda icon, item: switch_mode(icon, "dev"),
-                    checked=lambda item: current_mode == "dev"
-                ),
-                TrayMenuItem(
-                    "Normal Mode",
-                    lambda icon, item: switch_mode(icon, "normal"),
-                    checked=lambda item: current_mode == "normal"
-                ),
+    menu = None
+    try:
+        dev_label = "✓ Dev Mode" if current_mode == "dev" else "Dev Mode"
+        normal_label = "✓ Normal Mode" if current_mode == "normal" else "Normal Mode"
+
+        mode_menu = TrayMenu(
+            TrayMenuItem(dev_label, lambda icon, item: switch_mode(icon, "dev")),
+            TrayMenuItem(normal_label, lambda icon, item: switch_mode(icon, "normal")),
+        )
+
+        menu = TrayMenu(
+            TrayMenuItem("Open", open_app, default=True),
+            TrayMenuItem("Khởi chạy mode", mode_menu),
+            TrayMenuItem("Restart", restart_application),
+            TrayMenuItem("Exit", exit_application)
+        )
+    except Exception as e:
+        log_message(f"Failed to create full tray menu: {traceback.format_exc()}")
+        try:
+            menu = TrayMenu(
+                TrayMenuItem("Open", open_app, default=True),
+                TrayMenuItem("Restart", restart_application),
+                TrayMenuItem("Exit", exit_application)
             )
-        ),
-        TrayMenuItem("Restart", restart_application),
-        TrayMenuItem("Exit", exit_application)
-    )
+        except Exception as e2:
+            log_message(f"Failed to create basic fallback menu: {e2}")
 
-    icon = TrayIcon(APP_NAME, image, APP_NAME, menu)
+    try:
+        icon = TrayIcon(APP_NAME, image, APP_NAME, menu)
+    except Exception as e:
+        log_message(f"Failed to create TrayIcon object: {traceback.format_exc()}")
+        raise e
+
     return icon
 
 
 def ensure_mode_ready(mode):
+    log_message(f"ensure_mode_ready start: {mode}")
     start_backend()
     
     # Wait for backend to listen
@@ -481,23 +525,29 @@ def ensure_mode_ready(mode):
             "Lỗi khởi động",
             "Không thể kết nối đến server-go.exe ở cổng 11000 sau 15 giây."
         )
+        log_message("ensure_mode_ready end: backend failed to start")
         return False
 
     if mode == "normal":
         stop_vite_dev_server()
     elif mode == "dev":
         if not start_vite_dev_server():
+            log_message("ensure_mode_ready end: vite failed to start")
             return False
             
+    log_message("ensure_mode_ready end: success")
     return True
 
 
 def main():
+    log_message("main start")
     global current_mode
     if not acquire_single_instance_lock():
+        log_message("main aborted: single instance lock acquired by another process")
         return
 
     current_mode = load_launcher_mode()
+    log_message(f"current_mode loaded: {current_mode}")
 
     # Check index.html build first (only in normal mode)
     if current_mode == "normal":
@@ -507,6 +557,7 @@ def main():
                 "Chưa build frontend",
                 "Chưa build frontend. Vui lòng chạy:\n\ncd client && npm run build\n\ntrước khi khởi động ứng dụng."
             )
+            log_message("main exit: client/dist/index.html missing in Normal Mode")
             sys.exit(1)
 
     if not ensure_mode_ready(current_mode):
@@ -523,14 +574,25 @@ def main():
         sys.exit(1)
 
     # Open Chrome App
-    open_app(mode=current_mode)
+    open_app()
     
+    log_message("create_tray_icon start")
     icon = create_tray_icon()
+    log_message("create_tray_icon end")
+    
+    log_message("icon.run before")
     icon.run()
+    log_message("icon.run after")
 
 
 if __name__ == "__main__":
     # Ensure working directory is the script directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(script_dir)
-    main()
+    try:
+        log_message("launcher start")
+        main()
+    except Exception as e:
+        err = traceback.format_exc()
+        log_message("FATAL ERROR:\n" + err)
+        show_error_message("MonViewPhone Launcher Error", err)

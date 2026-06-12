@@ -331,6 +331,7 @@
     "app_icon_ico": "assets/IconMonViewPhone.ico",
     "favicon_ico": "client/public/favicon.ico",
     "favicon_png": "client/public/favicon.png",
-    "launcher_config": "launcher_config.json"
+    "launcher_config": "launcher_config.json",
+    "launcher_log": "launcher.log"
   }
 }
