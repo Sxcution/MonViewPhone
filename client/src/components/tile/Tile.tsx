@@ -41,11 +41,13 @@ function TileComponent({
     accountData,
     isFilteredOut = false,
     nearbyAutoOpenEnabled = false,
+    highlightFilterMatched = false,
     onOpenDeviceViewer,
 }: TileProps) {
     const { t } = useI18n();
     const [accountOverlayMounted, setAccountOverlayMounted] = useState(false);
     const [tileTab, setTileTab] = useState<string>('wechat');
+    const [alwaysShowHeader, setAlwaysShowHeader] = useState(() => localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
 
     useEffect(() => {
         if (accountData?.defaultPlatform) {
@@ -54,10 +56,18 @@ function TileComponent({
     }, [accountData?.defaultPlatform]);
 
     useEffect(() => {
-        if (showAccountOverlay) {
+        const handleSettingsUpdate = () => {
+            setAlwaysShowHeader(localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
+        };
+        window.addEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
+        return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
+    }, []);
+
+    useEffect(() => {
+        if (showAccountOverlay || alwaysShowHeader) {
             setAccountOverlayMounted(true);
         }
-    }, [showAccountOverlay]);
+    }, [showAccountOverlay, alwaysShowHeader]);
     const {
         activeUdid,
         registerDevice,
@@ -251,8 +261,13 @@ function TileComponent({
         }
     }, [syncAll, syncMain, selectOnly]);
 
+    const highlightClass = highlightFilterMatched
+        ? typeof highlightFilterMatched === 'string'
+            ? ` is-filter-matched-${highlightFilterMatched}`
+            : ' is-filter-matched-yellow'
+        : '';
     const tileClass = `tile${isActive ? ' active' : ''}${selected ? ' selected' : ''}${isSyncMain ? ' sync-main' : ''
-        }${isSyncFollower ? ' sync-follower' : ''}${isViewing ? ' viewing' : ''}`;
+        }${isSyncFollower ? ' sync-follower' : ''}${isViewing ? ' viewing' : ''}${highlightClass}`;
 
     const viewingLabel = t('Đang điều khiển');
     const viewingHint = t('Thiết bị đang mở trong viewer — tránh điều khiển trùng lặp');
@@ -375,10 +390,10 @@ function TileComponent({
 
                         {accountOverlayMounted && (
                             <div 
-                                className={`tile-account-overlay ${showAccountOverlay ? 'is-open' : 'is-hidden'} ${isFilteredOut ? 'mxh-filtered-out' : ''}`} 
+                                className={`tile-account-overlay ${showAccountOverlay ? 'is-open' : (alwaysShowHeader ? 'is-header-only' : 'is-hidden')} ${isFilteredOut ? 'mxh-filtered-out' : ''}`} 
                                 onMouseDown={e => e.stopPropagation()}
                             >
-                                {isFilteredOut && (
+                                {isFilteredOut && showAccountOverlay && (
                                     <div className="mxh-filter-overlay">
                                         <div className="mxh-filter-overlay-inner">
                                             <div className="mxh-filter-x">×</div>
@@ -399,6 +414,7 @@ function TileComponent({
                                             setActiveTab={setTileTab}
                                             nearbyAutoOpenEnabled={nearbyAutoOpenEnabled}
                                             onOpenDeviceViewer={onOpenDeviceViewer}
+                                            showAccountOverlay={showAccountOverlay}
                                         />
                                     </div>
                                 )}

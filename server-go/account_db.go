@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -454,6 +455,8 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 			parsed := []accountHistoryEntry{}
 			if err := json.Unmarshal([]byte(historyRaw.String), &parsed); err == nil {
 				history = parsed
+			} else {
+				log.Printf("[account-db] invalid history_json for account %s: %v", id, err)
 			}
 		}
 

@@ -212,10 +212,61 @@ async function syncSettingsWithBackend(): Promise<boolean> {
       } catch(e){}
     }
 
-    // Populate localStorage with backend keys
+    // Config keys to synchronize
+    const configKeysToSync = [
+      'automationMacrosV1',
+      'automationAppActionsV1',
+      'automationDeviceProfilesV1',
+      'automationSettingsV1',
+      'automationQuickSlotsV1',
+      'manualSyncTimeSettingsV1',
+      'manualSyncMacroSettingsV1',
+      'syncTimeHotkey',
+      'monviewphone:sync-time-hotkey',
+      'monviewphone:device-account-hotkey',
+      'visualAlertGlobalSettingsV1',
+      'monviewphone:dav-hide-phone',
+      'monviewphone:dav-hide-email',
+      'monviewphone:dav-hide-qr',
+      'monviewphone:dav-hide-created-at',
+      'monviewphone:dav-always-show-header'
+    ];
+
+    const patch: Record<string, string> = {};
+    for (const key of configKeysToSync) {
+      const localVal = localStorage.getItem(key);
+      const backendVal = data[key];
+
+      // Consider backend empty if it is missing, empty, or "[]", "{}", "[null]"
+      const isBackendEmpty = !backendVal || backendVal === '' || backendVal === '[]' || backendVal === '{}' || backendVal === '[null]';
+      const isLocalValValid = localVal && localVal !== '' && localVal !== '[]' && localVal !== '{}' && localVal !== '[null]';
+
+      if (isBackendEmpty && isLocalValValid) {
+        // Backend is empty/default, client has data -> upload to backend
+        patch[key] = localVal;
+      } else if (!isBackendEmpty) {
+        // Backend has valid data -> overwrite client localStorage
+        localStorage.setItem(key, backendVal as string);
+      }
+    }
+
+    // Populate all other non-config keys from backend
     for (const [key, val] of Object.entries(data)) {
-      if (typeof val === 'string') {
+      if (typeof val === 'string' && !configKeysToSync.includes(key)) {
         localStorage.setItem(key, val);
+      }
+    }
+
+    if (Object.keys(patch).length > 0) {
+      console.log('[Sync] Uploading missing/valid local config keys to backend:', Object.keys(patch));
+      try {
+        await fetch(settingsUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch)
+        });
+      } catch (err) {
+        console.error('[Sync] Failed to upload missing config keys to backend:', err);
       }
     }
 

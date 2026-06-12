@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
-import { saveHotkeySettingToBackend } from '@/lib/backendSettings'
+import { saveHotkeySettingToBackend, saveBackendSetting } from '@/lib/backendSettings'
 import { loadDeviceAccountVault, getDeviceAccountDataFromVault, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
-import { hasNearbyRelevantAccount, getNearestNearbyHours } from '@/lib/deviceAccountNearby'
+import { hasNearbyRelevantAccount, getNearestNearbyHours, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby'
 import { readPageParams } from '@/lib/params'
 import { useServer } from '@/context/ServerContext'
 import { Tile } from '@/components/Tile'
@@ -309,6 +309,8 @@ type ConfirmState = {
 export function App() {
   const [deviceAccountOverlayOpen, setDeviceAccountOverlayOpen] = useState(false)
   const [deviceAccountOverlayMounted, setDeviceAccountOverlayMounted] = useState(false)
+  const [accountManagerOpen, setAccountManagerOpen] = useState(false)
+
   const [vault, setVault] = useState<VaultData>(() => loadDeviceAccountVault())
   const [davSearch, setDavSearch] = useState('')
   const [davActiveFilter, setDavActiveFilter] = useState('default')
@@ -327,10 +329,10 @@ export function App() {
   });
 
   useEffect(() => {
-    if (deviceAccountOverlayOpen) {
+    if (deviceAccountOverlayOpen || accountManagerOpen) {
       setDeviceAccountOverlayMounted(true)
     }
-  }, [deviceAccountOverlayOpen])
+  }, [deviceAccountOverlayOpen, accountManagerOpen])
 
   useEffect(() => {
     const handleAccountUpdate = () => {
@@ -1589,8 +1591,8 @@ export function App() {
   }, [focusGroupIdx, savedGroups]);
 
   const isDeviceMatchingAccountFilter = useCallback((udid: string) => {
-    // Nếu không mở overlay tài khoản thì không áp dụng bộ lọc
-    if (!deviceAccountOverlayOpen) return true;
+    // Nếu không mở quản lý tài khoản thì không áp dụng bộ lọc
+    if (!accountManagerOpen) return true;
 
     const accountData = getDeviceAccountDataFromVault(vault, udid);
     const accounts = (accountData.platforms[davActiveTab] || []).filter(acc => acc !== null && acc !== undefined);
@@ -1611,13 +1613,15 @@ export function App() {
           if (acc.createdAt) return (Date.now() - acc.createdAt) < thirtyDaysMs;
           return (acc as any).isNew === true;
         });
-      } else if (davActiveFilter === 'disabled') {
-        filterMatched = accounts.some(acc => acc.status === 'Die' || acc.status === 'Risk');
+      } else if (davActiveFilter === 'die') {
+        filterMatched = accounts.some(acc => acc.status === 'Die');
+      } else if (davActiveFilter === 'risk') {
+        filterMatched = accounts.some(acc => acc.status === 'Risk');
       } else if (davActiveFilter === 'unverified') {
         filterMatched = accounts.some(acc => acc.status === 'Unverified' || (acc as any).verifyStatus === 'Unverified');
       } else if (davActiveFilter === 'incomplete_info') {
         filterMatched = accounts.some(acc => !acc.name || !acc.nickname || !acc.phone || !acc.email);
-      } else if (davActiveFilter === 'wechat_scan_vn') {
+      } else if (davActiveFilter === 'wechat_scan_qr') {
         if (davActiveTab === 'wechat') {
           filterMatched = accounts.some(acc => {
             const wc = acc as WeChatAccount;
@@ -1627,20 +1631,7 @@ export function App() {
               const nextScan = wc.lastScanDate + 30 * 24 * 60 * 60 * 1000;
               if (nextScan > Date.now()) return false;
             }
-            return wc.phoneRegion !== 'HK';
-          });
-        }
-      } else if (davActiveFilter === 'wechat_scan_hk') {
-        if (davActiveTab === 'wechat') {
-          filterMatched = accounts.some(acc => {
-            const wc = acc as WeChatAccount;
-            const scanCount = wc.scanCount || 0;
-            if (scanCount >= 3) return false;
-            if (wc.lastScanDate) {
-              const nextScan = wc.lastScanDate + 30 * 24 * 60 * 60 * 1000;
-              if (nextScan > Date.now()) return false;
-            }
-            return wc.phoneRegion === 'HK';
+            return true;
           });
         }
       } else if (davActiveFilter === 'has_notice') {
@@ -1671,7 +1662,7 @@ export function App() {
     }
 
     return true;
-  }, [deviceAccountOverlayOpen, vault, davActiveTab, davActiveFilter, davSearch]);
+  }, [accountManagerOpen, vault, davActiveTab, davActiveFilter, davSearch]);
 
   const selectedVisible = useMemo(
     () => orderedRegistered.filter(id => connectSelection.has(id)),
@@ -2182,7 +2173,14 @@ export function App() {
       if (isAltC || matchesHotkey(e, savedHotkey)) {
         e.preventDefault()
         e.stopPropagation()
-        setDeviceAccountOverlayOpen(prev => !prev)
+        setDeviceAccountOverlayOpen(prev => {
+          const next = !prev;
+          if (next) {
+            setAccountManagerOpen(true);
+            setDeviceAccountOverlayMounted(true);
+          }
+          return next;
+        });
         return
       }
 
@@ -2201,7 +2199,7 @@ export function App() {
         capture: true,
       } as any)
     }
-  }, [deviceAccountOverlayOpen])
+  }, [deviceAccountOverlayOpen, accountManagerOpen])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -2708,7 +2706,7 @@ export function App() {
               let renderOrder = [...mergedOrder];
               // Chỉ sort khi mode là priority_sort
               if (
-                deviceAccountOverlayOpen &&
+                accountManagerOpen &&
                 davActiveFilter === 'nearby_people' &&
                 davActiveTab === 'wechat' &&
                 davNearbyFilterMode === 'priority_sort'
@@ -2749,7 +2747,7 @@ export function App() {
                 // Cả 2 mode (priority_sort và hide_unmatched) đều làm mờ title không khớp.
                 // Điểm khác nhau duy nhất là priority_sort thì sort renderOrder ở trên, hide_unmatched giữ nguyên vị trí.
                 const isVisible = isMatchedByConnectionAndGroup;
-                const isFilteredOut = deviceAccountOverlayOpen && isMatchedByConnectionAndGroup && !isAccountMatched;
+                const isFilteredOut = accountManagerOpen && isMatchedByConnectionAndGroup && !isAccountMatched;
 
                 return (
                   <div
@@ -2881,6 +2879,27 @@ export function App() {
                       accountData={getDeviceAccountDataFromVault(vault, udid)}
                       isFilteredOut={isFilteredOut}
                       nearbyAutoOpenEnabled={davActiveTab === 'wechat' && davActiveFilter === 'nearby_people'}
+                      highlightFilterMatched={(() => {
+                        if (!accountManagerOpen || deviceAccountOverlayOpen || !isAccountMatched || (davActiveFilter === 'default' && davSearch.trim() === '')) {
+                          return false;
+                        }
+                        const accountData = getDeviceAccountDataFromVault(vault, udid);
+                        const accounts = (accountData.platforms[davActiveTab] || []).filter(acc => acc !== null && acc !== undefined);
+                        if (accounts.some(acc => acc.status === 'Die')) {
+                          return 'red';
+                        }
+                        if (accounts.some(acc => acc.status === 'Risk')) {
+                          return 'orange';
+                        }
+                        const state = getNearbyAccountGroupState(accounts);
+                        if (state === 'eligible') {
+                          return 'blue';
+                        }
+                        if (state === 'upcoming') {
+                          return 'yellow';
+                        }
+                        return 'yellow'; // Fallback
+                      })()}
                       onOpenDeviceViewer={openDeviceViewerFromAccountOverlay}
                     />
                   </div>
@@ -3819,11 +3838,11 @@ export function App() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', marginTop: 12 }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
-                      Mở Kho tài khoản:
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', marginTop: 12, flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: '220px' }}>
+                      <div style={{ fontSize: 12, color: 'var(--md-muted)', marginRight: 4 }}>
+                        Quản lý tài khoản:
+                      </div>
                       <input
                         type="text"
                         placeholder="Nhấn tổ hợp phím..."
@@ -3837,7 +3856,7 @@ export function App() {
                           borderRadius: '6px',
                           padding: '6px 10px',
                           fontSize: 12,
-                          width: 160,
+                          width: 140,
                           textAlign: 'center',
                           cursor: 'pointer',
                           fontWeight: 'bold',
@@ -3866,6 +3885,8 @@ export function App() {
                         </button>
                       )}
                     </div>
+
+
                   </div>
 
                 </div>
@@ -5183,7 +5204,11 @@ export function App() {
       {deviceAccountOverlayMounted && (
         <DeviceAccountOverlay
           open={deviceAccountOverlayOpen}
-          onClose={() => setDeviceAccountOverlayOpen(false)}
+          panelOpen={accountManagerOpen}
+          onClose={() => {
+            setDeviceAccountOverlayOpen(false);
+            setAccountManagerOpen(false);
+          }}
           registeredUdids={registeredUdids}
           connectedUdids={connectedUdids}
           orderMap={orderMap}

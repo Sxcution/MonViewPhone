@@ -2,9 +2,11 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, ShieldAlert, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings, History } from 'lucide-react';
 import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby';
+import { saveBackendSetting } from '@/lib/backendSettings';
 import { 
   getDeviceAccountData, 
   saveDeviceAccountData, 
+  saveDeviceAccountDataAsync,
   loadDeviceAccountVault,
   getDeviceAccountDataFromVault,
   VaultData,
@@ -21,6 +23,7 @@ import {
 
 type DeviceAccountOverlayProps = {
   open: boolean;
+  panelOpen: boolean;
   onClose: () => void;
   registeredUdids: string[];
   connectedUdids: Set<string>;
@@ -354,7 +357,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   activeTab,
   setActiveTab,
   nearbyAutoOpenEnabled,
-  onOpenDeviceViewer
+  onOpenDeviceViewer,
+  showAccountOverlay = false
 }: { 
   udid: string; 
   order: number; 
@@ -366,6 +370,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   setActiveTab: (tab: PlatformType) => void;
   nearbyAutoOpenEnabled?: boolean;
   onOpenDeviceViewer?: (udid: string) => void;
+  showAccountOverlay?: boolean;
 }) {
   const [data, setData] = useState(initialData);
   const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
@@ -373,6 +378,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [hiddenIdentityFields, setHiddenIdentityFields] = useState<Record<string, boolean>>({});
   const [pendingDeleteAccount, setPendingDeleteAccount] = useState<{ id: string; name: string } | null>(null);
   const [historyModalAccountId, setHistoryModalAccountId] = useState<string | null>(null);
+  const [pendingResetHistoryAccount, setPendingResetHistoryAccount] = useState<Account | null>(null);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -380,6 +386,23 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     };
     window.addEventListener('device-account-platforms-updated', handleUpdate);
     return () => window.removeEventListener('device-account-platforms-updated', handleUpdate);
+  }, []);
+
+  // States for hiding fields on tile/panel
+  const [hidePhone, setHidePhone] = useState(() => localStorage.getItem('monviewphone:dav-hide-phone') === 'true');
+  const [hideEmail, setHideEmail] = useState(() => localStorage.getItem('monviewphone:dav-hide-email') === 'true');
+  const [hideQR, setHideQR] = useState(() => localStorage.getItem('monviewphone:dav-hide-qr') === 'true');
+  const [hideCreatedAt, setHideCreatedAt] = useState(() => localStorage.getItem('monviewphone:dav-hide-created-at') === 'true');
+
+  useEffect(() => {
+    const handleHideSettingsUpdate = () => {
+      setHidePhone(localStorage.getItem('monviewphone:dav-hide-phone') === 'true');
+      setHideEmail(localStorage.getItem('monviewphone:dav-hide-email') === 'true');
+      setHideQR(localStorage.getItem('monviewphone:dav-hide-qr') === 'true');
+      setHideCreatedAt(localStorage.getItem('monviewphone:dav-hide-created-at') === 'true');
+    };
+    window.addEventListener('monviewphone:dav-hide-settings-changed', handleHideSettingsUpdate);
+    return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleHideSettingsUpdate);
   }, []);
 
   const [ctxMenu, setCtxMenu] = useState<{ x: number, y: number, accountId: string } | null>(null);
@@ -452,6 +475,23 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false);
   const platformDropdownRef = useRef<HTMLDivElement>(null);
   const autoOpenedNearbyDropdownRef = useRef(false);
+
+  const [isEditingName, setIsEditingName] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const handleNameClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setAccountTitleDropdownOpen(v => !v);
+    setPlatformDropdownOpen(false);
+  };
+
+  const handleNameDoubleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsEditingName(true);
+    setAccountTitleDropdownOpen(false);
+  };
 
   // Tính toán xem panel này có tài khoản đủ / gần đủ Nearby không
   const panelHasNearbyRelevantAccount = useMemo(() => {
@@ -598,7 +638,11 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   // Save when data changes
   const updateData = (newData: typeof data) => {
     setData(newData);
-    saveDeviceAccountData(udid, newData);
+    void saveDeviceAccountDataAsync(udid, newData).then(ok => {
+      if (!ok) {
+        console.error('[DeviceAccountOverlay] Failed to persist account history to backend/Data.db');
+      }
+    });
     window.dispatchEvent(new Event('device-account-updated'));
   };
 
@@ -1038,51 +1082,6 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           <span className={`dav-order ${panelHasNearbyEligibleAccount ? 'dav-order-nearby-eligible' : ''}`}>
             {order.toString().padStart(2, '0')}
           </span>
-          {deviceNoticeStatus !== 'none' && (
-            <>
-              <button
-                type="button"
-                className="dav-bell-btn"
-                onMouseEnter={(e) => setBellTooltip({ x: e.clientX, y: e.clientY })}
-                onMouseMove={(e) => setBellTooltip({ x: e.clientX, y: e.clientY })}
-                onMouseLeave={() => setBellTooltip(null)}
-                onClick={handleNoticeIconClick}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  lineHeight: 1,
-                  height: 16,
-                  width: 16
-                }}
-              >
-                <Bell 
-                  size={13} 
-                  color={deviceNoticeStatus === 'expired' ? 'var(--md-danger)' : 'var(--md-warning)'} 
-                  className={deviceNoticeStatus === 'expired' ? "dav-bell-expired animate-pulse" : ""} 
-                />
-              </button>
-              {bellTooltip && noticeTooltipText && ReactDOM.createPortal(
-                <div
-                  className="dav-bell-tooltip-floating"
-                  style={{
-                    left: bellTooltip.x,
-                    top: bellTooltip.y,
-                  }}
-                >
-                  {noticeTooltipText}
-                </div>,
-                document.body
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="dav-panel-title-right">
           <div className="dav-title-dropdown-wrap" ref={accountTitleDropdownRef}>
             <button
               type="button"
@@ -1103,7 +1102,6 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             </button>
             {accountTitleDropdownOpen && (
               <div className="dav-title-account-dropdown contextMenuPanel">
-                <div className="dav-title-dropdown-heading">Tai khoan nhom hien tai</div>
                 {groupAccounts.length === 0 ? (
                   <div className="dav-title-empty">Khong co tai khoan</div>
                 ) : (
@@ -1161,6 +1159,180 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               </div>
             )}
           </div>
+        </div>
+
+        {selectedAccount && (
+          <div className="dav-header-name-wrapper">
+            {showAccountOverlay && (
+              <Shield 
+                size={12} 
+                color={shieldColor} 
+                style={{ flexShrink: 0, cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowNameStatusDropdown(!showNameStatusDropdown);
+                }}
+              />
+            )}
+            {isEditingName ? (
+              <input 
+                ref={nameInputRef}
+                className="dav-transparent-input header-name-input" 
+                style={{ color: nameColor, fontWeight: 'bold' }}
+                placeholder="Tên tài khoản"
+                value={selectedAccount.name || ''} 
+                onChange={e => handleUpdateAccount(selectedAccount.id, { name: e.target.value })} 
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    setIsEditingName(false);
+                  }
+                }}
+                onBlur={() => setIsEditingName(false)}
+                autoFocus
+              />
+            ) : (
+              <div 
+                className="header-name-display-wrapper"
+                onClick={handleNameClick}
+                onDoubleClick={handleNameDoubleClick}
+              >
+                <span 
+                  className="header-name-display"
+                  style={{ color: nameColor, fontWeight: 'bold' }}
+                >
+                  {selectedAccount.name || 'Tên tài khoản'}
+                </span>
+                {activeTab === 'wechat' && renderNearbyAccountIcon(selectedAccount)}
+              </div>
+            )}
+            
+            {showNameStatusDropdown && (
+              <div 
+                className="dav-name-status-dropdown"
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  background: '#252525',
+                  border: '1px solid #333',
+                  borderRadius: '6px',
+                  padding: '4px',
+                  zIndex: 21000,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  minWidth: '100px'
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                {selectedAccount.status !== 'Die' && selectedAccount.status !== 'Risk' ? (
+                  <>
+                    <button 
+                      type="button"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ef4444',
+                        padding: '6px 8px',
+                        fontSize: '11px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        borderRadius: '4px'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpdateAccount(selectedAccount.id, { status: 'Die' });
+                        setShowNameStatusDropdown(false);
+                      }}
+                    >
+                      Set Die
+                    </button>
+                    <button 
+                      type="button"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#f97316',
+                        padding: '6px 8px',
+                        fontSize: '11px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        borderRadius: '4px'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpdateAccount(selectedAccount.id, { status: 'Risk' });
+                        setShowNameStatusDropdown(false);
+                      }}
+                    >
+                      Set Risk
+                    </button>
+                  </>
+                ) : (
+                  <button 
+                    type="button"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#22c55e',
+                      padding: '6px 8px',
+                      fontSize: '11px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      borderRadius: '4px'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUpdateAccount(selectedAccount.id, { status: 'Live' });
+                      setShowNameStatusDropdown(false);
+                    }}
+                  >
+                    Set Live
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="dav-panel-title-right">
+          {deviceNoticeStatus !== 'none' && (
+            <>
+              <button
+                type="button"
+                className="dav-bell-btn"
+                onMouseEnter={(e) => setBellTooltip({ x: e.clientX, y: e.clientY })}
+                onMouseMove={(e) => setBellTooltip({ x: e.clientX, y: e.clientY })}
+                onMouseLeave={() => setBellTooltip(null)}
+                onClick={handleNoticeIconClick}
+              >
+                <Bell 
+                  size={20} 
+                  color={deviceNoticeStatus === 'expired' ? 'var(--md-danger)' : 'var(--md-warning)'} 
+                  className={deviceNoticeStatus === 'expired' ? "dav-bell-expired animate-pulse" : ""} 
+                />
+              </button>
+              {bellTooltip && noticeTooltipText && ReactDOM.createPortal(
+                <div
+                  className="dav-bell-tooltip-floating"
+                  style={{
+                    left: bellTooltip.x,
+                    top: bellTooltip.y,
+                  }}
+                >
+                  {noticeTooltipText}
+                </div>,
+                document.body
+              )}
+            </>
+          )}
         </div>
       </div>
       <div className="dav-panel-body">
@@ -1224,116 +1396,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             e.stopPropagation();
             setCtxMenu({ x: e.clientX, y: e.clientY, accountId: selectedAccount.id });
           }}>
-            {/* Tên tài khoản */}
-            <div className="dav-input-wrapper" style={{ marginTop: '10px', position: 'relative' }}>
-              <Shield 
-                size={12} 
-                color={shieldColor} 
-                style={{ flexShrink: 0, cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowNameStatusDropdown(!showNameStatusDropdown);
-                }}
-              />
-              <input 
-                className="dav-transparent-input" 
-                style={{ color: nameColor, fontWeight: 'bold', fontSize: '13px' }}
-                placeholder="Tên tài khoản"
-                value={selectedAccount.name || ''} 
-                onChange={e => handleUpdateAccount(selectedAccount.id, { name: e.target.value })} 
-              />
-              
-              {showNameStatusDropdown && (
-                <div 
-                  className="dav-name-status-dropdown"
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 8,
-                    background: '#252525',
-                    border: '1px solid #333',
-                    borderRadius: '6px',
-                    padding: '4px',
-                    zIndex: 100,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '2px',
-                    minWidth: '100px'
-                  }}
-                  onClick={e => e.stopPropagation()}
-                >
-                  {selectedAccount.status !== 'Die' && selectedAccount.status !== 'Risk' ? (
-                    <>
-                      <button 
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#ef4444',
-                          padding: '6px 8px',
-                          fontSize: '11px',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          borderRadius: '4px'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        onClick={() => {
-                          handleUpdateAccount(selectedAccount.id, { status: 'Die' });
-                          setShowNameStatusDropdown(false);
-                        }}
-                      >
-                        Set Die
-                      </button>
-                      <button 
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: '#f97316',
-                          padding: '6px 8px',
-                          fontSize: '11px',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          borderRadius: '4px'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        onClick={() => {
-                          handleUpdateAccount(selectedAccount.id, { status: 'Risk' });
-                          setShowNameStatusDropdown(false);
-                        }}
-                      >
-                        Set Risk
-                      </button>
-                    </>
-                  ) : (
-                    <button 
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#22c55e',
-                        padding: '6px 8px',
-                        fontSize: '11px',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        borderRadius: '4px'
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      onClick={() => {
-                        handleUpdateAccount(selectedAccount.id, { status: 'Live' });
-                        setShowNameStatusDropdown(false);
-                      }}
-                    >
-                      Set Live
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* Biệt danh (Nickname) */}
-            <div className="dav-input-wrapper">
+            <div className="dav-input-wrapper" style={{ marginTop: '10px' }}>
               <span 
                 className="dav-identity-toggle"
                 title={isIdentityHidden('nickname') ? 'Hiện biệt danh' : 'Ẩn biệt danh'}
@@ -1364,113 +1428,131 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             </div>
 
             {/* Số điện thoại */}
-            <div className="dav-input-wrapper">
-              <span
-                className="dav-identity-toggle"
-                title={isIdentityHidden('phone') ? 'Hiện số điện thoại' : 'Ẩn số điện thoại'}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  toggleIdentityHidden('phone');
-                }}
-                style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
-              >
-                <Phone size={12} color="#ec4899" style={{ flexShrink: 0 }} />
-              </span>
-              <input 
-                className="dav-transparent-input" 
-                placeholder="Số điện thoại"
-                readOnly={isIdentityHidden('phone')}
-                value={
-                  isIdentityHidden('phone') && selectedAccount.phone
-                    ? '••••••'
-                    : selectedAccount.phone || ''
-                }
-                onChange={e => {
-                  if (isIdentityHidden('phone')) return;
-                  handleUpdateAccount(selectedAccount.id, { phone: e.target.value });
-                }} 
-              />
-            </div>
+            {!hidePhone && (
+              <div className="dav-input-wrapper">
+                <span
+                  className="dav-identity-toggle"
+                  title={isIdentityHidden('phone') ? 'Hiện số điện thoại' : 'Ẩn số điện thoại'}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleIdentityHidden('phone');
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
+                >
+                  <Phone size={12} color="#ec4899" style={{ flexShrink: 0 }} />
+                </span>
+                <input 
+                  className="dav-transparent-input" 
+                  placeholder="Số điện thoại"
+                  readOnly={isIdentityHidden('phone')}
+                  value={
+                    isIdentityHidden('phone') && selectedAccount.phone
+                      ? '••••••'
+                      : selectedAccount.phone || ''
+                  }
+                  onChange={e => {
+                    if (isIdentityHidden('phone')) return;
+                    handleUpdateAccount(selectedAccount.id, { phone: e.target.value });
+                  }} 
+                />
+              </div>
+            )}
 
             {/* Email */}
-            <div className="dav-input-wrapper">
-              <span
-                className="dav-identity-toggle"
-                title={isIdentityHidden('email') ? 'Hiện email' : 'Ẩn email'}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  toggleIdentityHidden('email');
-                }}
-                style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
-              >
-                <Mail size={12} color="#9ca3af" style={{ flexShrink: 0 }} />
-              </span>
-              <input 
-                className="dav-transparent-input" 
-                placeholder="Địa chỉ Email"
-                readOnly={isIdentityHidden('email')}
-                value={
-                  isIdentityHidden('email') && selectedAccount.email
-                    ? '••••••'
-                    : selectedAccount.email || ''
-                }
-                onChange={e => {
-                  if (isIdentityHidden('email')) return;
-                  handleUpdateAccount(selectedAccount.id, { email: e.target.value });
-                }} 
-              />
-            </div>
+            {!hideEmail && (
+              <div className="dav-input-wrapper">
+                <span
+                  className="dav-identity-toggle"
+                  title={isIdentityHidden('email') ? 'Hiện email' : 'Ẩn email'}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleIdentityHidden('email');
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
+                >
+                  <Mail size={12} color="#9ca3af" style={{ flexShrink: 0 }} />
+                </span>
+                <input 
+                  className="dav-transparent-input" 
+                  placeholder="Địa chỉ Email"
+                  readOnly={isIdentityHidden('email')}
+                  value={
+                    isIdentityHidden('email') && selectedAccount.email
+                      ? '••••••'
+                      : selectedAccount.email || ''
+                  }
+                  onChange={e => {
+                    if (isIdentityHidden('email')) return;
+                    handleUpdateAccount(selectedAccount.id, { email: e.target.value });
+                  }} 
+                />
+              </div>
+            )}
 
             {/* Hàng QR Code & Nearby People */}
-            <div className="dav-stats-row">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <QrCode size={13} color="#ffffff" style={{ flexShrink: 0 }} />
-                <span style={{ fontWeight: 'bold', color: (selectedAccount.scanCount || 0) >= 3 ? '#ef4444' : '#ffffff' }}>
-                  {selectedAccount.scanCount || 0}/3
-                </span>
-                {qrCountdownText && (
-                  <span style={{ color: '#eab308', fontSize: '10px' }}>
-                    {qrCountdownText}
-                  </span>
-                )}
-              </div>
-
-              {(() => {
-                if (!isWeChat || !selectedAccount) return null;
-                // Điều kiện bắt buộc: tài khoản phải đủ 1 năm tuổi mới hiển thị Nearby
-                if (!isEligibleNearby) return null;
+            {(() => {
+              const showNearby = (() => {
+                if (!isWeChat || !selectedAccount) return false;
+                if (!isEligibleNearby) return false;
                 const diffMs = selectedAccount.nearbyPeopleDueDate
                   ? selectedAccount.nearbyPeopleDueDate - Date.now()
                   : 0;
-
-                // Hide icon if remaining days > 7
                 if (selectedAccount.nearbyPeopleDueDate && diffMs > 7 * 24 * 60 * 60 * 1000) {
-                  return null;
+                  return false;
                 }
+                return true;
+              })();
 
-                return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {selectedAccount.nearbyPeopleDueDate && diffMs > 0 ? (
-                      <>
-                        <MapPin size={13} color="#eab308" style={{ flexShrink: 0 }} />
-                        <span style={{ color: '#eab308', fontSize: '11px', fontWeight: '500' }}>
-                          {formatCountdown(diffMs)}
+              const showRow = !hideQR || showNearby;
+              if (!showRow) return null;
+
+              return (
+                <div className="dav-stats-row">
+                  {!hideQR ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <QrCode size={13} color="#ffffff" style={{ flexShrink: 0 }} />
+                      <span style={{ fontWeight: 'bold', color: (selectedAccount.scanCount || 0) >= 3 ? '#ef4444' : '#ffffff' }}>
+                        {selectedAccount.scanCount || 0}/3
+                      </span>
+                      {qrCountdownText && (
+                        <span style={{ color: '#eab308', fontSize: '10px' }}>
+                          {qrCountdownText}
                         </span>
-                      </>
-                    ) : (
-                      <>
-                        <MapPin size={13} color="#22c55e" style={{ flexShrink: 0 }} />
-                        <span style={{ color: '#22c55e', fontSize: '11px', fontWeight: '500' }}>
-                          Active
-                        </span>
-                      </>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div />
+                  )}
+
+                  {showNearby && (() => {
+                    const diffMs = selectedAccount.nearbyPeopleDueDate
+                      ? selectedAccount.nearbyPeopleDueDate - Date.now()
+                      : 0;
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {selectedAccount.nearbyPeopleDueDate && diffMs > 0 ? (
+                          <>
+                            <MapPin size={13} color="#eab308" style={{ flexShrink: 0 }} />
+                            <span style={{ color: '#eab308', fontSize: '11px', fontWeight: '500' }}>
+                              {formatCountdown(diffMs)}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <MapPin size={13} color="#22c55e" style={{ flexShrink: 0 }} />
+                            <span style={{ color: '#22c55e', fontSize: '11px', fontWeight: '500' }}>
+                              Active
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })()}
 
             {/* Thông báo */}
             <div className="dav-notice-centered-row" onClick={() => setShowNoticeEdit(true)}>
@@ -1484,46 +1566,48 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             </div>
 
             {/* input_created_at : Nhập ngày tạo tài khoản */}
-            <div className="dav-centered-row">
-              {!selectedAccount.createdAt || showDateInput ? (
-                <input 
-                  type="text"
-                  className="dav-centered-input" 
-                  style={{ fontSize: '10px', width: '90px', padding: 0, color: '#fff', textAlign: 'center', background: 'transparent', border: 'none' }}
-                  placeholder="DD/MM/YYYY"
-                  value={dateText}
-                  onChange={e => setDateText(formatDatePickerMask(e.target.value))}
-                  onBlur={e => handleDateSubmit(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleDateSubmit(dateText);
-                    if (e.key === 'Escape') {
-                      let originalText = '';
-                      if (selectedAccount.createdAt) {
-                        const d = new Date(selectedAccount.createdAt);
-                        const day = String(d.getDate()).padStart(2, '0');
-                        const month = String(d.getMonth() + 1).padStart(2, '0');
-                        const year = d.getFullYear();
-                        originalText = `${day}/${month}/${year}`;
+            {!hideCreatedAt && (
+              <div className="dav-centered-row">
+                {!selectedAccount.createdAt || showDateInput ? (
+                  <input 
+                    type="text"
+                    className="dav-centered-input" 
+                    style={{ fontSize: '10px', width: '90px', padding: 0, color: '#fff', textAlign: 'center', background: 'transparent', border: 'none' }}
+                    placeholder="DD/MM/YYYY"
+                    value={dateText}
+                    onChange={e => setDateText(formatDatePickerMask(e.target.value))}
+                    onBlur={e => handleDateSubmit(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleDateSubmit(dateText);
+                      if (e.key === 'Escape') {
+                        let originalText = '';
+                        if (selectedAccount.createdAt) {
+                          const d = new Date(selectedAccount.createdAt);
+                          const day = String(d.getDate()).padStart(2, '0');
+                          const month = String(d.getMonth() + 1).padStart(2, '0');
+                          const year = d.getFullYear();
+                          originalText = `${day}/${month}/${year}`;
+                        }
+                        setDateText(originalText);
+                        setShowDateInput(false);
                       }
-                      setDateText(originalText);
-                      setShowDateInput(false);
-                    }
-                  }}
-                  autoFocus={showDateInput}
-                />
-              ) : (
-                <span 
-                  className="dav-centered-input"
-                  style={{ fontSize: '10px', color: isOverOneYear ? '#22c55e' : '#fff', cursor: 'pointer' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDateInput(true);
-                  }}
-                >
-                  Đã tạo: {getRelativeTimeStr(selectedAccount.createdAt)}
-                </span>
-              )}
-            </div>
+                    }}
+                    autoFocus={showDateInput}
+                  />
+                ) : (
+                  <span 
+                    className="dav-centered-input"
+                    style={{ fontSize: '10px', color: isOverOneYear ? '#22c55e' : '#fff', cursor: 'pointer' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDateInput(true);
+                    }}
+                  >
+                    Đã tạo: {getRelativeTimeStr(selectedAccount.createdAt)}
+                  </span>
+                )}
+              </div>
+            )}
             {selectedAccount.status === 'Die' && selectedAccount.dieAt ? (
               <div className="dav-centered-row dav-die-age-row">
                 <span className="dav-die-age-text">
@@ -1699,7 +1783,14 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     onPointerDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      handleUpdateAccount(selectedAccount.id, { nearbyPeopleEnabled: true, nearbyPeopleDueDate: Date.now() + 30 * 24 * 60 * 60 * 1000 }, 'Open Nearby');
+                      const updates: Partial<Account> = {
+                        nearbyPeopleEnabled: true,
+                        nearbyPeopleDueDate: Date.now() + 30 * 24 * 60 * 60 * 1000
+                      };
+                      if (selectedAccount.status === 'Risk') {
+                        updates.status = 'Live';
+                      }
+                      handleUpdateAccount(selectedAccount.id, updates, 'Open Nearby');
                       setCtxMenu(null);
                     }}
                   >
@@ -1715,6 +1806,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       handleUpdateAccount(selectedAccount.id, {
                         status: 'Risk',
                         nearbyPeopleEnabled: false,
+                        nearbyPeopleDueDate: Date.now() + 30 * 24 * 60 * 60 * 1000,
                         notice: {
                           title: 'Dưỡng Hiện',
                           content: 'Dưỡng Hiện',
@@ -1888,6 +1980,17 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             <div className="confirmActions">
               <button
                 type="button"
+                className="modalBtnDanger"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setPendingResetHistoryAccount(historyModalAccount);
+                }}
+              >
+                Reset
+              </button>
+              <button
+                type="button"
                 className="modalBtnPrimary"
                 onPointerDown={(e) => {
                   e.preventDefault();
@@ -1896,6 +1999,44 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 }}
               >
                 Đóng
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {pendingResetHistoryAccount && ReactDOM.createPortal(
+        <div className="confirmOverlay" style={{ zIndex: 29000, background: 'transparent' }} onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}>
+          <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480, zIndex: 29001 }} onPointerDown={e => e.stopPropagation()}>
+            <div className="confirmTitle">Reset lịch sử tài khoản</div>
+            <div className="confirmText">
+              Bạn có chắc chắn muốn reset toàn bộ lịch sử trạng thái của tài khoản <strong>{getAccountDisplayName(pendingResetHistoryAccount)}</strong>?
+              Hành động này sẽ xoá sạch lịch sử đã ghi và không thể hoàn tác.
+            </div>
+            <div className="confirmActions">
+              <button 
+                type="button" 
+                className="modalBtn" 
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setPendingResetHistoryAccount(null);
+                }}
+              >
+                Huỷ
+              </button>
+              <button 
+                type="button" 
+                className="modalBtnDanger" 
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleUpdateAccount(pendingResetHistoryAccount.id, { history: [] });
+                  setPendingResetHistoryAccount(null);
+                }}
+              >
+                Xác nhận
               </button>
             </div>
           </div>
@@ -1997,6 +2138,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
 export function DeviceAccountOverlay({
   open,
+  panelOpen,
   onClose,
   registeredUdids,
   connectedUdids,
@@ -2040,6 +2182,32 @@ export function DeviceAccountOverlay({
     setNearbyFilterMode(mode);
     localStorage.setItem(DAV_NEARBY_FILTER_MODE_KEY_LOCAL, mode);
     window.dispatchEvent(new CustomEvent('monviewphone:dav-nearby-filter-mode-changed', { detail: mode }));
+  };
+
+  // === Hide settings (Ẩn/Hiển) ===
+  const [hidePhone, setHidePhone] = useState(() => localStorage.getItem('monviewphone:dav-hide-phone') === 'true');
+  const [hideEmail, setHideEmail] = useState(() => localStorage.getItem('monviewphone:dav-hide-email') === 'true');
+  const [hideQR, setHideQR] = useState(() => localStorage.getItem('monviewphone:dav-hide-qr') === 'true');
+  const [hideCreatedAt, setHideCreatedAt] = useState(() => localStorage.getItem('monviewphone:dav-hide-created-at') === 'true');
+  const [alwaysShowHeader, setAlwaysShowHeader] = useState(() => localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
+
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setHidePhone(localStorage.getItem('monviewphone:dav-hide-phone') === 'true');
+      setHideEmail(localStorage.getItem('monviewphone:dav-hide-email') === 'true');
+      setHideQR(localStorage.getItem('monviewphone:dav-hide-qr') === 'true');
+      setHideCreatedAt(localStorage.getItem('monviewphone:dav-hide-created-at') === 'true');
+      setAlwaysShowHeader(localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
+    };
+    window.addEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
+    return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
+  }, []);
+
+  const updateHideSetting = (key: string, value: boolean, setter: (val: boolean) => void) => {
+    setter(value);
+    localStorage.setItem(key, String(value));
+    saveBackendSetting(key, String(value));
+    window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
   };
 
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(() => {
@@ -2093,7 +2261,7 @@ export function DeviceAccountOverlay({
   };
 
   useEffect(() => {
-    if (!open || !dragPos) return;
+    if (!panelOpen || !dragPos) return;
 
     requestAnimationFrame(() => {
       const fixed = clampDavPanelPosition(dragPos, floatingPanelRef.current);
@@ -2102,7 +2270,7 @@ export function DeviceAccountOverlay({
         localStorage.setItem('monviewphone:dav-drag-pos', JSON.stringify(fixed));
       }
     });
-  }, [open, dragPos]);
+  }, [panelOpen, dragPos]);
 
   useEffect(() => {
     const onResize = () => {
@@ -2203,20 +2371,21 @@ export function DeviceAccountOverlay({
 
   // Auto-focus search input when opened
   useEffect(() => {
-    if (open) {
+    if (panelOpen) {
       setTimeout(() => {
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
       }, 50);
     }
-  }, [open]);
+  }, [panelOpen]);
 
   // 1. Tính toán statistics
-  const { totalAccs, oneYearCount, newMonthCount, disabledCount, unverifiedCount, incompleteInfoCount } = useMemo(() => {
+  const { totalAccs, oneYearCount, newMonthCount, dieCount, riskCount, unverifiedCount, incompleteInfoCount } = useMemo(() => {
     let total = 0;
     let oneYear = 0;
     let newMonth = 0;
-    let disabled = 0;
+    let die = 0;
+    let risk = 0;
     let unverified = 0;
     let incomplete = 0;
     
@@ -2240,8 +2409,11 @@ export function DeviceAccountOverlay({
           newMonth++;
         }
         
-        if (acc.status === 'Die' || acc.status === 'Risk') {
-          disabled++;
+        if (acc.status === 'Die') {
+          die++;
+        }
+        if (acc.status === 'Risk') {
+          risk++;
         }
         if (acc.status === 'Unverified' || (acc as any).verifyStatus === 'Unverified') {
           unverified++;
@@ -2256,15 +2428,15 @@ export function DeviceAccountOverlay({
       totalAccs: total,
       oneYearCount: oneYear,
       newMonthCount: newMonth,
-      disabledCount: disabled,
+      dieCount: die,
+      riskCount: risk,
       unverifiedCount: unverified,
       incompleteInfoCount: incomplete
     };
   }, [registeredUdids, activeTab, vault]);
 
-  const { totalDevices, scanVNCount, scanHKCount, hasNoticeCount, nearbyPeopleCount } = useMemo(() => {
-    let scanVN = 0;
-    let scanHK = 0;
+  const { totalDevices, scanQRCount, hasNoticeCount, nearbyPeopleCount } = useMemo(() => {
+    let scanQR = 0;
     let hasNotice = 0;
     let nearbyPeople = 0;
     
@@ -2273,7 +2445,7 @@ export function DeviceAccountOverlay({
       const accounts = d.platforms[activeTab] || [];
       
       if (activeTab === 'wechat') {
-        const hasVN = accounts.some(acc => {
+        const hasQR = accounts.some(acc => {
           const wc = acc as WeChatAccount;
           const scanCount = wc.scanCount || 0;
           if (scanCount >= 3) return false;
@@ -2281,21 +2453,9 @@ export function DeviceAccountOverlay({
             const nextScan = wc.lastScanDate + 30 * 24 * 60 * 60 * 1000;
             if (nextScan > Date.now()) return false;
           }
-          return wc.phoneRegion !== 'HK';
+          return true;
         });
-        if (hasVN) scanVN++;
-
-        const hasHK = accounts.some(acc => {
-          const wc = acc as WeChatAccount;
-          const scanCount = wc.scanCount || 0;
-          if (scanCount >= 3) return false;
-          if (wc.lastScanDate) {
-            const nextScan = wc.lastScanDate + 30 * 24 * 60 * 60 * 1000;
-            if (nextScan > Date.now()) return false;
-          }
-          return wc.phoneRegion === 'HK';
-        });
-        if (hasHK) scanHK++;
+        if (hasQR) scanQR++;
         
         const hasNearby = activeTab === 'wechat' && hasNearbyRelevantAccount(accounts);
         if (hasNearby) nearbyPeople++;
@@ -2307,8 +2467,7 @@ export function DeviceAccountOverlay({
     
     return {
       totalDevices: registeredUdids.length,
-      scanVNCount: scanVN,
-      scanHKCount: scanHK,
+      scanQRCount: scanQR,
       hasNoticeCount: hasNotice,
       nearbyPeopleCount: nearbyPeople
     };
@@ -2320,7 +2479,7 @@ export function DeviceAccountOverlay({
 
   return ReactDOM.createPortal(
     <>
-      <div className={`dav-overlay ${open ? 'is-open' : 'is-hidden'}`}>
+      <div className={`dav-overlay ${panelOpen ? 'is-open' : 'is-hidden'}`}>
       <div 
         ref={floatingPanelRef}
         className="dav-floating-panel" 
@@ -2336,42 +2495,66 @@ export function DeviceAccountOverlay({
             localStorage.removeItem('monviewphone:dav-drag-pos');
           }}
         >
-          <div className="dav-floating-title-left">
+          <div className="dav-floating-title-left" style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <span className="dav-floating-title">Quản lý tài khoản</span>
-          </div>
-          
-          <div className="dav-floating-platform-select">
-            {platforms.map(p => (
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 16 }}>
+              <span style={{ fontSize: 11, color: 'var(--md-muted)', userSelect: 'none' }}>Overlay Header</span>
               <button
-                key={p.id}
                 type="button"
-                className={`dav-floating-platform-btn ${activeTab === p.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(p.id)}
-                onContextMenu={(e) => {
-                  if (p.id === 'wechat') return;
+                className={`dav-toggle-switch ${alwaysShowHeader ? 'on' : ''}`}
+                style={{ width: 34, height: 18 }}
+                onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setPlatformCtxMenu({
-                    x: e.clientX,
-                    y: e.clientY,
-                    platformId: p.id
-                  });
+                  const nextVal = !alwaysShowHeader;
+                  setAlwaysShowHeader(nextVal);
+                  localStorage.setItem('monviewphone:dav-always-show-header', String(nextVal));
+                  saveBackendSetting('monviewphone:dav-always-show-header', String(nextVal));
+                  window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+                }}
+                onDoubleClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                 }}
               >
-                {p.label}
+                <div className="dav-toggle-knob" style={{ width: 12, height: 12, top: 2, left: alwaysShowHeader ? 18 : 2 }} />
               </button>
-            ))}
-            <button
-              type="button"
-              className="dav-floating-platform-btn-add"
-              onClick={() => setShowAddPlatformModal(true)}
-              title="Thêm nhóm mới"
-            >
-              <Plus size={12} />
-            </button>
+            </div>
           </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="dav-floating-platform-select" style={{ marginRight: 4 }}>
+              {platforms.map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`dav-floating-platform-btn ${activeTab === p.id ? 'active' : ''}`}
+                  onClick={() => setActiveTab(p.id)}
+                  onContextMenu={(e) => {
+                    if (p.id === 'wechat') return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setPlatformCtxMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      platformId: p.id
+                    });
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="dav-floating-platform-btn-add"
+                onClick={() => setShowAddPlatformModal(true)}
+                title="Thêm nhóm mới"
+              >
+                <Plus size={12} />
+              </button>
+            </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {/* btn_dav_settings : Nút cài đặt Quản lý tài khoản */}
             <button
               type="button"
@@ -2405,8 +2588,12 @@ export function DeviceAccountOverlay({
               TK mới: <strong style={{ color: '#fff' }}>{newMonthCount}</strong>
             </span>
             <span className="dav-stats-divider">|</span>
-            <span className={`dav-stats-btn ${activeFilter === 'disabled' ? 'active' : ''}`} onClick={() => handleFilterClick('disabled')}>
-              TK hạn chế: <strong style={{ color: 'var(--md-danger)' }}>{disabledCount}</strong>
+            <span className={`dav-stats-btn ${activeFilter === 'die' ? 'active' : ''}`} onClick={() => handleFilterClick('die')}>
+              TK Die: <strong style={{ color: 'var(--md-danger)' }}>{dieCount}</strong>
+            </span>
+            <span className="dav-stats-divider">|</span>
+            <span className={`dav-stats-btn ${activeFilter === 'risk' ? 'active' : ''}`} onClick={() => handleFilterClick('risk')}>
+              TK Risk: <strong style={{ color: '#f97316' }}>{riskCount}</strong>
             </span>
             <span className="dav-stats-divider">|</span>
             <span className={`dav-stats-btn ${activeFilter === 'unverified' ? 'active' : ''}`} onClick={() => handleFilterClick('unverified')}>
@@ -2414,7 +2601,7 @@ export function DeviceAccountOverlay({
             </span>
             <span className="dav-stats-divider">|</span>
             <span className={`dav-stats-btn ${activeFilter === 'incomplete_info' ? 'active' : ''}`} onClick={() => handleFilterClick('incomplete_info')}>
-              Thiếu Info: <strong style={{ color: 'var(--md-info)' }}>{incompleteInfoCount}</strong>
+              Thiếu Info: <strong style={{ color: '#ffffff' }}>{incompleteInfoCount}</strong>
             </span>
           </div>
           
@@ -2422,12 +2609,8 @@ export function DeviceAccountOverlay({
             <span className="dav-stats-label">Thiết bị:</span>
             <span className="dav-stats-val-total">{totalDevices}</span>
             <span className="dav-stats-divider">|</span>
-            <span className={`dav-stats-btn ${activeFilter === 'wechat_scan_vn' ? 'active' : ''}`} onClick={() => handleFilterClick('wechat_scan_vn')}>
-              Scan VN: <strong style={{ color: 'var(--md-success)' }}>{scanVNCount}</strong>
-            </span>
-            <span className="dav-stats-divider">|</span>
-            <span className={`dav-stats-btn ${activeFilter === 'wechat_scan_hk' ? 'active' : ''}`} onClick={() => handleFilterClick('wechat_scan_hk')}>
-              Scan HK: <strong style={{ color: '#8b5cf6' }}>{scanHKCount}</strong>
+            <span className={`dav-stats-btn ${activeFilter === 'wechat_scan_qr' ? 'active' : ''}`} onClick={() => handleFilterClick('wechat_scan_qr')}>
+              Scan QR: <strong style={{ color: '#ffffff' }}>{scanQRCount}</strong>
             </span>
             <span className="dav-stats-divider">|</span>
             <span className={`dav-stats-btn ${activeFilter === 'has_notice' ? 'active' : ''}`} onClick={() => handleFilterClick('has_notice')}>
@@ -2435,7 +2618,7 @@ export function DeviceAccountOverlay({
             </span>
             <span className="dav-stats-divider">|</span>
             <span className={`dav-stats-btn ${activeFilter === 'nearby_people' ? 'active' : ''}`} onClick={() => handleFilterClick('nearby_people')}>
-              Nearby People: <strong style={{ color: '#ec4899' }}>{nearbyPeopleCount}</strong>
+              Nearby People: <strong style={{ color: '#3b82f6' }}>{nearbyPeopleCount}</strong>
             </span>
           </div>
         </div>
@@ -2569,25 +2752,97 @@ export function DeviceAccountOverlay({
             <div className="dav-settings-section">
               <div className="dav-settings-section-title">Bộ lọc Nearby People</div>
 
-              {/* btn_dav_settings_priority_sort : Chọn mode sắp xếp ưu tiên Nearby */}
-              <button
-                type="button"
-                className={`dav-settings-choice ${nearbyFilterMode === 'priority_sort' ? 'active' : ''}`}
-                onClick={() => updateNearbyFilterMode('priority_sort')}
-              >
-                <strong>Sắp xếp ưu tiên Nearby</strong>
-                <span>Giữ cách cũ, đưa title có Nearby gần nhất lên trước</span>
-              </button>
+              <div className="dav-settings-row-container">
+                {/* btn_dav_settings_priority_sort : Chọn mode sắp xếp ưu tiên Nearby */}
+                <button
+                  type="button"
+                  className={`dav-settings-choice ${nearbyFilterMode === 'priority_sort' ? 'active' : ''}`}
+                  onClick={() => updateNearbyFilterMode('priority_sort')}
+                >
+                  <strong>Sắp xếp ưu tiên Nearby</strong>
+                </button>
 
-              {/* btn_dav_settings_hide_unmatched : Chọn mode ẩn title không liên quan */}
-              <button
-                type="button"
-                className={`dav-settings-choice ${nearbyFilterMode === 'hide_unmatched' ? 'active' : ''}`}
-                onClick={() => updateNearbyFilterMode('hide_unmatched')}
-              >
-                <strong>Ẩn title không liên quan</strong>
-                <span>Chỉ hiện title có tài khoản đủ điều kiện hoặc còn tối đa 3 ngày</span>
-              </button>
+                {/* btn_dav_settings_hide_unmatched : Chọn mode ẩn title không liên quan */}
+                <button
+                  type="button"
+                  className={`dav-settings-choice ${nearbyFilterMode === 'hide_unmatched' ? 'active' : ''}`}
+                  onClick={() => updateNearbyFilterMode('hide_unmatched')}
+                >
+                  <strong>Ẩn title không liên quan</strong>
+                </button>
+              </div>
+            </div>
+
+            <div className="dav-settings-section">
+              <div className="dav-settings-section-title">Ẩn/Hiển</div>
+
+              {/* btn_dav_settings_hide_phone : Bật/Tắt ẩn số điện thoại */}
+              <div className="dav-settings-toggle-row">
+                <span className="dav-settings-toggle-label">Ẩn SĐT</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: hidePhone ? 'var(--md-info)' : 'var(--md-muted)' }}>
+                    {hidePhone ? 'On' : 'Off'}
+                  </span>
+                  <button
+                    type="button"
+                    className={`dav-toggle-switch ${hidePhone ? 'on' : ''}`}
+                    onClick={() => updateHideSetting('monviewphone:dav-hide-phone', !hidePhone, setHidePhone)}
+                  >
+                    <div className="dav-toggle-knob" />
+                  </button>
+                </div>
+              </div>
+
+              {/* btn_dav_settings_hide_email : Bật/Tắt ẩn Email */}
+              <div className="dav-settings-toggle-row">
+                <span className="dav-settings-toggle-label">Ẩn Email</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: hideEmail ? 'var(--md-info)' : 'var(--md-muted)' }}>
+                    {hideEmail ? 'On' : 'Off'}
+                  </span>
+                  <button
+                    type="button"
+                    className={`dav-toggle-switch ${hideEmail ? 'on' : ''}`}
+                    onClick={() => updateHideSetting('monviewphone:dav-hide-email', !hideEmail, setHideEmail)}
+                  >
+                    <div className="dav-toggle-knob" />
+                  </button>
+                </div>
+              </div>
+
+              {/* btn_dav_settings_hide_qr : Bật/Tắt ẩn QR */}
+              <div className="dav-settings-toggle-row">
+                <span className="dav-settings-toggle-label">Ẩn QR</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: hideQR ? 'var(--md-info)' : 'var(--md-muted)' }}>
+                    {hideQR ? 'On' : 'Off'}
+                  </span>
+                  <button
+                    type="button"
+                    className={`dav-toggle-switch ${hideQR ? 'on' : ''}`}
+                    onClick={() => updateHideSetting('monviewphone:dav-hide-qr', !hideQR, setHideQR)}
+                  >
+                    <div className="dav-toggle-knob" />
+                  </button>
+                </div>
+              </div>
+
+              {/* btn_dav_settings_hide_created_at : Bật/Tắt ẩn Ngày tạo */}
+              <div className="dav-settings-toggle-row">
+                <span className="dav-settings-toggle-label">Ẩn Ngày Tạo</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: hideCreatedAt ? 'var(--md-info)' : 'var(--md-muted)' }}>
+                    {hideCreatedAt ? 'On' : 'Off'}
+                  </span>
+                  <button
+                    type="button"
+                    className={`dav-toggle-switch ${hideCreatedAt ? 'on' : ''}`}
+                    onClick={() => updateHideSetting('monviewphone:dav-hide-created-at', !hideCreatedAt, setHideCreatedAt)}
+                  >
+                    <div className="dav-toggle-knob" />
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="confirmActions">

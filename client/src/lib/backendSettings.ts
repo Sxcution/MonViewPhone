@@ -130,13 +130,13 @@ export function validateVaultData(vault: VaultData) {
   return { valid, deviceCount, wechatAccountCount, totalAccountCount, hasEmmaZhao };
 }
 
-export async function saveDeviceAccountVaultToBackend(vault: VaultData): Promise<void> {
+export async function saveDeviceAccountVaultToBackend(vault: VaultData): Promise<boolean> {
   const result = validateVaultData(vault);
   if (!result.valid) {
     console.error(
       `[Vault Client Guard] Refusing to POST vault: safety thresholds not met. Devices: ${result.deviceCount}/35, WeChat accounts: ${result.wechatAccountCount}/104, Emma Zhao: ${result.hasEmmaZhao ? 'Yes' : 'No'}`
     );
-    return;
+    return false;
   }
 
   const { wsServer } = readPageParams();
@@ -161,8 +161,10 @@ export async function saveDeviceAccountVaultToBackend(vault: VaultData): Promise
       throw new Error(`HTTP status ${res.status}: ${errText}`);
     }
     console.log('[Vault Client Guard] Successfully saved vault explicitly to backend.');
+    return true;
   } catch (err) {
     console.error('[Vault Client Guard] Failed to save vault explicitly to backend:', err);
+    return false;
   }
 }
 

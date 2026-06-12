@@ -119,6 +119,16 @@ export function saveDeviceAccountVault(data: VaultData): void {
   }
 }
 
+export async function saveDeviceAccountVaultAsync(data: VaultData): Promise<boolean> {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return await saveDeviceAccountVaultToBackend(data);
+  } catch (err) {
+    console.error('Failed to save device account vault async:', err);
+    return false;
+  }
+}
+
 export function getDeviceAccountDataFromVault(vault: VaultData, udid: string): DeviceAccountData {
   const platformsList = getSavedPlatforms();
   if (vault && vault.devices && vault.devices[udid]) {
@@ -158,6 +168,13 @@ export function saveDeviceAccountData(udid: string, data: DeviceAccountData): vo
   data.updatedAt = Date.now();
   vault.devices[udid] = data;
   saveDeviceAccountVault(vault);
+}
+
+export async function saveDeviceAccountDataAsync(udid: string, data: DeviceAccountData): Promise<boolean> {
+  const vault = loadDeviceAccountVault();
+  data.updatedAt = Date.now();
+  vault.devices[udid] = data;
+  return await saveDeviceAccountVaultAsync(vault);
 }
 
 export function generateAccountId(): string {

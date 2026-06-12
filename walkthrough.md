@@ -220,3 +220,30 @@ Chúng tôi đã loại bỏ hoàn toàn các cơ chế giới hạn luồng, h�
 
 3. **Kết quả**:
    - Đã biên dịch thành công 100% frontend (`npm run build`) và backend Go. Toàn bộ thiết bị được chọn sẽ phản hồi đồng thời ngay lập tức khi click nút.
+
+## Tính năng Luôn hiện Header và Di chuyển Tên tài khoản lên Header của Panel Quản lý tài khoản
+
+Chúng tôi đã bổ sung tuỳ chọn "Luôn hiện Header" và di chuyển ô nhập Tên tài khoản WeChat lên thanh Header của overlay thiết bị:
+
+1. **Tuỳ chọn "Luôn hiện Header" (Header Always On)**:
+   - Thêm toggle cấu hình **Luôn hiện Header** vào trong modal **Cài đặt Quản lý tài khoản** (mục **Ẩn/Hiển**).
+   - Thiết lập key cấu hình kỹ thuật chuẩn `alwaysShowHeader` (được lưu và đồng bộ dưới khoá `'monviewphone:dav-always-show-header'`).
+   - Cập nhật [Tile.tsx](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/tile/Tile.tsx) lắng nghe sự kiện thay đổi cài đặt ẩn/hiển để mount overlay và thiết lập CSS class động: `.tile-account-overlay.is-header-only`.
+   - Cập nhật [styles.css](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/styles.css) để khi ở chế độ `.is-header-only`, overlay sẽ chỉ có chiều cao cố định `28px` bám ở trên cùng và ẩn phần thân `.dav-panel-body` đi.
+   - **Đồng bộ hiển thị Dropdown khi overlay ẩn**: Thiết lập `overflow: visible !important` cho cả `.tile-account-overlay.is-header-only` và `.dav-panel` để khi người dùng click vào tên hoặc badge ở header, dropdown danh sách tài khoản vẫn hiển thị nổi lên phía trên màn hình scrcpy thay vì bị che khuất. Vùng màn hình scrcpy phía dưới vẫn nhận tương tác chuột bình thường từ người dùng.
+
+2. **Di chuyển và tối ưu hóa tương tác Tên tài khoản trên Header**:
+   - Di chuyển ô nhập tên tài khoản (kèm icon `Shield` bảo mật và dropdown đổi trạng thái tài khoản) từ thân card `.dav-account-card` (trong `.dav-panel-body`) lên thanh tiêu đề `.dav-panel-header`, nằm giữa tiêu đề máy bên trái và nút danh sách tài khoản bên phải.
+   - Loại bỏ ô nhập tên tài khoản cũ trong `.dav-account-card` để tránh trùng lặp.
+   - Thêm kiểu dáng CSS (`.dav-header-name-wrapper` và `.header-name-input`) hiển thị trong suốt, không viền, tự động co giãn (`flex: 1`) và thu nhỏ chữ khi ở trên tile thiết bị.
+   - *Ẩn icon Shield*: Icon hình khiên bảo mật (`Shield`) chỉ hiển thị khi Overlay đang mở (`showAccountOverlay === true`), tức là khi tắt/thu nhỏ overlay về chế độ `Header Always On` thì icon Shield sẽ tự động ẩn đi để tránh rối mắt trên tile.
+   - *Căn giữa Tên tài khoản*: Thiết lập `.dav-header-name-wrapper` sử dụng `justify-content: center` và `.header-name-input`, `.header-name-display` sử dụng `text-align: center` để căn lề giữa tuyệt đối cho tên và ô nhập.
+   - *Hiển thị Badge Location (MapPin)*: Hiển thị biểu tượng Location trực tiếp bên cạnh tên tài khoản trên header khi tài khoản đang chọn là WeChat (màu xanh dương `#3b82f6` nếu đủ điều kiện, màu cam `#f97316` nếu gần đủ điều kiện / upcoming tối đa 3 ngày).
+   - *Click 1 lần (Single-click)*: Kích hoạt hiển thị dropdown danh sách tài khoản ngay lập tức (không bị delay 250ms).
+   - *Click 2 lần (Double-click)*: Mở chế độ chỉnh sửa tên tài khoản trực tiếp (inline input editor) lập tức và tự động đóng dropdown danh sách tài khoản, hoàn thành chỉnh sửa khi nhấn `Enter` hoặc di chuột ra ngoài (`onBlur`).
+   - *Bỏ tiêu đề dropdown*: Loại bỏ dòng chữ tiêu đề `"Tai khoan nhom hien tai"` trong dropdown danh sách tài khoản để hiển thị danh sách các tài khoản gọn gàng và trực quan hơn.
+
+3. **Đồng bộ và Kiểm thử**:
+   - Đăng ký khoá `'monviewphone:dav-always-show-header'` vào danh sách `configKeysToSync` trong `main.tsx` để đồng bộ an toàn qua backend `settings.json`.
+   - Cập nhật hằng số, lớp CSS và biến trạng thái mới vào [naming_registry.json](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/naming_registry.json) và [project_structure.md](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/project_structure.md).
+   - Chạy `npm run build` biên dịch thành công 100% frontend mà không có lỗi.

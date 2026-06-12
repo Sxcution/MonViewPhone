@@ -1959,6 +1959,24 @@ video {
   outline-offset: -1px;
 }
 
+/* Color-coded border highlights for filter matched devices when overlay is off (no outer glow) */
+.tile.is-filter-matched-blue {
+  border-color: #3b82f6 !important;
+  box-shadow: none !important;
+}
+.tile.is-filter-matched-orange {
+  border-color: #f97316 !important;
+  box-shadow: none !important;
+}
+.tile.is-filter-matched-red {
+  border-color: #ef4444 !important;
+  box-shadow: none !important;
+}
+.tile.is-filter-matched-yellow {
+  border-color: #facc15 !important;
+  box-shadow: none !important;
+}
+
 canvas {
   display: block;
   background: #181818;
@@ -9113,8 +9131,21 @@ textarea:focus,
 
 .dav-order {
   font-weight: bold;
-  font-size: 16px;
+  font-size: 24px;
   color: #ffffff;
+}
+
+.dav-bell-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  height: 24px;
+  width: 24px;
 }
 
 .dav-order.dav-order-nearby-eligible {
@@ -9208,10 +9239,10 @@ textarea:focus,
   background: var(--md-muted-2);
   color: #fff;
   border: 1px solid transparent;
-  font-size: 11px;
+  font-size: 16px;
   font-weight: bold;
-  width: 18px;
-  height: 18px;
+  width: 27px;
+  height: 27px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -9838,6 +9869,106 @@ select.dav-input {
   flex-direction: column;
 }
 
+/* --- Header Always On (.is-header-only) --- */
+.tile-account-overlay.is-header-only {
+  bottom: auto !important;
+  height: 28px !important;
+  background: #141416;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: visible !important;
+}
+
+.tile-account-overlay.is-header-only .dav-panel {
+  overflow: visible !important;
+}
+
+.tile-account-overlay.is-header-only .dav-panel-header {
+  height: 28px !important;
+  padding: 0 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+
+.tile-account-overlay.is-header-only .dav-panel-body {
+  display: none !important;
+}
+
+.tile-account-overlay.is-header-only .dav-order {
+  font-size: 16px !important;
+  line-height: 1 !important;
+}
+
+.tile-account-overlay.is-header-only .dav-bell-btn {
+  height: 18px !important;
+  width: 18px !important;
+}
+
+.tile-account-overlay.is-header-only .dav-bell-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.tile-account-overlay.is-header-only .dav-total-badge {
+  font-size: 11px !important;
+  padding: 2px 6px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  line-height: 14px !important;
+}
+
+.tile-account-overlay.is-header-only .dav-header-name-wrapper .header-name-input,
+.tile-account-overlay.is-header-only .dav-header-name-wrapper .header-name-display {
+  font-size: 11px !important;
+}
+
+/* --- Header Name Input styles --- */
+.dav-header-name-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  margin-left: 6px;
+  margin-right: 6px;
+  position: relative;
+}
+
+.dav-header-name-wrapper .header-name-input {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  padding: 2px 0 !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+  text-align: center !important;
+}
+
+.dav-header-name-wrapper .header-name-display-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  width: 100%;
+  min-width: 0;
+}
+
+.dav-header-name-wrapper .header-name-display {
+  color: inherit;
+  font-weight: bold;
+  font-size: 12px;
+  user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center !important;
+}
+
 .tile-account-overlay .dav-panel {
   border: none;
   background: transparent;
@@ -10247,12 +10378,18 @@ input[type=number] {
   width: 100%;
 }
 
+.dav-search-box-global input:focus {
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
 .dav-floating-panel {
   position: absolute;
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(20, 20, 22, 0.95);
+  background: #202020;
   border: 1px solid var(--md-border);
   border-radius: 8px;
   padding: 8px 12px;
@@ -10355,10 +10492,10 @@ input[type=number] {
 }
 
 /* Account Overlay Filtering Dimming Styles (MonDashboard Style) */
-.tile-account-overlay.mxh-filtered-out .tile-account-inner {
-  filter: grayscale(1) brightness(0.55);
+.tile-account-overlay.mxh-filtered-out {
   opacity: 0.35;
-  transition: filter 0.2s ease, opacity 0.2s ease;
+  filter: grayscale(1) brightness(0.55);
+  transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
 .mxh-filter-overlay {
@@ -10664,3 +10801,67 @@ input[type=number] {
   background: #ffffff;
   box-shadow: 0 0 0 1px rgba(255,255,255,0.35);
 }
+
+/* === Account Settings Layout & Toggles === */
+.dav-settings-row-container {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dav-settings-row-container .dav-settings-choice {
+  flex: 1;
+  width: auto;
+}
+
+.dav-settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--md-border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.dav-settings-toggle-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--md-text);
+}
+
+.dav-toggle-switch {
+  position: relative;
+  width: 38px;
+  height: 20px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--md-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.dav-toggle-switch.on {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: var(--md-info);
+}
+
+.dav-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--md-muted);
+  border-radius: 50%;
+  transition: left 0.2s ease, background 0.2s ease;
+}
+
+.dav-toggle-switch.on .dav-toggle-knob {
+  left: 20px;
+  background: var(--md-info);
+}
+
