@@ -6,7 +6,7 @@
 - `APK Build/`: Android helper APK source.
 - [NEW] [assets/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/assets): Project assets directory. Contains `IconMonViewPhone.png` (original image) and `IconMonViewPhone.ico` (multi-size Windows icon file).
 - `rule.md`: Local development rules and UI interaction notes.
-- [NEW] [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw): Windows tray launcher and process manager. Starts the Go backend server on port 11000 and runs a preflight data safety check. Supports Dev Mode (runs Vite dev server on port 5173 and opens Chrome App at port 5173) and Normal Mode (opens Chrome App at port 11000 serving production files). Saves run mode configuration in `launcher_config.json` and manages child processes (Go backend, Vite dev server, Chrome App) cleanly. Loads the custom tray icon from `assets/IconMonViewPhone.png`.
+- [NEW] [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw): Windows tray launcher and process manager. Starts the Go backend server and executes a preflight data safety check before opening Chrome in App mode pointing to `http://localhost:11000/`. Does not run Vite or NPM. Loads the custom tray icon from `assets/IconMonViewPhone.png`.
 - [NEW] [Backup/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/Backup): Local directory for backup data (ignored by Git). Contains `Backup/adb/` for copying and restoring ADB host keys (`adbkey` and `adbkey.pub`) when starting the application.
 
 Removed legacy layers:

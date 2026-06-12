@@ -23,27 +23,34 @@ type accountNotice struct {
 	StartDate *int64 `json:"startDate"`
 }
 
+type accountHistoryEntry struct {
+	ID        string `json:"id"`
+	Action    string `json:"action"`
+	Timestamp int64  `json:"timestamp"`
+}
+
 type deviceAccount struct {
-	ID                  string         `json:"id"`
-	Name                string         `json:"name"`
-	Nickname            string         `json:"nickname"`
-	Phone               string         `json:"phone"`
-	Email               string         `json:"email"`
-	Note                string         `json:"note"`
-	Status              string         `json:"status"`
-	Notice              *accountNotice `json:"notice"`
-	AppType             string         `json:"appType,omitempty"`
-	CreatedAt           *int64         `json:"createdAt"`
-	VerifyStatus        string         `json:"verifyStatus"`
-	PhoneRegion         string         `json:"phoneRegion"`
-	ScanCount           int            `json:"scanCount"`
-	LastScanDate        *int64         `json:"lastScanDate"`
-	NearbyPeopleEnabled bool           `json:"nearbyPeopleEnabled"`
-	NearbyPeopleDueDate *int64         `json:"nearbyPeopleDueDate"`
-	ImportedFrom        string         `json:"importedFrom,omitempty"`
-	DashboardAccountID  *int           `json:"dashboardAccountId,omitempty"`
-	DashboardCardName   string         `json:"dashboardCardName,omitempty"`
-	DashboardCardID     *int           `json:"dashboardCardId,omitempty"`
+	ID                  string                `json:"id"`
+	Name                string                `json:"name"`
+	Nickname            string                `json:"nickname"`
+	Phone               string                `json:"phone"`
+	Email               string                `json:"email"`
+	Note                string                `json:"note"`
+	Status              string                `json:"status"`
+	Notice              *accountNotice        `json:"notice"`
+	History             []accountHistoryEntry `json:"history,omitempty"`
+	AppType             string                `json:"appType,omitempty"`
+	CreatedAt           *int64                `json:"createdAt"`
+	VerifyStatus        string                `json:"verifyStatus"`
+	PhoneRegion         string                `json:"phoneRegion"`
+	ScanCount           int                   `json:"scanCount"`
+	LastScanDate        *int64                `json:"lastScanDate"`
+	NearbyPeopleEnabled bool                  `json:"nearbyPeopleEnabled"`
+	NearbyPeopleDueDate *int64                `json:"nearbyPeopleDueDate"`
+	ImportedFrom        string                `json:"importedFrom,omitempty"`
+	DashboardAccountID  *int                  `json:"dashboardAccountId,omitempty"`
+	DashboardCardName   string                `json:"dashboardCardName,omitempty"`
+	DashboardCardID     *int                  `json:"dashboardCardId,omitempty"`
 }
 
 type deviceAccountData struct {
@@ -102,6 +109,7 @@ func initDeviceAccountDB(db *sql.DB) error {
 			status TEXT NOT NULL DEFAULT 'Live',
 			app_type TEXT,
 			notice_json TEXT,
+			history_json TEXT,
 			created_at_ms INTEGER,
 			verify_status TEXT,
 			phone_region TEXT,
@@ -120,7 +128,14 @@ func initDeviceAccountDB(db *sql.DB) error {
 		CREATE INDEX IF NOT EXISTS idx_accounts_udid_platform ON accounts(udid, platform);
 		CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_source ON accounts(source, source_account_id);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`ALTER TABLE accounts ADD COLUMN history_json TEXT`)
+	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+		return err
+	}
+	return nil
 }
 
 func sqlNullString(value string) sql.NullString {
@@ -264,10 +279,10 @@ func syncDeviceAccountVaultToDB(raw string) error {
 	insertAccount, err := tx.Prepare(`
 		INSERT INTO accounts (
 			id, udid, platform, name, nickname, phone, email, note, status, app_type,
-			notice_json, created_at_ms, verify_status, phone_region, scan_count,
+			notice_json, history_json, created_at_ms, verify_status, phone_region, scan_count,
 			last_scan_date_ms, nearby_people_enabled, nearby_people_due_date_ms,
 			source, source_account_id, source_card_name, source_card_id, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`)
 	if err != nil {
 		return err
@@ -297,6 +312,14 @@ func syncDeviceAccountVaultToDB(raw string) error {
 					}
 					noticeJSON = sql.NullString{String: string(bytes), Valid: true}
 				}
+				historyJSON := sql.NullString{}
+				if len(account.History) > 0 {
+					bytes, err := json.Marshal(account.History)
+					if err != nil {
+						return err
+					}
+					historyJSON = sql.NullString{String: string(bytes), Valid: true}
+				}
 				var dashboardAccountID sql.NullString
 				if account.DashboardAccountID != nil {
 					dashboardAccountID = sql.NullString{String: strconv.Itoa(*account.DashboardAccountID), Valid: true}
@@ -317,6 +340,7 @@ func syncDeviceAccountVaultToDB(raw string) error {
 					account.Status,
 					sqlNullString(account.AppType),
 					noticeJSON,
+					historyJSON,
 					sqlNullInt64(account.CreatedAt),
 					sqlNullString(account.VerifyStatus),
 					sqlNullString(account.PhoneRegion),
@@ -363,7 +387,7 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 	rows, err := db.Query(`
 		SELECT
 			a.id, a.udid, a.platform, a.name, a.nickname, a.phone, a.email, a.note, a.status,
-			a.app_type, a.notice_json, a.created_at_ms, a.verify_status, a.phone_region,
+			a.app_type, a.notice_json, a.history_json, a.created_at_ms, a.verify_status, a.phone_region,
 			a.scan_count, a.last_scan_date_ms, a.nearby_people_enabled, a.nearby_people_due_date_ms,
 			a.source, a.source_account_id, a.source_card_name, a.source_card_id,
 			d.display_name
@@ -382,7 +406,7 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 	for rows.Next() {
 		var (
 			id, udid, platform, name, nickname, phone, email, note, status string
-			appType, noticeRaw, verifyStatus, phoneRegion                  sql.NullString
+			appType, noticeRaw, historyRaw, verifyStatus, phoneRegion      sql.NullString
 			createdAt, lastScanDate, nearbyPeopleDueDate                   sql.NullInt64
 			scanCount, nearbyPeopleEnabled                                 int
 			source, sourceAccountID, sourceCardName, sourceCardID          sql.NullString
@@ -390,7 +414,7 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 		)
 		if err := rows.Scan(
 			&id, &udid, &platform, &name, &nickname, &phone, &email, &note, &status,
-			&appType, &noticeRaw, &createdAt, &verifyStatus, &phoneRegion,
+			&appType, &noticeRaw, &historyRaw, &createdAt, &verifyStatus, &phoneRegion,
 			&scanCount, &lastScanDate, &nearbyPeopleEnabled, &nearbyPeopleDueDate,
 			&source, &sourceAccountID, &sourceCardName, &sourceCardID,
 			&displayName,
@@ -425,6 +449,13 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 				notice = &parsed
 			}
 		}
+		var history []accountHistoryEntry
+		if historyRaw.Valid && historyRaw.String != "" {
+			parsed := []accountHistoryEntry{}
+			if err := json.Unmarshal([]byte(historyRaw.String), &parsed); err == nil {
+				history = parsed
+			}
+		}
 
 		account := deviceAccount{
 			ID:                  id,
@@ -435,6 +466,7 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 			Note:                note,
 			Status:              status,
 			Notice:              notice,
+			History:             history,
 			AppType:             nullableString(appType),
 			CreatedAt:           nullableInt64(createdAt),
 			VerifyStatus:        nullableString(verifyStatus),
@@ -499,11 +531,11 @@ func getDeviceOrderFromDB() (map[string]int, error) {
 		}
 		order[udid] = deviceOrder
 	}
-	
+
 	// Check total devices
 	var totalDevices int
 	_ = db.QueryRow("SELECT COUNT(*) FROM devices").Scan(&totalDevices)
-	
+
 	if len(order) < totalDevices && totalDevices > 0 {
 		// Repair
 		repairRows, err := db.Query("SELECT udid FROM devices")
@@ -524,7 +556,7 @@ func getDeviceOrderFromDB() (map[string]int, error) {
 				}
 			}
 			repairRows.Close()
-			
+
 			// Re-number empty ones
 			idx = 1
 			for _, v := range order {
@@ -542,11 +574,11 @@ func getDeviceOrderFromDB() (map[string]int, error) {
 				}
 			}
 			repairRows.Close()
-			
+
 			updateDeviceOrderInDB(order)
 		}
 	}
-	
+
 	return order, nil
 }
 

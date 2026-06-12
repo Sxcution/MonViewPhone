@@ -42,6 +42,14 @@ export interface AccountNotice {
   startDate?: number | null;
 }
 
+export type AccountHistoryAction = 'Live' | 'Die' | 'Risk' | 'Open Nearby' | 'Open Nearby People' | 'Risk Nearby';
+
+export interface AccountHistoryEntry {
+  id: string;
+  action: AccountHistoryAction;
+  timestamp: number;
+}
+
 export interface BaseAccount {
   id: string;
   name: string;
@@ -51,6 +59,7 @@ export interface BaseAccount {
   note: string;
   status: AccountStatus;
   notice: AccountNotice | null;
+  history?: AccountHistoryEntry[];
   appType?: 'main' | 'clone' | 'secure' | 'shelter';
   dieAt?: number | null;
 }
@@ -165,6 +174,7 @@ export function createNewAccount(isWeChat: boolean): Account {
     note: '',
     status: 'Live',
     notice: null,
+    history: [],
     dieAt: null,
   };
   

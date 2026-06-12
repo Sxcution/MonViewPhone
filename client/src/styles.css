@@ -9183,6 +9183,27 @@ textarea:focus,
   background: #ef4444;
 }
 
+.dav-status-dot.live {
+  background: var(--md-success);
+}
+
+.dav-status-dot.die {
+  background: var(--md-danger);
+}
+
+.dav-status-dot.risk {
+  background: var(--md-warning);
+}
+
+.dav-status-dot.verify {
+  background: var(--md-warning);
+}
+
+.dav-ctx-item.verified {
+  color: var(--md-success);
+  font-weight: 700;
+}
+
 .dav-total-badge {
   background: var(--md-muted-2);
   color: #fff;
@@ -9669,6 +9690,10 @@ select.dav-input {
   z-index: 10001;
 }
 
+.dav-ctx-submenu.is-open {
+  display: flex;
+}
+
 .dav-ctx-submenu::before {
   content: "";
   position: absolute;
@@ -9692,6 +9717,111 @@ select.dav-input {
 .dav-ctx-menu.direction-left .dav-ctx-submenu::before {
   left: auto;
   right: -8px;
+}
+
+.dav-history-overlay {
+  z-index: 28000;
+  background: transparent;
+  pointer-events: none;
+}
+
+.dav-history-panel {
+  width: min(392px, 100%);
+  max-height: min(640px, calc(100vh - 48px));
+  background: var(--md-card);
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-sm);
+  box-shadow: var(--md-shadow-panel);
+  pointer-events: auto;
+}
+
+.dav-history-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dav-history-title {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.dav-history-account-name {
+  color: var(--md-text);
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dav-history-list {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  max-height: 420px;
+  flex-direction: column;
+  overflow-y: auto;
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-sm);
+  background: var(--md-surface-2);
+}
+
+.dav-history-row {
+  display: grid;
+  grid-template-columns: minmax(104px, 1fr) 58px 58px 42px;
+  gap: 6px;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--md-border);
+  color: var(--md-text-soft);
+  font-size: 12px;
+}
+
+.dav-history-row:last-child {
+  border-bottom: none;
+}
+
+.dav-history-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 32px;
+  background: var(--md-card);
+  color: var(--md-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.dav-history-status {
+  color: var(--md-text);
+  font-weight: 600;
+}
+
+.dav-history-status.live {
+  color: var(--md-success);
+}
+
+.dav-history-status.die {
+  color: var(--md-danger);
+}
+
+.dav-history-status.risk {
+  color: var(--md-warning);
+}
+
+.dav-history-status.nearby {
+  color: var(--md-blue);
+}
+
+.dav-history-empty {
+  padding: 18px 12px;
+  color: var(--md-muted);
+  font-size: 13px;
+  text-align: center;
 }
 
 .tile-account-overlay {

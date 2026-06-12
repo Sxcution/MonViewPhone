@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, ShieldAlert, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings } from 'lucide-react';
+import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, ShieldAlert, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings, History } from 'lucide-react';
 import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby';
 import { 
   getDeviceAccountData, 
@@ -11,6 +11,7 @@ import {
   DeviceAccountData,
   PlatformType, 
   Account, 
+  AccountHistoryAction,
   WeChatAccount, 
   createNewAccount,
   getSavedPlatforms,
@@ -72,6 +73,41 @@ const parseDateDDMMYYYY = (val: string): number | null => {
 function formatDate(ts: number | null) {
   if (!ts) return 'N/A';
   return new Date(ts).toLocaleDateString('vi-VN');
+}
+
+function getAccountDisplayName(account?: Account | null) {
+  return account?.name || account?.phone || account?.nickname || 'Không tên';
+}
+
+function generateHistoryId() {
+  return Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
+}
+
+function getStatusHistoryAction(status?: string): AccountHistoryAction | null {
+  if (status === 'Live' || status === 'Die' || status === 'Risk') return status;
+  return null;
+}
+
+function getHistoryActionLabel(action: AccountHistoryAction | string) {
+  if (action === 'Open Nearby People') return 'Open Nearby';
+  return action;
+}
+
+function getHistoryActionClass(action: AccountHistoryAction | string) {
+  if (action === 'Live') return 'live';
+  if (action === 'Die') return 'die';
+  if (action === 'Risk' || action === 'Risk Nearby') return 'risk';
+  if (action === 'Open Nearby' || action === 'Open Nearby People') return 'nearby';
+  return '';
+}
+
+function formatHistoryTimeParts(ts: number) {
+  const d = new Date(ts);
+  return {
+    time: d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    date: d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+    year: d.getFullYear().toString(),
+  };
 }
 
 function getRelativeTimeStr(createdAt: number) {
@@ -336,6 +372,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [bellTooltip, setBellTooltip] = useState<{ x: number; y: number } | null>(null);
   const [hiddenIdentityFields, setHiddenIdentityFields] = useState<Record<string, boolean>>({});
   const [pendingDeleteAccount, setPendingDeleteAccount] = useState<{ id: string; name: string } | null>(null);
+  const [historyModalAccountId, setHistoryModalAccountId] = useState<string | null>(null);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -568,6 +605,23 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const activeAccounts = data.platforms[activeTab] || [];
   const selectedAccountId = data.selectedAccountByPlatform[activeTab];
   let selectedAccount = activeAccounts.find(a => a.id === selectedAccountId) || activeAccounts[0];
+  const historyModalAccount = historyModalAccountId
+    ? activeAccounts.find(a => a.id === historyModalAccountId)
+    : null;
+  const historyEntries = useMemo(() => {
+    if (!historyModalAccount) return [];
+    const stored = Array.isArray(historyModalAccount.history) ? historyModalAccount.history : [];
+    if (stored.length > 0) {
+      return [...stored].sort((a, b) => b.timestamp - a.timestamp);
+    }
+    const fallbackAction = getStatusHistoryAction(historyModalAccount.status);
+    if (!fallbackAction) return [];
+    return [{
+      id: 'current-status',
+      action: fallbackAction,
+      timestamp: data.updatedAt || Date.now(),
+    }];
+  }, [historyModalAccount, data.updatedAt]);
 
   const getIdentityKey = (field: 'nickname' | 'phone' | 'email') =>
     `${selectedAccount?.id || 'none'}:${field}`;
@@ -760,7 +814,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     updateData(newData);
   };
 
-  const handleUpdateAccount = (id: string, updates: Partial<Account>) => {
+  const handleUpdateAccount = (id: string, updates: Partial<Account>, historyAction?: AccountHistoryAction) => {
     const newData = {
       ...data,
       platforms: {
@@ -768,6 +822,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
         [activeTab]: (data.platforms[activeTab] || []).map(a => {
           if (a.id === id) {
             const updated = { ...a, ...updates };
+            const statusHistoryAction = getStatusHistoryAction(updates.status);
+            const nextHistoryAction = historyAction || (statusHistoryAction && updates.status !== a.status ? statusHistoryAction : null);
             if (updates.status === 'Die' && a.status !== 'Die') {
               updated.dieAt = Date.now();
             }
@@ -786,6 +842,16 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               };
             } else if (updates.status && updates.status !== 'Risk' && a.status === 'Risk' && a.notice?.title === 'Account Risk') {
               updated.notice = null;
+            }
+            if (nextHistoryAction) {
+              updated.history = [
+                ...(Array.isArray(a.history) ? a.history : []),
+                {
+                  id: generateHistoryId(),
+                  action: nextHistoryAction,
+                  timestamp: Date.now(),
+                },
+              ];
             }
             return updated;
           }
@@ -1491,7 +1557,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           >
             <div className="dav-ctx-item dav-ctx-has-sub">
               <Users size={16} /> Tài Khoản
-              <div className="dav-ctx-submenu" style={{ display: activeLevel1 === 'tai_khoan' ? 'flex' : 'none' }}>
+              <div className={`dav-ctx-submenu ${activeLevel1 === 'tai_khoan' ? 'is-open' : ''}`}>
                 {activeAccounts.map(a => (
                   <button
                     key={a.id}
@@ -1530,7 +1596,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 >
                   <div className="dav-ctx-item dav-ctx-has-sub">
                     <Plus size={16} /> Thêm tài khoản
-                    <div className="dav-ctx-submenu" style={{ display: activeLevel2 === 'them_tai_khoan' ? 'flex' : 'none' }}>
+                    <div className={`dav-ctx-submenu ${activeLevel2 === 'them_tai_khoan' ? 'is-open' : ''}`}>
                       {(['main', 'clone', 'secure', 'shelter'] as const).map(type => (
                         <button
                           key={type}
@@ -1560,7 +1626,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           >
             <div className="dav-ctx-item dav-ctx-has-sub">
               <Activity size={16} /> Trạng Thái
-              <div className="dav-ctx-submenu" style={{ display: activeLevel1 === 'trang_thai' ? 'flex' : 'none' }}>
+              <div className={`dav-ctx-submenu ${activeLevel1 === 'trang_thai' ? 'is-open' : ''}`}>
                 <button 
                   className={`dav-ctx-item ${selectedAccount.status === 'Live' ? 'active' : ''}`} 
                   onPointerDown={(e) => {
@@ -1570,7 +1636,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     setCtxMenu(null);
                   }}
                 >
-                  <div className="dav-status-dot" style={{ background: '#22c55e' }} /> Set Live {selectedAccount.status === 'Live' ? '(Hiện tại)' : ''}
+                  <div className="dav-status-dot live" /> Set Live {selectedAccount.status === 'Live' ? '(Hiện tại)' : ''}
                 </button>
                 <button 
                   className={`dav-ctx-item ${selectedAccount.status === 'Die' ? 'active' : ''}`} 
@@ -1581,7 +1647,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     setCtxMenu(null);
                   }}
                 >
-                  <div className="dav-status-dot" style={{ background: '#ef4444' }} /> Set Die {selectedAccount.status === 'Die' ? '(Hiện tại)' : ''}
+                  <div className="dav-status-dot die" /> Set Die {selectedAccount.status === 'Die' ? '(Hiện tại)' : ''}
                 </button>
                 <button 
                   className={`dav-ctx-item ${selectedAccount.status === 'Risk' ? 'active' : ''}`} 
@@ -1592,11 +1658,10 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     setCtxMenu(null);
                   }}
                 >
-                  <div className="dav-status-dot" style={{ background: '#f97316' }} /> Set Risk {selectedAccount.status === 'Risk' ? '(Hiện tại)' : ''}
+                  <div className="dav-status-dot risk" /> Set Risk {selectedAccount.status === 'Risk' ? '(Hiện tại)' : ''}
                 </button>
                 <button 
-                  className={`dav-ctx-item ${selectedAccount.status === 'Unverified' ? 'active' : ''}`} 
-                  style={selectedAccount.status === 'Unverified' ? { color: '#22c55e', fontWeight: 'bold' } : {}}
+                  className={`dav-ctx-item ${selectedAccount.status === 'Unverified' ? 'active verified' : ''}`}
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1607,11 +1672,11 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 >
                   {selectedAccount.status === 'Unverified' ? (
                     <>
-                      <div className="dav-status-dot" style={{ background: '#22c55e' }} /> Verify Success
+                      <div className="dav-status-dot live" /> Verify Success
                     </>
                   ) : (
                     <>
-                      <div className="dav-status-dot" style={{ background: '#eab308' }} /> Set UnVerify
+                      <div className="dav-status-dot verify" /> Set UnVerify
                     </>
                   )}
                 </button>
@@ -1628,17 +1693,17 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             >
               <div className="dav-ctx-item dav-ctx-has-sub">
                 <MapPin size={16} /> Nearby People
-                <div className="dav-ctx-submenu" style={{ display: activeLevel1 === 'nearby' ? 'flex' : 'none' }}>
+                <div className={`dav-ctx-submenu ${activeLevel1 === 'nearby' ? 'is-open' : ''}`}>
                   <button 
                     className={`dav-ctx-item ${selectedAccount.nearbyPeopleEnabled ? 'active' : ''}`} 
                     onPointerDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      handleUpdateAccount(selectedAccount.id, { nearbyPeopleEnabled: true, nearbyPeopleDueDate: Date.now() + 30 * 24 * 60 * 60 * 1000 });
+                      handleUpdateAccount(selectedAccount.id, { nearbyPeopleEnabled: true, nearbyPeopleDueDate: Date.now() + 30 * 24 * 60 * 60 * 1000 }, 'Open Nearby');
                       setCtxMenu(null);
                     }}
                   >
-                    Open Nearby People
+                    Open Nearby
                   </button>
                   <button 
                     className="dav-ctx-item" 
@@ -1657,7 +1722,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                           startDate,
                           dueDate
                         }
-                      });
+                      }, 'Risk Nearby');
                       setCtxMenu(null);
                     }}
                   >
@@ -1677,7 +1742,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             >
               <div className="dav-ctx-item dav-ctx-has-sub">
                 <QrCode size={16} /> Quét QR
-                <div className="dav-ctx-submenu" style={{ display: activeLevel1 === 'quet_qr' ? 'flex' : 'none' }}>
+                <div className={`dav-ctx-submenu ${activeLevel1 === 'quet_qr' ? 'is-open' : ''}`}>
                   <button 
                     className="dav-ctx-item" 
                     disabled={(selectedAccount.scanCount || 0) >= 3}
@@ -1685,6 +1750,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       e.preventDefault();
                       e.stopPropagation();
                       const currentCount = selectedAccount.scanCount || 0;
+                      if (currentCount >= 3) return;
                       handleUpdateAccount(selectedAccount.id, {
                         scanCount: Math.min(3, currentCount + 1),
                         lastScanDate: Date.now()
@@ -1712,6 +1778,18 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               </div>
             </div>
           )}
+
+          <button
+            className="dav-ctx-item"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setHistoryModalAccountId(selectedAccount.id);
+              setCtxMenu(null);
+            }}
+          >
+            <History size={16} /> Lịch sử tài khoản
+          </button>
 
           <div className="dav-ctx-divider" />
           <button 
@@ -1763,6 +1841,61 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 }}
               >
                 Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {historyModalAccount && ReactDOM.createPortal(
+        <div
+          className="confirmOverlay dav-history-overlay"
+        >
+          <div
+            className="confirmPanel dav-history-panel"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="dav-history-title-row">
+              <div className="confirmTitle dav-history-title">Lịch sử tài khoản</div>
+              <div className="dav-history-account-name">
+                {getAccountDisplayName(historyModalAccount)}
+              </div>
+            </div>
+            <div className="dav-history-list">
+              <div className="dav-history-row dav-history-head">
+                <span>Trạng thái</span>
+                <span>Giờ</span>
+                <span>Ngày</span>
+                <span>Năm</span>
+              </div>
+              {historyEntries.length > 0 ? historyEntries.map(entry => {
+                const parts = formatHistoryTimeParts(entry.timestamp);
+                return (
+                  <div className="dav-history-row" key={entry.id}>
+                    <span className={`dav-history-status ${getHistoryActionClass(entry.action)}`}>
+                      {getHistoryActionLabel(entry.action)}
+                    </span>
+                    <span>{parts.time}</span>
+                    <span>{parts.date}</span>
+                    <span>{parts.year}</span>
+                  </div>
+                );
+              }) : (
+                <div className="dav-history-empty">Chưa có lịch sử trạng thái.</div>
+              )}
+            </div>
+            <div className="confirmActions">
+              <button
+                type="button"
+                className="modalBtnPrimary"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setHistoryModalAccountId(null);
+                }}
+              >
+                Đóng
               </button>
             </div>
           </div>
