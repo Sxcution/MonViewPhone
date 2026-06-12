@@ -12,7 +12,30 @@ function isUserEditableElement(el: Element | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   if (el.id === PASTE_SINK_ID) return false;
   const tag = el.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable) {
+    return true;
+  }
+  // Check if click target or active element is inside an interactive modal, panel, overlay, or context menu
+  if (
+    el.closest('.confirmOverlay') ||
+    el.closest('.confirmPanel') ||
+    el.closest('.modalOverlay') ||
+    el.closest('.modalPanel') ||
+    el.closest('.syncModalOverlay') ||
+    el.closest('.syncModalPanel') ||
+    el.closest('.vsp-modal-overlay') ||
+    el.closest('.vsp-modal') ||
+    el.closest('.automationModalBackdrop') ||
+    el.closest('.automationContent') ||
+    el.closest('.rightConfigPanel') ||
+    el.closest('.dav-panel') ||
+    el.closest('.dav-ctx-menu') ||
+    el.closest('.contextMenuPanel') ||
+    el.closest('.react-contexify')
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /**

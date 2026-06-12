@@ -2747,7 +2747,7 @@ export function App() {
                 // Cả 2 mode (priority_sort và hide_unmatched) đều làm mờ title không khớp.
                 // Điểm khác nhau duy nhất là priority_sort thì sort renderOrder ở trên, hide_unmatched giữ nguyên vị trí.
                 const isVisible = isMatchedByConnectionAndGroup;
-                const isFilteredOut = accountManagerOpen && isMatchedByConnectionAndGroup && !isAccountMatched;
+                const isFilteredOut = deviceAccountOverlayOpen && accountManagerOpen && isMatchedByConnectionAndGroup && !isAccountMatched;
 
                 return (
                   <div
@@ -2880,25 +2880,32 @@ export function App() {
                       isFilteredOut={isFilteredOut}
                       nearbyAutoOpenEnabled={davActiveTab === 'wechat' && davActiveFilter === 'nearby_people'}
                       highlightFilterMatched={(() => {
-                        if (!accountManagerOpen || deviceAccountOverlayOpen || !isAccountMatched || (davActiveFilter === 'default' && davSearch.trim() === '')) {
+                        if (!accountManagerOpen) {
                           return false;
                         }
                         const accountData = getDeviceAccountDataFromVault(vault, udid);
                         const accounts = (accountData.platforms[davActiveTab] || []).filter(acc => acc !== null && acc !== undefined);
-                        if (accounts.some(acc => acc.status === 'Die')) {
+
+                        // Ưu tiên màu theo bộ lọc đang chọn (nearby_people được ưu tiên cao nhất)
+                        if (davActiveFilter === 'nearby_people' && isAccountMatched) {
+                          const state = getNearbyAccountGroupState(accounts);
+                          if (state === 'eligible') {
+                            return 'blue';
+                          }
+                          if (state === 'upcoming') {
+                            return 'yellow';
+                          }
+                        }
+
+                        // Chỉ hiện màu die/risk khi bộ lọc tương ứng đang active
+                        if (davActiveFilter === 'die' && accounts.some(acc => acc.status === 'Die')) {
                           return 'red';
                         }
-                        if (accounts.some(acc => acc.status === 'Risk')) {
+                        if (davActiveFilter === 'risk' && accounts.some(acc => acc.status === 'Risk')) {
                           return 'orange';
                         }
-                        const state = getNearbyAccountGroupState(accounts);
-                        if (state === 'eligible') {
-                          return 'blue';
-                        }
-                        if (state === 'upcoming') {
-                          return 'yellow';
-                        }
-                        return 'yellow'; // Fallback
+                        
+                        return false;
                       })()}
                       onOpenDeviceViewer={openDeviceViewerFromAccountOverlay}
                     />

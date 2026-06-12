@@ -247,3 +247,27 @@ Chúng tôi đã bổ sung tuỳ chọn "Luôn hiện Header" và di chuyển ô
    - Đăng ký khoá `'monviewphone:dav-always-show-header'` vào danh sách `configKeysToSync` trong `main.tsx` để đồng bộ an toàn qua backend `settings.json`.
    - Cập nhật hằng số, lớp CSS và biến trạng thái mới vào [naming_registry.json](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/naming_registry.json) và [project_structure.md](file:///C:/Users/Mon/Desktop/Protect/MonViewPhone/project_structure.md).
    - Chạy `npm run build` biên dịch thành công 100% frontend mà không có lỗi.
+
+## Thêm Submenu Phân Loại Cho Các Tài Khoản Đã Tạo Sẵn
+
+Chúng tôi đã bổ sung các submenu phân loại tài khoản (Main, Clone, Secure Folder, Shelter) cho các tài khoản đã tạo sẵn ở mọi vị trí tương tác context menu để nâng cao trải nghiệm người dùng:
+
+1. **Submenu Phân Loại Trong Danh Sách Tài Khoản (`Tài Khoản`)**:
+   - Thay đổi cấu trúc menu danh sách tài khoản đã tạo sẵn trong submenu **Tài Khoản** của menu ngữ cảnh chính.
+   - Khi hover vào một tài khoản đã tạo sẵn trong danh sách, một submenu mới sẽ mở ra hiển thị hai tuỳ chọn:
+     - **Chọn tài khoản này**: Đặt tài khoản đó làm tài khoản chính cho thiết bị (`handleSetMain`).
+     - **Phân loại**: Khi hover vào đây, một sub-submenu (Level 4) sẽ mở ra hiển thị các tuỳ chọn phân loại tương ứng: **Main**, **Clone**, **Secure Folder**, **Shelter**.
+   - Việc tách riêng hai hành động giúp người dùng thao tác trực quan, tránh việc vô tình chọn tài khoản làm chính khi đang muốn đổi phân loại và ngược lại.
+
+2. **Submenu Phân Loại Trên Card Tài Khoản Đang Chọn**:
+   - Thêm trực tiếp tuỳ chọn **Phân Loại** vào menu ngữ cảnh chính (khi click chuột phải vào card tài khoản đang chọn).
+   - Menu con này cho phép người dùng đổi nhanh phân loại của tài khoản hiện tại mà không cần phải tìm kiếm và hover vào tài khoản đó trong danh sách `Tài Khoản`.
+
+3. **Submenu Phân Loại Trong Menu Ngữ Cảnh Dropdown Tiêu Đề**:
+   - Bổ sung tuỳ chọn **Phân loại** vào menu ngữ cảnh `accountActionMenu` (khi click chuột phải vào tài khoản trong dropdown danh sách tài khoản ở header của thiết bị).
+   - Cho phép người dùng trực tiếp phân loại nhanh tài khoản từ danh sách dropdown ở header mà không cần mở giao diện Quản lý tài khoản toàn màn hình.
+
+4. **Đồng Bộ & Build**:
+   - Cấu trúc lại các biến trạng thái submenu React (`showClassificationSubmenu` và `activeLevel4`) đảm bảo được reset sạch sẽ khi đóng menu ngữ cảnh để tránh lỗi giao diện.
+   - Thêm hằng số vào `naming_registry.json` và cập nhật thông tin trong `project_structure.md`.
+   - Biên dịch thành công 100% frontend bằng lệnh `npm run build`.

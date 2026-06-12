@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, ShieldAlert, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings, History } from 'lucide-react';
+import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, ShieldAlert, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings, History, Layers } from 'lucide-react';
 import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby';
 import { saveBackendSetting } from '@/lib/backendSettings';
 import { useServer } from '@/context/ServerContext';
@@ -405,6 +405,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [pendingResetHistoryAccount, setPendingResetHistoryAccount] = useState<Account | null>(null);
   const [deviceProfiles, setDeviceProfiles] = useState<{ id: number; name: string }[]>([]);
   const [showSetSubmenu, setShowSetSubmenu] = useState(false);
+  /* showClassificationSubmenu : State hiển thị submenu phân loại của tài khoản trong dropdown */
+  const [showClassificationSubmenu, setShowClassificationSubmenu] = useState(false);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -433,8 +435,10 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
   const [ctxMenu, setCtxMenu] = useState<{ x: number, y: number, accountId: string } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [activeLevel1, setActiveLevel1] = useState<'tai_khoan' | 'trang_thai' | 'nearby' | 'quet_qr' | null>(null);
+  const [activeLevel1, setActiveLevel1] = useState<'tai_khoan' | 'trang_thai' | 'nearby' | 'quet_qr' | 'phan_loai' | null>(null);
   const [activeLevel2, setActiveLevel2] = useState<string | null>(null);
+  const [activeLevel3, setActiveLevel3] = useState<string | null>(null);
+  const [activeLevel4, setActiveLevel4] = useState<string | null>(null);
 
   const handleOpenViewerMiddleClick = (e: React.MouseEvent<HTMLElement>) => {
     if (e.button !== 1) return;
@@ -502,21 +506,11 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const platformDropdownRef = useRef<HTMLDivElement>(null);
   const autoOpenedNearbyDropdownRef = useRef(false);
 
-  const [isEditingName, setIsEditingName] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-
   const handleNameClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setAccountTitleDropdownOpen(v => !v);
     setPlatformDropdownOpen(false);
-  };
-
-  const handleNameDoubleClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsEditingName(true);
-    setAccountTitleDropdownOpen(false);
   };
 
   // Tính toán xem panel này có tài khoản đủ / gần đủ Nearby không
@@ -556,9 +550,19 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   }, [nearbyAutoOpenEnabled, activeTab, panelHasNearbyRelevantAccount]);
   const [accountActionMenu, setAccountActionMenu] = useState<{ x: number; y: number; sourceUdid: string; account: Account } | null>(null);
   const accountActionMenuRef = useRef<HTMLDivElement>(null);
+  const moveInputRef = useRef<HTMLInputElement>(null);
   const [moveModal, setMoveModal] = useState<{ sourceUdid: string, account: Account } | null>(null);
   const [targetOrderStr, setTargetOrderStr] = useState('');
   const [moveError, setMoveError] = useState('');
+
+  useEffect(() => {
+    if (moveModal) {
+      const timer = setTimeout(() => {
+        moveInputRef.current?.focus();
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [moveModal]);
 
   useEffect(() => {
     if (accountActionMenu) {
@@ -573,30 +577,39 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     } else {
       setDeviceProfiles([]);
       setShowSetSubmenu(false);
+      setShowClassificationSubmenu(false);
     }
   }, [accountActionMenu, wsServer]);
 
   useEffect(() => {
-    if (!accountTitleDropdownOpen && !platformDropdownOpen && !accountActionMenu) return;
+    if (!accountTitleDropdownOpen && !platformDropdownOpen) return;
     const hide = (e: MouseEvent) => {
       const target = e.target as Node;
       if (accountTitleDropdownRef.current?.contains(target)) return;
+      const headerNameWrap = accountTitleDropdownRef.current?.closest('.dav-panel-header')?.querySelector('.dav-header-name-wrapper');
+      if (headerNameWrap?.contains(target)) return;
       if (platformDropdownRef.current?.contains(target)) return;
-      if (accountActionMenuRef.current?.contains(target)) return;
-      // Khi filter Nearby đang bật và dropdown được ghim bởi auto-open,
-      // click ngoài không đóng accountTitleDropdown — chỉ đóng khi filter tắt.
-      if (nearbyAutoOpenEnabled && autoOpenedNearbyDropdownRef.current) {
-        setPlatformDropdownOpen(false);
-        setAccountActionMenu(null);
-        return;
-      }
+      
       setAccountTitleDropdownOpen(false);
       setPlatformDropdownOpen(false);
+    };
+    window.addEventListener('mousedown', hide, true);
+    return () => window.removeEventListener('mousedown', hide, true);
+  }, [accountTitleDropdownOpen, platformDropdownOpen]);
+
+  // Close accountActionMenu on outside click
+  useEffect(() => {
+    if (!accountActionMenu) return;
+    const hide = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (accountActionMenuRef.current && accountActionMenuRef.current.contains(target)) {
+        return;
+      }
       setAccountActionMenu(null);
     };
-    window.addEventListener('mousedown', hide);
-    return () => window.removeEventListener('mousedown', hide);
-  }, [accountTitleDropdownOpen, platformDropdownOpen, accountActionMenu, nearbyAutoOpenEnabled]);
+    window.addEventListener('mousedown', hide, true);
+    return () => window.removeEventListener('mousedown', hide, true);
+  }, [accountActionMenu]);
 
   const handleConfirmMove = () => {
     setMoveError('');
@@ -834,9 +847,15 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   // Close name status dropdown on outside click
   useEffect(() => {
     if (!showNameStatusDropdown) return;
-    const hide = () => setShowNameStatusDropdown(false);
-    window.addEventListener('click', hide);
-    return () => window.removeEventListener('click', hide);
+    const hide = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const panelEl = accountTitleDropdownRef.current?.closest('.dav-panel');
+      const wrapper = panelEl?.querySelector('.dav-header-name-wrapper');
+      if (wrapper && wrapper.contains(target)) return;
+      setShowNameStatusDropdown(false);
+    };
+    window.addEventListener('mousedown', hide, true);
+    return () => window.removeEventListener('mousedown', hide, true);
   }, [showNameStatusDropdown]);
 
   const handleSaveNotice = () => {
@@ -1014,8 +1033,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       }
       setCtxMenu(null);
     };
-    window.addEventListener('click', hide);
-    return () => window.removeEventListener('click', hide);
+    window.addEventListener('mousedown', hide, true);
+    return () => window.removeEventListener('mousedown', hide, true);
   }, [ctxMenu]);
 
   // Reset submenu states when context menu is closed
@@ -1023,6 +1042,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     if (!ctxMenu) {
       setActiveLevel1(null);
       setActiveLevel2(null);
+      setActiveLevel3(null);
+      setActiveLevel4(null);
     }
   }, [ctxMenu]);
 
@@ -1251,37 +1272,18 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 }}
               />
             )}
-            {isEditingName ? (
-              <input 
-                ref={nameInputRef}
-                className="dav-transparent-input header-name-input" 
+            <div 
+              className="header-name-display-wrapper"
+              onClick={handleNameClick}
+            >
+              <span 
+                className="header-name-display"
                 style={{ color: nameColor, fontWeight: 'bold' }}
-                placeholder="Tên tài khoản"
-                value={selectedAccount.name || ''} 
-                onChange={e => handleUpdateAccount(selectedAccount.id, { name: e.target.value })} 
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    setIsEditingName(false);
-                  }
-                }}
-                onBlur={() => setIsEditingName(false)}
-                autoFocus
-              />
-            ) : (
-              <div 
-                className="header-name-display-wrapper"
-                onClick={handleNameClick}
-                onDoubleClick={handleNameDoubleClick}
               >
-                <span 
-                  className="header-name-display"
-                  style={{ color: nameColor, fontWeight: 'bold' }}
-                >
-                  {selectedAccount.name || 'Tên tài khoản'}
-                </span>
-                {activeTab === 'wechat' && renderNearbyAccountIcon(selectedAccount)}
-              </div>
-            )}
+                {selectedAccount.name || 'Tên tài khoản'}
+              </span>
+              {activeTab === 'wechat' && renderNearbyAccountIcon(selectedAccount)}
+            </div>
             
             {showNameStatusDropdown && (
               <div 
@@ -1473,6 +1475,22 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             e.stopPropagation();
             setCtxMenu({ x: e.clientX, y: e.clientY, accountId: selectedAccount.id });
           }}>
+            {/* Tên tài khoản */}
+            <div className="dav-input-wrapper" style={{ marginTop: '10px' }}>
+              <span 
+                style={{ color: '#888', userSelect: 'none', fontSize: '11px', fontWeight: 'bold', marginLeft: '2px', cursor: 'default', display: 'inline-flex', alignItems: 'center' }}
+              >
+                Tên
+              </span>
+              <input 
+                className="dav-transparent-input" 
+                style={{ color: '#fff', fontWeight: 'bold' }}
+                placeholder="Tên tài khoản"
+                value={selectedAccount.name || ''}
+                onChange={e => handleUpdateAccount(selectedAccount.id, { name: e.target.value })} 
+              />
+            </div>
+
             {/* Biệt danh (Nickname) */}
             <div className="dav-input-wrapper" style={{ marginTop: '10px' }}>
               <span 
@@ -1720,32 +1738,72 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               <Users size={16} /> Tài Khoản
               <div className={`dav-ctx-submenu ${activeLevel1 === 'tai_khoan' ? 'is-open' : ''}`}>
                 {activeAccounts.map(a => (
-                  <button
+                  <div
                     key={a.id}
-                    className={`dav-ctx-item ${a.id === selectedAccount.id ? 'active' : ''}`}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleSetMain(a.id);
-                      setCtxMenu(null);
+                    className="dav-ctx-submenu-container"
+                    onMouseEnter={() => setActiveLevel3(a.id)}
+                    onMouseLeave={() => {
+                      setActiveLevel3(null);
+                      setActiveLevel4(null);
                     }}
                   >
-                    <span
-                      style={{
-                        fontWeight: a.id === selectedAccount.id ? 'bold' : 'normal',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '2px',
-                        color: getAccountListNameColor(a),
-                      }}
-                    >
-                      {a.name || a.phone || a.nickname || 'Tài khoản'}
-                      {activeTab === 'wechat' && renderNearbyAccountIcon(a)}
-                      {renderUnverifiedIcon(a)}
-                      {renderAccountNoticeIcon(a)}
-                      {renderAppTypeIcon(a.appType)}
-                    </span>
-                  </button>
+                    <div className="dav-ctx-item dav-ctx-has-sub">
+                      <span
+                        style={{
+                          fontWeight: a.id === selectedAccount.id ? 'bold' : 'normal',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          color: getAccountListNameColor(a),
+                          width: '100%'
+                        }}
+                      >
+                        {a.name || a.phone || a.nickname || 'Tài khoản'}
+                        {activeTab === 'wechat' && renderNearbyAccountIcon(a)}
+                        {renderUnverifiedIcon(a)}
+                        {renderAccountNoticeIcon(a)}
+                        {renderAppTypeIcon(a.appType)}
+                      </span>
+                      <div className={`dav-ctx-submenu ${activeLevel3 === a.id ? 'is-open' : ''}`}>
+                        <button
+                          className={`dav-ctx-item ${a.id === selectedAccount.id ? 'active' : ''}`}
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleSetMain(a.id);
+                            setCtxMenu(null);
+                          }}
+                        >
+                          Chọn tài khoản này
+                        </button>
+                        <div 
+                          className="dav-ctx-submenu-container"
+                          onMouseEnter={() => setActiveLevel4(a.id)}
+                          onMouseLeave={() => setActiveLevel4(null)}
+                        >
+                          <div className="dav-ctx-item dav-ctx-has-sub">
+                            Phân loại
+                            <div className={`dav-ctx-submenu ${activeLevel4 === a.id ? 'is-open' : ''}`}>
+                              {(['main', 'clone', 'secure', 'shelter'] as const).map(type => (
+                                <button
+                                  key={type}
+                                  className={`dav-ctx-item ${a.appType === type ? 'active' : ''}`}
+                                  onPointerDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleUpdateAccount(a.id, { appType: type });
+                                    setCtxMenu(null);
+                                  }}
+                                >
+                                  {getAppTypeLabel(type)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ))}
                 
                 <div className="dav-ctx-divider" />
@@ -1775,6 +1833,33 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Submenu Phân Loại */}
+          <div 
+            className="dav-ctx-submenu-container"
+            onMouseEnter={() => setActiveLevel1('phan_loai')}
+            onMouseLeave={() => setActiveLevel1(null)}
+          >
+            <div className="dav-ctx-item dav-ctx-has-sub">
+              <Layers size={16} /> Phân Loại
+              <div className={`dav-ctx-submenu ${activeLevel1 === 'phan_loai' ? 'is-open' : ''}`}>
+                {(['main', 'clone', 'secure', 'shelter'] as const).map(type => (
+                  <button 
+                    key={type}
+                    className={`dav-ctx-item ${selectedAccount.appType === type ? 'active' : ''}`} 
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleUpdateAccount(selectedAccount.id, { appType: type });
+                      setCtxMenu(null);
+                    }}
+                  >
+                    {getAppTypeLabel(type)}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -2208,6 +2293,43 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               </div>
             </div>
           )}
+
+          {/* Submenu Phân Loại */}
+          <div 
+            className="dav-ctx-submenu-container"
+            onMouseEnter={() => setShowClassificationSubmenu(true)}
+            onMouseLeave={() => setShowClassificationSubmenu(false)}
+          >
+            <button
+              type="button"
+              className="dav-ctx-item dav-ctx-has-sub"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowClassificationSubmenu(v => !v);
+              }}
+            >
+              Phân loại
+            </button>
+            <div className={`dav-ctx-submenu ${showClassificationSubmenu ? 'is-open' : ''}`}>
+              {(['main', 'clone', 'secure', 'shelter'] as const).map(type => (
+                <button
+                  key={type}
+                  type="button"
+                  className={`dav-ctx-item ${accountActionMenu.account.appType === type ? 'active' : ''}`}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleUpdateAccount(accountActionMenu.account.id, { appType: type });
+                    setAccountActionMenu(null);
+                    setAccountTitleDropdownOpen(false);
+                  }}
+                >
+                  {getAppTypeLabel(type)}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>,
         document.body
       )}
@@ -2216,10 +2338,14 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
         <div 
           className="confirmOverlay" 
           onClick={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}
         >
           <div 
             className="confirmPanel confirmPanel--compact" 
             style={{ minWidth: '280px' }}
+            onMouseDown={e => e.stopPropagation()}
+            onPointerDown={e => e.stopPropagation()}
           >
             <div className="confirmTitle" style={{ textAlign: 'center', fontSize: '14px' }}>
               Di chuyển tài khoản
@@ -2231,6 +2357,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <span style={{ fontSize: '11px', color: 'var(--md-muted)' }}>Nhập số máy đích</span>
               <input
+                ref={moveInputRef}
                 type="number"
                 className="dav-input"
                 style={{ textAlign: 'center', fontSize: '14px', fontWeight: 'bold' }}
@@ -2248,9 +2375,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             
             <div className="confirmActions" style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
               <button 
+                type="button"
                 className="modalBtn" 
                 style={{ flex: 1 }}
-                onClick={() => {
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   setMoveModal(null);
                   setTargetOrderStr('');
                   setMoveError('');
@@ -2259,9 +2389,14 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 Hủy
               </button>
               <button 
+                type="button"
                 className="modalBtnPrimary" 
                 style={{ flex: 1 }}
-                onClick={() => handleConfirmMove()}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleConfirmMove();
+                }}
               >
                 Xác nhận
               </button>
@@ -2431,8 +2566,8 @@ export function DeviceAccountOverlay({
         setPlatformCtxMenu(null);
       }
     };
-    window.addEventListener('mousedown', hide);
-    return () => window.removeEventListener('mousedown', hide);
+    window.addEventListener('mousedown', hide, true);
+    return () => window.removeEventListener('mousedown', hide, true);
   }, [platformCtxMenu]);
 
   // Sync vault state when updates occur (one listener for all panels)

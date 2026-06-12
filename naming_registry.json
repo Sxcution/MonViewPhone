@@ -261,7 +261,10 @@
       "hide_qr": "monviewphone:dav-hide-qr",
       "hide_created_at": "monviewphone:dav-hide-created-at",
       "always_show_header": "monviewphone:dav-always-show-header",
-      "wechat_launch_profile": "wechatLaunchProfile"
+      "wechat_launch_profile": "wechatLaunchProfile",
+      "active_level_3": "activeLevel3",
+      "active_level_4": "activeLevel4",
+      "show_classification_submenu": "showClassificationSubmenu"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",

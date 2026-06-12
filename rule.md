@@ -290,16 +290,95 @@ All UI lists, grids, or containers that display dynamic data (such as profile li
 - Set `flex: 1; min-height: 0; overflow-y: auto;` on the list/grid content wrappers to force scrollbars to appear and prevent them from stretching their parent containers.
 ## Scrcpy Server Build Rules
 
-Thu m?c server-go/scrcpy-decompiled là source code Java có ch?a do?n code ClipboardManager.java dã du?c fix tham s? deviceId + Looper c?a Android 14. 
-Nó dóng vai trò nhu b?n backup mã ngu?n d? sau này n?u c?n nghiên c?u thêm có th? m? ra xem, nhung TUY?T Ð?I KHÔNG ÐU?C dùng script d? build l?i toàn b? scrcpy-server.jar t? thu m?c dó n?a (do WebSocket Core s? b? h?ng và gây l?i "Waiting for response").
-N?u c?n s?a file jar, hãy dùng phuong pháp Smali Injection: gi?i nén classes.dex t? file scrcpy-server.jar g?c dang ch?y, d?ch ngu?c b?ng baksmali, chép dè file smali c?n s?a, r?i build l?i classes.dex b?ng smali và dóng gói l?i vào jar b?ng l?nh jar uf.
+Thu m?c server-go/scrcpy-decompiled lï¿½ source code Java cï¿½ ch?a do?n code ClipboardManager.java dï¿½ du?c fix tham s? deviceId + Looper c?a Android 14. 
+Nï¿½ dï¿½ng vai trï¿½ nhu b?n backup mï¿½ ngu?n d? sau nï¿½y n?u c?n nghiï¿½n c?u thï¿½m cï¿½ th? m? ra xem, nhung TUY?T ï¿½?I KHï¿½NG ï¿½U?C dï¿½ng script d? build l?i toï¿½n b? scrcpy-server.jar t? thu m?c dï¿½ n?a (do WebSocket Core s? b? h?ng vï¿½ gï¿½y l?i "Waiting for response").
+N?u c?n s?a file jar, hï¿½y dï¿½ng phuong phï¿½p Smali Injection: gi?i nï¿½n classes.dex t? file scrcpy-server.jar g?c dang ch?y, d?ch ngu?c b?ng baksmali, chï¿½p dï¿½ file smali c?n s?a, r?i build l?i classes.dex b?ng smali vï¿½ dï¿½ng gï¿½i l?i vï¿½o jar b?ng l?nh jar uf.
 
 
 ## SCRCPY BUILD RULE
-Tuy?t d?i KHÔNG dùng script d? build l?i toàn b? scrcpy-server.jar t? thu m?c scrcpy-decompiled (vì s? làm h?ng WebSocket Core). Thu m?c scrcpy-decompiled ch? gi? l?i d? tham kh?o mã ngu?n (ch?a do?n code fix ClipboardManager và Android 14/15). N?u c?n patch scrcpy-server.jar, hãy dùng công c? apktool d? decompile ra file .smali, s?a file .smali, và recompile l?i b?ng apktool b.
+Tuy?t d?i KHï¿½NG dï¿½ng script d? build l?i toï¿½n b? scrcpy-server.jar t? thu m?c scrcpy-decompiled (vï¿½ s? lï¿½m h?ng WebSocket Core). Thu m?c scrcpy-decompiled ch? gi? l?i d? tham kh?o mï¿½ ngu?n (ch?a do?n code fix ClipboardManager vï¿½ Android 14/15). N?u c?n patch scrcpy-server.jar, hï¿½y dï¿½ng cï¿½ng c? apktool d? decompile ra file .smali, s?a file .smali, vï¿½ recompile l?i b?ng apktool b.
 
 ## Rules for Number Inputs
-1. Trong các ô nh?p S?, luôn luôn b? thanh Tang/Gi?m (spinner controls).
+1. Trong cï¿½c ï¿½ nh?p S?, luï¿½n luï¿½n b? thanh Tang/Gi?m (spinner controls).
    - Web (CSS): input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
    - Desktop (QSS): QSpinBox::up-button, QSpinBox::down-button { width: 0; }
 
+## Account Overlay â€” Two Distinct UI States (CRITICAL: Do NOT confuse these)
+
+This project has two completely different UI concepts that are both related to "account overlay".
+Future AI sessions MUST understand the distinction before modifying any filtering,
+border-highlight, or overlay-related logic.
+
+---
+
+### 1. Account Manager Panel (always visible, left side)
+
+- **Variable:** `accountManagerOpen` (boolean state in App.tsx)
+- **Trigger:** Toggled by a persistent button/tab in the UI â€” NOT a hotkey.
+- **What it is:** The main left-side panel that lists all accounts per device.
+  It stays open in the DOM when active and does NOT disappear on hotkey press.
+- **Role in filtering:** When `accountManagerOpen === true`, the filter toolbar
+  (platform tab + filter dropdown) becomes active.
+  `davActiveTab` (e.g. `wechat`) and `davActiveFilter`
+  (e.g. `nearby_people`, `die`, `risk`, `default`) are only meaningful when this panel is open.
+- **If `accountManagerOpen === false`:** No border highlights appear on any tile.
+
+---
+
+### 2. Device Account Overlay â€” Hotkey-toggled per-tile floating card
+
+- **Variable:** `deviceAccountOverlayOpen` (boolean state in App.tsx)
+- **Trigger:** A global hotkey (e.g. Alt+A). Press once = OPEN. Press again = CLOSE.
+- **What it is:** A floating account card rendered ON TOP OF each device tile in the grid,
+  showing account info directly on the tile. This is what the user means by
+  "Overlay On" and "Overlay Off".
+
+#### Overlay ON (`deviceAccountOverlayOpen === true`):
+- The full account overlay card is shown on each tile (CSS class: `is-open`).
+- Tiles whose accounts do NOT match the active filter are dimmed (grayscale + low brightness),
+  but opacity stays at 1.0 (NOT transparent).
+- Tiles whose accounts DO match show a colored border via `highlightFilterMatched`.
+
+#### Overlay OFF (`deviceAccountOverlayOpen === false`):
+- The overlay card collapses to a compact header strip at the top of each tile
+  (CSS class: `is-header-only`). Only the account name row is visible.
+- Tiles are NOT dimmed at all â€” no opacity or grayscale changes.
+- Matched tiles still show a colored border highlight (`highlightFilterMatched`).
+- No visual penalty for non-matching tiles.
+
+---
+
+### 3. Border Highlight Color Rules (`highlightFilterMatched` prop on `<Tile>`)
+
+Border colors are determined by the ACTIVE filter, not by account status alone.
+Die/Risk colors do NOT always show â€” they only show when their filter is selected.
+
+| `davActiveFilter` value | Condition on tile | Border color |
+|---|---|---|
+| `nearby_people` | Account group state = `eligible` | Blue |
+| `nearby_people` | Account group state = `upcoming` | Yellow |
+| `die` | Any account has `status === "Die"` | Red |
+| `risk` | Any account has `status === "Risk"` | Orange |
+| any other / no match | â€” | No border (`false`) |
+
+**Priority rule:** `nearby_people` is evaluated FIRST.
+If a tile has Die accounts AND also qualifies for the nearby_people filter,
+and the user has selected `nearby_people` filter â†’ show Blue/Yellow (nearby color), NOT Red.
+Die/Risk colors only show when their respective filter (`die` / `risk`) is explicitly active.
+
+**Guard rule:** `accountManagerOpen` must be `true` for any border to appear.
+If the Account Manager Panel is closed â†’ always return `false` (no borders at all).
+
+---
+
+### 4. State variable reference
+
+| Variable | Type | Meaning |
+|---|---|---|
+| `accountManagerOpen` | boolean | Is the left Account Manager Panel open? |
+| `deviceAccountOverlayOpen` | boolean | Is the per-tile hotkey overlay currently ON? |
+| `davActiveTab` | string | Platform tab (e.g. `wechat`) |
+| `davActiveFilter` | string | Filter mode: `default`, `nearby_people`, `die`, `risk` |
+| `isFilteredOut` | boolean per tile | Tile does NOT match filter (used to dim tile when overlay ON) |
+| `isAccountMatched` | boolean per tile | Tile DOES match filter (used for border highlight) |
+| `highlightFilterMatched` | `false` or color string | Border color: `blue`, `yellow`, `red`, `orange`, or `false` |

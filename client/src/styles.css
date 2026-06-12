@@ -10493,7 +10493,7 @@ input[type=number] {
 
 /* Account Overlay Filtering Dimming Styles (MonDashboard Style) */
 .tile-account-overlay.mxh-filtered-out {
-  opacity: 0.35;
+  opacity: 1;
   filter: grayscale(1) brightness(0.55);
   transition: opacity 0.2s ease, filter 0.2s ease;
 }

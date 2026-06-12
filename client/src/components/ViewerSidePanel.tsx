@@ -84,9 +84,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // File Export
-  const [exportPath, setExportPath] = useState('/sdcard/');
-  const [exportStatus, setExportStatus] = useState<string | null>(null);
+
 
   // ADB Modal
   const [showAdbModal, setShowAdbModal] = useState(false);
@@ -321,25 +319,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
     }
   }, [wsServer, udid, selectedProfile, connectSelection]);
 
-  // File Export
-  const handleExport = useCallback(async () => {
-    if (!exportPath.trim()) return;
-    setExportStatus(t('Đang tải...'));
-    try {
-      const base = httpBase(wsServer);
-      const res = await fetch(`${base}api/goog/device/pull-file`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ udid, remotePath: exportPath.trim() }),
-      });
-      if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j?.error || `Status ${res.status}`); }
-      const blob = await res.blob();
-      const name = exportPath.trim().split('/').filter(Boolean).pop() || 'file.bin';
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `${udid}_${name}`; a.click();
-      URL.revokeObjectURL(url);
-      setExportStatus(t('✅ Đã tải: {name}', { name }));
-    } catch (err: any) { setExportStatus(`❌ ${err?.message || t('Lỗi')}`); }
-  }, [wsServer, udid, exportPath, t]);
+
 
   // ADB execution
   const executeAdbCommand = useCallback(async (cmd: string) => {
@@ -497,18 +477,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
             {importStatus && <div className="vsp-status">{importStatus}</div>}
           </div>
 
-          {/* 5. Xuất tệp */}
-          <div className="vsp-section">
-            <div className="vsp-section-title vsp-clickable" onClick={handleExport}>
-              <Download size={15} /><span>{t('Xuất tệp từ điện thoại')}</span>
-            </div>
-            <div className="vsp-row">
-              <input className="vsp-input vsp-input-grow" placeholder="/sdcard/DCIM/photo.jpg"
-                value={exportPath} onChange={e => setExportPath(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleExport()} />
-            </div>
-            {exportStatus && <div className="vsp-status">{exportStatus}</div>}
-          </div>
+
 
           {/* 6. Chạy lệnh ADB - with hover submenu */}
           <div className="vsp-section vsp-adb-section" ref={adbSectionRef}
