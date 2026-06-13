@@ -283,6 +283,12 @@ func main() {
 			case "/api/goog/device/display-power":
 				handleDisplayPower(w, r)
 				return
+			case "/api/goog/pc/open-file-dialog":
+				handleOpenFileDialog(w, r)
+				return
+			case "/api/goog/device/push-local-file":
+				handlePushLocalFile(w, r)
+				return
 			default:
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusNotFound)

@@ -16,6 +16,7 @@ import { AutomationModal, type AutomationDeviceOption, type AutomationModalRef }
 import { AutomationPanel } from '@/components/AutomationPanel'
 import { VisualAlertPanel } from '@/components/VisualAlertPanel'
 import { ThemeInspector } from '@/components/ThemeInspector'
+import { MacroPlaybackPanel } from '@/components/MacroPlaybackPanel'
 import { applyThemeOverrides, loadThemeOverrides, clearThemeOverrides } from '@/lib/themeInspector'
 import { useActive } from '@/context/ActiveContext'
 import { AndroidKeycode } from '@/lib/keyEvent'
@@ -527,6 +528,18 @@ export function App() {
     });
   }, []);
 
+  const handleViewDevice = useCallback((id: string) => {
+    setViewerUdid(prev => prev === id ? null : id)
+  }, [])
+
+  const handleDragStart = useCallback((id: string) => {
+    setDraggingTile(id)
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    setDraggingTile(null)
+  }, [])
+
   // ===== SYNC TIME SETTINGS STATE AND EVENT HANDLERS =====
   const [syncTimeModalOpen, setSyncTimeModalOpen] = useState(false);
   const [syncTimeSettings, setSyncTimeSettings] = useState<SyncTimeSettings>(loadSyncTimeSettings);
@@ -810,20 +823,7 @@ export function App() {
     () => new Set(syncTargets)
   )
   const [runningMacroUdids, setRunningMacroUdids] = useState<Set<string>>(new Set())
-  const [macroPlaybackItems, setMacroPlaybackItems] = useState<MacroPlaybackProgressDetail[]>([])
-  const [macroPlaybackExpanded, setMacroPlaybackExpanded] = useState(true)
-  const [macroPlaybackNow, setMacroPlaybackNow] = useState(Date.now())
-  const [macroPlaybackPosition, setMacroPlaybackPosition] = useState<{ x: number; y: number } | null>(null)
-  const macroPlaybackDragRef = useRef<{
-    active: boolean;
-    startX: number;
-    startY: number;
-    originX: number;
-    originY: number;
-    panelEl?: HTMLElement | null;
-    lastX?: number;
-    lastY?: number;
-  }>({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 })
+
 
   useEffect(() => {
     const handleMacroRunning = (e: Event) => {
@@ -842,79 +842,7 @@ export function App() {
     return () => window.removeEventListener(MACRO_RUNNING_UDIDS_EVENT, handleMacroRunning)
   }, [])
 
-  useEffect(() => {
-    const handleProgress = (e: Event) => {
-      const detail = (e as CustomEvent<MacroPlaybackProgressDetail>).detail
-      if (!detail?.id) return
-      setMacroPlaybackItems(prev => {
-        if (!detail.running) {
-          // Macro xong: giữ item, đánh dấu finished
-          return prev.map(item => item.id === detail.id ? { ...detail, running: false } : item)
-        }
-        const next = prev.filter(item => item.id !== detail.id)
-        return [...next, detail]
-      })
-      setMacroPlaybackNow(Date.now())
-    }
-    window.addEventListener(MACRO_PLAYBACK_PROGRESS_EVENT, handleProgress)
-    return () => window.removeEventListener(MACRO_PLAYBACK_PROGRESS_EVENT, handleProgress)
-  }, [])
 
-  useEffect(() => {
-    if (!macroPlaybackItems.length) return
-    const id = window.setInterval(() => setMacroPlaybackNow(Date.now()), 1000)
-    return () => window.clearInterval(id)
-  }, [macroPlaybackItems.length])
-
-  const onMacroPlaybackPointerMove = useCallback((event: PointerEvent) => {
-    const drag = macroPlaybackDragRef.current
-    if (!drag.active || !drag.panelEl) return
-    event.preventDefault()
-    const nextX = drag.originX + event.clientX - drag.startX
-    const nextY = drag.originY + event.clientY - drag.startY
-    const finalX = Math.max(8, Math.min(window.innerWidth - 180, nextX))
-    const finalY = Math.max(8, Math.min(window.innerHeight - 48, nextY))
-    
-    drag.panelEl.style.left = `${finalX}px`
-    drag.panelEl.style.top = `${finalY}px`
-    
-    drag.lastX = finalX
-    drag.lastY = finalY
-  }, [])
-
-  const onMacroPlaybackPointerUp = useCallback(() => {
-    const drag = macroPlaybackDragRef.current
-    if (!drag.active) return
-    drag.active = false
-    document.body.classList.remove('is-dragging-modal')
-    window.removeEventListener('pointermove', onMacroPlaybackPointerMove)
-    window.removeEventListener('pointerup', onMacroPlaybackPointerUp)
-    
-    if (drag.lastX !== undefined && drag.lastY !== undefined) {
-      setMacroPlaybackPosition({ x: drag.lastX, y: drag.lastY })
-    }
-  }, [onMacroPlaybackPointerMove])
-
-  const startMacroPlaybackDrag = useCallback((event: React.PointerEvent<HTMLElement>) => {
-    if (event.button !== 0) return
-    if ((event.target as HTMLElement).closest('button')) return
-    const panel = event.currentTarget.closest('.macroPlaybackPanel') as HTMLElement | null
-    if (!panel) return
-    const rect = panel.getBoundingClientRect()
-    macroPlaybackDragRef.current = {
-      active: true,
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: rect.left,
-      originY: rect.top,
-      panelEl: panel,
-      lastX: rect.left,
-      lastY: rect.top,
-    }
-    document.body.classList.add('is-dragging-modal')
-    window.addEventListener('pointermove', onMacroPlaybackPointerMove, { passive: false })
-    window.addEventListener('pointerup', onMacroPlaybackPointerUp)
-  }, [onMacroPlaybackPointerMove, onMacroPlaybackPointerUp])
 
   type CtxSubState = null | {
     main: 'profileList' | { appId: AutomationAppId; actionId: string };
@@ -1155,36 +1083,7 @@ export function App() {
     return () => window.removeEventListener('mousedown', handleClickOutside);
   }, [contextMenuOpen]);
 
-  // Track vị trí chuột cho tooltip (dùng RAF + style transform trực tiếp để tránh rerender)
-  useEffect(() => {
-    let raf = 0;
-    let lastX = 0;
-    let lastY = 0;
 
-    const apply = () => {
-      raf = 0;
-      const el = selectionBadgeRef.current;
-      if (!el) return;
-
-      el.style.transform = `translate3d(${lastX + 14}px, ${lastY + 14}px, 0)`;
-    };
-
-    const onPointerMove = (e: PointerEvent) => {
-      lastX = e.clientX;
-      lastY = e.clientY;
-
-      if (!raf) {
-        raf = window.requestAnimationFrame(apply);
-      }
-    };
-
-    window.addEventListener('pointermove', onPointerMove, true);
-
-    return () => {
-      window.removeEventListener('pointermove', onPointerMove, true);
-      if (raf) window.cancelAnimationFrame(raf);
-    };
-  }, []);
 
   const [connectModalOpen, setConnectModalOpen] = useState(false)
 
@@ -1508,13 +1407,13 @@ export function App() {
               mapped.forEach(d => lastSeen.set(d.udid, now))
               startTransition(() => {
                 setRemoteDevices(prev => {
-                  const next = new Map<string, RemoteDevice>()
-                  mapped.forEach(d => next.set(d.udid, d))
+                  const nextMap = new Map<string, RemoteDevice>()
+                  mapped.forEach(d => nextMap.set(d.udid, d))
                   prev.forEach(d => {
-                    if (next.has(d.udid)) return
+                    if (nextMap.has(d.udid)) return
                     const seenAt = lastSeen.get(d.udid) || 0
                     if (now - seenAt <= DEVICE_LIST_OFFLINE_GRACE_MS) {
-                      next.set(d.udid, d)
+                      nextMap.set(d.udid, d)
                     }
                   })
                   Array.from(lastSeen.entries()).forEach(([udid, seenAt]) => {
@@ -1522,18 +1421,32 @@ export function App() {
                       lastSeen.delete(udid)
                     }
                   })
-                  return Array.from(next.values())
+                  const nextList = Array.from(nextMap.values())
+                  if (prev.length === nextList.length) {
+                    const hasChanged = prev.some((d, idx) => {
+                      const nd = nextList[idx]
+                      return d.udid !== nd.udid || d.type !== nd.type
+                    })
+                    if (!hasChanged) return prev
+                  }
+                  return nextList
                 })
                 setAllKnownDevices(prev => {
-                  let changed = false
+                  let hasNew = false
+                  for (const d of mapped) {
+                    if (!prev.some(item => item.udid === d.udid)) {
+                      hasNew = true
+                      break
+                    }
+                  }
+                  if (!hasNew) return prev;
                   const next = [...prev]
-                  mapped.forEach((d, i) => {
-                    if (!next.find(item => item.udid === d.udid)) {
-                      next.push({ udid: d.udid, name: `P${next.length + 1}` }) // ← Dùng số thứ tự
-                      changed = true
+                  mapped.forEach((d) => {
+                    if (!next.some(item => item.udid === d.udid)) {
+                      next.push({ udid: d.udid, name: `P${next.length + 1}` })
                     }
                   })
-                  return changed ? next : prev
+                  return next
                 })
               })
             }
@@ -1664,10 +1577,7 @@ export function App() {
     mergedOrder.forEach((id, idx) => m.set(id, getTileNumber(id, idx + 1)))
     return m
   }, [mergedOrder, getTileNumber])
-  const formatPlaybackElapsed = useCallback((startedAt: number) => {
-    const elapsedSec = Math.max(0, Math.floor((macroPlaybackNow - startedAt) / 1000))
-    return `${String(Math.floor(elapsedSec / 60)).padStart(2, '0')}:${String(elapsedSec % 60).padStart(2, '0')}`
-  }, [macroPlaybackNow])
+
   const orderedRegistered = useMemo(() => {
     const arr = [...filteredRegistered]
 
@@ -1804,6 +1714,93 @@ export function App() {
     () => orderedRegistered.filter(id => connectSelection.has(id)),
     [orderedRegistered, connectSelection]
   )
+
+  // Track vị trí chuột cho tooltip (dùng RAF + style transform trực tiếp để tránh rerender)
+  useEffect(() => {
+    if (selectedVisible.length < 2) return;
+
+    let raf = 0;
+    let lastX = 0;
+    let lastY = 0;
+
+    const apply = () => {
+      raf = 0;
+      const el = selectionBadgeRef.current;
+      if (!el) return;
+
+      el.style.transform = `translate3d(${lastX + 14}px, ${lastY + 14}px, 0)`;
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      lastX = e.clientX;
+      lastY = e.clientY;
+
+      if (!raf) {
+        raf = window.requestAnimationFrame(apply);
+      }
+    };
+
+    window.addEventListener('pointermove', onPointerMove, true);
+
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove, true);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, [selectedVisible.length >= 2]);
+
+  const tileAccountDataMap = useMemo(() => {
+    const map = new Map<string, any>();
+    mergedOrder.forEach(udid => {
+      map.set(udid, getDeviceAccountDataFromVault(vault, udid));
+    });
+    return map;
+  }, [vault, mergedOrder]);
+
+  const tileAccountMatchedMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    mergedOrder.forEach(udid => {
+      map.set(udid, isDeviceMatchingAccountFilter(udid));
+    });
+    return map;
+  }, [mergedOrder, isDeviceMatchingAccountFilter]);
+
+  const tileHighlightsMap = useMemo(() => {
+    const map = new Map<string, 'blue' | 'yellow' | 'red' | 'orange' | false>();
+    if (!accountManagerOpen) return map;
+
+    mergedOrder.forEach(udid => {
+      const isAccountMatched = tileAccountMatchedMap.get(udid) ?? true;
+      const accountData = tileAccountDataMap.get(udid);
+      if (!accountData) {
+        map.set(udid, false);
+        return;
+      }
+      const accounts = (accountData.platforms[davActiveTab] || []).filter((acc: any) => acc !== null && acc !== undefined);
+
+      if (davActiveFilter === 'nearby_people' && isAccountMatched) {
+        const state = getNearbyAccountGroupState(accounts);
+        if (state === 'eligible') {
+          map.set(udid, 'blue');
+          return;
+        }
+        if (state === 'upcoming') {
+          map.set(udid, 'yellow');
+          return;
+        }
+      }
+
+      if (davActiveFilter === 'die' && accounts.some((acc: any) => acc.status === 'Die')) {
+        map.set(udid, 'red');
+        return;
+      }
+      if (davActiveFilter === 'risk' && accounts.some((acc: any) => acc.status === 'Risk')) {
+        map.set(udid, 'orange');
+        return;
+      }
+      map.set(udid, false);
+    });
+    return map;
+  }, [accountManagerOpen, mergedOrder, tileAccountMatchedMap, tileAccountDataMap, davActiveTab, davActiveFilter]);
   const automationDevices = useMemo<AutomationDeviceOption[]>(
     () => orderedRegistered.map(udid => {
       const meta = androidDeviceMap[udid];
@@ -3012,7 +3009,7 @@ export function App() {
                   (!currentFocusGroupSet || (currentFocusGroupSet.has(udid) && isConnected));
 
                 // 2. Kiểm tra bộ lọc tài khoản (chỉ khi overlay tài khoản đang mở)
-                const isAccountMatched = isDeviceMatchingAccountFilter(udid);
+                 const isAccountMatched = tileAccountMatchedMap.get(udid) ?? true;
 
                 // 3. Quyết định hiển thị hay ẩn hoàn toàn
                 // Cả 2 mode (priority_sort và hide_unmatched) đều làm mờ title không khớp.
@@ -3132,52 +3129,23 @@ export function App() {
                       showTileInfo={showTileInfo}
                       isDisconnected={!isConnected}
                       visualAlertActive={Boolean(visualTileAlerts[udid])}
-                      onClearVisualAlert={() => clearVisualAlert(udid)}
+                      onClearVisualAlert={clearVisualAlert}
                       streamConfig={
                         viewerUdid === udid ? viewerStreamConfig : streamConfig
                       }
                       onRegisterReload={registerReload}
                       onUnregisterReload={unregisterReload}
-                      onViewDevice={id => {
-                        setViewerUdid(prev => prev === id ? null : id)
-                      }}
+                      onViewDevice={handleViewDevice}
                       onMove={moveTile}
                       onChangeOrderNumber={setTileNumber}
-                      onDragStart={id => setDraggingTile(id)}
-                      onDragEnd={() => setDraggingTile(null)}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
                       showAccountOverlay={deviceAccountOverlayOpen}
                       orderMap={orderMap}
-                      accountData={getDeviceAccountDataFromVault(vault, udid)}
+                      accountData={tileAccountDataMap.get(udid) || getDeviceAccountDataFromVault(vault, udid)}
                       isFilteredOut={isFilteredOut}
                       nearbyAutoOpenEnabled={davActiveTab === 'wechat' && davActiveFilter === 'nearby_people'}
-                      highlightFilterMatched={(() => {
-                        if (!accountManagerOpen) {
-                          return false;
-                        }
-                        const accountData = getDeviceAccountDataFromVault(vault, udid);
-                        const accounts = (accountData.platforms[davActiveTab] || []).filter(acc => acc !== null && acc !== undefined);
-
-                        // Ưu tiên màu theo bộ lọc đang chọn (nearby_people được ưu tiên cao nhất)
-                        if (davActiveFilter === 'nearby_people' && isAccountMatched) {
-                          const state = getNearbyAccountGroupState(accounts);
-                          if (state === 'eligible') {
-                            return 'blue';
-                          }
-                          if (state === 'upcoming') {
-                            return 'yellow';
-                          }
-                        }
-
-                        // Chỉ hiện màu die/risk khi bộ lọc tương ứng đang active
-                        if (davActiveFilter === 'die' && accounts.some(acc => acc.status === 'Die')) {
-                          return 'red';
-                        }
-                        if (davActiveFilter === 'risk' && accounts.some(acc => acc.status === 'Risk')) {
-                          return 'orange';
-                        }
-                        
-                        return false;
-                      })()}
+                      highlightFilterMatched={tileHighlightsMap.get(udid) ?? false}
                       onOpenDeviceViewer={openDeviceViewerFromAccountOverlay}
                     />
                   </div>
@@ -4754,108 +4722,7 @@ export function App() {
           document.body
         );
       })()}
-      {macroPlaybackItems.length ? createPortal(
-        <section
-          className={`macroPlaybackPanel${macroPlaybackExpanded ? ' expanded' : ' collapsed'}`}
-          aria-label='Automation Playback'
-          style={macroPlaybackPosition ? {
-            left: macroPlaybackPosition.x,
-            top: macroPlaybackPosition.y,
-            right: 'auto',
-            bottom: 'auto',
-          } : undefined}
-        >
-          <header className='macroPlaybackHeader' onPointerDown={startMacroPlaybackDrag}>
-            <div className='macroPlaybackHeading'>
-              <span>Automation Playback</span>
-              <small>{macroPlaybackItems.filter(i => i.running).length > 0 ? `${macroPlaybackItems.filter(i => i.running).length} đang chạy` : 'Hoàn tất'}</small>
-            </div>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <button
-                type='button'
-                className='modalBtn macroPlaybackToggleBtn'
-                onClick={() => setMacroPlaybackExpanded(prev => !prev)}
-              >
-                {macroPlaybackExpanded ? 'Thu gọn' : 'Mở rộng'}
-              </button>
-              <button
-                type='button'
-                className='modalBtn macroPlaybackCloseBtn'
-                onClick={() => {
-                  // Dừng tất cả macro đang chạy trước khi đóng
-                  macroPlaybackItems.forEach(item => {
-                    if (item.running) {
-                      const detail: MacroPlaybackStopDetail = { id: item.id }
-                      window.dispatchEvent(new CustomEvent(MACRO_PLAYBACK_STOP_EVENT, { detail }))
-                    }
-                  })
-                  setMacroPlaybackItems([])
-                }}
-                title='Đóng panel'
-              >
-                ✕
-              </button>
-            </div>
-          </header>
-          {macroPlaybackExpanded ? (
-            <div className='macroPlaybackList'>
-              {macroPlaybackItems.map(item => (
-                <div key={item.id} className={`macroPlaybackItem${!item.running ? ' finished' : ''}`}>
-                  <div className='macroPlaybackItemText'>
-                    <span>
-                      {item.running
-                        ? (item.totalSteps !== undefined ? `Đang chạy (${item.currentStep ?? 0}/${item.totalSteps}):` : 'Đang chạy:')
-                        : (item.totalSteps !== undefined ? `Hoàn tất (${item.totalSteps}/${item.totalSteps}):` : 'Hoàn tất:')}
-                    </span>
-                    <strong>{item.title}</strong>
-                    <small>{formatPlaybackElapsed(item.startedAt)}</small>
-                  </div>
-                  {item.running ? (
-                    <button
-                      type='button'
-                      className='modalBtnDanger macroPlaybackStopBtn'
-                      onClick={() => {
-                        const detail: MacroPlaybackStopDetail = { id: item.id }
-                        window.dispatchEvent(new CustomEvent(MACRO_PLAYBACK_STOP_EVENT, { detail }))
-                        setMacroPlaybackItems(prev => prev.filter(progress => progress.id !== item.id))
-                      }}
-                    >
-                      Stop
-                    </button>
-                  ) : (
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {item.replayAppId && item.replayActionId ? (
-                        <button
-                          type='button'
-                          className='modalBtnPrimary macroPlaybackStopBtn'
-                          onClick={() => {
-                            // Xóa item cũ và dispatch replay event
-                            setMacroPlaybackItems(prev => prev.filter(p => p.id !== item.id))
-                            window.dispatchEvent(new CustomEvent(MACRO_PLAYBACK_REPLAY_EVENT, {
-                              detail: { appId: item.replayAppId, actionId: item.replayActionId }
-                            }))
-                          }}
-                        >
-                          ▶ Play
-                        </button>
-                      ) : null}
-                      <button
-                        type='button'
-                        className='modalBtn macroPlaybackStopBtn'
-                        onClick={() => setMacroPlaybackItems(prev => prev.filter(p => p.id !== item.id))}
-                        title='Xóa khỏi danh sách'
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </section>,
-        document.body,
-      ) : null}
+      <MacroPlaybackPanel />
 
       {/* Modal Thêm Nhóm */}
       {groupModalOpen && (

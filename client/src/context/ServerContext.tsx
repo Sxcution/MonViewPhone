@@ -28,6 +28,32 @@ type ServerContextValue = {
 
 const Ctx = createContext<ServerContextValue | null>(null);
 
+const areGoogDevicesEqual = (a: GoogDeviceDescriptor, b: GoogDeviceDescriptor): boolean => {
+  if (a.udid !== b.udid) return false;
+  if (a.state !== b.state) return false;
+  if (a.pid !== b.pid) return false;
+  if (a['ro.product.model'] !== b['ro.product.model']) return false;
+  if (a['ro.product.manufacturer'] !== b['ro.product.manufacturer']) return false;
+  if (a['ro.build.version.release'] !== b['ro.build.version.release']) return false;
+  if (a['ro.build.version.sdk'] !== b['ro.build.version.sdk']) return false;
+
+  const aIfaces = a.interfaces || [];
+  const bIfaces = b.interfaces || [];
+  if (aIfaces.length !== bIfaces.length) return false;
+  for (let i = 0; i < aIfaces.length; i++) {
+    if (aIfaces[i].name !== bIfaces[i].name || aIfaces[i].ipv4 !== bIfaces[i].ipv4) return false;
+  }
+  return true;
+};
+
+const areGoogDeviceListsEqual = (a: GoogDeviceDescriptor[], b: GoogDeviceDescriptor[]): boolean => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!areGoogDevicesEqual(a[i], b[i])) return false;
+  }
+  return true;
+};
+
 export function ServerProvider({ wsServer, children }: { wsServer: string; children: React.ReactNode }) {
   const [androidDevices, setAndroidDevices] = useState<GoogDeviceDescriptor[]>([]);
   const [trackerMeta, setTrackerMeta] = useState<{ id: string; name: string } | null>(null);
@@ -40,13 +66,22 @@ export function ServerProvider({ wsServer, children }: { wsServer: string; child
 
     const onList = (list: GoogDeviceDescriptor[], meta: { id: string; name: string }) => {
       const safeList = Array.isArray(list) ? list : [];
-      setAndroidDevices(safeList);
-      setTrackerMeta(meta ?? null);
+      setAndroidDevices((prev) => {
+        if (areGoogDeviceListsEqual(prev, safeList)) return prev;
+        return safeList;
+      });
+      setTrackerMeta((prev) => {
+        if (prev?.id === meta?.id && prev?.name === meta?.name) return prev;
+        return meta ?? null;
+      });
     };
 
     const onDevice = (dev: GoogDeviceDescriptor, meta: { id: string; name: string }) => {
       if (!dev || typeof dev !== 'object' || !('udid' in dev)) {
-        setTrackerMeta(meta ?? null);
+        setTrackerMeta((prev) => {
+          if (prev?.id === meta?.id && prev?.name === meta?.name) return prev;
+          return meta ?? null;
+        });
         return;
       }
 
@@ -54,6 +89,10 @@ export function ServerProvider({ wsServer, children }: { wsServer: string; child
         const safePrev = Array.isArray(prev) ? prev : [];
         const idx = safePrev.findIndex((d) => d.udid === dev.udid);
         if (idx >= 0) {
+          const oldDev = safePrev[idx];
+          if (areGoogDevicesEqual(oldDev, dev)) {
+            return prev;
+          }
           const next = [...safePrev];
           next[idx] = dev;
           return next;
@@ -61,7 +100,10 @@ export function ServerProvider({ wsServer, children }: { wsServer: string; child
         return [...safePrev, dev];
       });
 
-      setTrackerMeta(meta ?? null);
+      setTrackerMeta((prev) => {
+        if (prev?.id === meta?.id && prev?.name === meta?.name) return prev;
+        return meta ?? null;
+      });
     };
 
     const scheduleReconnect = () => {

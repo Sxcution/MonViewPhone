@@ -68,9 +68,20 @@ function TileComponent({
     }, []);
 
     useEffect(() => {
+        let timeoutId: number | undefined;
         if (showAccountOverlay || alwaysShowHeader) {
             setAccountOverlayMounted(true);
+        } else {
+            // Warm cache: giữ mounted thêm 5 giây trước khi unmount
+            timeoutId = window.setTimeout(() => {
+                setAccountOverlayMounted(false);
+            }, 5000);
         }
+        return () => {
+            if (timeoutId !== undefined) {
+                window.clearTimeout(timeoutId);
+            }
+        };
     }, [showAccountOverlay, alwaysShowHeader]);
     const {
         activeUdid,
@@ -431,7 +442,7 @@ function TileComponent({
                                 className="tileVisualAlertBadge" 
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    onClearVisualAlert?.();
+                                    onClearVisualAlert?.(udid);
                                 }}
                             >
                                 <Bell size={14} className="visualAlertBadgeIcon" />

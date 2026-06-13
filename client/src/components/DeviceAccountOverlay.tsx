@@ -1154,11 +1154,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   };
 
   useEffect(() => {
+    if (!showAccountOverlay) return;
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 10000);
     return () => clearInterval(timer);
-  }, []);
+  }, [showAccountOverlay]);
 
   // activeDailyReminders : Danh sách tài khoản đang đến giờ nhắc nhở hàng ngày
   const activeDailyReminders = useMemo(() => {
@@ -1670,6 +1671,20 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
     setAccountTitleDropdownOpen(false);
     setAccountHoverTooltip(null);
+
+    if (showAccountOverlay) {
+      davDebug('ITEM_SKIP_OPEN_WECHAT_DEVICE_ACCOUNT_OVERLAY_OPEN', {
+        accountId: latestAccount.id,
+        accUdid,
+        showAccountOverlay,
+        alwaysShowHeader,
+      });
+      davDebug('ITEM_ACTIVATE_DONE_SELECT_ONLY', {
+        accountId: latestAccount.id,
+        accUdid,
+      });
+      return;
+    }
 
     davDebug('ITEM_CALL_OPEN_WECHAT_FROM_MOUSE_DOWN', {
       accountId: latestAccount.id,
@@ -2239,7 +2254,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               })()}
         </div>
       </div>
-      <div className="dav-panel-body">
+      {showAccountOverlay && (
+        <div className="dav-panel-body">
         {!selectedAccount ? (
           <div className="dav-empty-state">
             <p>Chưa có tài khoản {platforms.find(p => p.id === activeTab)?.label || 'WeChat'}</p>
@@ -2570,6 +2586,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           </div>
         )}
       </div>
+      )}
 
       {/* Context Menu Portal */}
       {ctxMenu && ReactDOM.createPortal(

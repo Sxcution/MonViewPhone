@@ -20,7 +20,7 @@ export type TileProps = {
     showTileInfo?: boolean;
     isDisconnected?: boolean;
     visualAlertActive?: boolean;
-    onClearVisualAlert?: () => void;
+    onClearVisualAlert?: (udid: string) => void;
     onRegisterReload?: (udid: string, reload: (opts?: StreamReloadOptions) => void) => void;
     onUnregisterReload?: (udid: string) => void;
     onViewDevice?: (udid: string) => void;

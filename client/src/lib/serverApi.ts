@@ -715,3 +715,45 @@ export async function setDeviceDisplayPower(
     method: json?.method,
   };
 }
+
+export async function openPcFileDialog(
+  wsServer: string,
+  initialDir: string,
+  multi = true,
+  filter = "Images and Videos|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.mp4;*.mov;*.mkv|All Files|*.*"
+): Promise<{ success: boolean; cancelled: boolean; files: string[]; warning?: string }> {
+  const endpoint = `${httpBase(wsServer)}api/goog/pc/open-file-dialog`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initialDir, multi, filter }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Open file dialog failed (status ${res.status})`);
+  }
+  return {
+    success: true,
+    cancelled: !!json.cancelled,
+    files: json.files || [],
+    warning: json.warning,
+  };
+}
+
+export async function pushLocalFileApi(
+  wsServer: string,
+  udid: string,
+  localPath: string,
+  remotePath: string
+): Promise<void> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/push-local-file`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, localPath, remotePath }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Push local file failed (status ${res.status})`);
+  }
+}

@@ -8,6 +8,8 @@ import {
   installApkToUser,
   listUserProfiles,
   runAdbCommandApi,
+  openPcFileDialog,
+  pushLocalFileApi,
 } from '@/lib/serverApi';
 import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Star, List, Save, Trash2, Palette, Plus } from 'lucide-react';
 
@@ -83,6 +85,138 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
   // File Import
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Local PC folder import config
+  const LS_DEVICE_IMPORT_FOLDERS = 'monviewphone:device-import-folders';
+  const [deviceFolders, setDeviceFolders] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(LS_DEVICE_IMPORT_FOLDERS) || '{}');
+    } catch {
+      return {};
+    }
+  });
+  const [showPathInput, setShowPathInput] = useState(false);
+  const [folderPathInput, setFolderPathInput] = useState('');
+
+  useEffect(() => {
+    setFolderPathInput(deviceFolders[udid] || '');
+    setShowPathInput(false);
+  }, [udid, deviceFolders]);
+
+  const handleImportRightClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setShowPathInput(prev => !prev);
+  };
+
+  const handleSavePath = () => {
+    const pathTrimmed = folderPathInput.trim();
+    if (!pathTrimmed) {
+      showToast('Vui lòng nhập đường dẫn hợp lệ', 'err');
+      return;
+    }
+    const next = { ...deviceFolders, [udid]: pathTrimmed };
+    setDeviceFolders(next);
+    localStorage.setItem(LS_DEVICE_IMPORT_FOLDERS, JSON.stringify(next));
+    setShowPathInput(false);
+    showToast('Đã lưu đường dẫn thư mục', 'ok');
+  };
+
+  const handleDeletePath = () => {
+    const next = { ...deviceFolders };
+    delete next[udid];
+    setDeviceFolders(next);
+    localStorage.setItem(LS_DEVICE_IMPORT_FOLDERS, JSON.stringify(next));
+    setFolderPathInput('');
+    setShowPathInput(false);
+    showToast('Đã xóa thư mục đã lưu', 'ok');
+  };
+
+  const handleImportClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    const savedPath = deviceFolders[udid];
+    if (!savedPath) {
+      // Fallback to native browser file picker
+      fileInputRef.current?.click();
+      return;
+    }
+
+    try {
+      setImportStatus('Đang mở hộp thoại chọn tệp trên PC...');
+      const res = await openPcFileDialog(wsServer, savedPath, true);
+      if (res.cancelled || !res.files || res.files.length === 0) {
+        setImportStatus(null);
+        return;
+      }
+
+      if (res.warning) {
+        showToast(`⚠️ Warning: ${res.warning}`, 'err');
+      }
+
+      const files = res.files;
+      const targets = connectSelection && connectSelection.has(udid)
+        ? Array.from(connectSelection)
+        : [udid];
+
+      const runWithConcurrency = async <T,>(
+        items: T[],
+        limit: number,
+        worker: (item: T, index: number) => Promise<void>
+      ) => {
+        let nextIndex = 0;
+        const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+          while (nextIndex < items.length) {
+            const index = nextIndex++;
+            await worker(items[index], index);
+          }
+        });
+        await Promise.all(workers);
+      };
+
+      for (let i = 0; i < files.length; i++) {
+        const localPath = files[i];
+        const parts = localPath.split(/[\\/]/);
+        const fileName = parts[parts.length - 1];
+        setImportStatus(`Đang đẩy ${fileName}... (${i + 1}/${files.length})`);
+
+        const ext = fileName.toLowerCase().split('.').pop() || '';
+        let folder = 'Download';
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'mp4', 'mkv', 'avi', 'mov'].includes(ext)) {
+            folder = 'DCIM/Camera';
+        } else if (['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) {
+            folder = 'Music';
+        }
+
+        const targetPath = selectedProfile > 0 
+          ? `/storage/emulated/${selectedProfile}/${folder}/${fileName}` 
+          : `/sdcard/${folder}/${fileName}`;
+
+        let failed = 0;
+        let lastErrorMsg = '';
+
+        await runWithConcurrency(targets, 8, async (targetUdid) => {
+          try {
+            await pushLocalFileApi(wsServer, targetUdid, localPath, targetPath);
+          } catch (err: any) {
+            failed++;
+            lastErrorMsg = err?.message || 'Lỗi';
+          }
+        });
+
+        if (failed === 0) {
+          setImportStatus(`✅ Đã đẩy: ${fileName} lên ${targets.length} thiết bị`);
+          showToast(`✅ Push: ${fileName}`, 'ok');
+        } else {
+          setImportStatus(`❌ Lỗi đẩy ${fileName} trên ${failed}/${targets.length} thiết bị. Lỗi: ${lastErrorMsg}`);
+          showToast(`❌ Push: ${lastErrorMsg}`, 'err');
+        }
+      }
+    } catch (err: any) {
+      console.error('[VSP] Local push error:', err);
+      const msg = err?.message || 'Lỗi';
+      setImportStatus(`❌ ${msg}`);
+      showToast(`❌: ${msg}`, 'err');
+    }
+  };
 
 
 
@@ -465,16 +599,53 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
 
           {/* 4. Nhập tệp */}
           <div className="vsp-section">
-            <div className="vsp-section-title vsp-clickable" onClick={() => {
-              console.log('[VSP] File import click, ref:', fileInputRef.current);
-              fileInputRef.current?.click();
-            }}>
+            <div 
+              className="vsp-section-title vsp-clickable" 
+              onClick={handleImportClick}
+              onContextMenu={handleImportRightClick}
+              title="Click trái: Nhập tệp | Click phải: Cấu hình thư mục ảnh PC"
+            >
               <Upload size={15} /><span>{t('Nhập tệp vào điện thoại')}</span>
             </div>
             <input ref={fileInputRef} type="file" multiple
               style={{ position: 'absolute', width: 0, height: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }}
               onChange={handleFileImport} />
             {importStatus && <div className="vsp-status">{importStatus}</div>}
+
+            {showPathInput && (
+              <div className="vsp-import-path-container" onClick={e => e.stopPropagation()}>
+                <input 
+                  type="text" 
+                  className="vsp-import-path-input" 
+                  placeholder="Dán đường dẫn thư mục ảnh trên PC..." 
+                  value={folderPathInput}
+                  onChange={e => setFolderPathInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSavePath();
+                    }
+                  }}
+                  autoFocus
+                />
+                <div className="vsp-import-path-actions">
+                  <button 
+                    type="button" 
+                    className="vsp-import-path-btn danger" 
+                    onClick={handleDeletePath}
+                  >
+                    Xóa
+                  </button>
+                  <button 
+                    type="button" 
+                    className="vsp-import-path-btn primary" 
+                    onClick={handleSavePath}
+                  >
+                    Lưu
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
 

@@ -13,7 +13,8 @@
       "automation_modal": "AutomationModal",
       "sync_time_settings_modal": "SyncTimeSettingsModal",
       "automation_panel": "AutomationPanel",
-      "device_account_overlay": "DeviceAccountOverlay"
+      "device_account_overlay": "DeviceAccountOverlay",
+      "macro_playback_panel": "MacroPlaybackPanel"
     },
     "css_classes": {
       "dav_floating_settings_btn": "dav-floating-settings-btn",

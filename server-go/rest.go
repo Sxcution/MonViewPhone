@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -990,6 +991,164 @@ func handleSetWallpaper(w http.ResponseWriter, r *http.Request) {
 
 	if !strings.Contains(out, "SUCCESS") {
 		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Setter failed, output: " + out})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, jsonResponse{"success": true})
+}
+
+func handleOpenFileDialog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		InitialDir string `json:"initialDir"`
+		Multi      bool   `json:"multi"`
+		Filter     string `json:"filter"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid request body: " + err.Error()})
+		return
+	}
+
+	dir := req.InitialDir
+	warning := ""
+	if dir == "" {
+		dir = getFallbackDir()
+	} else {
+		if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+			dir = getFallbackDir()
+			warning = fmt.Sprintf("Directory %q not found, fallback to %q", req.InitialDir, dir)
+		}
+	}
+
+	filter := req.Filter
+	if filter == "" {
+		filter = "Images and Videos|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.mp4;*.mov;*.mkv|All Files|*.*"
+	}
+
+	psScript := fmt.Sprintf(`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.InitialDirectory = '%s'
+$dialog.Multiselect = $%t
+$dialog.Filter = '%s'
+$result = $dialog.ShowDialog()
+if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+    $out = @{
+        success = $true
+        cancelled = $false
+        files = $dialog.FileNames
+    }
+} else {
+    $out = @{
+        success = $true
+        cancelled = $true
+        files = @()
+    }
+}
+$out | ConvertTo-Json -Compress`,
+		strings.ReplaceAll(dir, "'", "''"),
+		req.Multi,
+		strings.ReplaceAll(filter, "'", "''"),
+	)
+
+	tmpFile, err := os.CreateTemp("", "open-dialog-*.ps1")
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to create temp script: " + err.Error()})
+		return
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := tmpFile.WriteString(psScript); err != nil {
+		tmpFile.Close()
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to write temp script: " + err.Error()})
+		return
+	}
+	tmpFile.Close()
+
+	// Execute powershell script
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File", tmpPath)
+	output, err := cmd.Output()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to run file dialog: " + err.Error()})
+		return
+	}
+
+	// Parse JSON output from PowerShell
+	var result struct {
+		Success   bool     `json:"success"`
+		Cancelled bool     `json:"cancelled"`
+		Files     []string `json:"files"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": "Failed to parse dialog output: " + err.Error(), "raw": string(output)})
+		return
+	}
+
+	resp := jsonResponse{
+		"success":   result.Success,
+		"cancelled": result.Cancelled,
+		"files":     result.Files,
+	}
+	if warning != "" {
+		resp["warning"] = warning
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func getFallbackDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "."
+	}
+	downloads := filepath.Join(home, "Downloads")
+	if fi, err := os.Stat(downloads); err == nil && fi.IsDir() {
+		return downloads
+	}
+	desktop := filepath.Join(home, "Desktop")
+	if fi, err := os.Stat(desktop); err == nil && fi.IsDir() {
+		return desktop
+	}
+	return home
+}
+
+func handlePushLocalFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		UDID       string `json:"udid"`
+		LocalPath  string `json:"localPath"`
+		RemotePath string `json:"remotePath"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid request body: " + err.Error()})
+		return
+	}
+
+	req.UDID = strings.TrimSpace(req.UDID)
+	req.LocalPath = strings.TrimSpace(req.LocalPath)
+	req.RemotePath = strings.TrimSpace(req.RemotePath)
+
+	if req.UDID == "" || req.LocalPath == "" || req.RemotePath == "" {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Missing udid, localPath, or remotePath"})
+		return
+	}
+
+	if _, err := os.Stat(req.LocalPath); err != nil {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Local file not found: " + err.Error()})
+		return
+	}
+
+	if err := pushFileToProfileAwarePath(req.UDID, req.LocalPath, req.RemotePath); err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
 		return
 	}
 

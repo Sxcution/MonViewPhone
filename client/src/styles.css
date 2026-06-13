@@ -11360,4 +11360,68 @@ body.is-dragging-modal iframe {
   box-shadow: var(--md-shadow-panel);
 }
 
+/* ViewerSidePanel import folder config */
+.vsp-import-path-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+.vsp-import-path-input {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #fff;
+  padding: 4px 6px;
+  font-size: 11px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.vsp-import-path-input:focus {
+  outline: none;
+  border-color: var(--md-info);
+}
+.vsp-import-path-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.vsp-import-path-btn {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition: all 0.15s ease;
+}
+.vsp-import-path-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.vsp-import-path-btn.primary {
+  background: linear-gradient(135deg, var(--md-info), var(--md-blue));
+  border: none;
+}
+.vsp-import-path-btn.primary:hover {
+  opacity: 0.9;
+}
+.vsp-import-path-btn.danger {
+  background: #dc2626;
+  border: none;
+  color: #fff;
+}
+.vsp-import-path-btn.danger:hover {
+  background: #b91c1c;
+}
+.vsp-import-path-btn.danger:active {
+  background: #991b1b;
+}
+
 
