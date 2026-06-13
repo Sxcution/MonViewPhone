@@ -1307,33 +1307,6 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     setCtxMenu(null);
   };
 
-  const openWechatForAccount = (account: Account, sourceUdid: string, reason: string) => {
-    if (activeTab !== 'wechat') {
-      console.debug('[DeviceAccountPanel] Skip open WeChat: activeTab is not wechat', { activeTab, sourceUdid, reason });
-      return;
-    }
-    const profile = account.wechatLaunchProfile;
-    const accountId = account.id;
-    const accountName = account.name || account.phone || account.nickname || 'Không tên';
-    if (!profile || typeof profile.userId !== 'number') {
-      console.warn('[DeviceAccountPanel] Skip open WeChat: account has no wechatLaunchProfile', { accountId, accountName, sourceUdid, reason });
-      return;
-    }
-    const packageName = profile.packageName || 'com.tencent.mm';
-    const activityName = profile.activityName || 'com.tencent.mm.ui.LauncherUI';
-    const cmd = `am start --user ${profile.userId} -n ${packageName}/${activityName}`;
-    console.info('[DeviceAccountPanel] Opening WeChat for account');
-    runAdbCommandApi(wsServer, sourceUdid, cmd)
-      .then(res => {
-        if (!res.success) {
-          console.warn('[DeviceAccountPanel] Failed to open WeChat via ADB:', res.output);
-        }
-      })
-      .catch(err => {
-        console.warn('[DeviceAccountPanel] Error calling auto-open WeChat ADB:', err);
-      });
-  };
-
   // Close context menu on outside click
   useEffect(() => {
     if (!ctxMenu) return;
@@ -1562,7 +1535,25 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                           handleSetMain(account.id);
                           setAccountTitleDropdownOpen(false);
                           setAccountHoverTooltip(null);
-                          openWechatForAccount(account, accUdid, 'header-dropdown-account-click');
+
+                          // Auto-open WeChat app under set profile
+                          const canAutoOpen = 
+                            activeTab === 'wechat' &&
+                            alwaysShowHeader === true &&
+                            showAccountOverlay === false;
+                          
+                          if (canAutoOpen && account.wechatLaunchProfile && typeof account.wechatLaunchProfile.userId === 'number') {
+                            const cmd = `am start --user ${account.wechatLaunchProfile.userId} -n com.tencent.mm/com.tencent.mm.ui.LauncherUI`;
+                            runAdbCommandApi(wsServer, accUdid, cmd)
+                              .then(res => {
+                                if (!res.success) {
+                                  console.warn('[DeviceAccountPanel] Failed to auto-open WeChat via ADB:', res.output);
+                                }
+                              })
+                              .catch(err => {
+                                console.warn('[DeviceAccountPanel] Error calling auto-open WeChat ADB:', err);
+                              });
+                          }
                         }}
                         onContextMenu={(e) => {
                           e.preventDefault();
@@ -1586,22 +1577,6 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                           {renderAccountNoticeIcon(account)}
                           {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
                         </span>
-                        {account.wechatLaunchProfile && (
-                          <span 
-                            style={{ 
-                              fontSize: '8px', 
-                              background: 'rgba(34, 197, 94, 0.2)', 
-                              color: '#22c55e', 
-                              padding: '1px 4px', 
-                              borderRadius: '4px',
-                              marginLeft: 'auto',
-                              fontWeight: 'bold',
-                              flexShrink: 0
-                            }}
-                          >
-                            U{account.wechatLaunchProfile.userId}
-                          </span>
-                        )}
                       </button>
                     );
                   })
