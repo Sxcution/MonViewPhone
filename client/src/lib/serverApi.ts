@@ -601,20 +601,42 @@ export async function installUploadedApk(wsServer: string, udid: string, filePat
   }
 }
 
-// Run arbitrary ADB command on a device
 export async function runAdbCommandApi(
   wsServer: string,
   udid: string,
   command: string,
 ): Promise<{ success: boolean; output: string }> {
+  const isDebug = typeof window !== 'undefined' && localStorage.getItem('monviewphone:dav-debug-open-wechat') === 'true';
   const endpoint = `${httpBase(wsServer)}api/goog/device/adb-command`;
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ udid, command }),
-  });
+  if (isDebug) {
+    console.log('[DAV_OPEN_WECHAT] ADB_API_REQUEST:', { endpoint, udid, command });
+  }
+  let res: Response;
+  try {
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ udid, command }),
+    });
+  } catch (err: any) {
+    if (isDebug) {
+      console.error('[DAV_OPEN_WECHAT] ADB_API_REQUEST_FAILED:', err);
+    }
+    throw err;
+  }
   const json = await res.json().catch(() => ({}));
-  return { success: !!json?.success, output: json?.output || json?.error || 'No output' };
+  const success = !!json?.success;
+  const output = json?.output || json?.error || 'No output';
+  if (isDebug) {
+    console.log('[DAV_OPEN_WECHAT] ADB_API_RESPONSE:', {
+      status: res.status,
+      ok: res.ok,
+      jsonRaw: json,
+      success,
+      output,
+    });
+  }
+  return { success, output };
 }
 
 // List user profiles on a device

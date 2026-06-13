@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -300,10 +301,19 @@ func handleAdbCommand(w http.ResponseWriter, r *http.Request) {
 
 	udid := strings.TrimSpace(req.UDID)
 	command := strings.TrimSpace(req.Command)
+
+	isDebugEnabled := os.Getenv("MONVIEWPHONE_ADB_DEBUG") == "1" || strings.Contains(command, "com.tencent.mm/com.tencent.mm.ui.LauncherUI")
+	if isDebugEnabled {
+		log.Printf("[ADB_COMMAND_DEBUG] request received method: %s, path: %s, udid: %s, command: %s", r.Method, r.URL.Path, udid, command)
+	}
+
+	startTime := time.Now()
 	var out string
 	var err error
+	var mode string
 
 	if strings.HasPrefix(command, "adb ") {
+		mode = "adb-command"
 		parts := strings.Fields(command)
 		cleaned := make([]string, 0, len(parts)+1)
 		for i := 1; i < len(parts); i++ {
@@ -316,7 +326,17 @@ func handleAdbCommand(w http.ResponseWriter, r *http.Request) {
 		args := append([]string{"-s", udid}, cleaned...)
 		out, err = adb.Command(args...)
 	} else {
+		mode = "adb-shell"
 		out, err = adb.Shell(udid, command)
+	}
+
+	durationMs := time.Since(startTime).Milliseconds()
+	if isDebugEnabled {
+		errStr := "nil"
+		if err != nil {
+			errStr = err.Error()
+		}
+		log.Printf("[ADB_COMMAND_DEBUG] result - mode: %s, duration: %d ms, error: %s, output: %s", mode, durationMs, errStr, out)
 	}
 
 	if err != nil {
