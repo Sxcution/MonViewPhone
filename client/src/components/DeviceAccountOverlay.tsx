@@ -593,6 +593,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
   const [ctxMenu, setCtxMenu] = useState<{ x: number, y: number, accountId: string } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const lastDropdownActivateRef = useRef<{ accountId: string; ts: number } | null>(null);
   const [activeLevel1, setActiveLevel1] = useState<'tai_khoan' | 'trang_thai' | 'nearby' | 'quet_qr' | 'phan_loai' | null>(null);
   const [activeLevel2, setActiveLevel2] = useState<string | null>(null);
   const [activeLevel3, setActiveLevel3] = useState<string | null>(null);
@@ -709,6 +710,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       const isInItem = target.closest('.dav-title-account-item');
       const isInHeader = target.closest('.header-name-display-wrapper');
       const isInTotalBadge = target.closest('.dav-total-badge');
+      if (!accountTitleDropdownOpen && !isInHeader && !isInTotalBadge) return;
       if (!isInDropdown && !isInItem && !isInHeader && !isInTotalBadge) {
         return;
       }
@@ -1609,6 +1611,77 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     return '#22c55e'; // Xanh lá cho tài khoản trên 1 năm tuổi
   }, [selectedAccount, showBlueNearby, isOverOneYear]);
 
+  const handleDropdownAccountActivate = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    account: Account,
+    accUdid: string
+  ) => {
+    if (e.button !== 0) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const now = Date.now();
+    if (
+      lastDropdownActivateRef.current?.accountId === account.id &&
+      now - lastDropdownActivateRef.current.ts < 500
+    ) {
+      davDebug('ITEM_ACTIVATE_DEDUPED', { accountId: account.id, accUdid });
+      return;
+    }
+    lastDropdownActivateRef.current = { accountId: account.id, ts: now };
+
+    const latestAccount =
+      (data.platforms[activeTab] || []).find(a => a.id === account.id) || account;
+
+    const activeAccs = data.platforms[activeTab] || [];
+    const selAccId = data.selectedAccountByPlatform[activeTab];
+    const selAcc = activeAccs.find(a => a.id === selAccId) || activeAccs[0];
+
+    davDebug('ITEM_ACTIVATE_START', {
+      eventType: e.type,
+      accUdid,
+      accountId: account.id,
+      latestAccountId: latestAccount.id,
+      name: latestAccount.name,
+      phone: latestAccount.phone,
+      nickname: latestAccount.nickname,
+      activeTab,
+      hasWechatLaunchProfile: !!latestAccount.wechatLaunchProfile,
+      wechatLaunchProfile: latestAccount.wechatLaunchProfile,
+      appType: latestAccount.appType,
+      selectedAccountId: selAcc?.id,
+    });
+
+    if (!account.wechatLaunchProfile && latestAccount.wechatLaunchProfile) {
+      davDebug('STALE_ACCOUNT_OBJECT_DETECTED', {
+        accountId: account.id,
+        latestProfile: latestAccount.wechatLaunchProfile,
+      });
+    }
+
+    davDebug('ITEM_CALL_HANDLE_SET_MAIN_FROM_MOUSE_DOWN', {
+      accountId: latestAccount.id,
+      accUdid,
+    });
+    handleSetMain(latestAccount.id);
+
+    setAccountTitleDropdownOpen(false);
+    setAccountHoverTooltip(null);
+
+    davDebug('ITEM_CALL_OPEN_WECHAT_FROM_MOUSE_DOWN', {
+      accountId: latestAccount.id,
+      accUdid,
+      wechatLaunchProfile: latestAccount.wechatLaunchProfile,
+    });
+    openWechatForAccount(latestAccount, accUdid, 'header-dropdown-account-mousedown');
+
+    davDebug('ITEM_ACTIVATE_DONE', {
+      accountId: latestAccount.id,
+      accUdid,
+    });
+  };
+
   const activePlatformLabel = platforms.find(p => p.id === activeTab)?.label || 'WeChat';
 
   return (
@@ -1713,10 +1786,17 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                         }}
                         onMouseDown={(e) => {
                           davDebug('ITEM_MOUSE_DOWN', buildItemData(account));
+
                           if (e.button === 1) {
                             e.preventDefault();
                             e.stopPropagation();
                             onOpenDeviceViewer?.(accUdid);
+                            return;
+                          }
+
+                          if (e.button === 0) {
+                            handleDropdownAccountActivate(e, account, accUdid);
+                            return;
                           }
                         }}
                         onAuxClick={(e) => {
@@ -1727,36 +1807,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                           }
                         }}
                         onClick={(e) => {
-                          davDebug('ITEM_CLICK_START', buildItemData(account));
                           e.preventDefault();
                           e.stopPropagation();
-                          davDebug('ITEM_CLICK_AFTER_PREVENT', buildItemData(account));
-                          
-                          const latestAccount =
-                            (data.platforms[activeTab] || []).find(a => a.id === account.id) || account;
-
-                          davDebug('ITEM_LATEST_ACCOUNT_RESOLVED', {
-                            accountProfile: account.wechatLaunchProfile,
-                            latestProfile: latestAccount.wechatLaunchProfile,
-                          });
-
-                          if (!account.wechatLaunchProfile && latestAccount.wechatLaunchProfile) {
-                            davDebug('STALE_ACCOUNT_OBJECT_DETECTED', {
-                              accountId: account.id,
-                              latestProfile: latestAccount.wechatLaunchProfile,
-                            });
-                          }
-
-                          davDebug('ITEM_CALL_HANDLE_SET_MAIN', buildItemData(latestAccount));
-                          handleSetMain(latestAccount.id);
-                          davDebug('ITEM_AFTER_HANDLE_SET_MAIN', buildItemData(latestAccount));
-                          
-                          setAccountTitleDropdownOpen(false);
-                          setAccountHoverTooltip(null);
-                          
-                          davDebug('ITEM_CALL_OPEN_WECHAT', buildItemData(latestAccount));
-                          openWechatForAccount(latestAccount, accUdid, 'header-dropdown-account-click');
-                          davDebug('ITEM_AFTER_OPEN_WECHAT', buildItemData(latestAccount));
+                          davDebug('ITEM_CLICK_SUPPRESSED_AFTER_MOUSE_DOWN', buildItemData(account));
                         }}
                         onContextMenu={(e) => {
                           e.preventDefault();
