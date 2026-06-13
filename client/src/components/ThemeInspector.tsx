@@ -201,11 +201,10 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
           });
         } else {
           // Normal Click: Copy LOGIC TARGET info block
-          const textToCopy = `ThemeInspector Target:
-Inspector ID: ${match.inspectorId}
+          const textToCopy = `Inspector ID Target: ${match.inspectorId}
 Label: ${match.label}
 Selector: ${match.selector}
-Class: ${match.classNameExact ? match.classNameExact : ''}
+Class: ${match.classNameExact || ''}
 Component: ${match.component || ''}
 Style Variable: ${match.cssVar}
 Property: ${match.property}`;

@@ -418,6 +418,25 @@ function sortThemeCandidates(candidates: ThemeVariableCandidate[]): ThemeVariabl
   });
 }
 
+function getCleanClassSelector(el: HTMLElement | null): string {
+  if (!el) return '';
+
+  const excluded = new Set([
+    'themeInspectorHoverTarget',
+    'themeInspectorRoot',
+    'themeInspectorTooltip',
+    'themeInspectorOverlay',
+    'themeInspectorPanel'
+  ]);
+
+  return Array.from(el.classList)
+    .filter(Boolean)
+    .filter(cls => !excluded.has(cls))
+    .filter(cls => !cls.startsWith('themeInspector'))
+    .map(cls => `.${cls}`)
+    .join('');
+}
+
 export function getThemeRoleForElement(el: HTMLElement): ThemeColorMatch | null {
   if (!el) return null;
 
@@ -445,12 +464,6 @@ export function getThemeRoleForElement(el: HTMLElement): ThemeColorMatch | null 
     label = logicTargetEl.getAttribute('data-inspector-label') || '';
     component = logicTargetEl.getAttribute('data-inspector-component') || '';
     selector = `[data-inspector-id="${inspectorId}"]`;
-  }
-
-  // Exact class of el
-  let classNameExact = '';
-  if (el.className) {
-    classNameExact = el.className.split(/\s+/).filter(Boolean).map(c => '.' + c).join('');
   }
 
   // 2. Style Info: find matches up the ancestor tree
@@ -491,7 +504,7 @@ export function getThemeRoleForElement(el: HTMLElement): ThemeColorMatch | null 
           cssVar: best.cssVar,
           property: best.property,
           source: 'computed-style',
-          matchedSelector: current.className ? `.${current.className.split(' ')[0]}` : current.tagName.toLowerCase(),
+          matchedSelector: getCleanClassSelector(current) || current.tagName.toLowerCase(),
           candidates: sorted
         };
       }
@@ -531,16 +544,18 @@ export function getThemeRoleForElement(el: HTMLElement): ThemeColorMatch | null 
 
   // D. Fallback if no style match found at all
   if (!foundMatch) {
-    const className = el.className || '';
     const id = el.id || '';
     foundMatch = {
       element: el,
       cssVar: '--md-border',
       property: 'background-color',
       source: 'fallback',
-      matchedSelector: id ? `#${id}` : (className ? `.${className.split(' ')[0]}` : el.tagName.toLowerCase())
+      matchedSelector: id ? `#${id}` : (getCleanClassSelector(el) || el.tagName.toLowerCase())
     };
   }
+
+  const classSourceEl = logicTargetEl || (foundMatch?.element as HTMLElement | null) || el;
+  const classNameExact = getCleanClassSelector(classSourceEl);
 
   // Fallback Selector logic:
   // data-inspector-id > exact class of element > COLOR_ROLES selector > generic selector
