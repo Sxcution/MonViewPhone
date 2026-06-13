@@ -391,6 +391,11 @@
     "volume_up": 24,
     "volume_down": 25
   },
+  "inspector_ids": {
+    "total_accounts_badge": "deviceAccount.totalAccountsBadge",
+    "notice_badge": "deviceAccount.noticeBadge",
+    "daily_reminder_tooltip": "deviceAccount.dailyReminderTooltip"
+  },
   "project_assets": {
     "app_icon_png": "assets/IconMonViewPhone.png",
     "app_icon_ico": "assets/IconMonViewPhone.ico",

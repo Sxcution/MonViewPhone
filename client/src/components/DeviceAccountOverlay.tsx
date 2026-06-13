@@ -1715,6 +1715,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           <div className="dav-title-dropdown-wrap" ref={accountTitleDropdownRef}>
             <button
               type="button"
+              data-inspector-id="deviceAccount.totalAccountsBadge"
+              data-inspector-label="Total accounts count badge"
+              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               className={[
                 'dav-total-badge',
                 panelNearbyAccountState === 'eligible' ? 'nearby-eligible' : '',
@@ -2018,6 +2021,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             <>
               <button
                 type="button"
+                data-inspector-id="deviceAccount.noticeBadge"
+                data-inspector-label="Notice warning badge"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                 className="dav-bell-btn"
                 onMouseEnter={(e) => setBellTooltip({ x: e.clientX, y: e.clientY })}
                 onMouseMove={(e) => setBellTooltip({ x: e.clientX, y: e.clientY })}
@@ -2048,7 +2054,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           )}
           {/* dav-daily-reminder-tooltip : Tooltip nhắc nhở hàng ngày */}
           {activeDailyReminders.length > 0 && (
-            <div className="dav-daily-reminder-tooltip">
+            <div 
+              data-inspector-id="deviceAccount.dailyReminderTooltip"
+              data-inspector-label="Daily reminder tooltip"
+              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+              className="dav-daily-reminder-tooltip"
+            >
               {activeDailyReminders.map(acc => {
                 const accName = acc.name || acc.phone || acc.nickname || 'Không tên';
                 const accNameColor = getAccountListNameColor(acc);

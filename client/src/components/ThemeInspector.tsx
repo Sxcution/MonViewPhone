@@ -8,7 +8,8 @@ import {
   removeThemeOverride,
   normalizeHexColor,
   applyThemeOverrides,
-  type ThemeColorRole
+  type ThemeColorRole,
+  type ThemeColorMatch
 } from '@/lib/themeInspector';
 
 type ThemeInspectorProps = {
@@ -19,7 +20,7 @@ type ThemeInspectorProps = {
 interface HoverState {
   x: number;
   y: number;
-  role: ThemeColorRole;
+  match: ThemeColorMatch;
   currentColor: string;
   target: HTMLElement;
 }
@@ -34,9 +35,38 @@ function rgbToHex(rgbStr: string): string {
   return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
 }
 
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      console.warn('Navigator clipboard writeText failed, trying fallback...', err);
+    }
+  }
+  try {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.top = '0';
+    textArea.style.left = '0';
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    return successful;
+  } catch (err) {
+    console.error('Fallback copy failed', err);
+    return false;
+  }
+}
+
 export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps) {
   const [hoverState, setHoverState] = useState<HoverState | null>(null);
-  const [editingRole, setEditingRole] = useState<{ role: ThemeColorRole; currentColor: string } | null>(null);
+  const [editingRole, setEditingRole] = useState<{ match: ThemeColorMatch } | null>(null);
+  const [copiedState, setCopiedState] = useState<{ text: string; type: 'id' | 'var'; x: number; y: number } | null>(null);
   
   // Editor values
   const [newColorText, setNewColorText] = useState('');
@@ -118,7 +148,7 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
 
         const match = getThemeRoleForElement(currentTarget);
         if (match) {
-          const { role, element: matchedEl } = match;
+          const matchedEl = match.element;
 
           if (hoveredTargetRef.current !== matchedEl) {
             cleanupHoverClassOnly();
@@ -126,14 +156,12 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
             hoveredTargetRef.current = matchedEl;
           }
 
-          const computed = window.getComputedStyle(matchedEl);
-          const rawColor = computed.getPropertyValue(role.property) || '';
-          const hexColor = rgbToHex(rawColor);
+          const hexColor = match.currentColor || '#000000';
 
           const nextHoverState = {
             x: evt.clientX,
             y: evt.clientY,
-            role,
+            match,
             currentColor: hexColor,
             target: matchedEl
           };
@@ -153,23 +181,49 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
 
       const currentHover = hoverStateRef.current;
       if (currentHover) {
+        // ALWAYS block native click to prevent triggering underlying UI actions
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
 
-        setEditingRole({
-          role: currentHover.role,
-          currentColor: currentHover.currentColor
-        });
-        const currentOverrides = loadThemeOverrides();
-        const activeColor = currentOverrides[currentHover.role.cssVar] || currentHover.currentColor;
-        setNewColorText(activeColor);
-        const normalized = normalizeHexColor(activeColor);
-        if (normalized) {
-          setColorPickerValue(normalized);
-        }
+        const match = currentHover.match;
 
-        clearHoverState();
+        if (e.ctrlKey) {
+          // Ctrl + Click: Open editing card
+          setEditingRole({
+            match
+          });
+          const currentOverrides = loadThemeOverrides();
+          const activeColor = currentOverrides[match.cssVar] || match.currentColor || '#000000';
+          setNewColorText(activeColor);
+          const normalized = normalizeHexColor(activeColor);
+          if (normalized) {
+            setColorPickerValue(normalized);
+          }
+          clearHoverState();
+        } else if (e.altKey || e.shiftKey) {
+          // Alt/Shift + Click: Copy Style Variable
+          const cssVar = match.cssVar;
+          copyToClipboard(cssVar).then(() => {
+            setCopiedState({ text: cssVar, type: 'var', x: e.clientX, y: e.clientY });
+            setTimeout(() => setCopiedState(null), 1500);
+          });
+        } else {
+          // Normal Click: Copy LOGIC TARGET info block
+          const textToCopy = `ThemeInspector Target:
+Inspector ID: ${match.inspectorId}
+Label: ${match.label}
+Selector: ${match.selector}
+Class: ${match.classNameExact ? match.classNameExact : ''}
+Component: ${match.component || ''}
+Style Variable: ${match.cssVar}
+Property: ${match.property}`;
+
+          copyToClipboard(textToCopy).then(() => {
+            setCopiedState({ text: match.inspectorId, type: 'id', x: e.clientX, y: e.clientY });
+            setTimeout(() => setCopiedState(null), 1500);
+          });
+        }
       }
     };
 
@@ -238,13 +292,13 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
     if (!editingRole) return;
     const normalized = normalizeHexColor(newColorText);
     if (!normalized) return;
-    setThemeOverride(editingRole.role.cssVar, normalized);
+    setThemeOverride(editingRole.match.cssVar, normalized);
     setEditingRole(null);
   };
 
   const handleResetCurrent = () => {
     if (!editingRole) return;
-    removeThemeOverride(editingRole.role.cssVar);
+    removeThemeOverride(editingRole.match.cssVar);
     setEditingRole(null);
   };
 
@@ -261,31 +315,84 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
             left: hoverState.x + 15,
             top: hoverState.y + 15,
             pointerEvents: 'none',
-            zIndex: 31000
+            zIndex: 31000,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            padding: '10px 12px'
           }}
         >
-          <div style={{ fontWeight: 'bold', marginBottom: 4, color: 'var(--md-info)' }}>
-            {hoverState.role.label}
+          {/* LOGIC TARGET INFO section */}
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '6px' }}>
+            <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--md-info)', fontWeight: 'bold', marginBottom: '4px' }}>
+              Logic Target Info
+            </div>
+            <div style={{ fontWeight: 'bold', marginBottom: '2px', color: 'var(--md-text)' }}>
+              {hoverState.match.label || 'Unknown Target'}
+            </div>
+            {hoverState.match.inspectorId && (
+              <div style={{ fontFamily: 'monospace', fontSize: '10px', color: 'var(--md-text-soft)' }}>
+                Inspector ID: <span style={{ color: 'var(--md-info)' }}>{hoverState.match.inspectorId}</span>
+              </div>
+            )}
+            {hoverState.match.component && (
+              <div style={{ fontFamily: 'monospace', fontSize: '10px', color: 'var(--md-muted)', marginTop: '2px', wordBreak: 'break-all' }}>
+                file: {hoverState.match.component}
+              </div>
+            )}
           </div>
-          <div style={{ fontFamily: 'monospace', fontSize: 11, marginBottom: 2 }}>
-            Variable: <span style={{ color: 'var(--md-text-soft)' }}>{hoverState.role.cssVar}</span>
+
+          {/* STYLE INFO section */}
+          <div>
+            <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--md-info)', fontWeight: 'bold', marginBottom: '4px' }}>
+              Style Info
+            </div>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', marginBottom: '2px' }}>
+              Style Variable: <span style={{ color: 'var(--md-text-soft)', fontWeight: 'bold' }}>{hoverState.match.cssVar}</span>
+            </div>
+            <div style={{ fontFamily: 'monospace', fontSize: '11px', marginBottom: '2px' }}>
+              Property: <span style={{ color: 'var(--md-text-soft)' }}>{hoverState.match.property}</span>
+            </div>
+            {hoverState.match.selector && (
+              <div style={{ fontFamily: 'monospace', fontSize: '11px', marginBottom: '2px', wordBreak: 'break-all' }}>
+                Selector: <span style={{ color: 'var(--md-muted)' }}>{hoverState.match.selector}</span>
+              </div>
+            )}
+            {hoverState.match.currentColor && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                <span style={{ fontSize: '11px' }}>Color:</span>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '2px',
+                    background: hoverState.match.currentColor,
+                    border: '1px solid var(--md-border)'
+                  }}
+                />
+                <span style={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: '11px' }}>{hoverState.match.currentColor}</span>
+              </div>
+            )}
           </div>
-          <div style={{ fontFamily: 'monospace', fontSize: 11, marginBottom: 2 }}>
-            Property: <span style={{ color: 'var(--md-text-soft)' }}>{hoverState.role.property}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <span>Color:</span>
-            <span
-              style={{
-                display: 'inline-block',
-                width: 12,
-                height: 12,
-                borderRadius: 2,
-                background: hoverState.currentColor,
-                border: '1px solid var(--md-border)'
-              }}
-            />
-            <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{hoverState.currentColor}</span>
+
+          {/* Candidates list (if multiple found) */}
+          {hoverState.match.candidates && hoverState.match.candidates.length > 1 && (
+            <div style={{ borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '4px', fontSize: '9px', color: 'var(--md-muted)' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>Other Variables:</div>
+              {hoverState.match.candidates.slice(1, 4).map((c, i) => (
+                <div key={i} style={{ fontFamily: 'monospace' }}>
+                  {c.property}: {c.cssVar}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Guide section */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '6px', fontSize: '10px', color: 'var(--md-muted)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <div>• Click: Copy Logic Target Info</div>
+            <div>• Alt/Shift + Click: Copy Style Variable</div>
+            <div>• Ctrl + Click: Open Color Editor</div>
           </div>
         </div>,
         document.body
@@ -314,14 +421,14 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
             </div>
 
             <div className="themeInspectorRow">
-              <span className="themeInspectorLabel" style={{ display: 'block', fontSize: 12, color: 'var(--md-muted)', marginBottom: 2 }}>Vùng UI:</span>
-              <strong style={{ fontSize: 14 }}>{editingRole.role.label}</strong>
+              <span className="themeInspectorLabel" style={{ display: 'block', fontSize: 12, color: 'var(--md-muted)', marginBottom: 2 }}>Inspector ID:</span>
+              <strong style={{ fontSize: 14 }}>{editingRole.match.inspectorId}</strong>
             </div>
 
             <div className="themeInspectorRow">
-              <span className="themeInspectorLabel" style={{ display: 'block', fontSize: 12, color: 'var(--md-muted)', marginBottom: 2 }}>CSS Variable:</span>
+              <span className="themeInspectorLabel" style={{ display: 'block', fontSize: 12, color: 'var(--md-muted)', marginBottom: 2 }}>Style Variable:</span>
               <code className="themeInspectorCode" style={{ fontFamily: 'monospace', fontSize: 12, background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: 4 }}>
-                {editingRole.role.cssVar}
+                {editingRole.match.cssVar}
               </code>
             </div>
 
@@ -334,11 +441,11 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
                     width: 14,
                     height: 14,
                     borderRadius: 3,
-                    background: editingRole.currentColor,
+                    background: editingRole.match.currentColor || '#000000',
                     border: '1px solid var(--md-border)'
                   }}
                 />
-                <span style={{ fontFamily: 'monospace' }}>{editingRole.currentColor}</span>
+                <span style={{ fontFamily: 'monospace' }}>{editingRole.match.currentColor || '#000000'}</span>
               </div>
             </div>
 
@@ -414,6 +521,31 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
               </button>
             </div>
           </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 3. Toast status overlay */}
+      {copiedState && createPortal(
+        <div
+          className="themeInspectorRoot"
+          style={{
+            position: 'fixed',
+            left: copiedState.x + 15,
+            top: copiedState.y + 15,
+            pointerEvents: 'none',
+            zIndex: 32000,
+            background: 'var(--md-success, #10b981)',
+            color: '#ffffff',
+            border: '1px solid var(--md-border-strong)',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            boxShadow: 'var(--md-shadow-panel)',
+            fontWeight: 'bold',
+            fontSize: '12px'
+          }}
+        >
+          {copiedState.type === 'var' ? 'Copied Style Variable' : 'Copied Inspector ID'}: {copiedState.text}
         </div>,
         document.body
       )}

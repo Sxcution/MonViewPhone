@@ -9,6 +9,15 @@ export type ThemeColorRole = {
 export type ThemeOverrideMap = Record<string, string>;
 
 export const COLOR_ROLES: ThemeColorRole[] = [
+  // Badges & status widgets (Priority 1)
+  {
+    key: 'badge.generic',
+    label: 'Badge / Status notification',
+    selector: '.dav-total-badge, .dav-daily-reminder-tooltip, .dav-account-type-badge, [class*="badge"], [class*="Badge"]',
+    cssVar: '--md-info',
+    property: 'background-color'
+  },
+
   // Automation modal surfaces
   {
     key: 'automation.modal.surface',
@@ -87,7 +96,7 @@ export const COLOR_ROLES: ThemeColorRole[] = [
   {
     key: 'right.panel.background',
     label: 'Right config panel',
-    selector: '.rightConfigPanel',
+    selector: '.rightConfigPanel, .viewerSidePanel, [class^="vsp-"], .automationPanel, .macroPlaybackPanel',
     cssVar: '--md-card',
     property: 'background-color'
   },
@@ -133,7 +142,7 @@ export const COLOR_ROLES: ThemeColorRole[] = [
   {
     key: 'modal.background',
     label: 'Modal / confirm panel',
-    selector: '.confirmPanel, .appSettingsPanel, .dav-modal-card',
+    selector: '.confirmPanel, .appSettingsPanel, .dav-modal-card, .themeInspectorPanel, .visualAlertPanel',
     cssVar: '--md-card',
     property: 'background-color'
   },
@@ -158,6 +167,15 @@ export const COLOR_ROLES: ThemeColorRole[] = [
     label: 'Context menu item',
     selector: '.ctxMenuItem, .automationContextMenuItem, .automationMacroSortItem, .vsp-ctx-item, .dropdown-item',
     cssVar: '--mvp-menu-item-bg',
+    property: 'background-color'
+  },
+
+  // Tile & device account headers
+  {
+    key: 'tile.header',
+    label: 'Tile header / Device info',
+    selector: '.tile, .tileHeader, .deviceName, .overlayHeader, [class^="dav-"]',
+    cssVar: '--md-card',
     property: 'background-color'
   },
 
@@ -276,10 +294,132 @@ export function clearThemeOverrides(): void {
   applyThemeOverrides({});
 }
 
+export interface ThemeVariableCandidate {
+  cssVar: string;
+  property: string;
+  value: string;
+  priority: number;
+}
+
 export type ThemeColorMatch = {
-  role: ThemeColorRole;
+  role?: ThemeColorRole;
   element: HTMLElement;
+  cssVar: string;
+  property: string;
+  currentColor?: string;
+  source: 'role' | 'computed-style' | 'inline-style' | 'fallback';
+  matchedSelector?: string;
+  className?: string;
+  id?: string;
+  candidates?: Array<{ cssVar: string; property: string; value: string; priority: number }>;
+  
+  // Logic Target & new requirements
+  inspectorId: string;
+  label: string;
+  selector: string;
+  classNameExact: string;
+  component: string;
 };
+
+function collectMatchedCssVars(el: HTMLElement): ThemeVariableCandidate[] {
+  const candidates: ThemeVariableCandidate[] = [];
+  const seen = new Set<string>();
+
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRuleList;
+    try {
+      rules = sheet.cssRules || sheet.rules;
+    } catch (e) {
+      continue;
+    }
+    if (!rules) continue;
+
+    function processRules(ruleList: any) {
+      for (const rule of Array.from(ruleList)) {
+        if (!rule) continue;
+        if (rule instanceof CSSStyleRule) {
+          try {
+            if (el.matches(rule.selectorText)) {
+              const style = rule.style;
+              if (style) {
+                for (let i = 0; i < style.length; i++) {
+                  const propName = style[i];
+                  const val = style.getPropertyValue(propName);
+                  const varMatch = val.match(/var\((--[^),\s]+)/);
+                  if (varMatch) {
+                    const cssVar = varMatch[1].trim();
+                    const key = `${propName}:${cssVar}`;
+                    if (!seen.has(key)) {
+                      seen.add(key);
+                      candidates.push({
+                        cssVar,
+                        property: propName,
+                        value: val,
+                        priority: 9
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // matches() fail on complex/invalid selectors
+          }
+        } else if (rule instanceof CSSMediaRule || rule instanceof CSSSupportsRule) {
+          try {
+            const subRules = (rule as any).cssRules || (rule as any).rules;
+            if (subRules) {
+              processRules(subRules);
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    processRules(rules);
+  }
+  return candidates;
+}
+
+function getCandidatePriority(c: ThemeVariableCandidate): number {
+  let propScore = 0;
+  const prop = c.property.toLowerCase();
+  if (prop === 'background-color' || prop === 'background') {
+    propScore = 100;
+  } else if (prop === 'color') {
+    propScore = 80;
+  } else if (prop.includes('border-') && prop.includes('color')) {
+    propScore = 60;
+  } else if (prop === 'border-color') {
+    propScore = 60;
+  } else if (prop === 'box-shadow') {
+    propScore = 40;
+  } else {
+    propScore = 20;
+  }
+
+  let varScore = 0;
+  const cssVar = c.cssVar.toLowerCase();
+  if (cssVar.startsWith('--mvp-')) {
+    varScore = 10;
+  } else if (cssVar.startsWith('--md-')) {
+    varScore = 8;
+  } else if (cssVar.startsWith('--modal-')) {
+    varScore = 6;
+  } else {
+    varScore = 2;
+  }
+
+  return propScore + varScore;
+}
+
+function sortThemeCandidates(candidates: ThemeVariableCandidate[]): ThemeVariableCandidate[] {
+  return [...candidates].sort((a, b) => {
+    const prioA = getCandidatePriority(a);
+    const prioB = getCandidatePriority(b);
+    return prioB - prioA;
+  });
+}
 
 export function getThemeRoleForElement(el: HTMLElement): ThemeColorMatch | null {
   if (!el) return null;
@@ -296,24 +436,165 @@ export function getThemeRoleForElement(el: HTMLElement): ThemeColorMatch | null 
     return null;
   }
 
+  // 1. Resolve Inspector ID & component & label
+  const logicTargetEl = el.closest('[data-inspector-id]') as HTMLElement | null;
+  let inspectorId = '';
+  let label = '';
+  let component = '';
+  let selector = '';
+
+  if (logicTargetEl) {
+    inspectorId = logicTargetEl.getAttribute('data-inspector-id') || '';
+    label = logicTargetEl.getAttribute('data-inspector-label') || '';
+    component = logicTargetEl.getAttribute('data-inspector-component') || '';
+    selector = `[data-inspector-id="${inspectorId}"]`;
+  }
+
+  // Exact class of el
+  let classNameExact = '';
+  if (el.className) {
+    classNameExact = el.className.split(/\s+/).filter(Boolean).map(c => '.' + c).join('');
+  }
+
+  // 2. Style Info: find matches up the ancestor tree
   let current: HTMLElement | null = el;
-  while (current) {
+  let foundMatch: Partial<ThemeColorMatch> | null = null;
+
+  while (current && !foundMatch) {
+    // A. Check exact COLOR_ROLES
     for (const role of COLOR_ROLES) {
       try {
         if (current.matches(role.selector)) {
-          // Rule: don't return app.background if inside modal/floating overlay
           if (role.key === 'app.background') {
             if (el.closest('.automationFloatingLayer, .automationModal, .automationCoordinatePanel, .automationContent, .syncTimeOverlay, .syncTimeCard, .themeInspectorRoot, .confirmOverlay, .appSettingsOverlay, .dav-overlay, .dav-ctx-menu, .contextMenuPanel')) {
-              return null;
+              continue;
             }
           }
-          return { role, element: current };
+          foundMatch = {
+            role,
+            element: current,
+            cssVar: role.cssVar,
+            property: role.property,
+            source: 'role',
+            matchedSelector: role.selector
+          };
+          break;
         }
-      } catch (err) {
-        // selector might not match on this node type
+      } catch (err) {}
+    }
+
+    // B. Check dynamic computed style
+    if (!foundMatch) {
+      const dynCandidates = collectMatchedCssVars(current);
+      if (dynCandidates.length > 0) {
+        const sorted = sortThemeCandidates(dynCandidates);
+        const best = sorted[0];
+        foundMatch = {
+          element: current,
+          cssVar: best.cssVar,
+          property: best.property,
+          source: 'computed-style',
+          matchedSelector: current.className ? `.${current.className.split(' ')[0]}` : current.tagName.toLowerCase(),
+          candidates: sorted
+        };
       }
     }
-    current = current.parentElement;
+
+    // C. Check inline style
+    if (!foundMatch) {
+      const styleAttr = current.getAttribute('style') || '';
+      const inlineVars: ThemeVariableCandidate[] = [];
+      const varRegex = /(--[^:\s]+)\s*:\s*([^;]+)/g;
+      let inlineMatch;
+      while ((inlineMatch = varRegex.exec(styleAttr)) !== null) {
+        inlineVars.push({
+          cssVar: inlineMatch[1].trim(),
+          property: 'custom-property',
+          value: inlineMatch[2].trim(),
+          priority: 1
+        });
+      }
+      if (inlineVars.length > 0) {
+        const sorted = sortThemeCandidates(inlineVars);
+        const best = sorted[0];
+        foundMatch = {
+          element: current,
+          cssVar: best.cssVar,
+          property: best.property,
+          source: 'inline-style',
+          candidates: sorted
+        };
+      }
+    }
+
+    if (!foundMatch) {
+      current = current.parentElement;
+    }
   }
-  return null;
+
+  // D. Fallback if no style match found at all
+  if (!foundMatch) {
+    const className = el.className || '';
+    const id = el.id || '';
+    foundMatch = {
+      element: el,
+      cssVar: '--md-border',
+      property: 'background-color',
+      source: 'fallback',
+      matchedSelector: id ? `#${id}` : (className ? `.${className.split(' ')[0]}` : el.tagName.toLowerCase())
+    };
+  }
+
+  // Fallback Selector logic:
+  // data-inspector-id > exact class of element > COLOR_ROLES selector > generic selector
+  if (!selector) {
+    if (el.id) {
+      selector = `#${el.id}`;
+    } else if (classNameExact) {
+      selector = classNameExact;
+    } else if (foundMatch.matchedSelector) {
+      selector = foundMatch.matchedSelector;
+    } else {
+      selector = el.tagName.toLowerCase();
+    }
+  }
+
+  // Fallbacks for inspectorId & label & component
+  if (!inspectorId) {
+    if (foundMatch.role) {
+      inspectorId = foundMatch.role.key;
+      label = foundMatch.role.label;
+    } else {
+      inspectorId = selector;
+      label = `Selector matching: ${selector}`;
+    }
+  }
+
+  const finalMatch: ThemeColorMatch = {
+    role: foundMatch.role,
+    element: foundMatch.element || el,
+    cssVar: foundMatch.cssVar || '',
+    property: foundMatch.property || '',
+    source: foundMatch.source || 'fallback',
+    matchedSelector: foundMatch.matchedSelector,
+    className: el.className || undefined,
+    id: el.id || undefined,
+    candidates: foundMatch.candidates,
+    
+    // logicTarget values
+    inspectorId,
+    label,
+    selector,
+    classNameExact,
+    component
+  };
+
+  if (finalMatch.element && finalMatch.property && finalMatch.property !== 'custom-property') {
+    try {
+      const comp = window.getComputedStyle(finalMatch.element);
+      finalMatch.currentColor = comp.getPropertyValue(finalMatch.property) || '';
+    } catch (e) {}
+  }
+
+  return finalMatch;
 }
