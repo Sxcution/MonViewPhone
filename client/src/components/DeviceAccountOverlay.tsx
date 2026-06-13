@@ -39,6 +39,8 @@ type DeviceAccountOverlayProps = {
   activeTab: PlatformType;
   setActiveTab: (val: PlatformType) => void;
   onOpenDeviceViewer?: (udid: string) => void;
+  connectSelection?: Set<string>;
+  setConnectSelection?: React.Dispatch<React.SetStateAction<Set<string>>>;
 };
 
 const ACCOUNT_STATUS_COLORS: Record<string, string> = {
@@ -3472,7 +3474,9 @@ export function DeviceAccountOverlay({
   activeFilter,
   setActiveFilter,
   activeTab,
-  setActiveTab
+  setActiveTab,
+  connectSelection,
+  setConnectSelection
 }: DeviceAccountOverlayProps) {
   const { wsServer } = useServer();
   const [vault, setVault] = useState<VaultData>(() => loadDeviceAccountVault());
@@ -4094,10 +4098,18 @@ export function DeviceAccountOverlay({
                       <div className="dav-saved-group-row">
                         <div 
                           className="dav-saved-group-info"
+                          // select_all_group_devices : Chọn tất cả thiết bị trong nhóm
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            setDavExpandedGroupIdx(isExpanded ? null : idx);
+                            if (setConnectSelection && connectSelection) {
+                              const allSelected = groupDevices.length > 0 && groupDevices.every(uid => connectSelection.has(uid));
+                              if (allSelected) {
+                                setConnectSelection(new Set());
+                              } else {
+                                setConnectSelection(new Set(groupDevices));
+                              }
+                            }
                           }}
                         >
                           <span className="dav-saved-group-name">{group.name}</span>
@@ -4149,7 +4161,7 @@ export function DeviceAccountOverlay({
                                   <div
                                     key={uid}
                                     className={`dav-saved-group-device-cell ${isOnline ? 'online' : 'offline'} ${matchedAccount ? 'has-set' : ''}`}
-                                    title={`${uid}${accountName ? ` - WeChat: ${accountName}` : ''}`}
+                                    title={accountName || 'Chưa set tài khoản'}
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();

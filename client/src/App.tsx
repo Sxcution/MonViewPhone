@@ -3996,7 +3996,7 @@ export function App() {
                                   <div
                                     key={uid}
                                     className={`rcpGridItem${connectSelection.has(uid) ? ' on' : ''}${!connectedUdids.has(uid) ? ' offline' : ''} rcpGroupDeviceItem${matchedAccount ? ' has-set' : ''}`}
-                                    title={`${uid}${accountName ? ` - WeChat: ${accountName}` : ''}`}
+                                    title={accountName || 'Chưa set tài khoản'}
                                     onClick={e => {
                                       e.preventDefault()
                                       e.stopPropagation()
@@ -5767,6 +5767,8 @@ export function App() {
           activeTab={davActiveTab}
           setActiveTab={setDavActiveTab}
           onOpenDeviceViewer={openDeviceViewerFromAccountOverlay}
+          connectSelection={connectSelection}
+          setConnectSelection={setConnectSelection}
         />
       )}
     </>
