@@ -9,9 +9,8 @@ import { createPortal } from 'react-dom';
 import {
   Bell,
   BellOff,
-  ChevronDown,
-  ChevronUp,
   Crosshair,
+  Settings,
   Trash2,
   X,
 } from 'lucide-react';
@@ -54,19 +53,10 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
 
   // Config state
   const [config, setConfig] = useState<VisualAlertConfig>(loadVisualAlertConfig);
-  const [expanded, setExpanded] = useState(() =>
-    loadBoolKey('rightPanel.visualAlertOpen', false)
-  );
   const [roiModalOpen, setRoiModalOpen] = useState(false);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('rightPanel.visualAlertOpen', String(expanded));
-    } catch {}
-  }, [expanded]);
-
   // Hook for scan loop
-  const { scanning, lastAlert, testScanDevice, testSound } = useVisualAlert({
+  const { scanning } = useVisualAlert({
     config,
     getCanvasForUdid,
     registeredUdids,
@@ -82,38 +72,12 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
     });
   }, []);
 
-  // Test scan (multi-ROI)
-  const [testResult, setTestResult] = useState<string | null>(null);
-  const handleTestScan = useCallback(() => {
-    if (!registeredUdids.length) {
-      setTestResult('Không có máy online');
-      return;
-    }
-    if (!config.rois.length) {
-      setTestResult('Chưa thiết lập điểm quét');
-      return;
-    }
-    const udid = registeredUdids[0];
-    const result = testScanDevice(udid);
-    const num = orderMap.get(udid) ?? 0;
-    if (!result.scanned) {
-      setTestResult(`Máy ${String(num).padStart(2, '0')}: Không thể đọc canvas`);
-    } else {
-      const lines = result.hits.map(
-        h => `${h.roiName}: ${h.redPixelCount} px ${h.detected ? '✅' : '❌'}`,
-      );
-      setTestResult(`Máy ${String(num).padStart(2, '0')}:\n${lines.join('\n')}`);
-    }
-    setTimeout(() => setTestResult(null), 5000);
-  }, [registeredUdids, testScanDevice, orderMap, config.rois.length]);
-
-  const handleTestSound = useCallback(() => {
-    testSound();
-  }, [testSound]);
-
   const handleROISave = useCallback(
-    (rois: VisualAlertROI[]) => {
-      updateConfig({ rois });
+    (rois: VisualAlertROI[], settings: { scanIntervalSec: number; confirmCount: number; cooldownSec: number }) => {
+      updateConfig({
+        rois,
+        ...settings,
+      });
       setRoiModalOpen(false);
     },
     [updateConfig],
@@ -142,108 +106,18 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
               <span className="visualAlertToggleKnob" />
             </button>
             <button
+              type="button"
               className="rcpIconBtn"
-              title={expanded ? 'Thu gọn' : 'Mở rộng'}
-              onClick={() => setExpanded(prev => !prev)}
+              title="Setting"
+              onClick={() => setRoiModalOpen(true)}
+              data-inspector-id="visualAlert.settingsButton"
+              data-inspector-label="Visual Alert settings button"
+              data-inspector-component="client/src/components/VisualAlertPanel.tsx"
             >
-              {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              <Settings size={15} />
             </button>
           </div>
         </div>
-
-        {expanded && (
-          <div className="visualAlertBody">
-            {config.rois.length > 10 && (
-              <div className="visualAlertROIWarning">⚠ Nhiều ROI có thể ảnh hưởng hiệu năng</div>
-            )}
-            <div className="visualAlertActions">
-              <button
-                className="visualAlertBtn"
-                onClick={() => {
-                  setRoiModalOpen(true);
-                }}
-                title="Thiết lập vùng nhận diện"
-              >
-                <span>Thiết lập ROI</span>
-              </button>
-              <button
-                className="visualAlertBtn"
-                onClick={handleTestScan}
-                title="Test quét trên 1 máy"
-              >
-                <span>Test quét</span>
-              </button>
-              <button
-                className="visualAlertBtn"
-                onClick={handleTestSound}
-                title="Test âm thanh"
-              >
-                <span>Test âm thanh</span>
-              </button>
-            </div>
-            {testResult && (
-              <div className="visualAlertTestResult" style={{ whiteSpace: 'pre-line' }}>{testResult}</div>
-            )}
-
-            {/* Settings */}
-            <div className="visualAlertSettingsGrid">
-              <label className="visualAlertSettingItem">
-                <span>Chu kỳ (s)</span>
-                <div className="visualAlertInputWrap">
-                  <input
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={config.scanIntervalSec}
-                    onChange={e =>
-                      updateConfig({
-                        scanIntervalSec: Math.max(1, Math.min(30, Number(e.target.value) || 3)),
-                      })
-                    }
-                  />
-                </div>
-              </label>
-              <label className="visualAlertSettingItem">
-                <span>Lần check</span>
-                <div className="visualAlertInputWrap">
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={config.confirmCount}
-                    onChange={e =>
-                      updateConfig({
-                        confirmCount: Math.max(1, Math.min(10, Number(e.target.value) || 2)),
-                      })
-                    }
-                  />
-                </div>
-              </label>
-              <label className="visualAlertSettingItem">
-                <span>Báo Lại</span>
-                <div className="visualAlertInputWrap">
-                  <input
-                    type="number"
-                    min={10}
-                    max={600}
-                    value={config.cooldownSec}
-                    onChange={e =>
-                      updateConfig({
-                        cooldownSec: Math.max(10, Math.min(600, Number(e.target.value) || 60)),
-                      })
-                    }
-                  />
-                </div>
-              </label>
-            </div>
-
-            {lastAlert && (
-              <div className="visualAlertLastAlert">
-                Lần cuối: {lastAlert.message} ({new Date(lastAlert.timestamp).toLocaleTimeString()})
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* ROI Setup Modal */}
@@ -254,6 +128,9 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
           onSave={handleROISave}
           onClose={() => setRoiModalOpen(false)}
           viewerUdid={viewerUdid}
+          scanIntervalSec={config.scanIntervalSec}
+          confirmCount={config.confirmCount}
+          cooldownSec={config.cooldownSec}
         />
       )}
     </>
@@ -265,9 +142,15 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
 type MultiROISetupModalProps = {
   currentROIs: VisualAlertROI[];
   redThreshold: VisualAlertConfig['redThreshold'];
-  onSave: (rois: VisualAlertROI[]) => void;
+  onSave: (
+    rois: VisualAlertROI[],
+    settings: { scanIntervalSec: number; confirmCount: number; cooldownSec: number }
+  ) => void;
   onClose: () => void;
   viewerUdid?: string | null;
+  scanIntervalSec: number;
+  confirmCount: number;
+  cooldownSec: number;
 };
 
 function MultiROISetupModal({
@@ -276,6 +159,9 @@ function MultiROISetupModal({
   onSave,
   onClose,
   viewerUdid,
+  scanIntervalSec,
+  confirmCount,
+  cooldownSec,
 }: MultiROISetupModalProps) {
   const { getCanvasForUdid, activeUdid, selectedGridUdid } = useActive();
 
@@ -292,6 +178,11 @@ function MultiROISetupModal({
   const [testResults, setTestResults] = useState<MultiROIResult | null>(null);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [pendingDeleteROI, setPendingDeleteROI] = useState<string | null>(null);
+
+  // Settings draft states
+  const [draftScanIntervalSec, setDraftScanIntervalSec] = useState(scanIntervalSec);
+  const [draftConfirmCount, setDraftConfirmCount] = useState(confirmCount);
+  const [draftCooldownSec, setDraftCooldownSec] = useState(cooldownSec);
 
   // Offset position for dragging
   const [modalPos, setModalPos] = useState({ x: 0, y: 0 });
@@ -510,7 +401,7 @@ function MultiROISetupModal({
           >
             <h5 className="visualAlertModalTitle">
               <Crosshair size={16} />
-              <span>Thiết lập vùng nhận diện</span>
+              <span>Thiết lập Visual Alert</span>
               {draftROIs.length > 0 && (
                 <span className="visualAlertROICountBadge">{draftROIs.length}</span>
               )}
@@ -585,6 +476,52 @@ function MultiROISetupModal({
                     <span>h: {activeROI.h.toFixed(3)}</span>
                   </div>
                 )}
+
+                {/* Settings */}
+                <div className="visualAlertSettingsGrid" style={{ marginTop: 8, marginBottom: 8 }}>
+                  <label className="visualAlertSettingItem">
+                    <span>Chu kỳ (s)</span>
+                    <div className="visualAlertInputWrap">
+                      <input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={draftScanIntervalSec}
+                        onChange={e =>
+                          setDraftScanIntervalSec(Math.max(1, Math.min(30, Number(e.target.value) || 3)))
+                        }
+                      />
+                    </div>
+                  </label>
+                  <label className="visualAlertSettingItem">
+                    <span>Lần check</span>
+                    <div className="visualAlertInputWrap">
+                      <input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={draftConfirmCount}
+                        onChange={e =>
+                          setDraftConfirmCount(Math.max(1, Math.min(10, Number(e.target.value) || 2)))
+                        }
+                      />
+                    </div>
+                  </label>
+                  <label className="visualAlertSettingItem">
+                    <span>Báo Lại</span>
+                    <div className="visualAlertInputWrap">
+                      <input
+                        type="number"
+                        min={10}
+                        max={600}
+                        value={draftCooldownSec}
+                        onChange={e =>
+                          setDraftCooldownSec(Math.max(10, Math.min(600, Number(e.target.value) || 60)))
+                        }
+                      />
+                    </div>
+                  </label>
+                </div>
 
                 {/* ROI List */}
                 <div className="visualAlertROIList">
@@ -688,7 +625,13 @@ function MultiROISetupModal({
                   </button>
                   <button
                     className="visualAlertModalBtn primary"
-                    onClick={() => onSave(draftROIs)}
+                    onClick={() =>
+                      onSave(draftROIs, {
+                        scanIntervalSec: draftScanIntervalSec,
+                        confirmCount: draftConfirmCount,
+                        cooldownSec: draftCooldownSec,
+                      })
+                    }
                   >
                     Lưu
                   </button>

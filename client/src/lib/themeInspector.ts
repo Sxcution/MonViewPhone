@@ -316,6 +316,9 @@ export type ThemeColorMatch = {
   selector: string;
   classNameExact: string;
   component: string;
+  uiText?: string;
+  title?: string;
+  ariaLabel?: string;
 };
 
 function collectMatchedCssVars(el: HTMLElement): ThemeVariableCandidate[] {
@@ -435,6 +438,11 @@ function getCleanClassSelector(el: HTMLElement | null): string {
     .filter(cls => !cls.startsWith('themeInspector'))
     .map(cls => `.${cls}`)
     .join('');
+}
+
+function getCleanText(el: HTMLElement | null): string {
+  if (!el) return '';
+  return (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
 }
 
 export function getThemeRoleForElement(el: HTMLElement): ThemeColorMatch | null {
@@ -582,6 +590,11 @@ export function getThemeRoleForElement(el: HTMLElement): ThemeColorMatch | null 
     }
   }
 
+  const textSourceEl = logicTargetEl || (foundMatch?.element as HTMLElement | null) || el;
+  const uiText = getCleanText(textSourceEl);
+  const title = textSourceEl?.getAttribute('title') || undefined;
+  const ariaLabel = textSourceEl?.getAttribute('aria-label') || undefined;
+
   const finalMatch: ThemeColorMatch = {
     role: foundMatch.role,
     element: foundMatch.element || el,
@@ -598,7 +611,10 @@ export function getThemeRoleForElement(el: HTMLElement): ThemeColorMatch | null 
     label,
     selector,
     classNameExact,
-    component
+    component,
+    uiText,
+    title,
+    ariaLabel
   };
 
   if (finalMatch.element && finalMatch.property && finalMatch.property !== 'custom-property') {

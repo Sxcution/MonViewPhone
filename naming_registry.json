@@ -395,7 +395,8 @@
   "inspector_ids": {
     "total_accounts_badge": "deviceAccount.totalAccountsBadge",
     "notice_badge": "deviceAccount.noticeBadge",
-    "daily_reminder_tooltip": "deviceAccount.dailyReminderTooltip"
+    "daily_reminder_tooltip": "deviceAccount.dailyReminderTooltip",
+    "visual_alert_settings_button": "visualAlert.settingsButton"
   },
   "project_assets": {
     "app_icon_png": "assets/IconMonViewPhone.png",

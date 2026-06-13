@@ -206,6 +206,9 @@ Label: ${match.label}
 Selector: ${match.selector}
 Class: ${match.classNameExact || ''}
 Component: ${match.component || ''}
+UI Text: ${match.uiText || ''}
+Title: ${match.title || ''}
+Aria Label: ${match.ariaLabel || ''}
 Style Variable: ${match.cssVar}
 Property: ${match.property}`;
 
