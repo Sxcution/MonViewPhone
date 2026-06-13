@@ -663,7 +663,16 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   const editingTouchRowIdRef = useRef<string | null>(null);
   const playbackControllersRef = useRef<Map<string, AbortController>>(new Map());
   const manualPlaybackIdRef = useRef<string | null>(null);
-  const dragRef = useRef({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 });
+  const dragRef = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    panelEl?: HTMLElement | null;
+    lastX?: number;
+    lastY?: number;
+  }>({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 });
   const lastRecordTimestampRef = useRef<number>(0);
   const macroRunningCounterRef = useRef<Map<string, number>>(new Map());
 
@@ -1563,26 +1572,52 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
 
   /* ── drag window ── */
   const onDragMove = useCallback((e: PointerEvent) => {
-    if (!dragRef.current.active) return;
+    const drag = dragRef.current;
+    if (!drag.active || !drag.panelEl) return;
     e.preventDefault();
-    setPosition({
-      x: clampPosition(dragRef.current.originX + e.clientX - dragRef.current.startX, 0, Math.max(0, window.innerWidth - 80)),
-      y: clampPosition(dragRef.current.originY + e.clientY - dragRef.current.startY, 0, Math.max(0, window.innerHeight - 60)),
-    });
+    const nextX = drag.originX + e.clientX - drag.startX;
+    const nextY = drag.originY + e.clientY - drag.startY;
+    const finalX = clampPosition(nextX, 0, Math.max(0, window.innerWidth - 80));
+    const finalY = clampPosition(nextY, 0, Math.max(0, window.innerHeight - 60));
+    
+    drag.panelEl.style.left = `${finalX}px`;
+    drag.panelEl.style.top = `${finalY}px`;
+    
+    drag.lastX = finalX;
+    drag.lastY = finalY;
   }, []);
 
   const onDragUp = useCallback(() => {
-    if (!dragRef.current.active) return;
-    dragRef.current.active = false;
+    const drag = dragRef.current;
+    if (!drag.active) return;
+    drag.active = false;
+    document.body.classList.remove('is-dragging-modal');
     window.removeEventListener('pointermove', onDragMove);
     window.removeEventListener('pointerup', onDragUp);
+    
+    if (drag.lastX !== undefined && drag.lastY !== undefined) {
+      setPosition({ x: drag.lastX, y: drag.lastY });
+    }
   }, [onDragMove]);
 
   const startDrag = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (e.button !== 0) return;
     if ((e.target as HTMLElement).closest('button, input, textarea, select')) return;
     e.preventDefault();
-    dragRef.current = { active: true, startX: e.clientX, startY: e.clientY, originX: position.x, originY: position.y };
+    const panel = e.currentTarget.closest('.automationFloatingLayer') as HTMLElement | null;
+    if (!panel) return;
+    
+    dragRef.current = {
+      active: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: position.x,
+      originY: position.y,
+      panelEl: panel,
+      lastX: position.x,
+      lastY: position.y
+    };
+    document.body.classList.add('is-dragging-modal');
     window.addEventListener('pointermove', onDragMove, { passive: false });
     window.addEventListener('pointerup', onDragUp);
   }, [onDragMove, onDragUp, position.x, position.y]);

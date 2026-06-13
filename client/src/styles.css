@@ -5204,6 +5204,16 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   border-color: rgba(233, 69, 96, 0.5) !important;
 }
 
+.rcpGroupDeviceItem.has-set {
+  border-color: var(--md-success) !important;
+  color: var(--md-success) !important;
+}
+
+.rcpGroupDeviceItem.has-set:hover {
+  border-color: var(--md-success) !important;
+  opacity: 0.8;
+}
+
 /* Context menu submenu hover bridge */
 .ctxAddToGroupWrap:hover .ctxSubMenu {
   display: flex !important;
@@ -8498,7 +8508,7 @@ textarea:focus,
   top: 3.5%;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 30;
+  z-index: 150;
   padding: 5px 12px;
   border-radius: 999px;
   background: rgba(255, 59, 48, 0.9);
@@ -9641,7 +9651,7 @@ select.dav-input {
   border-radius: 8px;
   padding: 6px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-  z-index: 25000 !important;
+  z-index: 29000 !important;
   min-width: 160px;
   display: flex;
   flex-direction: column;
@@ -10082,6 +10092,13 @@ select.dav-input {
   margin-left: 6px;
   margin-right: 6px;
   position: relative;
+  user-select: none !important;
+  caret-color: transparent !important;
+}
+
+.dav-header-name-wrapper * {
+  user-select: none !important;
+  caret-color: transparent !important;
 }
 
 .dav-header-name-wrapper .header-name-input {
@@ -10525,6 +10542,7 @@ input[type=number] {
   font-size: 11px;
   outline: none;
   width: 100%;
+  margin-left: 6px;
 }
 
 .dav-search-box-global input:focus {
@@ -11073,7 +11091,7 @@ input[type=number] {
 }
 
 .dav-daily-reminder-text {
-  color: var(--md-text);
+  color: #f97316;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -11119,4 +11137,227 @@ input[type=number] {
   outline: none !important;
   box-shadow: none !important;
 }
+
+/* Prevent stream canvas and device tile mouse interactions during modal dragging */
+body.is-dragging-modal canvas,
+body.is-dragging-modal .tileVideoFrame,
+body.is-dragging-modal .viewerCanvasWrap,
+body.is-dragging-modal .deviceTile,
+body.is-dragging-modal iframe {
+  pointer-events: none !important;
+}
+
+/* Container for Saved Groups List in Quản lý tài khoản */
+.dav-saved-groups-section {
+  width: 100%;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 6px;
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dav-saved-groups-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.dav-saved-groups-header-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dav-saved-groups-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--md-text-soft);
+}
+
+.dav-saved-groups-badge {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 5px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: normal;
+  color: var(--md-text);
+}
+
+.dav-saved-groups-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--md-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.dav-saved-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Custom scrollbar for groups list */
+.dav-saved-groups-list::-webkit-scrollbar {
+  width: 4px;
+}
+.dav-saved-groups-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+.dav-saved-groups-empty {
+  font-size: 11px;
+  color: var(--md-muted);
+  text-align: center;
+  padding: 12px 0;
+  font-style: italic;
+}
+
+.dav-saved-group-item {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--md-border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dav-saved-group-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.dav-saved-group-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  flex: 1;
+}
+
+.dav-saved-group-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--md-text);
+}
+
+.dav-saved-group-count {
+  font-size: 10px;
+  color: var(--md-muted);
+}
+
+.dav-saved-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dav-saved-group-play-btn {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 4px;
+  color: var(--md-success);
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  transition: all 0.15s ease;
+}
+
+.dav-saved-group-play-btn:hover {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: var(--md-success);
+}
+
+.dav-saved-group-expand-btn {
+  background: transparent;
+  border: none;
+  color: var(--md-muted);
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.15s ease;
+}
+
+.dav-saved-group-expand-btn.open {
+  transform: rotate(180deg);
+}
+
+.dav-saved-group-devices {
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.dav-saved-group-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 3px;
+}
+
+.dav-saved-group-device-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--md-border);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: context-menu;
+  user-select: none;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--md-text-soft);
+  transition: all 0.15s ease;
+}
+
+.dav-saved-group-device-cell.offline {
+  opacity: 0.4;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.dav-saved-group-device-cell:hover {
+  border-color: rgba(233, 69, 96, 0.5) !important;
+}
+
+.dav-saved-group-device-cell.has-set {
+  border-color: var(--md-success) !important;
+  color: var(--md-success) !important;
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.dav-saved-group-device-cell.has-set:hover {
+  border-color: var(--md-success) !important;
+  box-shadow: 0 0 4px rgba(34, 197, 94, 0.3);
+}
+
+/* Ensure the dropdown portal doesn't get cut off */
+.davGroupDeviceDropdownPanel {
+  box-shadow: var(--md-shadow-panel);
+}
+
 

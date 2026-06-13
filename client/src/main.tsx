@@ -224,6 +224,8 @@ async function syncSettingsWithBackend(): Promise<boolean> {
       'syncTimeHotkey',
       'monviewphone:sync-time-hotkey',
       'monviewphone:device-account-hotkey',
+      'monviewphone:account-manager-hotkey',
+      'monviewphone:overlay-header-hotkey',
       'visualAlertGlobalSettingsV1',
       'monviewphone:dav-hide-phone',
       'monviewphone:dav-hide-email',

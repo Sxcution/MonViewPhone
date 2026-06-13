@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, ShieldAlert, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings, History, Layers } from 'lucide-react';
+import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, ShieldAlert, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings, History, Layers, ChevronDown, ChevronUp, Play } from 'lucide-react';
 import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby';
 import { saveBackendSetting } from '@/lib/backendSettings';
 import { useServer } from '@/context/ServerContext';
@@ -357,16 +357,18 @@ function getAppTypeLabel(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unkno
   return 'Main';
 }
 
-function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unknown') {
+function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unknown', isLoggedInToday?: boolean) {
   if (!type || type === 'main' || type === 'unknown') return null;
+  
+  const iconColor = isLoggedInToday ? '#22c55e' : '#ffffff';
   
   if (type === 'shelter') {
     return (
       <span title="Shelter" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
         <Briefcase 
           size={13} 
-          color="#ffffff" 
-          style={{ flexShrink: 0, marginLeft: '4px' }} 
+          color={iconColor} 
+          style={{ flexShrink: 0, marginRight: '6px' }} 
         />
       </span>
     );
@@ -377,8 +379,8 @@ function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unk
       <span title="Secure Folder" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
         <Folder 
           size={13} 
-          color="#ffffff" 
-          style={{ flexShrink: 0, marginLeft: '4px' }} 
+          color={iconColor} 
+          style={{ flexShrink: 0, marginRight: '6px' }} 
         />
       </span>
     );
@@ -392,11 +394,11 @@ function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unk
           height="13" 
           viewBox="0 0 24 24" 
           fill="none" 
-          stroke="#ffffff" 
+          stroke={iconColor} 
           strokeWidth="3.5" 
           strokeLinecap="round" 
           strokeLinejoin="round" 
-          style={{ flexShrink: 0, marginLeft: '4px' }}
+          style={{ flexShrink: 0, marginRight: '6px' }}
         >
           <circle cx="9" cy="15" r="5" />
           <circle cx="15" cy="9" r="5" />
@@ -611,7 +613,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   }, [initialData]);
 
   // Load savedGroups and reactive listener
-  const [savedGroups, setSavedGroups] = useState<{ name: string, udids: string[] }[]>(() => {
+  const [savedGroups, setSavedGroups] = useState<{ name: string, udids: string[], selectedAccounts?: Record<string, string> }[]>(() => {
     try {
       const raw = localStorage.getItem('savedGroups');
       if (!raw) return [];
@@ -656,6 +658,26 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [platformDropdownOpen, setPlatformDropdownOpen] = useState(false);
   const platformDropdownRef = useRef<HTMLDivElement>(null);
   const autoOpenedNearbyDropdownRef = useRef(false);
+  const [dropdownCoords, setDropdownCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  useEffect(() => {
+    if (accountTitleDropdownOpen && accountTitleDropdownRef.current) {
+      const rect = accountTitleDropdownRef.current.getBoundingClientRect();
+      const dropdownWidth = 220;
+      const safetyWidth = 280; // Estimated width for edge-collision check
+      let left = rect.left;
+      if (left + safetyWidth > window.innerWidth) {
+        left = window.innerWidth - safetyWidth - 10;
+      }
+      setDropdownCoords({
+        top: rect.bottom + 4,
+        left: Math.max(10, left),
+        width: dropdownWidth,
+      });
+    } else {
+      setDropdownCoords(null);
+    }
+  }, [accountTitleDropdownOpen]);
 
   const handleNameClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -744,6 +766,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       const headerNameWrap = accountTitleDropdownRef.current?.closest('.dav-panel-header')?.querySelector('.dav-header-name-wrapper');
       if (headerNameWrap?.contains(target)) return;
       if (platformDropdownRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest('.dav-title-account-dropdown')) return;
       
       setAccountTitleDropdownOpen(false);
       setPlatformDropdownOpen(false);
@@ -859,6 +882,16 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const activeAccounts = data.platforms[activeTab] || [];
   const selectedAccountId = data.selectedAccountByPlatform[activeTab];
   let selectedAccount = activeAccounts.find(a => a.id === selectedAccountId) || activeAccounts[0];
+  const selectedAccountIsLoggedInToday = useMemo(() => {
+    if (!selectedAccount) return false;
+    const loginDates = Array.from(new Set(
+      (selectedAccount.history || [])
+        .filter(h => h.action === 'Login')
+        .map(h => getLocalDateString(h.timestamp))
+    ));
+    const todayStr = getLocalDateString(Date.now());
+    return loginDates.includes(todayStr);
+  }, [selectedAccount]);
   const historyModalAccount = historyModalAccountId
     ? activeAccounts.find(a => a.id === historyModalAccountId)
     : null;
@@ -932,14 +965,25 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const noticeTooltipText = useMemo(() => {
     return accountsWithNotices.map(acc => {
       const accName = acc.name || acc.phone || acc.nickname || 'Không tên';
+      const accNameColor = getAccountListNameColor(acc);
       const title = acc.notice?.title || '';
       if (acc.notice?.dueDate) {
         const diffMs = acc.notice.dueDate - Date.now();
         const timeStr = diffMs <= 0 ? 'đã đến hạn' : formatCountdown(diffMs);
-        return `${accName} : ${title} (${timeStr})`;
+        return (
+          <div key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+            <span style={{ color: accNameColor, fontWeight: 'bold' }}>{accName}</span>
+            <span style={{ color: '#f97316' }}> : {title} ({timeStr})</span>
+          </div>
+        );
       }
-      return `${accName} : ${title}`;
-    }).join('\n');
+      return (
+        <div key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+          <span style={{ color: accNameColor, fontWeight: 'bold' }}>{accName}</span>
+          <span style={{ color: '#f97316' }}> : {title}</span>
+        </div>
+      );
+    });
   }, [accountsWithNotices]);
 
   const handleNoticeIconClick = (e: React.MouseEvent) => {
@@ -1263,6 +1307,33 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     setCtxMenu(null);
   };
 
+  const openWechatForAccount = (account: Account, sourceUdid: string, reason: string) => {
+    if (activeTab !== 'wechat') {
+      console.debug('[DeviceAccountPanel] Skip open WeChat: activeTab is not wechat', { activeTab, sourceUdid, reason });
+      return;
+    }
+    const profile = account.wechatLaunchProfile;
+    const accountId = account.id;
+    const accountName = account.name || account.phone || account.nickname || 'Không tên';
+    if (!profile || typeof profile.userId !== 'number') {
+      console.warn('[DeviceAccountPanel] Skip open WeChat: account has no wechatLaunchProfile', { accountId, accountName, sourceUdid, reason });
+      return;
+    }
+    const packageName = profile.packageName || 'com.tencent.mm';
+    const activityName = profile.activityName || 'com.tencent.mm.ui.LauncherUI';
+    const cmd = `am start --user ${profile.userId} -n ${packageName}/${activityName}`;
+    console.info('[DeviceAccountPanel] Opening WeChat for account');
+    runAdbCommandApi(wsServer, sourceUdid, cmd)
+      .then(res => {
+        if (!res.success) {
+          console.warn('[DeviceAccountPanel] Failed to open WeChat via ADB:', res.output);
+        }
+      })
+      .catch(err => {
+        console.warn('[DeviceAccountPanel] Error calling auto-open WeChat ADB:', err);
+      });
+  };
+
   // Close context menu on outside click
   useEffect(() => {
     if (!ctxMenu) return;
@@ -1425,103 +1496,118 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             >
               {totalAccounts}
             </button>
-            {accountTitleDropdownOpen && (
-              <div className="dav-title-account-dropdown contextMenuPanel">
+            {accountTitleDropdownOpen && dropdownCoords && ReactDOM.createPortal(
+              <div 
+                className="dav-title-account-dropdown contextMenuPanel"
+                style={{
+                  position: 'fixed',
+                  top: `${dropdownCoords.top}px`,
+                  left: `${dropdownCoords.left}px`,
+                  minWidth: `${dropdownCoords.width}px`,
+                  width: 'max-content',
+                  maxWidth: '320px',
+                  right: 'auto',
+                  marginTop: 0,
+                  zIndex: 28000,
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  background: 'var(--md-card)',
+                  border: '1px solid var(--md-border)',
+                  boxShadow: 'var(--md-shadow-panel)',
+                  borderRadius: 'var(--md-radius-sm, 8px)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  padding: '6px',
+                }}
+                onMouseDown={e => e.stopPropagation()}
+              >
                 {groupAccounts.length === 0 ? (
                   <div className="dav-title-empty">Khong co tai khoan</div>
                 ) : (
-                   groupAccounts.map(({ udid: accUdid, account }) => (
-                    <button
-                      key={account.id}
-                      type="button"
-                      className={`dav-title-account-item ${selectedAccount?.id === account.id ? 'active' : ''}`}
-                      onMouseEnter={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account })}
-                      onMouseMove={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account })}
-                      onMouseLeave={() => setAccountHoverTooltip(null)}
-                      onMouseDown={(e) => {
-                        if (e.button === 1) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onOpenDeviceViewer?.(accUdid);
-                        }
-                      }}
-                      onAuxClick={(e) => {
-                        if (e.button === 1) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onOpenDeviceViewer?.(accUdid);
-                        }
-                      }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleSetMain(account.id);
-                        setAccountTitleDropdownOpen(false);
-                        setAccountHoverTooltip(null);
+                  groupAccounts.map(({ udid: accUdid, account }) => {
+                    const loginDates = Array.from(new Set(
+                      (account.history || [])
+                        .filter(h => h.action === 'Login')
+                        .map(h => getLocalDateString(h.timestamp))
+                    ));
+                    const todayStr = getLocalDateString(Date.now());
+                    const isLoggedInToday = loginDates.includes(todayStr);
 
-                        // Auto-open WeChat app under set profile
-                        const canAutoOpen = 
-                          activeTab === 'wechat' &&
-                          alwaysShowHeader === true &&
-                          showAccountOverlay === false;
-                        
-                        if (canAutoOpen && account.wechatLaunchProfile && typeof account.wechatLaunchProfile.userId === 'number') {
-                          const cmd = `am start --user ${account.wechatLaunchProfile.userId} -n com.tencent.mm/com.tencent.mm.ui.LauncherUI`;
-                          runAdbCommandApi(wsServer, accUdid, cmd)
-                            .then(res => {
-                              if (!res.success) {
-                                console.warn('[DeviceAccountPanel] Failed to auto-open WeChat via ADB:', res.output);
-                              }
-                            })
-                            .catch(err => {
-                              console.warn('[DeviceAccountPanel] Error calling auto-open WeChat ADB:', err);
-                            });
-                        }
-                      }}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setAccountActionMenu({ x: e.clientX, y: e.clientY, sourceUdid: accUdid, account });
-                      }}
-                    >
-                      {renderLoginStreakDot(account)}
-                      <span
-                        className="dav-title-account-name"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '2px',
-                          color: getAccountListNameColor(account),
-                          fontWeight: selectedAccount?.id === account.id ? 700 : 500,
+                    return (
+                      <button
+                        key={account.id}
+                        type="button"
+                        className={`dav-title-account-item ${selectedAccount?.id === account.id ? 'active' : ''}`}
+                        onMouseEnter={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account })}
+                        onMouseMove={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account })}
+                        onMouseLeave={() => setAccountHoverTooltip(null)}
+                        onMouseDown={(e) => {
+                          if (e.button === 1) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onOpenDeviceViewer?.(accUdid);
+                          }
+                        }}
+                        onAuxClick={(e) => {
+                          if (e.button === 1) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onOpenDeviceViewer?.(accUdid);
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleSetMain(account.id);
+                          setAccountTitleDropdownOpen(false);
+                          setAccountHoverTooltip(null);
+                          openWechatForAccount(account, accUdid, 'header-dropdown-account-click');
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setAccountActionMenu({ x: e.clientX, y: e.clientY, sourceUdid: accUdid, account });
                         }}
                       >
-                        {account.name || account.phone || account.nickname || 'Không tên'}
-                        {renderUnverifiedIcon(account)}
-                        {renderAccountNoticeIcon(account)}
-                        {renderAppTypeIcon(account.appType)}
-                        {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
+                        {renderAppTypeIcon(account.appType, isLoggedInToday)}
+                        <span
+                          className="dav-title-account-name"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '2px',
+                            color: getAccountListNameColor(account),
+                            fontWeight: selectedAccount?.id === account.id ? 700 : 500,
+                          }}
+                        >
+                          {account.name || account.phone || account.nickname || 'Không tên'}
+                          {renderUnverifiedIcon(account)}
+                          {renderAccountNoticeIcon(account)}
+                          {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
+                        </span>
                         {account.wechatLaunchProfile && (
                           <span 
-                            title={`Đã set: User ${account.wechatLaunchProfile.userId} - ${account.wechatLaunchProfile.name} / ${getAppTypeLabel(account.wechatLaunchProfile.appType)}`}
                             style={{ 
                               fontSize: '8px', 
                               background: 'rgba(34, 197, 94, 0.2)', 
                               color: '#22c55e', 
                               padding: '1px 4px', 
                               borderRadius: '4px',
-                              marginLeft: '4px',
+                              marginLeft: 'auto',
                               fontWeight: 'bold',
-                              cursor: 'pointer'
+                              flexShrink: 0
                             }}
                           >
                             U{account.wechatLaunchProfile.userId}
                           </span>
                         )}
-                      </span>
-                    </button>
-                  ))
+                      </button>
+                    );
+                  })
                 )}
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         </div>
@@ -1680,10 +1766,15 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   className={deviceNoticeStatus === 'expired' ? "dav-bell-expired animate-pulse" : ""} 
                 />
               </button>
-              {bellTooltip && noticeTooltipText && ReactDOM.createPortal(
+              {bellTooltip && noticeTooltipText && noticeTooltipText.length > 0 && ReactDOM.createPortal(
                 <div
                   className="dav-bell-tooltip-floating"
-                  style={getFloatingTooltipStyle(bellTooltip.x, bellTooltip.y)}
+                  style={{
+                    ...getFloatingTooltipStyle(bellTooltip.x, bellTooltip.y),
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}
                 >
                   {noticeTooltipText}
                 </div>,
@@ -1755,21 +1846,42 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 }
 
                 const statusTooltip = getAccountStatusTooltip(acc);
-                let noticeTooltip = '';
+                const details: React.ReactNode[] = [];
+                if (statusTooltip) {
+                  details.push(
+                    <span 
+                      key="status" 
+                      style={{ color: acc.status === 'Risk' ? '#f97316' : undefined }}
+                    >
+                      {statusTooltip}
+                    </span>
+                  );
+                }
                 if (acc.notice) {
                   const title = acc.notice.title || '';
+                  const isAutoRiskNotice = acc.status === 'Risk' && title === 'Account Risk';
+                  
                   if (acc.notice.dueDate) {
                     const diffMs = acc.notice.dueDate - Date.now();
-                    const timeStr = diffMs <= 0 ? 'đã đến hạn' : formatCountdown(diffMs);
-                    noticeTooltip = `Thông báo: ${title} (${timeStr})`;
+                    const isDue = diffMs <= 0;
+                    const shouldShowNotice = !isAutoRiskNotice || isDue;
+                    
+                    if (shouldShowNotice) {
+                      const timeStr = isDue ? 'đã đến hạn' : formatCountdown(diffMs);
+                      details.push(
+                        <span key="notice" style={{ color: '#f97316' }}>
+                          Thông báo: {title} ({timeStr})
+                        </span>
+                      );
+                    }
                   } else {
-                    noticeTooltip = `Thông báo: ${title}`;
+                    details.push(
+                      <span key="notice" style={{ color: '#f97316' }}>
+                        Thông báo: {title}
+                      </span>
+                    );
                   }
                 }
-
-                const details: string[] = [];
-                if (statusTooltip) details.push(statusTooltip);
-                if (noticeTooltip) details.push(noticeTooltip);
                 
                 const accName = acc.name || acc.phone || acc.nickname || 'Không tên';
                 const nameColor = getAccountListNameColor(acc);
@@ -1807,6 +1919,21 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     );
                   }
                   
+                  if (account.status === 'Risk') {
+                    let riskText = 'Risk';
+                    if (account.notice?.dueDate) {
+                      const diffMs = account.notice.dueDate - Date.now();
+                      const days = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+                      riskText = `${days} ngày`;
+                    }
+                    return (
+                      <div key={account.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+                        <span style={{ color: nameColor, fontWeight: 'bold' }}>{name}</span>
+                        <span style={{ color: '#f97316' }}>: {riskText}</span>
+                      </div>
+                    );
+                  }
+                  
                   const parts: string[] = [];
                   
                   if (activeTab === 'wechat') {
@@ -1817,6 +1944,28 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       const diffMs = account.nearbyPeopleDueDate - Date.now();
                       const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
                       parts.push(`📍 ${days} ngày`);
+                    }
+                  }
+                  
+                  const isLiveReady = account.status === 'Live';
+                  const getIsOverOneYear = (acc: Account) => {
+                    if (acc.isOneYearOld) return true;
+                    if (!acc.createdAt) return false;
+                    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+                    return (Date.now() - acc.createdAt) >= oneYearMs;
+                  };
+                  const isUnderOneYear = !getIsOverOneYear(account);
+                  const belongsToAnyGroup = savedGroups.some(g => {
+                    if (!g.selectedAccounts) return false;
+                    return Object.values(g.selectedAccounts).includes(account.id);
+                  });
+                  
+                  if (isLiveReady && isUnderOneYear && belongsToAnyGroup) {
+                    const matchedGroups = savedGroups.filter(g => g.selectedAccounts?.[udid] === account.id);
+                    if (matchedGroups.length > 0) {
+                      parts.push(matchedGroups.map(g => g.name).join(', '));
+                    } else {
+                      parts.push('Ready');
                     }
                   }
                   
@@ -2196,33 +2345,42 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             <div className="dav-ctx-item dav-ctx-has-sub">
               <Users size={16} /> Tài Khoản
               <div className={`dav-ctx-submenu ${activeLevel1 === 'tai_khoan' ? 'is-open' : ''}`}>
-                {activeAccounts.map(a => (
-                  <div
-                    key={a.id}
-                    className="dav-ctx-submenu-container"
-                    onMouseEnter={() => setActiveLevel3(a.id)}
-                    onMouseLeave={() => {
-                      setActiveLevel3(null);
-                      setActiveLevel4(null);
-                    }}
-                  >
-                    <div className="dav-ctx-item dav-ctx-has-sub">
-                      <span
-                        style={{
-                          fontWeight: a.id === selectedAccount.id ? 'bold' : 'normal',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '2px',
-                          color: getAccountListNameColor(a),
-                          width: '100%'
-                        }}
-                      >
-                        {a.name || a.phone || a.nickname || 'Tài khoản'}
-                        {renderUnverifiedIcon(a)}
-                        {renderAccountNoticeIcon(a)}
-                        {renderAppTypeIcon(a.appType)}
-                        {activeTab === 'wechat' && renderNearbyAccountIcon(a)}
-                      </span>
+                {activeAccounts.map(a => {
+                  const aLoginDates = Array.from(new Set(
+                    (a.history || [])
+                      .filter(h => h.action === 'Login')
+                      .map(h => getLocalDateString(h.timestamp))
+                  ));
+                  const todayStr = getLocalDateString(Date.now());
+                  const aIsLoggedInToday = aLoginDates.includes(todayStr);
+
+                  return (
+                    <div
+                      key={a.id}
+                      className="dav-ctx-submenu-container"
+                      onMouseEnter={() => setActiveLevel3(a.id)}
+                      onMouseLeave={() => {
+                        setActiveLevel3(null);
+                        setActiveLevel4(null);
+                      }}
+                    >
+                      <div className="dav-ctx-item dav-ctx-has-sub" style={{ display: 'flex', alignItems: 'center' }}>
+                        {renderAppTypeIcon(a.appType, aIsLoggedInToday)}
+                        <span
+                          style={{
+                            fontWeight: a.id === selectedAccount.id ? 'bold' : 'normal',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '2px',
+                            color: getAccountListNameColor(a),
+                            width: '100%'
+                          }}
+                        >
+                          {a.name || a.phone || a.nickname || 'Tài khoản'}
+                          {renderUnverifiedIcon(a)}
+                          {renderAccountNoticeIcon(a)}
+                          {activeTab === 'wechat' && renderNearbyAccountIcon(a)}
+                        </span>
                       <div className={`dav-ctx-submenu ${activeLevel3 === a.id ? 'is-open' : ''}`}>
                         <button
                           className={`dav-ctx-item ${a.id === selectedAccount.id ? 'active' : ''}`}
@@ -2263,7 +2421,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
                 
                 <div className="dav-ctx-divider" />
                 
@@ -3068,9 +3227,49 @@ export function DeviceAccountOverlay({
   activeTab,
   setActiveTab
 }: DeviceAccountOverlayProps) {
+  const { wsServer } = useServer();
   const [vault, setVault] = useState<VaultData>(() => loadDeviceAccountVault());
   const searchInputRef = useRef<HTMLInputElement>(null);
   const floatingPanelRef = useRef<HTMLDivElement | null>(null);
+
+  // Load savedGroups and reactive listener
+  const [savedGroups, setSavedGroups] = useState<{ name: string, udids: string[], selectedAccounts?: Record<string, string> }[]>(() => {
+    try {
+      const raw = localStorage.getItem('savedGroups');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : (parsed?.groups || []);
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const handleGroupsUpdate = () => {
+      try {
+        const raw = localStorage.getItem('savedGroups');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setSavedGroups(Array.isArray(parsed) ? parsed : (parsed?.groups || []));
+        }
+      } catch {}
+    };
+    window.addEventListener('saved-groups-updated', handleGroupsUpdate);
+    return () => window.removeEventListener('saved-groups-updated', handleGroupsUpdate);
+  }, []);
+
+  const [davGroupsExpanded, setDavGroupsExpanded] = useState<boolean>(() => {
+    return localStorage.getItem('monviewphone:dav-groups-expanded') === 'true';
+  });
+
+  const [davExpandedGroupIdx, setDavExpandedGroupIdx] = useState<number | null>(null);
+
+  const [davGroupDeviceDropdown, setDavGroupDeviceDropdown] = useState<{
+    udid: string;
+    groupIdx: number;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
   const [showAddPlatformModal, setShowAddPlatformModal] = useState(false);
@@ -3128,6 +3327,15 @@ export function DeviceAccountOverlay({
     return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
   }, []);
 
+  useEffect(() => {
+    if (!davGroupDeviceDropdown) return;
+    const handleOutsideClick = () => {
+      setDavGroupDeviceDropdown(null);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, [davGroupDeviceDropdown]);
+
   const updateHideSetting = (key: string, value: boolean, setter: (val: boolean) => void) => {
     setter(value);
     localStorage.setItem(key, String(value));
@@ -3162,6 +3370,9 @@ export function DeviceAccountOverlay({
       panelY: rect.top,
     };
     
+    let latestPos = { x: rect.left, y: rect.top };
+    document.body.classList.add('is-dragging-modal');
+    
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!dragStartRef.current) return;
       const dx = moveEvent.clientX - dragStartRef.current.x;
@@ -3171,14 +3382,22 @@ export function DeviceAccountOverlay({
         y: dragStartRef.current.panelY + dy,
       };
       const newPos = clampDavPanelPosition(rawPos, panel);
-      setDragPos(newPos);
-      localStorage.setItem('monviewphone:dav-drag-pos', JSON.stringify(newPos));
+      
+      // Update DOM directly
+      panel.style.left = `${newPos.x}px`;
+      panel.style.top = `${newPos.y}px`;
+      latestPos = newPos;
     };
     
     const handleMouseUp = () => {
       dragStartRef.current = null;
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      document.body.classList.remove('is-dragging-modal');
+      
+      // Update state and localStorage once at the end
+      setDragPos(latestPos);
+      localStorage.setItem('monviewphone:dav-drag-pos', JSON.stringify(latestPos));
     };
     
     window.addEventListener('mousemove', handleMouseMove);
@@ -3398,6 +3617,38 @@ export function DeviceAccountOverlay({
     };
   }, [registeredUdids, activeTab, vault]);
 
+  const handleDavRunGroupProfiles = React.useCallback(async (group: { name: string; udids: string[]; selectedAccounts?: Record<string, string> }) => {
+    const udids = group.udids;
+    const groupSelectedAccounts = group.selectedAccounts || {};
+    for (const udid of udids) {
+      if (!connectedUdids.has(udid)) continue;
+      const selectedId = groupSelectedAccounts[udid];
+      if (!selectedId) {
+        console.warn(`Device ${udid} has no mapped WeChat account in group "${group.name}", skipping.`);
+        continue;
+      }
+      try {
+        const devData = getDeviceAccountData(udid);
+        const accounts = devData?.platforms?.['wechat'] || [];
+        const activeAccount = accounts.find(a => a.id === selectedId);
+        if (!activeAccount) {
+          console.warn(`Mapped WeChat account ${selectedId} not found on device ${udid}, skipping.`);
+          continue;
+        }
+        
+        let userId = 0; // Default user 0
+        if (activeAccount?.wechatLaunchProfile && typeof activeAccount.wechatLaunchProfile.userId === 'number') {
+          userId = activeAccount.wechatLaunchProfile.userId;
+        }
+        
+        const cmd = `am start --user ${userId} -n com.tencent.mm/com.tencent.mm.ui.LauncherUI`;
+        await runAdbCommandApi(wsServer, udid, cmd);
+      } catch (err) {
+        console.warn(`Failed to run profiles for device ${udid}:`, err);
+      }
+    }
+  }, [connectedUdids, wsServer]);
+
   const handleFilterClick = (filter: string) => {
     setActiveFilter(activeFilter === filter ? 'default' : filter);
   };
@@ -3422,32 +3673,8 @@ export function DeviceAccountOverlay({
         >
           <div className="dav-floating-title-left" style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <span className="dav-floating-title">Quản lý tài khoản</span>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 16 }}>
-              <span style={{ fontSize: 11, color: 'var(--md-muted)', userSelect: 'none' }}>Overlay Header</span>
-              <button
-                type="button"
-                className={`dav-toggle-switch ${alwaysShowHeader ? 'on' : ''}`}
-                style={{ width: 34, height: 18 }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const nextVal = !alwaysShowHeader;
-                  setAlwaysShowHeader(nextVal);
-                  localStorage.setItem('monviewphone:dav-always-show-header', String(nextVal));
-                  saveBackendSetting('monviewphone:dav-always-show-header', String(nextVal));
-                  window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
-                }}
-                onDoubleClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-              >
-                <div className="dav-toggle-knob" style={{ width: 12, height: 12, top: 2, left: alwaysShowHeader ? 18 : 2 }} />
-              </button>
-            </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 16 }}>
               <span style={{ fontSize: 11, color: 'var(--md-muted)', userSelect: 'none' }}>Ẩn Tên</span>
               <button
                 type="button"
@@ -3582,6 +3809,125 @@ export function DeviceAccountOverlay({
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
+        </div>
+
+        {/* Nhóm đã tạo sẵn trong Quản lý tài khoản */}
+        <div className="dav-saved-groups-section">
+          <div 
+            className="dav-saved-groups-header-row"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const nextVal = !davGroupsExpanded;
+              setDavGroupsExpanded(nextVal);
+              localStorage.setItem('monviewphone:dav-groups-expanded', String(nextVal));
+            }}
+          >
+            <div className="dav-saved-groups-title">
+              <span>Danh sách nhóm máy</span>
+              <span className="dav-saved-groups-badge">{savedGroups.length}</span>
+            </div>
+            <button type="button" className="dav-saved-groups-toggle-btn">
+              {davGroupsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          </div>
+
+          {davGroupsExpanded && (
+            <div className="dav-saved-groups-list">
+              {savedGroups.length === 0 ? (
+                <div className="dav-saved-groups-empty">Không có nhóm nào</div>
+              ) : (
+                savedGroups.map((group, idx) => {
+                  const isExpanded = davExpandedGroupIdx === idx;
+                  const groupDevices = group.udids.filter(uid => registeredUdids.includes(uid));
+                  const onlineCount = groupDevices.filter(uid => connectedUdids.has(uid)).length;
+
+                  return (
+                    <div key={idx} className="dav-saved-group-item">
+                      <div className="dav-saved-group-row">
+                        <div 
+                          className="dav-saved-group-info"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setDavExpandedGroupIdx(isExpanded ? null : idx);
+                          }}
+                        >
+                          <span className="dav-saved-group-name">{group.name}</span>
+                          <span className="dav-saved-group-count">
+                            ({onlineCount}/{groupDevices.length})
+                          </span>
+                        </div>
+                        <div className="dav-saved-group-actions">
+                          <button
+                            type="button"
+                            className="dav-saved-group-play-btn"
+                            title="Chạy WeChat theo Set tài khoản đã chọn"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDavRunGroupProfiles(group);
+                            }}
+                          >
+                            <Play size={10} fill="currentColor" /> Chạy Set
+                          </button>
+                          <button
+                            type="button"
+                            className={`dav-saved-group-expand-btn ${isExpanded ? 'open' : ''}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDavExpandedGroupIdx(isExpanded ? null : idx);
+                            }}
+                          >
+                            ▾
+                          </button>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="dav-saved-group-devices">
+                          <div className="dav-saved-group-grid">
+                            {groupDevices
+                              .sort((a, b) => (orderMap.get(a) ?? 0) - (orderMap.get(b) ?? 0))
+                              .map(uid => {
+                                const selectedAccountId = group.selectedAccounts?.[uid];
+                                const devData = getDeviceAccountData(uid);
+                                const accounts = devData?.platforms?.['wechat'] || [];
+                                const matchedAccount = selectedAccountId ? accounts.find(a => a.id === selectedAccountId) : null;
+                                const accountName = matchedAccount ? (matchedAccount.name || matchedAccount.phone || matchedAccount.nickname || 'Không tên') : null;
+                                const isOnline = connectedUdids.has(uid);
+
+                                return (
+                                  <div
+                                    key={uid}
+                                    className={`dav-saved-group-device-cell ${isOnline ? 'online' : 'offline'} ${matchedAccount ? 'has-set' : ''}`}
+                                    title={`${uid}${accountName ? ` - WeChat: ${accountName}` : ''}`}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setDavGroupDeviceDropdown({
+                                        udid: uid,
+                                        groupIdx: idx,
+                                        x: rect.left,
+                                        y: rect.bottom + window.scrollY,
+                                      });
+                                    }}
+                                  >
+                                    <span>{String(orderMap.get(uid) ?? 0).padStart(2, '0')}</span>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -3878,6 +4224,125 @@ export function DeviceAccountOverlay({
         </div>,
         document.body
       )}
+      {davGroupDeviceDropdown && (() => {
+        const devData = getDeviceAccountData(davGroupDeviceDropdown.udid);
+        const accounts = devData?.platforms?.['wechat'] || [];
+        const group = savedGroups[davGroupDeviceDropdown.groupIdx];
+        const groupSelectedAccounts = group?.selectedAccounts || {};
+        const selectedId = groupSelectedAccounts[davGroupDeviceDropdown.udid];
+
+        return ReactDOM.createPortal(
+          <div 
+            className="dav-title-account-dropdown contextMenuPanel davGroupDeviceDropdownPanel" 
+            style={{
+              position: 'fixed',
+              left: davGroupDeviceDropdown.x,
+              top: davGroupDeviceDropdown.y,
+              right: 'auto',
+              zIndex: 29000,
+              minWidth: 200,
+              maxHeight: 300,
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {accounts.length === 0 ? (
+              <div className="dav-title-empty" style={{ padding: '8px 12px', color: 'var(--md-muted)', fontSize: 13, fontStyle: 'italic', textAlign: 'center' }}>Không có tài khoản</div>
+            ) : (
+              accounts.map((account) => {
+                const aLoginDates = Array.from(new Set(
+                  (account.history || [])
+                    .filter(h => h.action === 'Login')
+                    .map(h => getLocalDateString(h.timestamp))
+                ));
+                const todayStr = getLocalDateString(Date.now());
+                const aIsLoggedInToday = aLoginDates.includes(todayStr);
+
+                return (
+                  <button
+                    key={account.id}
+                    type="button"
+                    className={`dav-title-account-item ${selectedId === account.id ? 'active' : ''}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      const isDeselect = selectedId === account.id;
+
+                      if (!isDeselect) {
+                        const today = Date.now();
+                        const date = new Date(today);
+                        const todayStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                        
+                        const updatedPlatforms = { ...devData.platforms };
+                        if (updatedPlatforms['wechat']) {
+                          updatedPlatforms['wechat'] = updatedPlatforms['wechat'].map(acc => {
+                            if (acc.id === account.id) {
+                              const history = acc.history || [];
+                              const alreadyLoggedInToday = history.some(
+                                h => h.action === 'Login' && (
+                                  (() => {
+                                    const hd = new Date(h.timestamp);
+                                    const hdStr = `${hd.getFullYear()}-${String(hd.getMonth() + 1).padStart(2, '0')}-${String(hd.getDate()).padStart(2, '0')}`;
+                                    return hdStr === todayStr;
+                                  })()
+                                )
+                              );
+                              if (!alreadyLoggedInToday) {
+                                return {
+                                  ...acc,
+                                  history: [
+                                    ...history,
+                                    { id: Math.random().toString(36).substr(2, 9), action: 'Login', timestamp: today }
+                                  ]
+                                };
+                              }
+                            }
+                            return acc;
+                          });
+                        }
+                        
+                        const newData = {
+                          ...devData,
+                          platforms: updatedPlatforms,
+                        };
+                        saveDeviceAccountData(davGroupDeviceDropdown.udid, newData);
+                      }
+                      
+                      // Update group selection
+                      const nextGroups = savedGroups.map((g, i) => {
+                        if (i !== davGroupDeviceDropdown.groupIdx) return g;
+                        const selAcc = { ...(g.selectedAccounts || {}) };
+                        if (isDeselect) {
+                          delete selAcc[davGroupDeviceDropdown.udid];
+                        } else {
+                          selAcc[davGroupDeviceDropdown.udid] = account.id;
+                        }
+                        return { ...g, selectedAccounts: selAcc };
+                      });
+                      setSavedGroups(nextGroups);
+                      localStorage.setItem('savedGroups', JSON.stringify(nextGroups));
+                      
+                      // Trigger state refresh
+                      setVault(loadDeviceAccountVault());
+                      
+                      // Dispatch events to refresh other components
+                      window.dispatchEvent(new CustomEvent('saved-groups-updated'));
+                      window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+                      
+                      setDavGroupDeviceDropdown(null);
+                    }}
+                  >
+                    {renderAppTypeIcon(account.appType, aIsLoggedInToday)}
+                    <span className="dav-title-account-name">{account.name || account.phone || account.nickname || 'Không tên'}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>,
+          document.body
+        );
+      })()}
     </>,
     document.body
   );

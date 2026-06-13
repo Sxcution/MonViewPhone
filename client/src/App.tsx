@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, startTransiti
 import { createPortal } from 'react-dom'
 import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
 import { saveHotkeySettingToBackend, saveBackendSetting } from '@/lib/backendSettings'
-import { loadDeviceAccountVault, getDeviceAccountDataFromVault, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
+import { loadDeviceAccountVault, getDeviceAccountDataFromVault, getDeviceAccountData, saveDeviceAccountData, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
 import { hasNearbyRelevantAccount, getNearestNearbyHours, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby'
 import { readPageParams } from '@/lib/params'
 import { useServer } from '@/context/ServerContext'
@@ -122,7 +122,7 @@ const VIEWER_STREAM_CONFIG_KEY = 'viewerStreamConfig'
 const SAVED_GROUPS_BACKUP_KEY = 'savedGroupsBackupV1'
 const SAVED_GROUPS_DELETED_ALL_KEY = 'savedGroupsDeletedAllV1'
 
-type SavedDeviceGroup = { name: string; udids: string[] }
+type SavedDeviceGroup = { name: string; udids: string[]; selectedAccounts?: Record<string, string> }
 
 function uniqueStrings(values: unknown): string[] {
   if (!Array.isArray(values)) return []
@@ -146,7 +146,18 @@ function normalizeSavedGroups(value: unknown): SavedDeviceGroup[] {
     const name = typeof (item as any).name === 'string' ? (item as any).name.trim() : ''
     const udids = uniqueStrings((item as any).udids)
     if (!name || udids.length === 0) continue
-    out.push({ name, udids })
+
+    const selectedAccounts: Record<string, string> = {}
+    const rawAccounts = (item as any).selectedAccounts
+    if (rawAccounts && typeof rawAccounts === 'object') {
+      for (const [k, v] of Object.entries(rawAccounts)) {
+        if (typeof v === 'string') {
+          selectedAccounts[k] = v
+        }
+      }
+    }
+
+    out.push({ name, udids, selectedAccounts })
   }
   return out
 }
@@ -567,6 +578,39 @@ export function App() {
     saveHotkeySettingToBackend('monviewphone:device-account-hotkey', newHotkey);
   }, []);
 
+  // ===== ACCOUNT MANAGER MODAL HOTKEY =====
+  const [accountManagerHotkey, setAccountManagerHotkey] = useState(() => localStorage.getItem('monviewphone:account-manager-hotkey') || 'Alt+M');
+
+  const handleAccountManagerHotkeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const lowerKey = e.key.toLowerCase();
+    if (['control', 'alt', 'shift', 'meta'].includes(lowerKey)) {
+      return;
+    }
+
+    const parts: string[] = [];
+    if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
+    if (e.altKey) parts.push('Alt');
+    if (e.shiftKey) parts.push('Shift');
+
+    let keyName = e.key;
+    if (keyName === ' ') {
+      keyName = 'Space';
+    } else if (keyName.length === 1) {
+      keyName = keyName.toUpperCase();
+    } else {
+      keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
+    }
+    parts.push(keyName);
+
+    const newHotkey = parts.join('+');
+    setAccountManagerHotkey(newHotkey);
+    localStorage.setItem('monviewphone:account-manager-hotkey', newHotkey);
+    saveHotkeySettingToBackend('monviewphone:account-manager-hotkey', newHotkey);
+  }, []);
+
   // ===== OVERLAY HEADER HOTKEY =====
   // Hotkey này toggle deviceAccountOverlayOpen (bảng overlay nổi trên từng tile)
   const [overlayHeaderHotkey, setOverlayHeaderHotkey] = useState(() => localStorage.getItem('monviewphone:overlay-header-hotkey') || '');
@@ -770,7 +814,16 @@ export function App() {
   const [macroPlaybackExpanded, setMacroPlaybackExpanded] = useState(true)
   const [macroPlaybackNow, setMacroPlaybackNow] = useState(Date.now())
   const [macroPlaybackPosition, setMacroPlaybackPosition] = useState<{ x: number; y: number } | null>(null)
-  const macroPlaybackDragRef = useRef({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 })
+  const macroPlaybackDragRef = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    panelEl?: HTMLElement | null;
+    lastX?: number;
+    lastY?: number;
+  }>({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 })
 
   useEffect(() => {
     const handleMacroRunning = (e: Event) => {
@@ -814,21 +867,32 @@ export function App() {
   }, [macroPlaybackItems.length])
 
   const onMacroPlaybackPointerMove = useCallback((event: PointerEvent) => {
-    if (!macroPlaybackDragRef.current.active) return
+    const drag = macroPlaybackDragRef.current
+    if (!drag.active || !drag.panelEl) return
     event.preventDefault()
-    const nextX = macroPlaybackDragRef.current.originX + event.clientX - macroPlaybackDragRef.current.startX
-    const nextY = macroPlaybackDragRef.current.originY + event.clientY - macroPlaybackDragRef.current.startY
-    setMacroPlaybackPosition({
-      x: Math.max(8, Math.min(window.innerWidth - 180, nextX)),
-      y: Math.max(8, Math.min(window.innerHeight - 48, nextY)),
-    })
+    const nextX = drag.originX + event.clientX - drag.startX
+    const nextY = drag.originY + event.clientY - drag.startY
+    const finalX = Math.max(8, Math.min(window.innerWidth - 180, nextX))
+    const finalY = Math.max(8, Math.min(window.innerHeight - 48, nextY))
+    
+    drag.panelEl.style.left = `${finalX}px`
+    drag.panelEl.style.top = `${finalY}px`
+    
+    drag.lastX = finalX
+    drag.lastY = finalY
   }, [])
 
   const onMacroPlaybackPointerUp = useCallback(() => {
-    if (!macroPlaybackDragRef.current.active) return
-    macroPlaybackDragRef.current.active = false
+    const drag = macroPlaybackDragRef.current
+    if (!drag.active) return
+    drag.active = false
+    document.body.classList.remove('is-dragging-modal')
     window.removeEventListener('pointermove', onMacroPlaybackPointerMove)
     window.removeEventListener('pointerup', onMacroPlaybackPointerUp)
+    
+    if (drag.lastX !== undefined && drag.lastY !== undefined) {
+      setMacroPlaybackPosition({ x: drag.lastX, y: drag.lastY })
+    }
   }, [onMacroPlaybackPointerMove])
 
   const startMacroPlaybackDrag = useCallback((event: React.PointerEvent<HTMLElement>) => {
@@ -843,8 +907,11 @@ export function App() {
       startY: event.clientY,
       originX: rect.left,
       originY: rect.top,
+      panelEl: panel,
+      lastX: rect.left,
+      lastY: rect.top,
     }
-    setMacroPlaybackPosition({ x: rect.left, y: rect.top })
+    document.body.classList.add('is-dragging-modal')
     window.addEventListener('pointermove', onMacroPlaybackPointerMove, { passive: false })
     window.addEventListener('pointerup', onMacroPlaybackPointerUp)
   }, [onMacroPlaybackPointerMove, onMacroPlaybackPointerUp])
@@ -1166,6 +1233,31 @@ export function App() {
   // Context menu nhóm (right-click)
   const [groupContextMenu, setGroupContextMenu] = useState<{ x: number; y: number; idx: number } | null>(null)
 
+  // Dropdown chọn tài khoản cho từng máy trong nhóm khi click
+  const [activeGroupDeviceDropdown, setActiveGroupDeviceDropdown] = useState<{
+    udid: string;
+    groupIdx: number;
+    x: number;
+    y: number;
+  } | null>(null)
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setVault(loadDeviceAccountVault());
+    };
+    window.addEventListener('monviewphone:dav-hide-settings-changed', handleUpdate);
+    return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleUpdate);
+  }, []);
+
+  useEffect(() => {
+    if (!activeGroupDeviceDropdown) return;
+    const handleOutsideClick = () => {
+      setActiveGroupDeviceDropdown(null);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, [activeGroupDeviceDropdown]);
+
   const [connectPorts, setConnectPorts] = useState<Record<string, number>>({})
   const [connectBusy, setConnectBusy] = useState(false)
   const targetConnect = deviceFilter === 'wifi' ? 'usb' : 'wifi'
@@ -1177,6 +1269,16 @@ export function App() {
   } | null>(null)
   const [modalPostLoading, setModalPostLoading] = useState(false)
   const modalPostTimerRef = useRef<number | null>(null)
+  const groupClickTimeoutRef = useRef<any>(null)
+  const lastGroupClickIdxRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (groupClickTimeoutRef.current) {
+        clearTimeout(groupClickTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const formatConnectNotification = useCallback(
     (
@@ -1792,6 +1894,39 @@ export function App() {
     [wsServer]
   )
 
+  // handleRunGroupProfiles : Chạy profiles WeChat cho nhóm máy
+  const handleRunGroupProfiles = useCallback(async (group: SavedDeviceGroup) => {
+    const udids = group.udids;
+    const groupSelectedAccounts = group.selectedAccounts || {};
+    for (const udid of udids) {
+      if (!connectedUdids.has(udid)) continue;
+      const selectedId = groupSelectedAccounts[udid];
+      if (!selectedId) {
+        console.warn(`Device ${udid} has no mapped WeChat account in group "${group.name}", skipping.`);
+        continue;
+      }
+      try {
+        const devData = getDeviceAccountData(udid);
+        const accounts = devData?.platforms?.['wechat'] || [];
+        const activeAccount = accounts.find(a => a.id === selectedId);
+        if (!activeAccount) {
+          console.warn(`Mapped WeChat account ${selectedId} not found on device ${udid}, skipping.`);
+          continue;
+        }
+        
+        let userId = 0; // Default user 0
+        if (activeAccount?.wechatLaunchProfile && typeof activeAccount.wechatLaunchProfile.userId === 'number') {
+          userId = activeAccount.wechatLaunchProfile.userId;
+        }
+        
+        const cmd = `am start --user ${userId} -n com.tencent.mm/com.tencent.mm.ui.LauncherUI`;
+        await runAdbCommandApi(wsServer, udid, cmd);
+      } catch (err) {
+        console.warn(`Failed to run profiles for device ${udid}:`, err);
+      }
+    }
+  }, [connectedUdids, wsServer]);
+
   // callback_runPhysicalScreenOffWithStayAwake : Chạy stay awake trước rồi tắt màn hình vật lý
   const runPhysicalScreenOffWithStayAwake = useCallback(
     async (targets: string[]) => {
@@ -2210,7 +2345,6 @@ export function App() {
         setDeviceAccountOverlayOpen(prev => {
           const next = !prev;
           if (next) {
-            setAccountManagerOpen(true);
             setDeviceAccountOverlayMounted(true);
           }
           return next;
@@ -2233,7 +2367,64 @@ export function App() {
         capture: true,
       } as any)
     }
-  }, [deviceAccountOverlayOpen, accountManagerOpen])
+  }, [deviceAccountOverlayOpen])
+
+  // ===== ACCOUNT MANAGER MODAL HOTKEY LISTENER =====
+  useEffect(() => {
+    const handleAccountManagerHotkey = (e: KeyboardEvent) => {
+      const active = document.activeElement as HTMLElement | null;
+
+      // Bỏ qua khi đang hover/focus trên phone tile
+      const isHoveringPhone =
+        document.querySelector('.tile:hover') !== null ||
+        document.querySelector('.viewerCanvas:hover') !== null ||
+        document.querySelector('#viewerPanel:hover') !== null;
+
+      const isCanvasFocused =
+        active &&
+        (active.tagName === 'CANVAS' || active.classList.contains('viewerCanvas'));
+
+      if (isHoveringPhone || isCanvasFocused) return;
+
+      // Bỏ qua khi focus vào input thường
+      if (
+        active &&
+        (['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) || active.isContentEditable) &&
+        !active.closest('.dav-overlay') &&
+        !active.closest('.tile-account-overlay')
+      ) {
+        return;
+      }
+
+      const savedHotkey = localStorage.getItem('monviewphone:account-manager-hotkey') || 'Alt+M';
+      if (matchesHotkey(e, savedHotkey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setAccountManagerOpen(prev => {
+          const next = !prev;
+          if (next) {
+            setDeviceAccountOverlayMounted(true);
+          }
+          return next;
+        });
+      }
+
+      if (e.key === 'Escape') {
+        setAccountManagerOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleAccountManagerHotkey, {
+      capture: true,
+      passive: false,
+    });
+
+    return () => {
+      window.removeEventListener('keydown', handleAccountManagerHotkey, {
+        capture: true,
+      } as any);
+    };
+  }, []);
 
   // ===== OVERLAY HEADER HOTKEY LISTENER =====
   // Toggle alwaysShowHeader (nút "Overlay Header" trong modal Quản lý tài khoản)
@@ -3667,22 +3858,35 @@ export function App() {
                             className={`rcpSavedGroupBtn${activeGroupIdx === idx ? ' active' : ''}${focusGroupIdx === idx ? ' focused' : ''}`}
                             title={`Click: chọn nhóm | Double click: chỉ hiện nhóm này | Drag: đổi thứ tự`}
                             onClick={() => {
-                              if (activeGroupIdx === idx) {
-                                setActiveGroupIdx(null)
-                                setConnectSelection(new Set())
+                              if (groupClickTimeoutRef.current && lastGroupClickIdxRef.current === idx) {
+                                clearTimeout(groupClickTimeoutRef.current);
+                                groupClickTimeoutRef.current = null;
+                                lastGroupClickIdxRef.current = null;
+
+                                if (focusGroupIdx === idx) {
+                                  setFocusGroupIdx(null);
+                                } else {
+                                  setFocusGroupIdx(idx);
+                                  setConnectSelection(new Set(group.udids));
+                                  setActiveGroupIdx(idx);
+                                }
                               } else {
-                                setConnectSelection(new Set(group.udids))
-                                setActiveGroupIdx(idx)
-                              }
-                            }}
-                            onDoubleClick={() => {
-                              if (focusGroupIdx === idx) {
-                                // Double click lại → bỏ focus, hiện hết
-                                setFocusGroupIdx(null)
-                              } else {
-                                setFocusGroupIdx(idx)
-                                setConnectSelection(new Set(group.udids))
-                                setActiveGroupIdx(idx)
+                                if (groupClickTimeoutRef.current) {
+                                  clearTimeout(groupClickTimeoutRef.current);
+                                }
+                                lastGroupClickIdxRef.current = idx;
+                                groupClickTimeoutRef.current = setTimeout(() => {
+                                  groupClickTimeoutRef.current = null;
+                                  lastGroupClickIdxRef.current = null;
+
+                                  if (activeGroupIdx === idx) {
+                                    setActiveGroupIdx(null);
+                                    setConnectSelection(new Set());
+                                  } else {
+                                    setConnectSelection(new Set(group.udids));
+                                    setActiveGroupIdx(idx);
+                                  }
+                                }, 250);
                               }
                             }}
                             onContextMenu={e => {
@@ -3722,6 +3926,35 @@ export function App() {
                             {focusGroupIdx === idx && <span className='rcpGroupFocusDot' title='Đang lọc nhóm này'>●</span>}
                           </button>
 
+                          {/* Nút chạy WeChat Profile cho nhóm */}
+                          <button
+                            className='rcpSavedGroupPlay'
+                            title='Chạy WeChat theo Set tài khoản đã chọn'
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleRunGroupProfiles(group);
+                            }}
+                            style={{
+                              background: 'rgba(61, 220, 132, 0.1)',
+                              border: '1px solid rgba(61, 220, 132, 0.3)',
+                              borderRadius: '4px',
+                              color: '#3ddc84',
+                              padding: '2px 6px',
+                              fontSize: '11px',
+                              cursor: 'pointer',
+                              marginRight: '4px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '2px',
+                              height: '22px',
+                              alignSelf: 'center',
+                            }}
+                          >
+                            ▶ Chạy Set
+                          </button>
+
                           {/* Nút dropdown xem device */}
                           <button
                             className={`rcpSavedGroupExpand${expandedGroupIdx === idx ? ' open' : ''}`}
@@ -3745,22 +3978,48 @@ export function App() {
                         {expandedGroupIdx === idx && (
                           <div className='rcpSavedGroupDevices'>
                             <div className='rcpGrid rcpGridCompact rcpGrid12' style={{ marginTop: 4 }}>
-                              {group.udids.filter(uid => displayFilter === 'all' || connectedUdids.has(uid)).map(uid => (
-                                <div
-                                  key={uid}
-                                  className={`rcpGridItem${connectSelection.has(uid) ? ' on' : ''}${!connectedUdids.has(uid) ? ' offline' : ''} rcpGroupDeviceItem`}
-                                  title={uid}
-                                  onContextMenu={e => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    setContextMenuTarget({ x: e.clientX, y: e.clientY, udid: uid, groupIdx: idx, sourceGrid: 'group' })
-                                    setContextMenuInput(String(orderMap.get(uid) ?? 0))
-                                    setContextMenuOpen(true)
-                                  }}
-                                >
-                                  <span>{String(orderMap.get(uid) ?? 0).padStart(2, '0')}</span>
-                                </div>
-                              ))}
+                              {group.udids
+                                .filter(uid => displayFilter === 'all' || connectedUdids.has(uid))
+                                .sort((a, b) => {
+                                  const numA = orderMap.get(a) ?? 0;
+                                  const numB = orderMap.get(b) ?? 0;
+                                  return numA - numB;
+                                })
+                                .map(uid => {
+                                const selectedAccountId = group.selectedAccounts?.[uid];
+                                const devData = getDeviceAccountData(uid);
+                                const accounts = devData?.platforms?.['wechat'] || [];
+                                const matchedAccount = selectedAccountId ? accounts.find(a => a.id === selectedAccountId) : null;
+                                const accountName = matchedAccount ? (matchedAccount.name || matchedAccount.phone || matchedAccount.nickname || 'Không tên') : null;
+
+                                return (
+                                  <div
+                                    key={uid}
+                                    className={`rcpGridItem${connectSelection.has(uid) ? ' on' : ''}${!connectedUdids.has(uid) ? ' offline' : ''} rcpGroupDeviceItem${matchedAccount ? ' has-set' : ''}`}
+                                    title={`${uid}${accountName ? ` - WeChat: ${accountName}` : ''}`}
+                                    onClick={e => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      const rect = e.currentTarget.getBoundingClientRect()
+                                      setActiveGroupDeviceDropdown({
+                                        udid: uid,
+                                        groupIdx: idx,
+                                        x: rect.left,
+                                        y: rect.bottom + window.scrollY,
+                                      })
+                                    }}
+                                    onContextMenu={e => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      setContextMenuTarget({ x: e.clientX, y: e.clientY, udid: uid, groupIdx: idx, sourceGrid: 'group' })
+                                      setContextMenuInput(String(orderMap.get(uid) ?? 0))
+                                      setContextMenuOpen(true)
+                                    }}
+                                  >
+                                    <span>{String(orderMap.get(uid) ?? 0).padStart(2, '0')}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
@@ -3928,7 +4187,7 @@ export function App() {
                   <div style={{ display: 'flex', alignItems: 'center', marginTop: 12, flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: '220px' }}>
                       <div style={{ fontSize: 12, color: 'var(--md-muted)', marginRight: 4 }}>
-                        Quản lý tài khoản:
+                        Hiện tài khoản máy (Tile):
                       </div>
                       <input
                         type="text"
@@ -4006,6 +4265,54 @@ export function App() {
                             setOverlayHeaderHotkey('');
                             localStorage.removeItem('monviewphone:overlay-header-hotkey');
                             saveHotkeySettingToBackend('monviewphone:overlay-header-hotkey', '');
+                          }}
+                          style={{
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '6px',
+                            color: '#ff8080',
+                            padding: '6px 10px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Xoá
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Account Manager Modal hotkey row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: '220px' }}>
+                      <div style={{ fontSize: 12, color: 'var(--md-muted)', marginRight: 4 }}>
+                        Bảng Quản lý tài khoản:
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Nhấn tổ hợp phím..."
+                        readOnly
+                        value={accountManagerHotkey}
+                        onKeyDown={handleAccountManagerHotkeyInputKeyDown}
+                        style={{
+                          background: '#0a0a0a',
+                          color: 'var(--md-info)',
+                          border: '1px solid #444',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          fontSize: 12,
+                          width: 140,
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          outline: 'none',
+                        }}
+                      />
+                      {accountManagerHotkey && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAccountManagerHotkey('');
+                            localStorage.removeItem('monviewphone:account-manager-hotkey');
+                            saveHotkeySettingToBackend('monviewphone:account-manager-hotkey', '');
                           }}
                           style={{
                             background: 'rgba(255,255,255,0.05)',
@@ -4342,6 +4649,111 @@ export function App() {
         onClose={() => setAutomationOpen(false)}
       />
       <ThemeInspector enabled={themeInspectorEnabled} onEnabledChange={setThemeInspectorEnabled} />
+      {activeGroupDeviceDropdown && (() => {
+        const devData = getDeviceAccountData(activeGroupDeviceDropdown.udid);
+        const accounts = devData?.platforms?.['wechat'] || [];
+        const group = savedGroups[activeGroupDeviceDropdown.groupIdx];
+        const groupSelectedAccounts = group?.selectedAccounts || {};
+        const selectedId = groupSelectedAccounts[activeGroupDeviceDropdown.udid];
+
+        return createPortal(
+          <div 
+            className="dav-title-account-dropdown contextMenuPanel" 
+            style={{
+              position: 'fixed',
+              left: activeGroupDeviceDropdown.x,
+              top: activeGroupDeviceDropdown.y,
+              right: 'auto',
+              zIndex: 28000,
+              minWidth: 200,
+              maxHeight: 300,
+              overflowY: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {accounts.length === 0 ? (
+              <div className="dav-title-empty" style={{ padding: '8px 12px', color: 'var(--md-muted)', fontSize: 13, fontStyle: 'italic', textAlign: 'center' }}>Không có tài khoản</div>
+            ) : (
+              accounts.map((account) => (
+                <button
+                  key={account.id}
+                  type="button"
+                  className={`dav-title-account-item ${selectedId === account.id ? 'active' : ''}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const isDeselect = selectedId === account.id;
+
+                    if (!isDeselect) {
+                      const today = Date.now();
+                      const date = new Date(today);
+                      const todayStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                      
+                      const updatedPlatforms = { ...devData.platforms };
+                      if (updatedPlatforms['wechat']) {
+                        updatedPlatforms['wechat'] = updatedPlatforms['wechat'].map(acc => {
+                          if (acc.id === account.id) {
+                            const history = acc.history || [];
+                            const alreadyLoggedInToday = history.some(
+                              h => h.action === 'Login' && (
+                                (() => {
+                                  const hd = new Date(h.timestamp);
+                                  const hdStr = `${hd.getFullYear()}-${String(hd.getMonth() + 1).padStart(2, '0')}-${String(hd.getDate()).padStart(2, '0')}`;
+                                  return hdStr === todayStr;
+                                })()
+                              )
+                            );
+                            if (!alreadyLoggedInToday) {
+                              return {
+                                ...acc,
+                                history: [
+                                  ...history,
+                                  { id: Math.random().toString(36).substr(2, 9), action: 'Login', timestamp: today }
+                                ]
+                              };
+                            }
+                          }
+                          return acc;
+                        });
+                      }
+                      
+                      const newData = {
+                        ...devData,
+                        platforms: updatedPlatforms,
+                      };
+                      saveDeviceAccountData(activeGroupDeviceDropdown.udid, newData);
+                    }
+                    
+                    // Update group selection
+                    setSavedGroups(prev => prev.map((g, i) => {
+                      if (i !== activeGroupDeviceDropdown.groupIdx) return g;
+                      const selAcc = { ...(g.selectedAccounts || {}) };
+                      if (isDeselect) {
+                        delete selAcc[activeGroupDeviceDropdown.udid];
+                      } else {
+                        selAcc[activeGroupDeviceDropdown.udid] = account.id;
+                      }
+                      return { ...g, selectedAccounts: selAcc };
+                    }));
+                    
+                    // Trigger state refresh in App.tsx
+                    setVault(loadDeviceAccountVault());
+                    
+                    // Dispatch event to refresh tiles and overlays
+                    window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+                    
+                    setActiveGroupDeviceDropdown(null);
+                  }}
+                >
+                  <span className="dav-title-account-name">{account.name || account.phone || account.nickname || 'Không tên'}</span>
+                </button>
+              ))
+            )}
+          </div>,
+          document.body
+        );
+      })()}
       {macroPlaybackItems.length ? createPortal(
         <section
           className={`macroPlaybackPanel${macroPlaybackExpanded ? ' expanded' : ' collapsed'}`}

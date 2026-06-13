@@ -629,3 +629,28 @@ Chúng tôi đã bổ sung tùy chọn **Thông báo** vào menu chuột phải 
 
 4. **Xác thực**:
    - Chạy lệnh `npm run build` biên dịch thành công 100% không có lỗi.
+
+## Loại bỏ dot đăng nhập và tích hợp icon phân loại ứng dụng bên trái
+
+Chúng tôi đã thực hiện cải tiến thiết kế hiển thị danh sách tài khoản theo yêu cầu của người dùng:
+
+1. **Loại bỏ chấm đăng nhập hôm nay (Login Streak Dot)**:
+   - Loại bỏ hoàn toàn dot trạng thái tròn (trắng/xanh lá) biểu thị tài khoản đăng nhập hôm nay trong danh sách dropdown.
+   - Xóa bỏ hiển thị tooltip đếm ngày chuỗi đăng nhập liên tục của tài khoản.
+
+2. **Di chuyển các biểu tượng phân loại ứng dụng (App Classification Icons) sang trái**:
+   - Di chuyển các icon Shelter (Briefcase), Secure Folder (Folder), Clone App (hai vòng tròn đồng tâm) từ bên trong thẻ hiển thị tên tài khoản (ở bên phải) sang vị trí bên trái ngoài cùng (thế chỗ cho dot đăng nhập cũ).
+   - Rút gọn CSS không còn sử dụng thuộc tính `marginLeft: '4px'` mà chuyển thành `marginRight: '6px'` để tạo khoảng trống đẹp mắt so với tên tài khoản.
+   - Đồng bộ hóa định dạng hiển thị này cho cả:
+     * Dropdown danh sách tài khoản chính của thiết bị (`groupAccounts`).
+     * Dropdown danh sách tài khoản thiết bị trong màn hình xem trước các nhóm lưu sẵn (`davGroupDeviceDropdown`).
+     * Submenu danh sách tài khoản ở menu ngữ cảnh khi click chuột phải (`activeAccounts`).
+
+3. **Thay đổi logic hiển thị màu sắc biểu tượng ứng dụng**:
+   - Mặc định, các biểu tượng Shelter, Secure Folder, Clone App sẽ hiển thị màu **Trắng** (`#ffffff`).
+   - Nếu tài khoản được ghi nhận có lượt đăng nhập vào ngày hôm nay (`loginDates.includes(todayStr)`), biểu tượng đó sẽ đổi sang màu **Xanh lá** (`#22c55e`).
+   - Bỏ logic hiển thị màu xanh lá dựa theo trạng thái đã được set profile.
+
+4. **Xác Thực**:
+   - Chạy lệnh `npm run build` biên dịch thành công 100% không gặp bất kỳ lỗi nào.
+
