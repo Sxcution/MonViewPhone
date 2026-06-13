@@ -17,7 +17,7 @@ import { AutomationPanel } from '@/components/AutomationPanel'
 import { VisualAlertPanel } from '@/components/VisualAlertPanel'
 import { ThemeInspector } from '@/components/ThemeInspector'
 import { MacroPlaybackPanel } from '@/components/MacroPlaybackPanel'
-import { applyThemeOverrides, loadThemeOverrides, clearThemeOverrides } from '@/lib/themeInspector'
+import { applyThemeOverrides, loadThemeOverrides } from '@/lib/themeInspector'
 import { useActive } from '@/context/ActiveContext'
 import { AndroidKeycode } from '@/lib/keyEvent'
 import { encodeKeycodeMessage, KeyEventAction } from '@/lib/control'
@@ -389,7 +389,8 @@ export function App() {
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'i') {
+      const hotkeyStr = localStorage.getItem('monviewphone:inspector-id-hotkey') || 'Ctrl+Shift+I';
+      if (hotkeyStr && matchesHotkey(e, hotkeyStr)) {
         e.preventDefault();
         e.stopPropagation();
         setThemeInspectorEnabled(prev => !prev);
@@ -658,6 +659,39 @@ export function App() {
     saveHotkeySettingToBackend('monviewphone:overlay-header-hotkey', newHotkey);
   }, []);
 
+  // ===== INSPECTOR ID HOTKEY =====
+  const [inspectorIdHotkey, setInspectorIdHotkey] = useState(() => localStorage.getItem('monviewphone:inspector-id-hotkey') || 'Ctrl+Shift+I');
+
+  const handleInspectorIdHotkeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const lowerKey = e.key.toLowerCase();
+    if (['control', 'alt', 'shift', 'meta'].includes(lowerKey)) {
+      return;
+    }
+
+    const parts: string[] = [];
+    if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
+    if (e.altKey) parts.push('Alt');
+    if (e.shiftKey) parts.push('Shift');
+
+    let keyName = e.key;
+    if (keyName === ' ') {
+      keyName = 'Space';
+    } else if (keyName.length === 1) {
+      keyName = keyName.toUpperCase();
+    } else {
+      keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
+    }
+    parts.push(keyName);
+
+    const newHotkey = parts.join('+');
+    setInspectorIdHotkey(newHotkey);
+    localStorage.setItem('monviewphone:inspector-id-hotkey', newHotkey);
+    saveHotkeySettingToBackend('monviewphone:inspector-id-hotkey', newHotkey);
+  }, []);
+
   // ===== SYNC TIME HOTKEY STATES & GLOBAL LISTENER =====
   const [syncTimeHotkey, setSyncTimeHotkey] = useState(() => localStorage.getItem('monviewphone:sync-time-hotkey') || '');
   const [hotkeySectionOpen, setHotkeySectionOpen] = useState(false);
@@ -845,7 +879,7 @@ export function App() {
 
 
   type CtxSubState = null | {
-    main: 'profileList' | { appId: AutomationAppId; actionId: string };
+    main: 'profileList' | 'setAccountList' | { appId: AutomationAppId; actionId: string };
     nested?: { type: 'profileActions'; profileId: string; appId?: AutomationAppId; actionId?: string } | 'macroList';
   };
 
@@ -1132,13 +1166,7 @@ export function App() {
   // Context menu nhóm (right-click)
   const [groupContextMenu, setGroupContextMenu] = useState<{ x: number; y: number; idx: number } | null>(null)
 
-  // Dropdown chọn tài khoản cho từng máy trong nhóm khi click
-  const [activeGroupDeviceDropdown, setActiveGroupDeviceDropdown] = useState<{
-    udid: string;
-    groupIdx: number;
-    x: number;
-    y: number;
-  } | null>(null)
+
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -1147,15 +1175,6 @@ export function App() {
     window.addEventListener('monviewphone:dav-hide-settings-changed', handleUpdate);
     return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleUpdate);
   }, []);
-
-  useEffect(() => {
-    if (!activeGroupDeviceDropdown) return;
-    const handleOutsideClick = () => {
-      setActiveGroupDeviceDropdown(null);
-    };
-    window.addEventListener('click', handleOutsideClick);
-    return () => window.removeEventListener('click', handleOutsideClick);
-  }, [activeGroupDeviceDropdown]);
 
   const [connectPorts, setConnectPorts] = useState<Record<string, number>>({})
   const [connectBusy, setConnectBusy] = useState(false)
@@ -3968,12 +3987,11 @@ export function App() {
                                     onClick={e => {
                                       e.preventDefault()
                                       e.stopPropagation()
-                                      const rect = e.currentTarget.getBoundingClientRect()
-                                      setActiveGroupDeviceDropdown({
-                                        udid: uid,
-                                        groupIdx: idx,
-                                        x: rect.left,
-                                        y: rect.bottom + window.scrollY,
+                                      setConnectSelection(prev => {
+                                        const next = new Set(prev)
+                                        if (next.has(uid)) next.delete(uid)
+                                        else next.add(uid)
+                                        return next
                                       })
                                     }}
                                     onContextMenu={e => {
@@ -4297,6 +4315,54 @@ export function App() {
                       )}
                     </div>
 
+                    {/* Inspector ID hotkey row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: '220px' }}>
+                      <div style={{ fontSize: 12, color: 'var(--md-muted)', marginRight: 4 }}>
+                        Bật/Tắt Inspector ID:
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Nhấn tổ hợp phím..."
+                        readOnly
+                        value={inspectorIdHotkey}
+                        onKeyDown={handleInspectorIdHotkeyInputKeyDown}
+                        style={{
+                          background: '#0a0a0a',
+                          color: 'var(--md-info)',
+                          border: '1px solid #444',
+                          borderRadius: '6px',
+                          padding: '6px 10px',
+                          fontSize: 12,
+                          width: 140,
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          outline: 'none',
+                        }}
+                      />
+                      {inspectorIdHotkey && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInspectorIdHotkey('');
+                            localStorage.removeItem('monviewphone:inspector-id-hotkey');
+                            saveHotkeySettingToBackend('monviewphone:inspector-id-hotkey', '');
+                          }}
+                          style={{
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '6px',
+                            color: '#ff8080',
+                            padding: '6px 10px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Xoá
+                        </button>
+                      )}
+                    </div>
+
                   </div>
 
                 </div>
@@ -4349,37 +4415,6 @@ export function App() {
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Theme Inspector Section */}
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', marginBottom: 6 }}>
-                Theme Inspector
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--md-muted)', marginBottom: 12 }}>
-                Rê chuột vào UI để xem mã màu, click để đổi màu
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className={themeInspectorEnabled ? 'modalBtnPrimary' : 'modalBtn'}
-                  style={{ height: 34, borderRadius: 8, padding: '0 16px', fontSize: 12, cursor: 'pointer' }}
-                  onClick={() => setThemeInspectorEnabled(prev => !prev)}
-                >
-                  {themeInspectorEnabled ? 'Tắt Theme Inspector' : 'Bật Theme Inspector'}
-                </button>
-                <button
-                  type="button"
-                  className='modalBtnDanger'
-                  style={{ height: 34, borderRadius: 8, padding: '0 16px', fontSize: 12, cursor: 'pointer' }}
-                  onClick={() => {
-                    clearThemeOverrides();
-                    window.dispatchEvent(new CustomEvent('monviewphone:theme-reset-all'));
-                  }}
-                >
-                  Reset toàn bộ màu đã chỉnh
-                </button>
-              </div>
             </div>
 
 
@@ -4617,111 +4652,7 @@ export function App() {
         onClose={() => setAutomationOpen(false)}
       />
       <ThemeInspector enabled={themeInspectorEnabled} onEnabledChange={setThemeInspectorEnabled} />
-      {activeGroupDeviceDropdown && (() => {
-        const devData = getDeviceAccountData(activeGroupDeviceDropdown.udid);
-        const accounts = devData?.platforms?.['wechat'] || [];
-        const group = savedGroups[activeGroupDeviceDropdown.groupIdx];
-        const groupSelectedAccounts = group?.selectedAccounts || {};
-        const selectedId = groupSelectedAccounts[activeGroupDeviceDropdown.udid];
 
-        return createPortal(
-          <div 
-            className="dav-title-account-dropdown contextMenuPanel" 
-            style={{
-              position: 'fixed',
-              left: activeGroupDeviceDropdown.x,
-              top: activeGroupDeviceDropdown.y,
-              right: 'auto',
-              zIndex: 28000,
-              minWidth: 200,
-              maxHeight: 300,
-              overflowY: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {accounts.length === 0 ? (
-              <div className="dav-title-empty" style={{ padding: '8px 12px', color: 'var(--md-muted)', fontSize: 13, fontStyle: 'italic', textAlign: 'center' }}>Không có tài khoản</div>
-            ) : (
-              accounts.map((account) => (
-                <button
-                  key={account.id}
-                  type="button"
-                  className={`dav-title-account-item ${selectedId === account.id ? 'active' : ''}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const isDeselect = selectedId === account.id;
-
-                    if (!isDeselect) {
-                      const today = Date.now();
-                      const date = new Date(today);
-                      const todayStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-                      
-                      const updatedPlatforms = { ...devData.platforms };
-                      if (updatedPlatforms['wechat']) {
-                        updatedPlatforms['wechat'] = updatedPlatforms['wechat'].map(acc => {
-                          if (acc.id === account.id) {
-                            const history = acc.history || [];
-                            const alreadyLoggedInToday = history.some(
-                              h => h.action === 'Login' && (
-                                (() => {
-                                  const hd = new Date(h.timestamp);
-                                  const hdStr = `${hd.getFullYear()}-${String(hd.getMonth() + 1).padStart(2, '0')}-${String(hd.getDate()).padStart(2, '0')}`;
-                                  return hdStr === todayStr;
-                                })()
-                              )
-                            );
-                            if (!alreadyLoggedInToday) {
-                              return {
-                                ...acc,
-                                history: [
-                                  ...history,
-                                  { id: Math.random().toString(36).substr(2, 9), action: 'Login', timestamp: today }
-                                ]
-                              };
-                            }
-                          }
-                          return acc;
-                        });
-                      }
-                      
-                      const newData = {
-                        ...devData,
-                        platforms: updatedPlatforms,
-                      };
-                      saveDeviceAccountData(activeGroupDeviceDropdown.udid, newData);
-                    }
-                    
-                    // Update group selection
-                    setSavedGroups(prev => prev.map((g, i) => {
-                      if (i !== activeGroupDeviceDropdown.groupIdx) return g;
-                      const selAcc = { ...(g.selectedAccounts || {}) };
-                      if (isDeselect) {
-                        delete selAcc[activeGroupDeviceDropdown.udid];
-                      } else {
-                        selAcc[activeGroupDeviceDropdown.udid] = account.id;
-                      }
-                      return { ...g, selectedAccounts: selAcc };
-                    }));
-                    
-                    // Trigger state refresh in App.tsx
-                    setVault(loadDeviceAccountVault());
-                    
-                    // Dispatch event to refresh tiles and overlays
-                    window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
-                    
-                    setActiveGroupDeviceDropdown(null);
-                  }}
-                >
-                  <span className="dav-title-account-name">{account.name || account.phone || account.nickname || 'Không tên'}</span>
-                </button>
-              ))
-            )}
-          </div>,
-          document.body
-        );
-      })()}
       <MacroPlaybackPanel />
 
       {/* Modal Thêm Nhóm */}
@@ -5506,6 +5437,190 @@ export function App() {
               </div>
             )}
 
+            {/* === Set WeChat Account (ONLY shown when sourceGrid === 'group') === */}
+            {contextMenuTarget.sourceGrid === 'group' && (
+              <div
+                style={{ position: 'relative' }}
+                className='ctxAddToGroupWrap'
+                onMouseEnter={() => setCtxSub({ main: 'setAccountList' })}
+                onMouseLeave={() => setCtxSub(null)}
+              >
+                <button
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#ffd700',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    padding: '7px 8px',
+                    textAlign: 'left',
+                    width: '100%',
+                    borderRadius: 4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 6
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(255,215,0,0.1)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                    <Plus size={14} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Set
+                    </span>
+                  </span>
+                  <span style={{ fontSize: 10, color: '#555' }}>▶</span>
+                </button>
+
+                {ctxSub?.main === 'setAccountList' && (() => {
+                  const clickedUdid = contextMenuTarget!.udid;
+                  const devData = getDeviceAccountData(clickedUdid);
+                  const accounts = devData?.platforms?.['wechat'] || [];
+                  const groupIdx = contextMenuTarget!.groupIdx;
+                  const group = groupIdx !== undefined ? savedGroups[groupIdx] : null;
+                  const groupSelectedAccounts = group?.selectedAccounts || {};
+                  const selectedId = groupSelectedAccounts[clickedUdid];
+
+                  return (
+                    <div
+                      className='ctxSubMenu'
+                      style={{
+                        display: 'flex',
+                        position: 'absolute',
+                        top: 0,
+                        left: 'calc(100% - 4px)',
+                        background: '#1a1a1a',
+                        border: '1px solid #333',
+                        borderRadius: 8,
+                        padding: '4px',
+                        flexDirection: 'column',
+                        gap: 2,
+                        minWidth: 200,
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                        zIndex: 10
+                      }}
+                      onMouseDown={e => e.stopPropagation()}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {accounts.length === 0 ? (
+                        <div style={{ padding: '6px 10px', color: '#666', fontSize: 12, fontStyle: 'italic' }}>
+                          Không có tài khoản
+                        </div>
+                      ) : (
+                        accounts.map(account => {
+                          const isCurrent = selectedId === account.id;
+                          return (
+                            <button
+                              key={account.id}
+                              type='button'
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: isCurrent ? '#ffd700' : '#cfcfcf',
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                padding: '6px 10px',
+                                textAlign: 'left',
+                                borderRadius: 4,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 8,
+                                width: '100%'
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = 'transparent';
+                              }}
+                              onPointerDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                const isDeselect = selectedId === account.id;
+
+                                if (!isDeselect) {
+                                  const today = Date.now();
+                                  const date = new Date(today);
+                                  const todayStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                                  
+                                  const updatedPlatforms = { ...devData.platforms };
+                                  if (updatedPlatforms['wechat']) {
+                                    updatedPlatforms['wechat'] = updatedPlatforms['wechat'].map(acc => {
+                                      if (acc.id === account.id) {
+                                        const history = acc.history || [];
+                                        const alreadyLoggedInToday = history.some(
+                                          h => h.action === 'Login' && (
+                                            (() => {
+                                              const hd = new Date(h.timestamp);
+                                              const hdStr = `${hd.getFullYear()}-${String(hd.getMonth() + 1).padStart(2, '0')}-${String(hd.getDate()).padStart(2, '0')}`;
+                                              return hdStr === todayStr;
+                                            })()
+                                          )
+                                        );
+                                        if (!alreadyLoggedInToday) {
+                                          return {
+                                            ...acc,
+                                            history: [
+                                              ...history,
+                                              { id: Math.random().toString(36).substr(2, 9), action: 'Login', timestamp: today }
+                                            ]
+                                          };
+                                        }
+                                      }
+                                      return acc;
+                                    });
+                                  }
+                                  
+                                  const newData = {
+                                    ...devData,
+                                    platforms: updatedPlatforms,
+                                  };
+                                  saveDeviceAccountData(clickedUdid, newData);
+                                }
+                                
+                                // Update group selection
+                                setSavedGroups(prev => prev.map((g, i) => {
+                                  if (i !== groupIdx) return g;
+                                  const selAcc = { ...(g.selectedAccounts || {}) };
+                                  if (isDeselect) {
+                                    delete selAcc[clickedUdid];
+                                  } else {
+                                    selAcc[clickedUdid] = account.id;
+                                  }
+                                  return { ...g, selectedAccounts: selAcc };
+                                }));
+                                
+                                // Trigger state refresh in App.tsx
+                                setVault(loadDeviceAccountVault());
+                                
+                                // Dispatch event to refresh tiles and overlays
+                                window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+                                
+                                setContextMenuTarget(null);
+                                setContextMenuOpen(false);
+                              }}
+                            >
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {account.name || account.phone || account.nickname || 'Không tên'}
+                              </span>
+                              {isCurrent ? <span style={{ fontSize: 11, color: '#ffd700' }}>✓ Đang chọn</span> : null}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
             {/* === Xoá khỏi nhóm — hiện khi click từ grid dropdown nhóm, HOẶC khi đang load nhóm và click từ grid tổng === */}
             {contextMenuTarget.groupIdx !== undefined && (() => {
               const grp = savedGroups[contextMenuTarget.groupIdx]
@@ -5636,6 +5751,19 @@ export function App() {
           onOpenDeviceViewer={openDeviceViewerFromAccountOverlay}
           connectSelection={connectSelection}
           setConnectSelection={setConnectSelection}
+          onDeviceContextMenu={(e, udid, groupIdx) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setContextMenuTarget({
+              x: e.clientX,
+              y: e.clientY,
+              udid,
+              sourceGrid: 'group',
+              groupIdx
+            })
+            setContextMenuInput(String(orderMap.get(udid) ?? 0))
+            setContextMenuOpen(true)
+          }}
         />
       )}
     </>

@@ -5,18 +5,18 @@ import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccou
 import { saveBackendSetting } from '@/lib/backendSettings';
 import { useServer } from '@/context/ServerContext';
 import { listUserProfiles, runAdbCommandApi } from '@/lib/serverApi';
-import { 
-  getDeviceAccountData, 
-  saveDeviceAccountData, 
+import {
+  getDeviceAccountData,
+  saveDeviceAccountData,
   saveDeviceAccountDataAsync,
   loadDeviceAccountVault,
   getDeviceAccountDataFromVault,
   VaultData,
   DeviceAccountData,
-  PlatformType, 
-  Account, 
+  PlatformType,
+  Account,
   AccountHistoryAction,
-  WeChatAccount, 
+  WeChatAccount,
   createNewAccount,
   getSavedPlatforms,
   saveSavedPlatforms,
@@ -41,6 +41,7 @@ type DeviceAccountOverlayProps = {
   onOpenDeviceViewer?: (udid: string) => void;
   connectSelection?: Set<string>;
   setConnectSelection?: React.Dispatch<React.SetStateAction<Set<string>>>;
+  onDeviceContextMenu?: (e: React.MouseEvent, udid: string, groupIdx: number) => void;
 };
 
 const ACCOUNT_STATUS_COLORS: Record<string, string> = {
@@ -121,21 +122,21 @@ function formatHistoryTimeParts(ts: number) {
 function getRelativeTimeStr(createdAt: number) {
   const diffMs = Date.now() - createdAt;
   if (diffMs < 0) return 'Mới tạo';
-  
+
   const totalDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   if (totalDays === 0) return 'Hôm nay';
-  
+
   const years = Math.floor(totalDays / 365);
   const remainingDaysAfterYears = totalDays % 365;
   const months = Math.floor(remainingDaysAfterYears / 30);
-  
+
   if (years > 0) {
     if (months > 0) {
       return `${years} năm ${months} tháng`;
     }
     return `${years} năm`;
   }
-  
+
   if (months > 0) {
     const days = totalDays % 30;
     if (days > 0) {
@@ -143,7 +144,7 @@ function getRelativeTimeStr(createdAt: number) {
     }
     return `${months} tháng`;
   }
-  
+
   return `${totalDays} ngày`;
 }
 
@@ -173,7 +174,7 @@ const getFloatingTooltipStyle = (x: number, y: number) => {
   const screenWidth = window.innerWidth;
   let tx = '-50%';
   let ty = 'calc(-100% - 10px)';
-  
+
   // Dynamic threshold to avoid overflowing the left/right screen boundaries
   const threshold = Math.min(250, screenWidth / 2 - 20);
   if (x < threshold) {
@@ -181,11 +182,11 @@ const getFloatingTooltipStyle = (x: number, y: number) => {
   } else if (x > screenWidth - threshold) {
     tx = 'calc(-100% - 15px)';
   }
-  
+
   if (y < 160) {
     ty = '15px';
   }
-  
+
   return {
     left: x,
     top: y,
@@ -212,12 +213,12 @@ const formatStreakDays = (totalDays: number): string => {
   if (totalDays < 30) {
     return `${totalDays} ngày`;
   }
-  
+
   const years = Math.floor(totalDays / 365);
   const remDays = totalDays % 365;
   const months = Math.floor(remDays / 30);
   const days = remDays % 30;
-  
+
   let result = '';
   if (years > 0) {
     result += `${years}N`;
@@ -263,7 +264,7 @@ function renderLoginStreakDot(account: Account) {
   }
 
   return (
-    <span 
+    <span
       className={`dav-account-state-dot streak-${dotColor}`}
       style={{
         width: '6px',
@@ -319,10 +320,10 @@ function clampDavPanelPosition(pos: { x: number; y: number }, panel?: HTMLElemen
 
 function computeBadges(acc: Account, isWeChat: boolean) {
   const badges: { label: string; color: string }[] = [];
-  
+
   if (acc.status === 'Die') badges.push({ label: 'Die', color: '#ef4444' });
   else if (acc.status === 'Risk') badges.push({ label: 'Risk', color: '#f97316' });
-  
+
   if (isWeChat) {
     const wc = acc as WeChatAccount;
     // 1 Year badge
@@ -332,7 +333,7 @@ function computeBadges(acc: Account, isWeChat: boolean) {
     } else if (wc.isNew || (wc.createdAt && Date.now() - wc.createdAt < 30 * 24 * 60 * 60 * 1000)) {
       badges.push({ label: 'TK Mới', color: '#0ea5e9' });
     }
-    
+
     if (wc.nearbyPeopleEnabled) {
       badges.push({ label: 'Nearby', color: '#ec4899' });
     }
@@ -361,45 +362,45 @@ function getAppTypeLabel(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unkno
 
 function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unknown', isLoggedInToday?: boolean) {
   if (!type || type === 'main' || type === 'unknown') return null;
-  
+
   const iconColor = isLoggedInToday ? '#22c55e' : '#ffffff';
-  
+
   if (type === 'shelter') {
     return (
       <span title="Shelter" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
-        <Briefcase 
-          size={13} 
-          color={iconColor} 
-          style={{ flexShrink: 0, marginRight: '6px' }} 
+        <Briefcase
+          size={13}
+          color={iconColor}
+          style={{ flexShrink: 0, marginRight: '6px' }}
         />
       </span>
     );
   }
-  
+
   if (type === 'secure') {
     return (
       <span title="Secure Folder" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
-        <Folder 
-          size={13} 
-          color={iconColor} 
-          style={{ flexShrink: 0, marginRight: '6px' }} 
+        <Folder
+          size={13}
+          color={iconColor}
+          style={{ flexShrink: 0, marginRight: '6px' }}
         />
       </span>
     );
   }
-  
+
   if (type === 'clone') {
     return (
       <span title="Clone App" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
-        <svg 
-          width="13" 
-          height="13" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke={iconColor} 
-          strokeWidth="3.5" 
-          strokeLinecap="round" 
-          strokeLinejoin="round" 
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={iconColor}
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
           style={{ flexShrink: 0, marginRight: '6px' }}
         >
           <circle cx="9" cy="15" r="5" />
@@ -408,7 +409,7 @@ function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unk
       </span>
     );
   }
-  
+
   return null;
 }
 
@@ -438,12 +439,12 @@ function renderNearbyAccountIcon(account: Account) {
         }
       }
       return (
-        <span 
-          title={`Còn ${text} để hiển thị Nearby People`} 
-          style={{ 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            flexShrink: 0, 
+        <span
+          title={`Còn ${text} để hiển thị Nearby People`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            flexShrink: 0,
             marginLeft: 4,
             gap: '2px',
             fontSize: '9px',
@@ -521,10 +522,10 @@ function getAppTypeFromProfile(userId: number, name: string): 'main' | 'shelter'
 }
 
 // --- Device Panel Component ---
-export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({ 
-  udid, 
-  order, 
-  model, 
+export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
+  udid,
+  order,
+  model,
   isOnline,
   orderMap,
   initialData,
@@ -534,10 +535,10 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   onOpenDeviceViewer,
   showAccountOverlay = false,
   alwaysShowHeader = false
-}: { 
-  udid: string; 
-  order: number; 
-  model: string; 
+}: {
+  udid: string;
+  order: number;
+  model: string;
   isOnline: boolean;
   orderMap: Map<string, number>;
   initialData: DeviceAccountData;
@@ -614,7 +615,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     e.stopPropagation();
     onOpenDeviceViewer?.(udid);
   };
-  
+
   // Sync state data when initialData prop changes (synchronized from parent vault update)
   useEffect(() => {
     setData(initialData);
@@ -716,7 +717,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       if (!isInDropdown && !isInItem && !isInHeader && !isInTotalBadge) {
         return;
       }
-      
+
       const mouseEvent = e as MouseEvent;
       const clientX = mouseEvent.clientX ?? 0;
       const clientY = mouseEvent.clientY ?? 0;
@@ -861,7 +862,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       const matchedPlatformDropdownRef = !!platformDropdownRef.current?.contains(target);
       const matchedDropdownClass = !!(target instanceof Element && target.closest('.dav-title-account-dropdown'));
       const shouldKeepOpen = matchedDropdownRef || matchedHeaderNameWrap || matchedPlatformDropdownRef || matchedDropdownClass;
-      
+
       davDebug('OUTSIDE_CLICK_CAPTURE', {
         target: target instanceof Element ? {
           tagName: target.tagName,
@@ -876,7 +877,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       });
 
       if (shouldKeepOpen) return;
-      
+
       setAccountTitleDropdownOpen(false);
       setPlatformDropdownOpen(false);
     };
@@ -937,7 +938,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     }
 
     const [accToMove] = srcData.platforms[activeTab].splice(accIdx, 1);
-    
+
     if (srcData.selectedAccountByPlatform[activeTab] === moveModal.account.id) {
       srcData.selectedAccountByPlatform[activeTab] = srcData.platforms[activeTab][0]?.id || '';
     }
@@ -949,7 +950,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     saveDeviceAccountData(targetUdid, tgtData);
 
     const sourceDevOrder = orderMap?.get(moveModal.sourceUdid) ?? 0;
-    
+
     let srcGrp = savedGroups.find(g => g.udids.includes(moveModal.sourceUdid));
     let tgtGrp = savedGroups.find(g => g.udids.includes(targetUdid));
     let newGroups = [...savedGroups];
@@ -1098,15 +1099,15 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const handleNoticeIconClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (accountsWithNotices.length === 0) return;
-    
+
     const expired = accountsWithNotices.filter(acc => acc.notice?.dueDate && acc.notice.dueDate <= Date.now());
     const nonExpired = accountsWithNotices.filter(acc => !acc.notice?.dueDate || acc.notice.dueDate > Date.now());
     const ordered = [...expired, ...nonExpired];
-    
+
     if (ordered.length === 0) return;
-    
+
     const currIdx = ordered.findIndex(acc => acc.id === selectedAccount?.id);
     if (currIdx === -1) {
       handleSetMain(ordered[0].id);
@@ -1184,7 +1185,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       setEditNoticeTitle(selectedAccount.notice?.title || '');
       setEditNoticeDays(selectedAccount.notice?.days?.toString() || '');
       setEditNoticeTime((selectedAccount.notice as any)?.dailyReminderTime || '');
-      
+
       let initialText = '';
       if (selectedAccount.createdAt) {
         const d = new Date(selectedAccount.createdAt);
@@ -1382,7 +1383,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const handleSetMain = (id: string) => {
     const today = Date.now();
     const todayStr = getLocalDateString(today);
-    
+
     const accountList = data.platforms[activeTab] || [];
     const accFound = accountList.find(a => a.id === id);
     const hasHistoryLoginToday = accFound
@@ -1461,7 +1462,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     const packageName = profile.packageName || 'com.tencent.mm';
     const activityName = profile.activityName || 'com.tencent.mm.ui.LauncherUI';
     const cmd = `am start --user ${profile.userId} -n ${packageName}/${activityName}`;
-    
+
     davDebug('OPEN_WECHAT_COMMAND_BUILT', {
       command: cmd,
       userId: profile.userId,
@@ -1540,7 +1541,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     if (activeTab !== 'wechat' || !selectedAccount) return false;
     // Điều kiện bắt buộc: tài khoản phải đủ 1 năm tuổi
     if (!isEligibleNearby) return false;
-    
+
     if (selectedAccount.nearbyPeopleDueDate) {
       const diffMs = selectedAccount.nearbyPeopleDueDate - Date.now();
       if (diffMs > 0) {
@@ -1548,7 +1549,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       }
       return true; // Đã hết đếm ngược -> màu Xanh dương
     }
-    
+
     return true; // Đủ 1 năm, chưa bật Nearby -> xanh dương
   }, [selectedAccount, activeTab, isEligibleNearby]);
 
@@ -1704,7 +1705,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   return (
     <div className="dav-panel" onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}>
       <div className="dav-panel-header">
-        <div 
+        <div
           className="dav-panel-title-left"
           onMouseDown={handleOpenViewerMiddleClick}
           onAuxClick={handleOpenViewerAuxClick}
@@ -1742,7 +1743,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               {totalAccounts}
             </button>
             {accountTitleDropdownOpen && dropdownCoords && ReactDOM.createPortal(
-              <div 
+              <div
                 className="dav-title-account-dropdown contextMenuPanel"
                 style={{
                   position: 'fixed',
@@ -1854,12 +1855,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                           {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
                         </span>
                         {account.wechatLaunchProfile && (
-                          <span 
-                            style={{ 
-                              fontSize: '8px', 
-                              background: 'rgba(34, 197, 94, 0.2)', 
-                              color: '#22c55e', 
-                              padding: '1px 4px', 
+                          <span
+                            style={{
+                              fontSize: '8px',
+                              background: 'rgba(34, 197, 94, 0.2)',
+                              color: '#22c55e',
+                              padding: '1px 4px',
                               borderRadius: '4px',
                               marginLeft: 'auto',
                               fontWeight: 'bold',
@@ -1882,13 +1883,13 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
         {selectedAccount && (
           <div className="dav-header-name-wrapper">
             {showAccountOverlay && (
-              <span 
+              <span
                 title={getAccountStatusTooltip(selectedAccount)}
                 style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
               >
-                <Shield 
-                  size={12} 
-                  color={shieldColor} 
+                <Shield
+                  size={12}
+                  color={shieldColor}
                   style={{ cursor: 'pointer' }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1897,7 +1898,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 />
               </span>
             )}
-            <div 
+            <div
               className="header-name-display-wrapper"
               onClick={handleNameClick}
               onContextMenu={(e) => {
@@ -1910,7 +1911,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               onMouseLeave={() => setAccountHoverTooltip(null)}
             >
               {!hideName && (
-                <span 
+                <span
                   className="header-name-display"
                   style={{ color: nameColor, fontWeight: 'bold' }}
                 >
@@ -1919,9 +1920,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               )}
               {activeTab === 'wechat' && renderNearbyAccountIcon(selectedAccount)}
             </div>
-            
+
             {showNameStatusDropdown && (
-              <div 
+              <div
                 className="dav-name-status-dropdown"
                 style={{
                   position: 'absolute',
@@ -1942,7 +1943,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               >
                 {selectedAccount.status !== 'Die' && selectedAccount.status !== 'Risk' ? (
                   <>
-                    <button 
+                    <button
                       type="button"
                       style={{
                         background: 'transparent',
@@ -1964,7 +1965,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     >
                       Set Die
                     </button>
-                    <button 
+                    <button
                       type="button"
                       style={{
                         background: 'transparent',
@@ -1988,7 +1989,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     </button>
                   </>
                 ) : (
-                  <button 
+                  <button
                     type="button"
                     style={{
                       background: 'transparent',
@@ -2030,10 +2031,10 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 onMouseLeave={() => setBellTooltip(null)}
                 onClick={handleNoticeIconClick}
               >
-                <Bell 
-                  size={20} 
-                  color={deviceNoticeStatus === 'expired' ? 'var(--md-danger)' : 'var(--md-warning)'} 
-                  className={deviceNoticeStatus === 'expired' ? "dav-bell-expired animate-pulse" : ""} 
+                <Bell
+                  size={20}
+                  color={deviceNoticeStatus === 'expired' ? 'var(--md-danger)' : 'var(--md-warning)'}
+                  className={deviceNoticeStatus === 'expired' ? "dav-bell-expired animate-pulse" : ""}
                 />
               </button>
               {bellTooltip && noticeTooltipText && noticeTooltipText.length > 0 && ReactDOM.createPortal(
@@ -2054,7 +2055,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           )}
           {/* dav-daily-reminder-tooltip : Tooltip nhắc nhở hàng ngày */}
           {activeDailyReminders.length > 0 && (
-            <div 
+            <div
               data-inspector-id="deviceAccount.dailyReminderTooltip"
               data-inspector-label="Daily reminder tooltip"
               data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
@@ -2070,7 +2071,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   </div>
                 );
               })}
-              <button 
+              <button
                 type="button"
                 className="dav-daily-reminder-close"
                 onClick={(e) => {
@@ -2086,21 +2087,21 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           {accountHoverTooltip && (() => {
                 const acc = accountHoverTooltip.account;
                 const loginHistory = (acc.history || []).filter(h => h.action === 'Login');
-                
+
                 let line1 = '';
                 if (loginHistory.length === 0) {
                   line1 = 'Offline: Chưa từng đăng nhập';
                 } else {
                   const lastLoginTs = Math.max(...loginHistory.map(h => h.timestamp));
                   const diffDays = getCalendarDaysDiff(lastLoginTs, Date.now());
-                  
+
                   const lastLoginDate = new Date(lastLoginTs);
                   const day = String(lastLoginDate.getDate()).padStart(2, '0');
                   const month = String(lastLoginDate.getMonth() + 1).padStart(2, '0');
                   const year = lastLoginDate.getFullYear();
                   const currentYear = new Date().getFullYear();
                   const formattedLastLogin = year === currentYear ? `${day}/${month}` : `${day}/${month}/${year}`;
-                  
+
                   const todayStr = getLocalDateString(Date.now());
                   const yesterdayStr = getLocalDateString(Date.now() - 24 * 60 * 60 * 1000);
                   const loginDates = Array.from(new Set(
@@ -2124,8 +2125,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 const details: React.ReactNode[] = [];
                 if (statusTooltip) {
                   details.push(
-                    <span 
-                      key="status" 
+                    <span
+                      key="status"
                       style={{ color: acc.status === 'Risk' ? '#f97316' : undefined }}
                     >
                       {statusTooltip}
@@ -2135,12 +2136,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 if (acc.notice) {
                   const title = acc.notice.title || '';
                   const isAutoRiskNotice = acc.status === 'Risk' && title === 'Account Risk';
-                  
+
                   if (acc.notice.dueDate) {
                     const diffMs = acc.notice.dueDate - Date.now();
                     const isDue = diffMs <= 0;
                     const shouldShowNotice = !isAutoRiskNotice || isDue;
-                    
+
                     if (shouldShowNotice) {
                       const timeStr = isDue ? 'đã đến hạn' : formatCountdown(diffMs);
                       details.push(
@@ -2157,7 +2158,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     );
                   }
                 }
-                
+
                 const accName = acc.name || acc.phone || acc.nickname || 'Không tên';
                 const nameColor = getAccountListNameColor(acc);
 
@@ -2184,7 +2185,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 const tooltipRows = groupAccounts.map(({ account }) => {
                   const name = account.name || account.phone || account.nickname || 'Không tên';
                   const nameColor = getAccountListNameColor(account);
-                  
+
                   if (account.status === 'Die') {
                     return (
                       <div key={account.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
@@ -2193,7 +2194,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       </div>
                     );
                   }
-                  
+
                   if (account.status === 'Risk') {
                     let riskText = 'Risk';
                     if (account.notice?.dueDate) {
@@ -2208,9 +2209,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       </div>
                     );
                   }
-                  
+
                   const parts: string[] = [];
-                  
+
                   if (activeTab === 'wechat') {
                     const nbState = getNearbyAccountState(account);
                     if (nbState === 'eligible') {
@@ -2221,7 +2222,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       parts.push(`📍 ${days} ngày`);
                     }
                   }
-                  
+
                   const isLiveReady = account.status === 'Live';
                   const getIsOverOneYear = (acc: Account) => {
                     if (acc.isOneYearOld) return true;
@@ -2234,7 +2235,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     if (!g.selectedAccounts) return false;
                     return Object.values(g.selectedAccounts).includes(account.id);
                   });
-                  
+
                   if (isLiveReady && isUnderOneYear && belongsToAnyGroup) {
                     const matchedGroups = savedGroups.filter(g => g.selectedAccounts?.[udid] === account.id);
                     if (matchedGroups.length > 0) {
@@ -2243,7 +2244,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       parts.push('Ready');
                     }
                   }
-                  
+
                   const detailsText = parts.join(' - ');
                   return (
                     <div key={account.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
@@ -2281,48 +2282,48 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 Cài đặt thông báo: <span style={{ fontWeight: 'bold', color: '#fff' }}>{selectedAccount.name || selectedAccount.phone || selectedAccount.nickname || 'Không tên'}</span>
               </span>
             </div>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Nội dung</span>
-                <input 
-                  className="dav-input dav-form-input" 
-                  placeholder="( Vui lòng nhập )" 
-                  value={editNoticeTitle} 
+                <input
+                  className="dav-input dav-form-input"
+                  placeholder="( Vui lòng nhập )"
+                  value={editNoticeTitle}
                   onChange={e => {
                     setEditNoticeTitle(e.target.value);
                     setNoticeError('');
-                  }} 
+                  }}
                   autoFocus
                 />
               </div>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Số ngày đếm ngược</span>
-                  <input 
+                  <input
                     type="number"
-                    className="dav-input dav-form-input" 
-                    placeholder="Số ngày" 
-                    value={editNoticeDays} 
+                    className="dav-input dav-form-input"
+                    placeholder="Số ngày"
+                    value={editNoticeDays}
                     onChange={e => {
                       setEditNoticeDays(e.target.value);
                       setNoticeError('');
-                    }} 
+                    }}
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Nhắc nhở hàng ngày</span>
-                  <input 
+                  <input
                     type="time"
                     lang="vi-VN"
                     step="60"
-                    className="dav-input dav-form-input" 
-                    value={editNoticeTime} 
+                    className="dav-input dav-form-input"
+                    value={editNoticeTime}
                     onChange={e => {
                       setEditNoticeTime(e.target.value);
                       setNoticeError('');
-                    }} 
+                    }}
                   />
                 </div>
               </div>
@@ -2333,10 +2334,10 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 {noticeError}
               </div>
             )}
-            
+
             <div className="dav-edit-actions">
-              <button 
-                className="dav-edit-btn cancel" 
+              <button
+                className="dav-edit-btn cancel"
                 style={{ background: '#64748b' }}
                 onClick={(e) => {
                   e.preventDefault();
@@ -2361,23 +2362,23 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           }}>
             {/* Tên tài khoản */}
             <div className="dav-input-wrapper" style={{ marginTop: '10px' }}>
-              <span 
+              <span
                 style={{ color: '#888', userSelect: 'none', fontSize: '11px', fontWeight: 'bold', marginLeft: '2px', cursor: 'default', display: 'inline-flex', alignItems: 'center' }}
               >
                 Tên
               </span>
-              <input 
-                className="dav-transparent-input" 
+              <input
+                className="dav-transparent-input"
                 style={{ color: '#fff', fontWeight: 'bold' }}
                 placeholder="Tên tài khoản"
                 value={selectedAccount.name || ''}
-                onChange={e => handleUpdateAccount(selectedAccount.id, { name: e.target.value })} 
+                onChange={e => handleUpdateAccount(selectedAccount.id, { name: e.target.value })}
               />
             </div>
 
             {/* Biệt danh (Nickname) */}
             <div className="dav-input-wrapper" style={{ marginTop: '10px' }}>
-              <span 
+              <span
                 className="dav-identity-toggle"
                 title={isIdentityHidden('nickname') ? 'Hiện biệt danh' : 'Ẩn biệt danh'}
                 onClick={(e) => {
@@ -2389,8 +2390,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               >
                 @
               </span>
-              <input 
-                className="dav-transparent-input" 
+              <input
+                className="dav-transparent-input"
                 style={{ color: '#fff' }}
                 placeholder="Biệt danh"
                 readOnly={isIdentityHidden('nickname')}
@@ -2402,7 +2403,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 onChange={e => {
                   if (isIdentityHidden('nickname')) return;
                   handleUpdateAccount(selectedAccount.id, { nickname: e.target.value });
-                }} 
+                }}
               />
             </div>
 
@@ -2421,8 +2422,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 >
                   <Phone size={12} color="#ec4899" style={{ flexShrink: 0 }} />
                 </span>
-                <input 
-                  className="dav-transparent-input" 
+                <input
+                  className="dav-transparent-input"
                   placeholder="Số điện thoại"
                   readOnly={isIdentityHidden('phone')}
                   value={
@@ -2433,7 +2434,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   onChange={e => {
                     if (isIdentityHidden('phone')) return;
                     handleUpdateAccount(selectedAccount.id, { phone: e.target.value });
-                  }} 
+                  }}
                 />
               </div>
             )}
@@ -2453,8 +2454,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 >
                   <Mail size={12} color="#9ca3af" style={{ flexShrink: 0 }} />
                 </span>
-                <input 
-                  className="dav-transparent-input" 
+                <input
+                  className="dav-transparent-input"
                   placeholder="Địa chỉ Email"
                   readOnly={isIdentityHidden('email')}
                   value={
@@ -2465,7 +2466,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   onChange={e => {
                     if (isIdentityHidden('email')) return;
                     handleUpdateAccount(selectedAccount.id, { email: e.target.value });
-                  }} 
+                  }}
                 />
               </div>
             )}
@@ -2548,9 +2549,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             {!hideCreatedAt && (
               <div className="dav-centered-row">
                 {!selectedAccount.createdAt || showDateInput ? (
-                  <input 
+                  <input
                     type="text"
-                    className="dav-centered-input" 
+                    className="dav-centered-input"
                     style={{ fontSize: '10px', width: '90px', padding: 0, color: '#fff', textAlign: 'center', background: 'transparent', border: 'none' }}
                     placeholder="DD/MM/YYYY"
                     value={dateText}
@@ -2574,7 +2575,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     autoFocus={showDateInput}
                   />
                 ) : (
-                  <span 
+                  <span
                     className="dav-centered-input"
                     style={{ fontSize: '10px', color: isOverOneYear ? '#22c55e' : '#fff', cursor: 'pointer' }}
                     onClick={(e) => {
@@ -2601,17 +2602,17 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
       {/* Context Menu Portal */}
       {ctxMenu && ReactDOM.createPortal(
-        <div 
-          ref={menuRef} 
-          className={`dav-ctx-menu contextMenuPanel ${ctxMenu.x > window.innerWidth - 380 ? 'direction-left' : ''}`} 
-          style={{ left: ctxMenu.x, top: ctxMenu.y }} 
+        <div
+          ref={menuRef}
+          className={`dav-ctx-menu contextMenuPanel ${ctxMenu.x > window.innerWidth - 380 ? 'direction-left' : ''}`}
+          style={{ left: ctxMenu.x, top: ctxMenu.y }}
           onClick={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
           onContextMenu={e => e.stopPropagation()}
         >
-          
+
           {/* Submenu Tài Khoản */}
-          <div 
+          <div
             className="dav-ctx-submenu-container"
             onMouseEnter={() => setActiveLevel1('tai_khoan')}
             onMouseLeave={() => {
@@ -2670,7 +2671,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                         >
                           Chọn tài khoản này
                         </button>
-                        <div 
+                        <div
                           className="dav-ctx-submenu-container"
                           onMouseEnter={() => setActiveLevel4(a.id)}
                           onMouseLeave={() => setActiveLevel4(null)}
@@ -2700,10 +2701,10 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   </div>
                 );
               })}
-                
+
                 <div className="dav-ctx-divider" />
-                
-                <div 
+
+                <div
                   className="dav-ctx-submenu-container"
                   onMouseEnter={() => setActiveLevel2('them_tai_khoan')}
                   onMouseLeave={() => setActiveLevel2(null)}
@@ -2733,7 +2734,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           </div>
 
           {/* Submenu Phân Loại */}
-          <div 
+          <div
             className="dav-ctx-submenu-container"
             onMouseEnter={() => setActiveLevel1('phan_loai')}
             onMouseLeave={() => setActiveLevel1(null)}
@@ -2742,9 +2743,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               <Layers size={16} /> Phân Loại
               <div className={`dav-ctx-submenu ${activeLevel1 === 'phan_loai' ? 'is-open' : ''}`}>
                 {(['main', 'clone', 'secure', 'shelter'] as const).map(type => (
-                  <button 
+                  <button
                     key={type}
-                    className={`dav-ctx-item ${selectedAccount.appType === type ? 'active' : ''}`} 
+                    className={`dav-ctx-item ${selectedAccount.appType === type ? 'active' : ''}`}
                     onPointerDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -2760,7 +2761,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           </div>
 
           {/* Submenu Trạng Thái */}
-          <div 
+          <div
             className="dav-ctx-submenu-container"
             onMouseEnter={() => setActiveLevel1('trang_thai')}
             onMouseLeave={() => setActiveLevel1(null)}
@@ -2768,8 +2769,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             <div className="dav-ctx-item dav-ctx-has-sub">
               <Activity size={16} /> Trạng Thái
               <div className={`dav-ctx-submenu ${activeLevel1 === 'trang_thai' ? 'is-open' : ''}`}>
-                <button 
-                  className={`dav-ctx-item ${selectedAccount.status === 'Live' ? 'active' : ''}`} 
+                <button
+                  className={`dav-ctx-item ${selectedAccount.status === 'Live' ? 'active' : ''}`}
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -2779,8 +2780,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 >
                   <div className="dav-status-dot live" /> Set Live {selectedAccount.status === 'Live' ? '(Hiện tại)' : ''}
                 </button>
-                <button 
-                  className={`dav-ctx-item ${selectedAccount.status === 'Die' ? 'active' : ''}`} 
+                <button
+                  className={`dav-ctx-item ${selectedAccount.status === 'Die' ? 'active' : ''}`}
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -2790,8 +2791,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 >
                   <div className="dav-status-dot die" /> Set Die {selectedAccount.status === 'Die' ? '(Hiện tại)' : ''}
                 </button>
-                <button 
-                  className={`dav-ctx-item ${selectedAccount.status === 'Risk' ? 'active' : ''}`} 
+                <button
+                  className={`dav-ctx-item ${selectedAccount.status === 'Risk' ? 'active' : ''}`}
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -2801,7 +2802,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 >
                   <div className="dav-status-dot risk" /> Set Risk {selectedAccount.status === 'Risk' ? '(Hiện tại)' : ''}
                 </button>
-                <button 
+                <button
                   className={`dav-ctx-item ${selectedAccount.status === 'Unverified' ? 'active verified' : ''}`}
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -2827,7 +2828,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
           {/* Submenu Nearby People (Only WeChat) */}
           {activeTab === 'wechat' && (
-            <div 
+            <div
               className="dav-ctx-submenu-container"
               onMouseEnter={() => setActiveLevel1('nearby')}
               onMouseLeave={() => setActiveLevel1(null)}
@@ -2835,8 +2836,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               <div className="dav-ctx-item dav-ctx-has-sub">
                 <MapPin size={16} /> Nearby People
                 <div className={`dav-ctx-submenu ${activeLevel1 === 'nearby' ? 'is-open' : ''}`}>
-                  <button 
-                    className={`dav-ctx-item ${selectedAccount.nearbyPeopleEnabled ? 'active' : ''}`} 
+                  <button
+                    className={`dav-ctx-item ${selectedAccount.nearbyPeopleEnabled ? 'active' : ''}`}
                     onPointerDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -2853,8 +2854,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   >
                     Open Nearby
                   </button>
-                  <button 
-                    className="dav-ctx-item" 
+                  <button
+                    className="dav-ctx-item"
                     onPointerDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -2884,7 +2885,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
           {/* Submenu Quét QR (Only WeChat) */}
           {activeTab === 'wechat' && (
-            <div 
+            <div
               className="dav-ctx-submenu-container"
               onMouseEnter={() => setActiveLevel1('quet_qr')}
               onMouseLeave={() => setActiveLevel1(null)}
@@ -2892,8 +2893,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               <div className="dav-ctx-item dav-ctx-has-sub">
                 <QrCode size={16} /> Quét QR
                 <div className={`dav-ctx-submenu ${activeLevel1 === 'quet_qr' ? 'is-open' : ''}`}>
-                  <button 
-                    className="dav-ctx-item" 
+                  <button
+                    className="dav-ctx-item"
                     disabled={(selectedAccount.scanCount || 0) >= 3}
                     onPointerDown={(e) => {
                       e.preventDefault();
@@ -2909,7 +2910,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   >
                     Quét thành công
                   </button>
-                  <button 
+                  <button
                     className="dav-ctx-item"
                     onPointerDown={(e) => {
                       e.preventDefault();
@@ -2941,8 +2942,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           </button>
 
           <div className="dav-ctx-divider" />
-          <button 
-            className="dav-ctx-item danger" 
+          <button
+            className="dav-ctx-item danger"
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -2968,9 +2969,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               Hành động này sẽ xoá toàn bộ dữ liệu tài khoản và không thể hoàn tác.
             </div>
             <div className="confirmActions">
-              <button 
-                type="button" 
-                className="modalBtn" 
+              <button
+                type="button"
+                className="modalBtn"
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -2979,9 +2980,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               >
                 Huỷ
               </button>
-              <button 
-                type="button" 
-                className="modalBtnDanger" 
+              <button
+                type="button"
+                className="modalBtnDanger"
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -3072,9 +3073,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               Hành động này sẽ xoá sạch lịch sử đã ghi và không thể hoàn tác.
             </div>
             <div className="confirmActions">
-              <button 
-                type="button" 
-                className="modalBtn" 
+              <button
+                type="button"
+                className="modalBtn"
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -3083,9 +3084,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               >
                 Huỷ
               </button>
-              <button 
-                type="button" 
-                className="modalBtnDanger" 
+              <button
+                type="button"
+                className="modalBtnDanger"
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -3145,7 +3146,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           </button>
 
           {activeTab === 'wechat' && (
-            <div 
+            <div
               className="dav-ctx-submenu-container"
               onMouseEnter={() => setShowSetSubmenu(true)}
               onMouseLeave={() => setShowSetSubmenu(false)}
@@ -3179,7 +3180,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                         onPointerDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          
+
                           const launch: WechatLaunchProfile = {
                             userId: profile.id,
                             name: profile.name,
@@ -3208,7 +3209,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           )}
 
           {/* Submenu Phân Loại */}
-          <div 
+          <div
             className="dav-ctx-submenu-container"
             onMouseEnter={() => setShowClassificationSubmenu(true)}
             onMouseLeave={() => setShowClassificationSubmenu(false)}
@@ -3263,14 +3264,14 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       )}
       {/* Move Modal Portal */}
       {moveModal && ReactDOM.createPortal(
-        <div 
-          className="confirmOverlay" 
+        <div
+          className="confirmOverlay"
           onClick={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
           onPointerDown={e => e.stopPropagation()}
         >
-          <div 
-            className="confirmPanel confirmPanel--compact" 
+          <div
+            className="confirmPanel confirmPanel--compact"
             style={{ minWidth: '280px' }}
             onMouseDown={e => e.stopPropagation()}
             onPointerDown={e => e.stopPropagation()}
@@ -3281,7 +3282,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             <div className="confirmText" style={{ textAlign: 'center', fontSize: '12px' }}>
               Di chuyển tài khoản <strong style={{ color: 'var(--md-text)' }}>{moveModal.account.name || moveModal.account.phone || moveModal.account.nickname || 'Không tên'}</strong>
             </div>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <span style={{ fontSize: '11px', color: 'var(--md-muted)' }}>Nhập số máy đích</span>
               <input
@@ -3300,11 +3301,11 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 </span>
               )}
             </div>
-            
+
             <div className="confirmActions" style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-              <button 
+              <button
                 type="button"
-                className="modalBtn" 
+                className="modalBtn"
                 style={{ flex: 1 }}
                 onPointerDown={(e) => {
                   e.preventDefault();
@@ -3316,9 +3317,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               >
                 Hủy
               </button>
-              <button 
+              <button
                 type="button"
-                className="modalBtnPrimary" 
+                className="modalBtnPrimary"
                 style={{ flex: 1 }}
                 onPointerDown={(e) => {
                   e.preventDefault();
@@ -3336,15 +3337,15 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
       {/* Notice Edit Modal Portal */}
       {noticeEditModal && ReactDOM.createPortal(
-        <div 
-          className="confirmOverlay" 
+        <div
+          className="confirmOverlay"
           onClick={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
           onPointerDown={e => e.stopPropagation()}
           style={{ zIndex: 28000 }}
         >
-          <div 
-            className="confirmPanel confirmPanel--compact" 
+          <div
+            className="confirmPanel confirmPanel--compact"
             style={{ minWidth: '360px' }}
             onMouseDown={e => e.stopPropagation()}
             onPointerDown={e => e.stopPropagation()}
@@ -3354,48 +3355,48 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 Cài đặt thông báo: <span style={{ fontWeight: 'bold', color: '#fff' }}>{noticeEditModal.account.name || noticeEditModal.account.phone || noticeEditModal.account.nickname || 'Không tên'}</span>
               </span>
             </div>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px', width: '100%' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Nội dung</span>
-                <input 
-                  className="dav-input dav-form-input" 
-                  placeholder="( Vui lòng nhập )" 
-                  value={editNoticeTitle} 
+                <input
+                  className="dav-input dav-form-input"
+                  placeholder="( Vui lòng nhập )"
+                  value={editNoticeTitle}
                   onChange={e => {
                     setEditNoticeTitle(e.target.value);
                     setNoticeError('');
-                  }} 
+                  }}
                   autoFocus
                 />
               </div>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Số ngày đếm ngược</span>
-                  <input 
+                  <input
                     type="number"
-                    className="dav-input dav-form-input" 
-                    placeholder="Số ngày" 
-                    value={editNoticeDays} 
+                    className="dav-input dav-form-input"
+                    placeholder="Số ngày"
+                    value={editNoticeDays}
                     onChange={e => {
                       setEditNoticeDays(e.target.value);
                       setNoticeError('');
-                    }} 
+                    }}
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', textAlign: 'left' }}>Nhắc nhở hàng ngày</span>
-                  <input 
+                  <input
                     type="time"
                     lang="vi-VN"
                     step="60"
-                    className="dav-input dav-form-input" 
-                    value={editNoticeTime} 
+                    className="dav-input dav-form-input"
+                    value={editNoticeTime}
                     onChange={e => {
                       setEditNoticeTime(e.target.value);
                       setNoticeError('');
-                    }} 
+                    }}
                   />
                 </div>
               </div>
@@ -3408,9 +3409,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             </div>
 
             <div className="confirmActions" style={{ display: 'flex', gap: '8px', marginTop: '15px' }}>
-              <button 
+              <button
                 type="button"
-                className="modalBtn" 
+                className="modalBtn"
                 style={{ flex: 1 }}
                 onPointerDown={(e) => {
                   e.preventDefault();
@@ -3425,9 +3426,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 Hủy
               </button>
               {noticeEditModal.account.notice && (
-                <button 
+                <button
                   type="button"
-                  className="modalBtnDanger" 
+                  className="modalBtnDanger"
                   style={{ flex: 1 }}
                   onPointerDown={(e) => {
                     e.preventDefault();
@@ -3443,20 +3444,20 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   Xóa
                 </button>
               )}
-              <button 
+              <button
                 type="button"
-                className="modalBtnPrimary" 
+                className="modalBtnPrimary"
                 style={{ flex: 1 }}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  
+
                   const daysNum = parseInt(editNoticeDays, 10);
                   if (!editNoticeTitle.trim() || isNaN(daysNum) || daysNum <= 0) {
                     setNoticeError('Vui lòng nhập đầy đủ nội dung và số ngày hợp lệ (>0).');
                     return;
                   }
-                  
+
                   const startDate = Date.now();
                   handleUpdateAccount(noticeEditModal.account.id, {
                     notice: {
@@ -3468,7 +3469,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       dailyReminderTime: editNoticeTime || undefined
                     } as any
                   });
-                  
+
                   setNoticeEditModal(null);
                   setEditNoticeTitle('');
                   setEditNoticeDays('');
@@ -3504,7 +3505,8 @@ export function DeviceAccountOverlay({
   activeTab,
   setActiveTab,
   connectSelection,
-  setConnectSelection
+  setConnectSelection,
+  onDeviceContextMenu
 }: DeviceAccountOverlayProps) {
   const { wsServer } = useServer();
   const [vault, setVault] = useState<VaultData>(() => loadDeviceAccountVault());
@@ -3543,12 +3545,7 @@ export function DeviceAccountOverlay({
 
   const [davExpandedGroupIdx, setDavExpandedGroupIdx] = useState<number | null>(null);
 
-  const [davGroupDeviceDropdown, setDavGroupDeviceDropdown] = useState<{
-    udid: string;
-    groupIdx: number;
-    x: number;
-    y: number;
-  } | null>(null);
+
 
   const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
   const [showAddPlatformModal, setShowAddPlatformModal] = useState(false);
@@ -3606,14 +3603,7 @@ export function DeviceAccountOverlay({
     return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
   }, []);
 
-  useEffect(() => {
-    if (!davGroupDeviceDropdown) return;
-    const handleOutsideClick = () => {
-      setDavGroupDeviceDropdown(null);
-    };
-    window.addEventListener('click', handleOutsideClick);
-    return () => window.removeEventListener('click', handleOutsideClick);
-  }, [davGroupDeviceDropdown]);
+
 
   const updateHideSetting = (key: string, value: boolean, setter: (val: boolean) => void) => {
     setter(value);
@@ -3640,7 +3630,7 @@ export function DeviceAccountOverlay({
     e.preventDefault();
     const panel = target.closest('.dav-floating-panel') as HTMLElement;
     if (!panel) return;
-    
+
     const rect = panel.getBoundingClientRect();
     dragStartRef.current = {
       x: e.clientX,
@@ -3648,10 +3638,10 @@ export function DeviceAccountOverlay({
       panelX: rect.left,
       panelY: rect.top,
     };
-    
+
     let latestPos = { x: rect.left, y: rect.top };
     document.body.classList.add('is-dragging-modal');
-    
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!dragStartRef.current) return;
       const dx = moveEvent.clientX - dragStartRef.current.x;
@@ -3661,24 +3651,24 @@ export function DeviceAccountOverlay({
         y: dragStartRef.current.panelY + dy,
       };
       const newPos = clampDavPanelPosition(rawPos, panel);
-      
+
       // Update DOM directly
       panel.style.left = `${newPos.x}px`;
       panel.style.top = `${newPos.y}px`;
       latestPos = newPos;
     };
-    
+
     const handleMouseUp = () => {
       dragStartRef.current = null;
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
       document.body.classList.remove('is-dragging-modal');
-      
+
       // Update state and localStorage once at the end
       setDragPos(latestPos);
       localStorage.setItem('monviewphone:dav-drag-pos', JSON.stringify(latestPos));
     };
-    
+
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   };
@@ -3742,17 +3732,17 @@ export function DeviceAccountOverlay({
       return;
     }
     const id = name.toLowerCase();
-    
+
     // Check duplicate
     const currentPlatforms = getSavedPlatforms();
     if (currentPlatforms.some(p => p.id === id)) {
       setAddPlatformError('Nhóm này đã tồn tại');
       return;
     }
-    
+
     const updated = [...currentPlatforms, { id, label: name }];
     saveSavedPlatforms(updated);
-    
+
     window.dispatchEvent(new Event('device-account-platforms-updated'));
     setActiveTab(id);
     setShowAddPlatformModal(false);
@@ -3762,11 +3752,11 @@ export function DeviceAccountOverlay({
 
   const handleConfirmDeletePlatform = () => {
     if (!pendingDeletePlatform) return;
-    
+
     const currentPlatforms = getSavedPlatforms();
     const updatedPlatforms = currentPlatforms.filter(p => p.id !== pendingDeletePlatform);
     saveSavedPlatforms(updatedPlatforms);
-    
+
     const updatedVault = { ...vault };
     for (const udid in updatedVault.devices) {
       const dev = updatedVault.devices[udid];
@@ -3781,14 +3771,14 @@ export function DeviceAccountOverlay({
       }
     }
     saveDeviceAccountVault(updatedVault);
-    
+
     window.dispatchEvent(new Event('device-account-platforms-updated'));
     window.dispatchEvent(new Event('device-account-updated'));
-    
+
     if (activeTab === pendingDeletePlatform) {
       setActiveTab('wechat');
     }
-    
+
     setPendingDeletePlatform(null);
   };
 
@@ -3811,10 +3801,10 @@ export function DeviceAccountOverlay({
     let risk = 0;
     let unverified = 0;
     let incomplete = 0;
-    
+
     const oneYearMs = 365 * 24 * 60 * 60 * 1000;
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-    
+
     for (const udid of registeredUdids) {
       const d = getDeviceAccountDataFromVault(vault, udid);
       const accounts = d.platforms[activeTab] || [];
@@ -3831,7 +3821,7 @@ export function DeviceAccountOverlay({
         } else if ((acc as any).isNew === true) {
           newMonth++;
         }
-        
+
         if (acc.status === 'Die') {
           die++;
         }
@@ -3846,7 +3836,7 @@ export function DeviceAccountOverlay({
         }
       }
     }
-    
+
     return {
       totalAccs: total,
       oneYearCount: oneYear,
@@ -3862,11 +3852,11 @@ export function DeviceAccountOverlay({
     let scanQR = 0;
     let hasNotice = 0;
     let nearbyPeople = 0;
-    
+
     for (const udid of registeredUdids) {
       const d = getDeviceAccountDataFromVault(vault, udid);
       const accounts = d.platforms[activeTab] || [];
-      
+
       if (activeTab === 'wechat') {
         const hasQR = accounts.some(acc => {
           const wc = acc as WeChatAccount;
@@ -3879,15 +3869,15 @@ export function DeviceAccountOverlay({
           return true;
         });
         if (hasQR) scanQR++;
-        
+
         const hasNearby = activeTab === 'wechat' && hasNearbyRelevantAccount(accounts);
         if (hasNearby) nearbyPeople++;
       }
-      
+
       const hasN = accounts.some(acc => !!(acc.notice && acc.notice.dueDate));
       if (hasN) hasNotice++;
     }
-    
+
     return {
       totalDevices: registeredUdids.length,
       scanQRCount: scanQR,
@@ -3914,12 +3904,12 @@ export function DeviceAccountOverlay({
           console.warn(`Mapped WeChat account ${selectedId} not found on device ${udid}, skipping.`);
           continue;
         }
-        
+
         let userId = 0; // Default user 0
         if (activeAccount?.wechatLaunchProfile && typeof activeAccount.wechatLaunchProfile.userId === 'number') {
           userId = activeAccount.wechatLaunchProfile.userId;
         }
-        
+
         const cmd = `am start --user ${userId} -n com.tencent.mm/com.tencent.mm.ui.LauncherUI`;
         await runAdbCommandApi(wsServer, udid, cmd);
       } catch (err) {
@@ -3935,13 +3925,13 @@ export function DeviceAccountOverlay({
   return ReactDOM.createPortal(
     <>
       <div className={`dav-overlay ${panelOpen ? 'is-open' : 'is-hidden'}`}>
-      <div 
+      <div
         ref={floatingPanelRef}
-        className="dav-floating-panel" 
+        className="dav-floating-panel"
         style={dragPos ? { position: 'absolute', left: `${dragPos.x}px`, top: `${dragPos.y}px`, transform: 'none' } : {}}
       >
-        <div 
-          className="dav-floating-header" 
+        <div
+          className="dav-floating-header"
           onMouseDown={handleHeaderMouseDown}
           onDoubleClick={(e) => {
             e.preventDefault();
@@ -3977,7 +3967,7 @@ export function DeviceAccountOverlay({
               </button>
             </div>
           </div>
-          
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div className="dav-floating-platform-select" style={{ marginRight: 4 }}>
               {platforms.map(p => (
@@ -4059,7 +4049,7 @@ export function DeviceAccountOverlay({
               Thiếu Info: <strong style={{ color: '#ffffff' }}>{incompleteInfoCount}</strong>
             </span>
           </div>
-          
+
           <div className="dav-stats-row-global">
             <span className="dav-stats-label">Thiết bị:</span>
             <span className="dav-stats-val-total">{totalDevices}</span>
@@ -4079,20 +4069,18 @@ export function DeviceAccountOverlay({
         </div>
 
         {/* Thanh tìm kiếm ngay phía dưới */}
-        <div className="dav-search-box-global">
-          <Search size={14} />
-          <input 
-            ref={searchInputRef}
-            type="text" 
-            placeholder="Tìm theo Tên, Nickname, SĐT, Email..." 
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
+        <input
+          ref={searchInputRef}
+          className="account-search-input"
+          type="text"
+          placeholder="Tìm theo Tên, Nickname, SĐT, Email..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
 
         {/* Nhóm đã tạo sẵn trong Quản lý tài khoản */}
         <div className="dav-saved-groups-section">
-          <div 
+          <div
             className="dav-saved-groups-header-row"
             onClick={(e) => {
               e.preventDefault();
@@ -4124,7 +4112,7 @@ export function DeviceAccountOverlay({
                   return (
                     <div key={idx} className="dav-saved-group-item">
                       <div className="dav-saved-group-row">
-                        <div 
+                        <div
                           className="dav-saved-group-info"
                           // select_all_group_devices : Chọn tất cả thiết bị trong nhóm
                           onClick={(e) => {
@@ -4167,7 +4155,7 @@ export function DeviceAccountOverlay({
                               setDavExpandedGroupIdx(isExpanded ? null : idx);
                             }}
                           >
-                            ▾
+                            <span className="dav-saved-group-expand-icon">▾</span>
                           </button>
                         </div>
                       </div>
@@ -4188,18 +4176,24 @@ export function DeviceAccountOverlay({
                                 return (
                                   <div
                                     key={uid}
-                                    className={`dav-saved-group-device-cell ${isOnline ? 'online' : 'offline'} ${matchedAccount ? 'has-set' : ''}`}
+                                    className={`dav-saved-group-device-cell ${isOnline ? 'online' : 'offline'} ${matchedAccount ? 'has-set' : ''} ${connectSelection?.has(uid) ? 'on' : ''}`}
                                     title={accountName || 'Chưa set tài khoản'}
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      setDavGroupDeviceDropdown({
-                                        udid: uid,
-                                        groupIdx: idx,
-                                        x: rect.left,
-                                        y: rect.bottom + window.scrollY,
-                                      });
+                                      if (setConnectSelection) {
+                                        setConnectSelection(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(uid)) next.delete(uid);
+                                          else next.add(uid);
+                                          return next;
+                                        });
+                                      }
+                                    }}
+                                    onContextMenu={(e) => {
+                                      if (onDeviceContextMenu) {
+                                        onDeviceContextMenu(e, uid, idx);
+                                      }
                                     }}
                                   >
                                     <span>{String(orderMap.get(uid) ?? 0).padStart(2, '0')}</span>
@@ -4218,7 +4212,7 @@ export function DeviceAccountOverlay({
         </div>
       </div>
     </div>
-      
+
       {showAddPlatformModal && (
         <div className="confirmOverlay" style={{ zIndex: 28000 }} onMouseDown={() => {
           setShowAddPlatformModal(false);
@@ -4278,12 +4272,12 @@ export function DeviceAccountOverlay({
       )}
 
       {platformCtxMenu && (
-        <div 
+        <div
           ref={platformCtxMenuRef}
-          className="dav-ctx-menu contextMenuPanel" 
-          style={{ 
-            left: platformCtxMenu.x, 
-            top: platformCtxMenu.y, 
+          className="dav-ctx-menu contextMenuPanel"
+          style={{
+            left: platformCtxMenu.x,
+            top: platformCtxMenu.y,
             zIndex: 29000
           }}
           onContextMenu={e => e.preventDefault()}
@@ -4511,126 +4505,7 @@ export function DeviceAccountOverlay({
         </div>,
         document.body
       )}
-      {davGroupDeviceDropdown && (() => {
-        const devData = getDeviceAccountData(davGroupDeviceDropdown.udid);
-        const accounts = devData?.platforms?.['wechat'] || [];
-        const group = savedGroups[davGroupDeviceDropdown.groupIdx];
-        const groupSelectedAccounts = group?.selectedAccounts || {};
-        const selectedId = groupSelectedAccounts[davGroupDeviceDropdown.udid];
-
-        return ReactDOM.createPortal(
-          <div 
-            className="dav-title-account-dropdown contextMenuPanel davGroupDeviceDropdownPanel" 
-            style={{
-              position: 'fixed',
-              left: davGroupDeviceDropdown.x,
-              top: davGroupDeviceDropdown.y,
-              right: 'auto',
-              zIndex: 29000,
-              minWidth: 200,
-              maxHeight: 300,
-              overflowY: 'auto',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {accounts.length === 0 ? (
-              <div className="dav-title-empty" style={{ padding: '8px 12px', color: 'var(--md-muted)', fontSize: 13, fontStyle: 'italic', textAlign: 'center' }}>Không có tài khoản</div>
-            ) : (
-              accounts.map((account) => {
-                const aLoginDates = Array.from(new Set(
-                  (account.history || [])
-                    .filter(h => h.action === 'Login')
-                    .map(h => getLocalDateString(h.timestamp))
-                ));
-                const todayStr = getLocalDateString(Date.now());
-                const aIsLoggedInToday = aLoginDates.includes(todayStr);
-
-                return (
-                  <button
-                    key={account.id}
-                    type="button"
-                    className={`dav-title-account-item ${selectedId === account.id ? 'active' : ''}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      
-                      const isDeselect = selectedId === account.id;
-
-                      if (!isDeselect) {
-                        const today = Date.now();
-                        const date = new Date(today);
-                        const todayStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-                        
-                        const updatedPlatforms = { ...devData.platforms };
-                        if (updatedPlatforms['wechat']) {
-                          updatedPlatforms['wechat'] = updatedPlatforms['wechat'].map(acc => {
-                            if (acc.id === account.id) {
-                              const history = acc.history || [];
-                              const alreadyLoggedInToday = history.some(
-                                h => h.action === 'Login' && (
-                                  (() => {
-                                    const hd = new Date(h.timestamp);
-                                    const hdStr = `${hd.getFullYear()}-${String(hd.getMonth() + 1).padStart(2, '0')}-${String(hd.getDate()).padStart(2, '0')}`;
-                                    return hdStr === todayStr;
-                                  })()
-                                )
-                              );
-                              if (!alreadyLoggedInToday) {
-                                return {
-                                  ...acc,
-                                  history: [
-                                    ...history,
-                                    { id: Math.random().toString(36).substr(2, 9), action: 'Login', timestamp: today }
-                                  ]
-                                };
-                              }
-                            }
-                            return acc;
-                          });
-                        }
-                        
-                        const newData = {
-                          ...devData,
-                          platforms: updatedPlatforms,
-                        };
-                        saveDeviceAccountData(davGroupDeviceDropdown.udid, newData);
-                      }
-                      
-                      // Update group selection
-                      const nextGroups = savedGroups.map((g, i) => {
-                        if (i !== davGroupDeviceDropdown.groupIdx) return g;
-                        const selAcc = { ...(g.selectedAccounts || {}) };
-                        if (isDeselect) {
-                          delete selAcc[davGroupDeviceDropdown.udid];
-                        } else {
-                          selAcc[davGroupDeviceDropdown.udid] = account.id;
-                        }
-                        return { ...g, selectedAccounts: selAcc };
-                      });
-                      setSavedGroups(nextGroups);
-                      localStorage.setItem('savedGroups', JSON.stringify(nextGroups));
-                      
-                      // Trigger state refresh
-                      setVault(loadDeviceAccountVault());
-                      
-                      // Dispatch events to refresh other components
-                      window.dispatchEvent(new CustomEvent('saved-groups-updated'));
-                      window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
-                      
-                      setDavGroupDeviceDropdown(null);
-                    }}
-                  >
-                    {renderAppTypeIcon(account.appType, aIsLoggedInToday)}
-                    <span className="dav-title-account-name">{account.name || account.phone || account.nickname || 'Không tên'}</span>
-                  </button>
-                );
-              })
-            )}
-          </div>,
-          document.body
-        );
-      })()}
-    </>,
+</>,
     document.body
   );
 }

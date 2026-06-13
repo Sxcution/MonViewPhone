@@ -94,16 +94,7 @@ export function ThemeInspector({ enabled, onEnabledChange }: ThemeInspectorProps
     setNewColorText(val);
   };
 
-  // Listen for reset-all event to clear editing panel if open
-  useEffect(() => {
-    const handleResetAll = () => {
-      setEditingRole(null);
-    };
-    window.addEventListener('monviewphone:theme-reset-all', handleResetAll);
-    return () => {
-      window.removeEventListener('monviewphone:theme-reset-all', handleResetAll);
-    };
-  }, []);
+
 
   function cleanupHoverClassOnly() {
     if (hoveredTargetRef.current) {
@@ -403,7 +394,7 @@ Property: ${match.property}`;
         <div className="themeInspectorOverlay themeInspectorRoot">
           <div className="themeInspectorPanel" onMouseDown={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--md-border)', paddingBottom: 8, marginBottom: 4 }}>
-              <strong style={{ fontSize: 15 }}>Theme Inspector Editor</strong>
+              <strong style={{ fontSize: 15 }}>Inspector ID Editor</strong>
               <button
                 type="button"
                 onClick={() => setEditingRole(null)}

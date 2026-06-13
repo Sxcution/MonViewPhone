@@ -17,6 +17,7 @@
       "macro_playback_panel": "MacroPlaybackPanel"
     },
     "css_classes": {
+      "account_search_input": "account-search-input",
       "dav_floating_settings_btn": "dav-floating-settings-btn",
       "dav_settings_overlay": "dav-settings-overlay",
       "dav_settings_panel": "dav-settings-panel",

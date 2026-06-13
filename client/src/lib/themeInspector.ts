@@ -289,10 +289,7 @@ export function removeThemeOverride(cssVar: string): ThemeOverrideMap {
   return overrides;
 }
 
-export function clearThemeOverrides(): void {
-  localStorage.removeItem(STORAGE_KEY);
-  applyThemeOverrides({});
-}
+
 
 export interface ThemeVariableCandidate {
   cssVar: string;

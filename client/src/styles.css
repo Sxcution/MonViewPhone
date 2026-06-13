@@ -10523,32 +10523,23 @@ input[type=number] {
   border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
-.dav-search-box-global {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.04);
+.account-search-input {
+  background: rgba(255, 255, 255, 0.055);
   border: 1px solid var(--md-border);
-  border-radius: 6px;
-  padding: 4px 10px;
+  border-radius: 8px;
+  padding: 0 12px;
+  height: 34px;
   width: 100%;
   max-width: 500px;
-}
-
-.dav-search-box-global input {
-  background: transparent;
-  border: none;
   color: var(--md-text);
-  font-size: 11px;
+  font-size: 12px;
   outline: none;
-  width: 100%;
-  margin-left: 6px;
+  box-sizing: border-box;
 }
 
-.dav-search-box-global input:focus {
-  border-color: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
+.account-search-input:focus {
+  border-color: var(--md-info);
+  box-shadow: none;
 }
 
 .dav-floating-panel {
@@ -11303,6 +11294,11 @@ body.is-dragging-modal iframe {
   transition: transform 0.15s ease;
 }
 
+.dav-saved-group-expand-icon {
+  display: inline-block;
+  transform: scaleX(1.6);
+}
+
 .dav-saved-group-expand-btn.open {
   transform: rotate(180deg);
 }
@@ -11353,6 +11349,12 @@ body.is-dragging-modal iframe {
 .dav-saved-group-device-cell.has-set:hover {
   border-color: var(--md-success) !important;
   box-shadow: 0 0 4px rgba(34, 197, 94, 0.3);
+}
+
+.dav-saved-group-device-cell.on {
+  border-color: var(--md-info) !important;
+  color: #fff !important;
+  background: rgba(59, 130, 246, 0.25) !important;
 }
 
 /* Ensure the dropdown portal doesn't get cut off */
