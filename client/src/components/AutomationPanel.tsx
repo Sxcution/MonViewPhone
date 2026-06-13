@@ -113,7 +113,12 @@ export function AutomationPanel({
   const availableActions = getAvailableActions();
 
   return (
-    <div className={`rcpSection${expanded ? '' : ' rcpSectionCollapsed'}`}>
+    <div 
+      className={`rcpSection${expanded ? '' : ' rcpSectionCollapsed'}`}
+      data-inspector-id="automationPanel.wrapper"
+      data-inspector-label="Automation quick panel section wrapper"
+      data-inspector-component="client/src/components/AutomationPanel.tsx"
+    >
       <div className='rcpTitleBar'>
         <div className='rcpTitle'>Automation</div>
         <div className='rcpTitleActions'>
@@ -123,6 +128,9 @@ export function AutomationPanel({
             title='Setting'
             onClick={onOpenSettings}
             style={{ marginRight: 4 }}
+            data-inspector-id="automationPanel.settingsButton"
+            data-inspector-label="Automation panel settings gear button"
+            data-inspector-component="client/src/components/AutomationPanel.tsx"
           >
             <Settings size={14} strokeWidth={2} />
           </button>
@@ -131,13 +139,21 @@ export function AutomationPanel({
             className='rcpIconBtn'
             title={expanded ? 'Collapse' : 'Expand'}
             onClick={() => setExpanded(prev => !prev)}
+            data-inspector-id="automationPanel.expandButton"
+            data-inspector-label="Automation panel expand/collapse button"
+            data-inspector-component="client/src/components/AutomationPanel.tsx"
           >
             {expanded ? <ChevronUp size={15} strokeWidth={2} /> : <ChevronDown size={15} strokeWidth={2} />}
           </button>
         </div>
       </div>
 
-      <div className={`rcpAutomationGrid${expanded ? '' : ' rcpCollapsedBody'}`}>
+      <div 
+        className={`rcpAutomationGrid${expanded ? '' : ' rcpCollapsedBody'}`}
+        data-inspector-id="automationPanel.grid"
+        data-inspector-label="Automation panel action slots grid"
+        data-inspector-component="client/src/components/AutomationPanel.tsx"
+      >
         {quickActions.map((slot, idx) => {
           if (!slot) {
             const isDropdownOpen = activeDropdownIdx === idx;
@@ -147,17 +163,29 @@ export function AutomationPanel({
                   type='button'
                   className='rcpAutomationBtn empty'
                   onClick={() => setActiveDropdownIdx(isDropdownOpen ? null : idx)}
+                  data-inspector-id="automationPanel.emptySlotButton"
+                  data-inspector-label={`Empty action slot button index ${idx}`}
+                  data-inspector-component="client/src/components/AutomationPanel.tsx"
                 >
                   <Plus size={16} />
                 </button>
                 {isDropdownOpen && (
-                  <div className='rcpAutomationSelectDropdown' ref={dropdownRef}>
+                  <div 
+                    className='rcpAutomationSelectDropdown' 
+                    ref={dropdownRef}
+                    data-inspector-id="automationPanel.selectDropdown"
+                    data-inspector-label={`Select action dropdown for slot ${idx}`}
+                    data-inspector-component="client/src/components/AutomationPanel.tsx"
+                  >
                     {availableActions.map(act => (
                       <button
                         key={`${act.appId}-${act.actionId}`}
                         type='button'
                         className='rcpAutomationSelectOption'
                         onClick={() => handleSelectAction(idx, act.appId, act.actionId)}
+                        data-inspector-id="automationPanel.selectDropdownOption"
+                        data-inspector-label={`Bind action ${act.actionName} to slot`}
+                        data-inspector-component="client/src/components/AutomationPanel.tsx"
                       >
                         <img src={act.appIcon} alt='' />
                         <span>{act.actionName}</span>
@@ -193,6 +221,9 @@ export function AutomationPanel({
                   setContextMenu({ idx, x: e.clientX, y: e.clientY });
                 }}
                 title={actionName}
+                data-inspector-id="automationPanel.actionSlotButton"
+                data-inspector-label={`Trigger action: ${actionName}`}
+                data-inspector-component="client/src/components/AutomationPanel.tsx"
               >
                 {app && <img src={app.icon} alt='' />}
                 <span>{actionName}</span>
@@ -207,6 +238,9 @@ export function AutomationPanel({
           className='automationContextMenuPanel contextMenuPanel dropdown-menu show'
           style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 30000 }}
           onMouseDown={e => e.stopPropagation()}
+          data-inspector-id="automationPanel.contextMenu"
+          data-inspector-label="Action slot context menu"
+          data-inspector-component="client/src/components/AutomationPanel.tsx"
         >
           <button
             type='button'
@@ -216,6 +250,9 @@ export function AutomationPanel({
               if (slot) playAppAction(slot.appId, slot.actionId);
               setContextMenu(null);
             }}
+            data-inspector-id="automationPanel.contextMenuRunButton"
+            data-inspector-label="Run action from context menu button"
+            data-inspector-component="client/src/components/AutomationPanel.tsx"
           >
             <span>Chạy hành động</span>
           </button>
@@ -224,6 +261,9 @@ export function AutomationPanel({
             type='button'
             className='automationContextMenuItem automationContextMenuDanger dropdown-item'
             onClick={() => handleRemoveAction(contextMenu.idx)}
+            data-inspector-id="automationPanel.contextMenuRemoveButton"
+            data-inspector-label="Remove action binding from slot button"
+            data-inspector-component="client/src/components/AutomationPanel.tsx"
           >
             <span>Gỡ khỏi panel</span>
           </button>

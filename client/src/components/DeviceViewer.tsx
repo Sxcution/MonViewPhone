@@ -434,6 +434,9 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
           e.stopPropagation();
         }
       }}
+      data-inspector-id="deviceViewer.panel"
+      data-inspector-label="Single device viewer main panel"
+      data-inspector-component="client/src/components/DeviceViewer.tsx"
     >
       <div className="viewerHeader">
         <div className="viewerTitle">
@@ -476,6 +479,9 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
                   e.preventDefault();
                   e.stopPropagation();
                 }}
+                data-inspector-id="deviceViewer.canvas"
+                data-inspector-label="Device screen mirroring canvas"
+                data-inspector-component="client/src/components/DeviceViewer.tsx"
               />
             </div>
           </div>

@@ -11,7 +11,7 @@ import {
   openPcFileDialog,
   pushLocalFileApi,
 } from '@/lib/serverApi';
-import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Star, List, Save, Trash2, Palette, Plus } from 'lucide-react';
+import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Save, Trash2, Palette, Plus, Copy } from 'lucide-react';
 
 type ViewerSidePanelProps = {
   udid: string;
@@ -51,7 +51,6 @@ const DEFAULT_PRESETS: { label: string; cmd: string; warn?: boolean; color?: str
   { label: 'Bộ nhớ trống', cmd: 'df -h /sdcard' },
 ];
 
-const LS_CUSTOM_CMDS = 'vsp_custom_commands';
 const LS_CMD_HISTORY = 'vsp_cmd_history';
 const LS_PRESET_COLORS = 'vsp_preset_colors';
 
@@ -218,8 +217,6 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
     }
   };
 
-
-
   // ADB Modal
   const [showAdbModal, setShowAdbModal] = useState(false);
   const [adbCommand, setAdbCommand] = useState('');
@@ -227,49 +224,147 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
   const [adbRunning, setAdbRunning] = useState(false);
   const [adbTab, setAdbTab] = useState<'preset' | 'history' | 'custom'>('preset');
   const [cmdHistory, setCmdHistory] = useState<string[]>(() => loadJson(LS_CMD_HISTORY, []));
-  const [customCmds, setCustomCmds] = useState(() => loadJson<{ label: string; cmd: string }[]>(LS_CUSTOM_CMDS, []));
   const [newCmdLabel, setNewCmdLabel] = useState('');
   const [newCmdValue, setNewCmdValue] = useState('');
-  const logEndRef = useRef<HTMLDivElement | null>(null);
+
   const logIdRef = useRef(0);
 
+  // Preset commands state
+  const LS_PRESETS = 'vsp_presets';
+  const [presets, setPresets] = useState<{ label: string; cmd: string; warn?: boolean; color?: string }[]>(() => loadJson(LS_PRESETS, DEFAULT_PRESETS));
+
+  // Draggable position
+  const [position, setPosition] = useState(() => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    return {
+      x: Math.max(20, Math.floor((w - 720) / 2)),
+      y: Math.max(20, Math.floor((h - 550) / 2)),
+    };
+  });
+
   // Preset color overrides
-  const [presetColors, setPresetColors] = useState<Record<number, string>>(() => loadJson(LS_PRESET_COLORS, {}));
+  const COLOR_MIGRATION: Record<string, string> = {
+    '#fff': '#ffffff', '#ff9c9c': '#ef4444', '#9cffb8': '#22c55e', '#9cd4ff': '#3b82f6', '#ffdc9c': '#f59e0b', '#d49cff': '#a855f7', '#ff9ce0': '#ec4899'
+  };
+  const [presetColors, setPresetColors] = useState<Record<number, string>>(() => {
+    const loaded = loadJson(LS_PRESET_COLORS, {});
+    const migrated: Record<number, string> = {};
+    for (const [k, v] of Object.entries(loaded)) {
+      migrated[Number(k)] = COLOR_MIGRATION[v as string] || v as string;
+    }
+    return migrated;
+  });
+
+  const [confirmCmd, setConfirmCmd] = useState<{ cmd: string; label: string } | null>(null);
 
   // Context menu for presets
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; idx: number } | null>(null);
+
+  // Drag and drop for presets
+  const [draggedPresetIdx, setDraggedPresetIdx] = useState<number | null>(null);
+  const [dragOverPresetIdx, setDragOverPresetIdx] = useState<number | null>(null);
   const [editingPreset, setEditingPreset] = useState<{ idx: number; label: string; cmd: string } | null>(null);
+
+  // ===== DRAGGABLE LOGIC =====
+  const dragRef = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    panelEl?: HTMLElement | null;
+    lastX?: number;
+    lastY?: number;
+  }>({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 });
+
+  const clampPosition = (val: number, min: number, max: number) => {
+    return Math.max(min, Math.min(max, val));
+  };
+
+  const onDragMove = useCallback((e: PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag.active || !drag.panelEl) return;
+    e.preventDefault();
+    const nextX = drag.originX + e.clientX - drag.startX;
+    const nextY = drag.originY + e.clientY - drag.startY;
+    const finalX = clampPosition(nextX, 0, Math.max(0, window.innerWidth - 100));
+    const finalY = clampPosition(nextY, 0, Math.max(0, window.innerHeight - 80));
+    
+    drag.panelEl.style.left = `${finalX}px`;
+    drag.panelEl.style.top = `${finalY}px`;
+    
+    drag.lastX = finalX;
+    drag.lastY = finalY;
+  }, []);
+
+  const onDragUp = useCallback(() => {
+    const drag = dragRef.current;
+    if (!drag.active) return;
+    drag.active = false;
+    document.body.classList.remove('is-dragging-modal');
+    window.removeEventListener('pointermove', onDragMove);
+    window.removeEventListener('pointerup', onDragUp);
+    
+    if (drag.lastX !== undefined && drag.lastY !== undefined) {
+      setPosition({ x: drag.lastX, y: drag.lastY });
+    }
+  }, [onDragMove]);
+
+  const startDrag = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest('button, input, select, textarea')) return;
+    e.preventDefault();
+    const panel = e.currentTarget.closest('.vsp-modal') as HTMLElement | null;
+    if (!panel) return;
+    
+    dragRef.current = {
+      active: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: position.x,
+      originY: position.y,
+      panelEl: panel,
+      lastX: position.x,
+      lastY: position.y
+    };
+    document.body.classList.add('is-dragging-modal');
+    window.addEventListener('pointermove', onDragMove, { passive: false });
+    window.addEventListener('pointerup', onDragUp);
+  }, [onDragMove, onDragUp, position.x, position.y]);
+
+  useEffect(() => {
+    return () => {
+      window.removeEventListener('pointermove', onDragMove);
+      window.removeEventListener('pointerup', onDragUp);
+    };
+  }, [onDragMove, onDragUp]);
 
   // ADB submenu on hover
   const [showAdbSubmenu, setShowAdbSubmenu] = useState(false);
   const adbHoverTimer = useRef<number | null>(null);
 
-  useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [adbLogs]);
+
 
   // Load profiles
   useEffect(() => {
     listUserProfiles(wsServer, udid).then(setProfiles).catch(() => {});
   }, [wsServer, udid]);
 
-  // Handle click outside to close context menu, but ignore right-click and context menu items
+  // Handle click outside to close context menu, using capture phase to catch clicks blocked by canvas
   useEffect(() => {
     if (!ctxMenu) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      // 1. Ignore if right-click
+    const handleClickOutside = (event: MouseEvent | PointerEvent) => {
       if (event.button === 2) return;
-
-      // 2. Check if click was on a context menu element
       const target = event.target as Element;
       const isClickOnContextMenu = target.closest('.react-contexify') || target.closest('.vsp-ctx-menu') || target.closest('.context-menu');
-      
-      // 3. If not on a context menu, close the local context menu
       if (!isClickOnContextMenu) {
         setCtxMenu(null);
       }
     };
 
-    window.addEventListener('mousedown', handleClickOutside);
-    return () => window.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('pointerdown', handleClickOutside, true);
+    return () => window.removeEventListener('pointerdown', handleClickOutside, true);
   }, [ctxMenu]);
 
   const handleChangeOrder = () => {
@@ -297,7 +392,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
   };
 
   const handleAdbLeave = () => {
-    adbHoverTimer.current = window.setTimeout(() => setShowAdbSubmenu(false), 2000);
+    adbHoverTimer.current = window.setTimeout(() => setShowAdbSubmenu(false), 100);
   };
 
   // Push file via HTTP API
@@ -453,8 +548,6 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
     }
   }, [wsServer, udid, selectedProfile, connectSelection]);
 
-
-
   // ADB execution
   const executeAdbCommand = useCallback(async (cmd: string) => {
     if (!cmd.trim()) return;
@@ -499,9 +592,9 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
     const id = ++logIdRef.current;
     const time = new Date().toLocaleTimeString('vi-VN');
     if (mainError) {
-      setAdbLogs(prev => [...prev, { id, time, command: cmd, output: mainError?.message || 'Error', success: false }]);
-    } else if (mainResult) {
-      setAdbLogs(prev => [...prev, { id, time, command: cmd, output: mainResult.output, success: mainResult.success }]);
+      setAdbLogs(prev => [{ id, time, command: cmd, output: mainError?.message || 'Error', success: false }, ...prev]);
+    } else {
+      setAdbLogs(prev => [{ id, time, command: cmd, output: mainResult.output, success: mainResult.success }, ...prev]);
     }
     setAdbRunning(false);
   }, [wsServer, udid, connectSelection]);
@@ -510,11 +603,11 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
 
   const handleSaveCustomCmd = () => {
     if (!newCmdLabel.trim() || !newCmdValue.trim()) return;
-    const next = [...customCmds, { label: newCmdLabel.trim(), cmd: newCmdValue.trim() }];
-    setCustomCmds(next); saveJson(LS_CUSTOM_CMDS, next);
+    const next = [...presets, { label: newCmdLabel.trim(), cmd: newCmdValue.trim() }];
+    setPresets(next); saveJson(LS_PRESETS, next);
     setNewCmdLabel(''); setNewCmdValue('');
+    setAdbTab('preset');
   };
-  const handleDeleteCustomCmd = (idx: number) => { const next = customCmds.filter((_, i) => i !== idx); setCustomCmds(next); saveJson(LS_CUSTOM_CMDS, next); };
 
   // Preset context menu handlers
   const handlePresetContextMenu = (e: React.MouseEvent, idx: number) => {
@@ -523,18 +616,102 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
   };
   const startEditPreset = (idx: number) => {
     setCtxMenu(null);
-    setEditingPreset({ idx, label: DEFAULT_PRESETS[idx].label, cmd: DEFAULT_PRESETS[idx].cmd });
+    setEditingPreset({ idx, label: presets[idx].label, cmd: presets[idx].cmd });
+  };
+  const handleDeletePreset = (idx: number) => {
+    setCtxMenu(null);
+    setPresets(prev => {
+      const next = prev.filter((_, i) => i !== idx);
+      saveJson(LS_PRESETS, next);
+      return next;
+    });
   };
   const setPresetColor = (idx: number, color: string) => {
     setCtxMenu(null);
     setPresetColors(prev => { const next = { ...prev, [idx]: color }; saveJson(LS_PRESET_COLORS, next); return next; });
   };
 
-  const COLORS = ['#fff', '#ff9c9c', '#9cffb8', '#9cd4ff', '#ffdc9c', '#d49cff', '#ff9ce0'];
+  const COLORS = ['#ffffff', '#ef4444', '#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899'];
+
+  const handlePresetClick = (cmd: string, label: string, color?: string, fromSubmenu?: boolean) => {
+    if (fromSubmenu) {
+      setShowAdbSubmenu(false);
+      if (cmd.includes('<')) {
+        setShowAdbModal(true);
+        setAdbCommand(cmd);
+        return;
+      }
+      if (color === '#ef4444' || color === '#ff9c9c' || color === 'red') {
+        setConfirmCmd({ cmd, label });
+      } else {
+        executeAdbCommand(cmd);
+      }
+    } else {
+      setAdbCommand(cmd);
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, idx: number) => {
+    setDraggedPresetIdx(idx);
+    e.dataTransfer.setData('text/plain', '');
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    if (draggedPresetIdx === null || draggedPresetIdx === idx) return;
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverPresetIdx !== idx) setDragOverPresetIdx(idx);
+  };
+
+  const handleDrop = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    if (draggedPresetIdx === null || draggedPresetIdx === idx) {
+      setDraggedPresetIdx(null);
+      setDragOverPresetIdx(null);
+      return;
+    }
+    const from = draggedPresetIdx;
+    const to = idx;
+    
+    setPresets(prev => {
+      const next = [...prev];
+      const item = next.splice(from, 1)[0];
+      next.splice(to, 0, item);
+      saveJson(LS_PRESETS, next);
+      return next;
+    });
+    
+    setPresetColors(prev => {
+      const nextColors: Record<number, string> = {};
+      const idxArray = Array.from({ length: presets.length }, (_, i) => i);
+      const movedIdx = idxArray.splice(from, 1)[0];
+      idxArray.splice(to, 0, movedIdx);
+      
+      idxArray.forEach((oldI, newI) => {
+        if (prev[oldI]) nextColors[newI] = prev[oldI];
+      });
+      saveJson(LS_PRESET_COLORS, nextColors);
+      return nextColors;
+    });
+    
+    setDraggedPresetIdx(null);
+    setDragOverPresetIdx(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPresetIdx(null);
+    setDragOverPresetIdx(null);
+  };
 
   return (
     <>
-      <div className="vsp-panel right-bar-container">
+      <div 
+        className="vsp-panel right-bar-container"
+        data-inspector-id="viewerSidePanel.panel"
+        data-inspector-label="Viewer sidebar control panel container"
+        data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+      >
         <div className="vsp-header" style={{ justifyContent: 'space-between' }}>
           <div className="device-serial-title" style={{
               color: '#fff', 
@@ -546,7 +723,16 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
           }}>
               📱 {udid}
           </div>
-          <button className="vsp-header-close" onClick={onCloseViewer} title={t('Close')}><X size={14} /></button>
+          <button 
+            className="vsp-header-close" 
+            onClick={onCloseViewer} 
+            title={t('Close')}
+            data-inspector-id="viewerSidePanel.closeButton"
+            data-inspector-label="Close device viewer button"
+            data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+          >
+            <X size={14} />
+          </button>
         </div>
         {/* Toast notifications */}
         {toasts.length > 0 && (
@@ -576,7 +762,14 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
             <div className="vsp-section">
               <div className="vsp-profile-inline">
                 <span className="vsp-label">{t('Profile:')}</span>
-                <select className="vsp-select" value={selectedProfile} onChange={e => setSelectedProfile(Number(e.target.value))}>
+                <select 
+                  className="vsp-select" 
+                  value={selectedProfile} 
+                  onChange={e => setSelectedProfile(Number(e.target.value))}
+                  data-inspector-id="viewerSidePanel.profileSelect"
+                  data-inspector-label="WeChat profile selector"
+                  data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+                >
                   {profiles.map(p => <option key={p.id} value={p.id}>User {p.id} - {p.name}</option>)}
                 </select>
               </div>
@@ -585,10 +778,16 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
 
           {/* 3. Cài APK */}
           <div className="vsp-section">
-            <div className="vsp-section-title vsp-clickable" onClick={() => {
-              console.log('[VSP] APK click, ref:', apkInputRef.current);
-              apkInputRef.current?.click();
-            }}>
+            <div 
+              className="vsp-section-title vsp-clickable" 
+              onClick={() => {
+                console.log('[VSP] APK click, ref:', apkInputRef.current);
+                apkInputRef.current?.click();
+              }}
+              data-inspector-id="viewerSidePanel.apkButton"
+              data-inspector-label="Upload and install APK button"
+              data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+            >
               <Package size={15} /><span>{t('Cài đặt APK')}</span>
             </div>
             <input ref={apkInputRef} type="file" accept=".apk,.xapk,.zip" multiple
@@ -604,6 +803,9 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
               onClick={handleImportClick}
               onContextMenu={handleImportRightClick}
               title="Click trái: Nhập tệp | Click phải: Cấu hình thư mục ảnh PC"
+              data-inspector-id="viewerSidePanel.importButton"
+              data-inspector-label="Push file to device button"
+              data-inspector-component="client/src/components/ViewerSidePanel.tsx"
             >
               <Upload size={15} /><span>{t('Nhập tệp vào điện thoại')}</span>
             </div>
@@ -648,30 +850,37 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
             )}
           </div>
 
-
-
           {/* 6. Chạy lệnh ADB - with hover submenu */}
-          <div className="vsp-section vsp-adb-section" ref={adbSectionRef}
+          <div 
+            className="vsp-section vsp-adb-section" 
+            ref={adbSectionRef}
             onMouseEnter={handleAdbEnter}
             onMouseLeave={handleAdbLeave}
+            data-inspector-id="viewerSidePanel.adbButton"
+            data-inspector-label="Run ADB Shell command sidebar row"
+            data-inspector-component="client/src/components/ViewerSidePanel.tsx"
           >
             <div className="vsp-section-title vsp-clickable" onClick={() => setShowAdbModal(true)}>
               <Terminal size={15} /><span>{t('Chạy lệnh ADB')}</span>
             </div>
             {showAdbSubmenu && ReactDOM.createPortal(
-              <div className="vsp-adb-submenu"
+              <div 
+                className="vsp-adb-submenu"
                 style={{ position: 'fixed', left: adbSubmenuPos.x, bottom: window.innerHeight - adbSubmenuPos.y, margin: 0 }}
                 onMouseEnter={() => {
                   if (adbHoverTimer.current) clearTimeout(adbHoverTimer.current);
                   setShowAdbSubmenu(true);
                 }}
                 onMouseLeave={handleAdbLeave}
+                data-inspector-id="viewerSidePanel.adbHoverSubmenu"
+                data-inspector-label="ADB quick commands hover popup menu"
+                data-inspector-component="client/src/components/ViewerSidePanel.tsx"
               >
-                {DEFAULT_PRESETS.map((c, i) => (
+                {presets.map((c, i) => (
                   <button key={i}
                     className={`vsp-adb-submenu-item${c.warn ? ' vsp-cmd-warn' : ''}`}
                     style={presetColors[i] ? { color: presetColors[i] } : undefined}
-                    onClick={e => { e.stopPropagation(); c.cmd.includes('<') ? (setShowAdbModal(true), setAdbCommand(c.cmd)) : executeAdbCommand(c.cmd); }}
+                    onClick={e => { e.stopPropagation(); handlePresetClick(c.cmd, c.label, presetColors[i], true); }}
                     title={c.cmd}
                   >
                     {c.label}
@@ -686,43 +895,69 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
 
       {/* ADB Command Modal */}
       {showAdbModal && (
-        <div className="vsp-modal-overlay" onClick={() => setShowAdbModal(false)}>
-          <div className="vsp-modal" onClick={e => e.stopPropagation()}>
-            <div className="vsp-modal-header">
-              <div className="vsp-modal-title"><Terminal size={18} /><span>ADB Command</span><span className="vsp-modal-udid">{udid}</span></div>
+        <div 
+          className="vsp-modal-overlay" 
+          style={{ background: 'transparent', backdropFilter: 'none', pointerEvents: 'none' }}
+          onClick={() => setShowAdbModal(false)}
+          data-inspector-id="viewerSidePanel.adbModalOverlay"
+          data-inspector-label="ADB command execution modal backdrop"
+          data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+        >
+          <div 
+            className="vsp-modal" 
+            style={{ left: position.x, top: position.y, position: 'fixed', pointerEvents: 'auto' }}
+            onClick={e => e.stopPropagation()}
+            data-inspector-id="viewerSidePanel.adbModal"
+            data-inspector-label="ADB command execution modal card"
+            data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+          >
+            <div className="vsp-modal-header" onPointerDown={startDrag} style={{ cursor: 'move' }}>
+              <div className="vsp-modal-title">
+                <Terminal size={18} />
+                <span>ADB Command</span>
+                <span style={{ color: '#fff', fontWeight: 400, fontSize: '13px' }}>Device:</span>
+                <span
+                  className="vsp-modal-udid"
+                  style={{ cursor: 'pointer' }}
+                  title={t('Click để copy số seri')}
+                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(udid); }}
+                >{udid}</span>
+              </div>
               <button className="vsp-modal-close" onClick={() => setShowAdbModal(false)}><X size={16} /></button>
             </div>
             <div className="vsp-modal-input-row">
-              <input className="vsp-modal-input" placeholder={t('Nhập lệnh ADB (VD: pm list packages -3)')}
-                value={adbCommand} onChange={e => setAdbCommand(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdbSubmit(); } }} autoFocus />
-              <button className="vsp-btn vsp-btn-primary" onClick={handleAdbSubmit} disabled={adbRunning || !adbCommand.trim()}>
+              <input
+                className="vsp-modal-input"
+                placeholder={t('Nhập lệnh ADB (VD: pm list packages -3)')}
+                value={adbCommand}
+                onChange={e => setAdbCommand(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdbSubmit(); } }}
+                autoFocus
+                data-inspector-id="viewerSidePanel.adbModalInput"
+                data-inspector-label="ADB command text field input"
+                data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+              />
+              <button
+                className="vsp-btn vsp-btn-primary"
+                onClick={handleAdbSubmit}
+                disabled={adbRunning || !adbCommand.trim()}
+                data-inspector-id="viewerSidePanel.adbModalExecuteButton"
+                data-inspector-label="Execute command button"
+                data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+              >
                 <Play size={14} />{t('Thực hiện')}
               </button>
+              <button className={`vsp-btn ${adbTab === 'history' ? 'vsp-btn-primary' : ''}`} onClick={() => setAdbTab(adbTab === 'history' ? 'preset' : 'history')}>
+                <Clock size={13} />{t('Lịch sử')}
+              </button>
+              <button className={`vsp-btn ${adbTab === 'custom' ? 'vsp-btn-primary' : ''}`} onClick={() => setAdbTab(adbTab === 'custom' ? 'preset' : 'custom')}>
+                <Plus size={13} />{t('Thêm lệnh')}
+              </button>
             </div>
-            <div className="vsp-modal-tabs">
-              <button className={`vsp-modal-tab ${adbTab === 'preset' ? 'on' : ''}`} onClick={() => setAdbTab('preset')}><List size={13} />{t('Lệnh nội bộ')}</button>
-              <button className={`vsp-modal-tab ${adbTab === 'history' ? 'on' : ''}`} onClick={() => setAdbTab('history')}><Clock size={13} />{t('Lịch sử')}</button>
-              <button className={`vsp-modal-tab ${adbTab === 'custom' ? 'on' : ''}`} onClick={() => setAdbTab('custom')}><Star size={13} />{t('Lệnh của tôi')}</button>
-            </div>
-            <div className="vsp-modal-tab-content">
-              {adbTab === 'preset' && (
-                <div className="automationSectionActions" style={{ flexWrap: 'wrap', gap: '8px' }}>
-                  {DEFAULT_PRESETS.map((c, i) => (
-                      <button key={i}
-                        className={`automationArrowBtn${c.warn ? ' vsp-cmd-warn' : ''}`}
-                        style={presetColors[i] ? { color: presetColors[i] } : {}}
-                        onClick={() => { c.cmd.includes('<') ? setAdbCommand(c.cmd) : executeAdbCommand(c.cmd); }}
-                        onContextMenu={e => handlePresetContextMenu(e, i)}
-                        title={c.cmd}
-                      >
-                        <Plus size={15} style={{ flexShrink: 0 }} />
-                        <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</span>
-                      </button>
-                  ))}
-                </div>
-              )}
-              {adbTab === 'history' && (
+
+            {/* Lịch sử / Thêm lệnh - hiển thị phía trên khu vực 2 cột khi được bật */}
+            {adbTab === 'history' && (
+              <div className="vsp-modal-tab-content">
                 <div className="vsp-cmd-list">
                   {cmdHistory.length === 0 && <div className="vsp-empty">{t('Chưa có lịch sử')}</div>}
                   {cmdHistory.map((cmd, i) => (
@@ -731,52 +966,121 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
                     </button>
                   ))}
                 </div>
-              )}
-              {adbTab === 'custom' && (
+              </div>
+            )}
+            {adbTab === 'custom' && (
+              <div className="vsp-modal-tab-content">
                 <div className="vsp-cmd-custom">
                   <div className="vsp-cmd-add-row">
                     <input className="vsp-input" placeholder={t('Tên')} value={newCmdLabel} onChange={e => setNewCmdLabel(e.target.value)} />
                     <input className="vsp-input vsp-input-grow" placeholder={t('Lệnh ADB')} value={newCmdValue} onChange={e => setNewCmdValue(e.target.value)} />
                     <button className="vsp-btn vsp-btn-primary" onClick={handleSaveCustomCmd}><Save size={14} /></button>
                   </div>
-                  <div className="vsp-cmd-list">
-                    {customCmds.length === 0 && <div className="vsp-empty">{t('Chưa có lệnh tùy chỉnh')}</div>}
-                    {customCmds.map((c, i) => (
-                      <div key={i} className="vsp-cmd-custom-item">
-                        <button className="vsp-cmd-custom-run" onClick={() => executeAdbCommand(c.cmd)} title={c.cmd}>
-                          <Play size={13} /><span className="vsp-cmd-label">{c.label}</span><span className="vsp-cmd-code">{c.cmd}</span>
-                        </button>
-                        <button className="vsp-cmd-custom-del" onClick={() => handleDeleteCustomCmd(i)}><Trash2 size={13} /></button>
-                      </div>
-                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* 2-column body: command list left + log right */}
+            <div className="vsp-modal-2col">
+              {/* Left column – Danh sách ADB */}
+              <div className="vsp-modal-2col-left">
+                <div className="vsp-modal-col-header">{t('Danh sách ADB')}</div>
+                <div className="vsp-modal-cmd-list">
+                  {presets.map((c, i) => (
+                    <div
+                      key={i}
+                      draggable
+                      className={`vsp-cmd-text-item${c.warn ? ' vsp-cmd-warn' : ''}${dragOverPresetIdx === i ? ' drag-over' : ''}${draggedPresetIdx === i ? ' dragging' : ''}`}
+                      style={{
+                        color: presetColors[i] || undefined,
+                        borderTop: dragOverPresetIdx === i && draggedPresetIdx !== null && draggedPresetIdx > i ? '2px solid var(--md-info)' : '2px solid transparent',
+                        borderBottom: dragOverPresetIdx === i && draggedPresetIdx !== null && draggedPresetIdx < i ? '2px solid var(--md-info)' : '2px solid transparent',
+                        opacity: draggedPresetIdx === i ? 0.4 : 1
+                      }}
+                      onClick={() => handlePresetClick(c.cmd, c.label, presetColors[i])}
+                      onContextMenu={e => handlePresetContextMenu(e, i)}
+                      onDragStart={e => handleDragStart(e, i)}
+                      onDragOver={e => handleDragOver(e, i)}
+                      onDrop={e => handleDrop(e, i)}
+                      onDragEnd={handleDragEnd}
+                      title={c.cmd}
+                    >
+                      {c.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right column – Nhật ký thực hiện */}
+              <div className="vsp-modal-2col-right">
+                <div className="vsp-modal-col-header">
+                  <span>{t('Nhật ký thực hiện')}</span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      className="vsp-btn" 
+                      onClick={() => {
+                        const logText = adbLogs.map(log => `[${log.time}] $ ${log.command}\n${log.output}`).join('\n\n');
+                        navigator.clipboard.writeText(logText);
+                      }}
+                      disabled={adbLogs.length === 0}
+                      data-inspector-id="viewerSidePanel.adbModalCopyLogButton"
+                      data-inspector-label="Copy ADB execution logs button"
+                      data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+                    >
+                      <Copy size={13} />{t('Copy log')}
+                    </button>
+                    <button 
+                      className="vsp-btn" 
+                      onClick={() => setAdbLogs([])}
+                      disabled={adbLogs.length === 0}
+                      data-inspector-id="viewerSidePanel.adbModalClearLogButton"
+                      data-inspector-label="Clear ADB execution logs button"
+                      data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+                    >
+                      <Trash2 size={13} />{t('Clear')}
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
-            <div className="vsp-modal-log-header">
-              <span>{t('Nhật ký thực hiện')}</span>
-              {adbLogs.length > 0 && <button className="vsp-btn-text" onClick={() => setAdbLogs([])}>{t('Xoá log')}</button>}
-            </div>
-            <div className="vsp-modal-log">
-              {adbLogs.length === 0 && <div className="vsp-empty">{t('Chưa có lệnh nào được thực hiện')}</div>}
-              {adbLogs.map(log => (
-                <div key={log.id} className={`vsp-log-entry ${log.success ? 'ok' : 'err'}`}>
-                  <div className="vsp-log-head"><span className="vsp-log-time">{log.time}</span><code className="vsp-log-cmd">$ {log.command}</code></div>
-                  <pre className="vsp-log-output">{log.output}</pre>
+                <div className="vsp-modal-log" style={{ background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '12px' }}>
+                  {adbLogs.length === 0 ? (
+                    <div className="vsp-empty">{t('Chưa có lệnh nào được thực hiện')}</div>
+                  ) : (
+                    adbLogs.map(log => (
+                      <div key={log.id} style={{ fontFamily: 'monospace', fontSize: '12.5px', borderBottom: '1px solid #1c1c1c', paddingBottom: '6px', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ color: '#666' }}>[{log.time}]</span>
+                          <span style={{ color: log.success ? '#2BD03C' : '#ff6060', fontWeight: 'bold' }}>$ {log.command}</span>
+                        </div>
+                        <pre style={{ margin: 0, paddingLeft: '8px', color: '#ccc', whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 'inherit', wordBreak: 'break-all' }}>
+                          {log.output}
+                        </pre>
+                      </div>
+                    ))
+                  )}
+
                 </div>
-              ))}
-              <div ref={logEndRef} />
+                {adbRunning && <div className="vsp-modal-running"><div className="vsp-spinner-small" /><span>{t('Đang thực hiện...')}</span></div>}
+              </div>
             </div>
-            {adbRunning && <div className="vsp-modal-running"><div className="vsp-spinner-small" /><span>{t('Đang thực hiện...')}</span></div>}
           </div>
         </div>
       )}
 
       {/* Preset right-click context menu - portal to body for correct positioning */}
       {ctxMenu && ReactDOM.createPortal(
-        <div className="vsp-ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={e => e.stopPropagation()}>
+        <div 
+          className="vsp-ctx-menu" 
+          style={{ left: ctxMenu.x, top: ctxMenu.y }} 
+          onClick={e => e.stopPropagation()}
+          data-inspector-id="viewerSidePanel.contextMenu"
+          data-inspector-label="ADB preset commands styling/edit context menu"
+          data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+        >
           <button className="vsp-ctx-item" onClick={() => startEditPreset(ctxMenu.idx)}>
             <Terminal size={13} />{t('Tuỳ chỉnh lệnh (Edit)')}
+          </button>
+          <button className="vsp-ctx-item" onClick={() => handleDeletePreset(ctxMenu.idx)} style={{ color: '#f87171' }}>
+            <Trash2 size={13} color="#f87171" />{t('Xoá lệnh (Delete)')}
           </button>
           <div className="vsp-ctx-divider" />
           <div className="vsp-ctx-label"><Palette size={12} />{t('Màu chữ')}</div>
@@ -805,6 +1109,16 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
               <input className="vsp-modal-input" value={editingPreset.cmd} onChange={e => setEditingPreset(p => p ? { ...p, cmd: e.target.value } : p)} />
               <button className="vsp-btn vsp-btn-primary vsp-btn-full" onClick={() => {
                 if (editingPreset.cmd.trim()) {
+                  setPresets(prev => {
+                    const next = [...prev];
+                    next[editingPreset.idx] = {
+                      ...next[editingPreset.idx],
+                      label: editingPreset.label.trim(),
+                      cmd: editingPreset.cmd.trim(),
+                    };
+                    saveJson(LS_PRESETS, next);
+                    return next;
+                  });
                   executeAdbCommand(editingPreset.cmd.trim());
                 }
                 setEditingPreset(null);
@@ -813,8 +1127,25 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
           </div>
         </div>
       )}
+
+      {confirmCmd && ReactDOM.createPortal(
+        <div className="confirmOverlay" style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="confirmPanel" style={{ width: 320, padding: 20 }}>
+            <div style={{ color: '#fff', fontSize: '15px', fontWeight: 'bold', marginBottom: '10px' }}>{t('Xác nhận lệnh rủi ro')}</div>
+            <div style={{ color: '#ccc', fontSize: '13px', marginBottom: '20px', lineHeight: 1.5 }}>
+              {t('Bạn có chắc muốn thực hiện lệnh')} <strong style={{ color: '#ef4444' }}>{confirmCmd.label}</strong> {t('không?')}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button className="modalBtn" onClick={() => setConfirmCmd(null)}>{t('Hủy')}</button>
+              <button className="modalBtnPrimary modalBtnDanger" onClick={() => {
+                executeAdbCommand(confirmCmd.cmd);
+                setConfirmCmd(null);
+              }}>{t('Thực hiện')}</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 }
-
-

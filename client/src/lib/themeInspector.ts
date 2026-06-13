@@ -590,10 +590,21 @@ export function getThemeRoleForElement(el: HTMLElement): ThemeColorMatch | null 
     }
   }
 
-  const textSourceEl = logicTargetEl || (foundMatch?.element as HTMLElement | null) || el;
+  let textSourceEl = el;
+  const nearestInteractive = el.closest('button, a, label, input, select, textarea') as HTMLElement | null;
+
+  if (nearestInteractive) {
+    textSourceEl = nearestInteractive;
+  } else if (logicTargetEl) {
+    const logicText = (logicTargetEl.textContent || '').trim();
+    if (logicTargetEl.tagName === 'BUTTON' || logicText.length < 150) {
+      textSourceEl = logicTargetEl;
+    }
+  }
+
   const uiText = getCleanText(textSourceEl);
-  const title = textSourceEl?.getAttribute('title') || undefined;
-  const ariaLabel = textSourceEl?.getAttribute('aria-label') || undefined;
+  const title = nearestInteractive?.getAttribute('title') || logicTargetEl?.getAttribute('title') || el.getAttribute('title') || undefined;
+  const ariaLabel = nearestInteractive?.getAttribute('aria-label') || logicTargetEl?.getAttribute('aria-label') || el.getAttribute('aria-label') || undefined;
 
   const finalMatch: ThemeColorMatch = {
     role: foundMatch.role,

@@ -297,16 +297,16 @@ All tooltips in the application must follow these rules:
 
 ## Scrcpy Server Build Rules
 
-Thu m?c server-go/scrcpy-decompiled l� source code Java c� ch?a do?n code ClipboardManager.java d� du?c fix tham s? deviceId + Looper c?a Android 14. 
-N� d�ng vai tr� nhu b?n backup m� ngu?n d? sau n�y n?u c?n nghi�n c?u th�m c� th? m? ra xem, nhung TUY?T �?I KH�NG �U?C d�ng script d? build l?i to�n b? scrcpy-server.jar t? thu m?c d� n?a (do WebSocket Core s? b? h?ng v� g�y l?i "Waiting for response").
-N?u c?n s?a file jar, h�y d�ng phuong ph�p Smali Injection: gi?i n�n classes.dex t? file scrcpy-server.jar g?c dang ch?y, d?ch ngu?c b?ng baksmali, ch�p d� file smali c?n s?a, r?i build l?i classes.dex b?ng smali v� d�ng g�i l?i v�o jar b?ng l?nh jar uf.
+Thu m?c server-go/scrcpy-decompiled l  source code Java c  ch?a do?n code ClipboardManager.java d  du?c fix tham s? deviceId + Looper c?a Android 14. 
+N  d ng vai tr  nhu b?n backup m  ngu?n d? sau n y n?u c?n nghi n c?u th m c  th? m? ra xem, nhung TUY?T  ?I KH NG  U?C d ng script d? build l?i to n b? scrcpy-server.jar t? thu m?c d  n?a (do WebSocket Core s? b? h?ng v  g y l?i "Waiting for response").
+N?u c?n s?a file jar, h y d ng phuong ph p Smali Injection: gi?i n n classes.dex t? file scrcpy-server.jar g?c dang ch?y, d?ch ngu?c b?ng baksmali, ch p d  file smali c?n s?a, r?i build l?i classes.dex b?ng smali v  d ng g i l?i v o jar b?ng l?nh jar uf.
 
 
 ## SCRCPY BUILD RULE
-Tuy?t d?i KH�NG d�ng script d? build l?i to�n b? scrcpy-server.jar t? thu m?c scrcpy-decompiled (v� s? l�m h?ng WebSocket Core). Thu m?c scrcpy-decompiled ch? gi? l?i d? tham kh?o m� ngu?n (ch?a do?n code fix ClipboardManager v� Android 14/15). N?u c?n patch scrcpy-server.jar, h�y d�ng c�ng c? apktool d? decompile ra file .smali, s?a file .smali, v� recompile l?i b?ng apktool b.
+Tuy?t d?i KH NG d ng script d? build l?i to n b? scrcpy-server.jar t? thu m?c scrcpy-decompiled (v  s? l m h?ng WebSocket Core). Thu m?c scrcpy-decompiled ch? gi? l?i d? tham kh?o m  ngu?n (ch?a do?n code fix ClipboardManager v  Android 14/15). N?u c?n patch scrcpy-server.jar, h y d ng c ng c? apktool d? decompile ra file .smali, s?a file .smali, v  recompile l?i b?ng apktool b.
 
 ## Rules for Number Inputs
-1. Trong c�c � nh?p S?, lu�n lu�n b? thanh Tang/Gi?m (spinner controls).
+1. Trong c c   nh?p S?, lu n lu n b? thanh Tang/Gi?m (spinner controls).
    - Web (CSS): input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
    - Desktop (QSS): QSpinBox::up-button, QSpinBox::down-button { width: 0; }
 
@@ -389,3 +389,104 @@ If the Account Manager Panel is closed → always return `false` (no borders at 
 | `isFilteredOut` | boolean per tile | Tile does NOT match filter (used to dim tile when overlay ON) |
 | `isAccountMatched` | boolean per tile | Tile DOES match filter (used for border highlight) |
 | `highlightFilterMatched` | `false` or color string | Border color: `blue`, `yellow`, `red`, `orange`, or `false` |
+## UI Inspector ID / Data Attribute Rules
+
+Khi tạo mới hoặc chỉnh sửa bất kỳ UI nào trong frontend, đặc biệt là button, badge, modal, panel, sidebar, context menu, dropdown, tooltip, tab, input, card, section hoặc overlay, bắt buộc phải gắn đầy đủ Inspector ID để sau này có thể dùng Inspector ID click vào UI và copy đúng target cho AI IDE sửa code.
+
+Mỗi UI target quan trọng phải có đủ các thuộc tính:
+
+```tsx
+data-inspector-id="domain.area.element"
+data-inspector-label="Human readable label"
+data-inspector-component="client/src/path/to/Component.tsx"
+```
+
+Quy tắc đặt tên:
+
+* `data-inspector-id` phải là tên kỹ thuật ổn định, không dùng tiếng Việt, không dùng khoảng trắng, không dùng text hiển thị làm ID chính
+* Format chuẩn: `domain.area.element`
+* Ví dụ đúng:
+
+  * `visualAlert.modalSaveButton`
+  * `visualAlert.modalTitle`
+  * `rightSidebar.settingsButton`
+  * `deviceAccount.totalAccountsBadge`
+  * `automation.actionButton`
+  * `syncTime.settingsModal`
+* Không dùng tên quá chung cho UI cụ thể:
+
+  * Sai: `button.generic`
+  * Sai: `text.primary`
+  * Sai: `section.background`
+  * Sai: `modal.background`
+* Nếu nhiều element dùng chung class, bắt buộc phải có Inspector ID riêng cho từng element để tránh AI IDE không biết đang chỉ nút nào
+
+Ví dụ button chuẩn:
+
+```tsx
+<button
+  className="visualAlertModalBtn primary"
+  data-inspector-id="visualAlert.modalSaveButton"
+  data-inspector-label="Visual Alert modal save button"
+  data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+>
+  Lưu
+</button>
+```
+
+Ví dụ badge chuẩn:
+
+```tsx
+<span
+  className="dav-total-badge"
+  data-inspector-id="deviceAccount.totalAccountsBadge"
+  data-inspector-label="Device account total accounts badge"
+  data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+>
+  {totalAccounts}
+</span>
+```
+
+Ví dụ modal chuẩn:
+
+```tsx
+<div
+  className="visualAlertModalCard visualAlertModalCardWide"
+  data-inspector-id="visualAlert.modalCard"
+  data-inspector-label="Visual Alert modal card"
+  data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+>
+```
+
+Với list item render động, có thể dùng chung `data-inspector-id` theo loại element, nhưng `data-inspector-label` nên kèm tên item thực tế nếu có.
+
+Ví dụ:
+
+```tsx
+<div
+  className="visualAlertROIItem"
+  data-inspector-id="visualAlert.roiItem"
+  data-inspector-label={`Visual Alert ROI item: ${roi.name}`}
+  data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+>
+```
+
+Khi sửa hoặc tạo UI mới, không được chỉ tạo class CSS mà bỏ qua Inspector ID. Class CSS dùng cho style, còn Inspector ID dùng để định danh UI target cho AI IDE sửa đúng logic.
+
+Mục tiêu bắt buộc: khi bật Inspector ID và click vào UI, clipboard phải cho ra target rõ ràng như:
+
+```text
+Inspector ID Target: visualAlert.modalSaveButton
+Label: Visual Alert modal save button
+Selector: [data-inspector-id="visualAlert.modalSaveButton"]
+Class: .visualAlertModalBtn.primary
+Component: client/src/components/VisualAlertPanel.tsx
+UI Text: Lưu
+Title:
+Aria Label:
+Style Variable: --mvp-button-bg
+Property: background-color
+```
+
+Nếu output vẫn ra các target chung như `button.generic`, `text.primary`, `section.background`, `modal.background` cho một UI cụ thể thì xem như UI đó chưa được đặt Inspector ID đầy đủ và cần bổ sung ngay.
+

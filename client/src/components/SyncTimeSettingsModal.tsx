@@ -117,7 +117,12 @@ export function SyncTimeSettingsModal({
   }, [onDragMove, onDragUp]);
 
   return createPortal(
-    <div className="syncTimeOverlay">
+    <div 
+      className="syncTimeOverlay"
+      data-inspector-id="syncTime.overlay"
+      data-inspector-label="Sync Time/Macro settings overlay backdrop"
+      data-inspector-component="client/src/components/SyncTimeSettingsModal.tsx"
+    >
       <div
         className="syncTimeCard"
         role="dialog"
@@ -125,6 +130,9 @@ export function SyncTimeSettingsModal({
         style={{ left: position.x, top: position.y }}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
+        data-inspector-id="syncTime.card"
+        data-inspector-label="Sync Time/Macro settings card panel"
+        data-inspector-component="client/src/components/SyncTimeSettingsModal.tsx"
       >
         <div className="syncTimeHeader" onPointerDown={startDrag}>
           <div className="syncTimeTitle">
@@ -136,6 +144,9 @@ export function SyncTimeSettingsModal({
             className="btn-close automationClose"
             aria-label="Close"
             onClick={onClose}
+            data-inspector-id="syncTime.closeButton"
+            data-inspector-label="Sync settings close button"
+            data-inspector-component="client/src/components/SyncTimeSettingsModal.tsx"
           >
             <X size={16} strokeWidth={2} />
           </button>
@@ -153,6 +164,9 @@ export function SyncTimeSettingsModal({
                 type="button"
                 className={`visualAlertToggle${settings.delayEnabled ? ' on' : ''}`}
                 onClick={() => onChange({ delayEnabled: !settings.delayEnabled })}
+                data-inspector-id="syncTime.delayToggle"
+                data-inspector-label="Sync delay enable toggle"
+                data-inspector-component="client/src/components/SyncTimeSettingsModal.tsx"
               >
                 <span className="visualAlertToggleKnob" />
               </button>
@@ -167,6 +181,9 @@ export function SyncTimeSettingsModal({
                 type="button"
                 className={`visualAlertToggle${settings.randomOrder ? ' on' : ''}`}
                 onClick={() => onChange({ randomOrder: !settings.randomOrder })}
+                data-inspector-id="syncTime.randomOrderToggle"
+                data-inspector-label="Random execution order toggle"
+                data-inspector-component="client/src/components/SyncTimeSettingsModal.tsx"
               >
                 <span className="visualAlertToggleKnob" />
               </button>
@@ -181,6 +198,9 @@ export function SyncTimeSettingsModal({
                 type="button"
                 className={`visualAlertToggle${settings.intervalEnabled ? ' on' : ''}`}
                 onClick={() => onChange({ intervalEnabled: !settings.intervalEnabled })}
+                data-inspector-id="syncTime.intervalToggle"
+                data-inspector-label="Sync interval enable toggle"
+                data-inspector-component="client/src/components/SyncTimeSettingsModal.tsx"
               >
                 <span className="visualAlertToggleKnob" />
               </button>
@@ -191,6 +211,9 @@ export function SyncTimeSettingsModal({
                 value={String(settings.intervalSec)}
                 onChange={(e) => handleNumberChange(e.target.value, 'intervalSec')}
                 disabled={isIntervalLocked}
+                data-inspector-id="syncTime.intervalInput"
+                data-inspector-label="Sync interval duration input"
+                data-inspector-component="client/src/components/SyncTimeSettingsModal.tsx"
               />
               <span className="syncTimeUnit">giây</span>
             </div>
@@ -204,6 +227,9 @@ export function SyncTimeSettingsModal({
                 type="button"
                 className={`visualAlertToggle${settings.offsetEnabled ? ' on' : ''}`}
                 onClick={() => onChange({ offsetEnabled: !settings.offsetEnabled })}
+                data-inspector-id="syncTime.offsetToggle"
+                data-inspector-label="Sync offset enable toggle"
+                data-inspector-component="client/src/components/SyncTimeSettingsModal.tsx"
               >
                 <span className="visualAlertToggleKnob" />
               </button>
@@ -214,6 +240,9 @@ export function SyncTimeSettingsModal({
                 value={String(settings.offsetMinPx)}
                 onChange={(e) => handleNumberChange(e.target.value, 'offsetMinPx')}
                 disabled={isOffsetLocked}
+                data-inspector-id="syncTime.offsetMinInput"
+                data-inspector-label="Sync offset minimum pixel input"
+                data-inspector-component="client/src/components/SyncTimeSettingsModal.tsx"
               />
               <span className="syncTimeRangeDash">-</span>
               <input
@@ -223,6 +252,9 @@ export function SyncTimeSettingsModal({
                 value={String(settings.offsetMaxPx)}
                 onChange={(e) => handleNumberChange(e.target.value, 'offsetMaxPx')}
                 disabled={isOffsetLocked}
+                data-inspector-id="syncTime.offsetMaxInput"
+                data-inspector-label="Sync offset maximum pixel input"
+                data-inspector-component="client/src/components/SyncTimeSettingsModal.tsx"
               />
               <span className="syncTimeUnit">px</span>
             </div>

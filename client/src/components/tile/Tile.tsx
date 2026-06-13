@@ -308,6 +308,9 @@ function TileComponent({
             ref={frameRef}
             style={{ cursor: 'pointer' }}
             aria-hidden={isViewing}
+            data-inspector-id="tile.videoFrame"
+            data-inspector-label="Tile screen mirroring canvas wrapper"
+            data-inspector-component="client/src/components/tile/Tile.tsx"
         >
             <canvas
                 ref={canvasRef}
@@ -337,6 +340,9 @@ function TileComponent({
                         clickDevice(udid);
                     }
                 }}
+                data-inspector-id="tile.canvas"
+                data-inspector-label="Tile screen mirroring canvas element"
+                data-inspector-component="client/src/components/tile/Tile.tsx"
             />
         </div>
     );
@@ -356,6 +362,9 @@ function TileComponent({
                     }
                 }
             }}
+            data-inspector-id="tile.wrapper"
+            data-inspector-label={`Device tile: ${udid}`}
+            data-inspector-component="client/src/components/tile/Tile.tsx"
         >
             {showTileInfo ? (
                 <TileHeader
@@ -383,7 +392,12 @@ function TileComponent({
 
             <div className="tileBody" ref={bodyRef}>
                 {isDisconnected && !showAccountOverlay ? (
-                    <div className="tileDisconnectedOverlay">
+                    <div 
+                        className="tileDisconnectedOverlay"
+                        data-inspector-id="tile.disconnectedOverlay"
+                        data-inspector-label="Tile disconnected error overlay"
+                        data-inspector-component="client/src/components/tile/Tile.tsx"
+                    >
                         <div className="tileDisconnectedIcon" aria-hidden="true">
                             <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
@@ -407,6 +421,9 @@ function TileComponent({
                             <div 
                                 className={`tile-account-overlay ${showAccountOverlay ? 'is-open' : (alwaysShowHeader ? 'is-header-only' : 'is-hidden')} ${isFilteredOut ? 'mxh-filtered-out' : ''} ${alwaysShowHeader && !showAccountOverlay && headerHideOrder ? 'header-hide-order' : ''} ${alwaysShowHeader && !showAccountOverlay && headerMinimalBg ? 'header-minimal-bg' : ''}`} 
                                 onMouseDown={e => e.stopPropagation()}
+                                data-inspector-id="tile.accountOverlay"
+                                data-inspector-label="Tile accounts info overlay cards"
+                                data-inspector-component="client/src/components/tile/Tile.tsx"
                             >
                                 {isFilteredOut && showAccountOverlay && (
                                     <div className="mxh-filter-overlay">
@@ -444,6 +461,9 @@ function TileComponent({
                                     e.stopPropagation();
                                     onClearVisualAlert?.(udid);
                                 }}
+                                data-inspector-id="tile.visualAlertBadge"
+                                data-inspector-label="Tile visual alert notification badge"
+                                data-inspector-component="client/src/components/tile/Tile.tsx"
                             >
                                 <Bell size={14} className="visualAlertBadgeIcon" />
                                 <span>Thông Báo Mới</span>
@@ -451,14 +471,24 @@ function TileComponent({
                         ) : null}
 
                         {isViewing ? (
-                            <div className="tileViewingOverlay">
+                            <div 
+                                className="tileViewingOverlay"
+                                data-inspector-id="tile.viewingOverlay"
+                                data-inspector-label="Tile screen is actively being viewed in detail modal overlay"
+                                data-inspector-component="client/src/components/tile/Tile.tsx"
+                            >
                                 <div className="tileViewingIcon" aria-hidden="true">
                                     <MousePointer2 size={44} strokeWidth={1.8} />
                                 </div>
                                 <div className="tileViewingTitle">{viewingLabel}</div>
                             </div>
                         ) : statusTrimmed ? (
-                            <div className={`tileStatusOverlay ${statusTone}`}>
+                            <div 
+                                className={`tileStatusOverlay ${statusTone}`}
+                                data-inspector-id="tile.statusOverlay"
+                                data-inspector-label="Tile connection and operation status message overlay"
+                                data-inspector-component="client/src/components/tile/Tile.tsx"
+                            >
                                 <div className="tileStatusIcon" aria-hidden="true">
                                     {statusIcon}
                                 </div>

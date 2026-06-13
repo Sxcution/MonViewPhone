@@ -86,13 +86,29 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
   return (
     <>
       {/* visualAlertSection : Section Visual Alert trong right panel */}
-      <div className="rcpSection visualAlertSection">
-        <div className="rcpTitleBar">
-          <div className="rcpTitle">
+      <div className="rcpSection visualAlertSection"
+        data-inspector-id="visualAlert.section"
+        data-inspector-label="Visual Alert section"
+        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+      >
+        <div className="rcpTitleBar"
+          data-inspector-id="visualAlert.header"
+          data-inspector-label="Visual Alert header"
+          data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+        >
+          <div className="rcpTitle"
+            data-inspector-id="visualAlert.title"
+            data-inspector-label="Visual Alert title"
+            data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+          >
             {config.enabled ? <Bell size={14} /> : <BellOff size={14} />}
             <span style={{ marginLeft: 6 }}>Visual Alert</span>
             {scanning && (
-              <span className="visualAlertScanBadge">Đang quét</span>
+              <span className="visualAlertScanBadge"
+                data-inspector-id="visualAlert.scanBadge"
+                data-inspector-label="Visual Alert scan badge"
+                data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+              >Đang quét</span>
             )}
           </div>
           <div className="rcpTitleActions">
@@ -384,12 +400,19 @@ function MultiROISetupModal({
 
   return createPortal(
     <>
-      <div className="visualAlertModalOverlay">
+      <div className="visualAlertModalOverlay"
+        data-inspector-id="visualAlert.modalOverlay"
+        data-inspector-label="Visual Alert modal overlay"
+        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+      >
         <div
           className="visualAlertModalCard visualAlertModalCardWide"
           style={{
             transform: `translate(${modalPos.x}px, ${modalPos.y}px)`,
           }}
+          data-inspector-id="visualAlert.modalCard"
+          data-inspector-label="Visual Alert modal card"
+          data-inspector-component="client/src/components/VisualAlertPanel.tsx"
         >
           {/* Header */}
           <div
@@ -398,12 +421,23 @@ function MultiROISetupModal({
             onPointerDown={handleHeaderPointerDown}
             onPointerMove={handleHeaderPointerMove}
             onPointerUp={handleHeaderPointerUp}
+            data-inspector-id="visualAlert.modalHeader"
+            data-inspector-label="Visual Alert modal header"
+            data-inspector-component="client/src/components/VisualAlertPanel.tsx"
           >
-            <h5 className="visualAlertModalTitle">
+            <h5 className="visualAlertModalTitle"
+              data-inspector-id="visualAlert.modalTitle"
+              data-inspector-label="Visual Alert modal title"
+              data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+            >
               <Crosshair size={16} />
               <span>Thiết lập Visual Alert</span>
               {draftROIs.length > 0 && (
-                <span className="visualAlertROICountBadge">{draftROIs.length}</span>
+                <span className="visualAlertROICountBadge"
+                  data-inspector-id="visualAlert.modalRoiCountBadge"
+                  data-inspector-label="Visual Alert modal ROI count badge"
+                  data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                >{draftROIs.length}</span>
               )}
             </h5>
             <button
@@ -415,26 +449,44 @@ function MultiROISetupModal({
                 e.stopPropagation();
                 onClose();
               }}
+              data-inspector-id="visualAlert.modalCloseButton"
+              data-inspector-label="Visual Alert modal close button"
+              data-inspector-component="client/src/components/VisualAlertPanel.tsx"
             >
               <X size={14} />
             </button>
           </div>
 
           {/* Body */}
-          <div className="visualAlertModalBody">
+          <div className="visualAlertModalBody"
+            data-inspector-id="visualAlert.modalBody"
+            data-inspector-label="Visual Alert modal body"
+            data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+          >
             {!selectedUdid || !activeCanvas ? (
-              <div className="visualAlertPickerEmpty">
+              <div className="visualAlertPickerEmpty"
+                data-inspector-id="visualAlert.modalEmptyState"
+                data-inspector-label="Visual Alert modal empty state"
+                data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+              >
                 Chọn một máy đang stream ở Grid trước
               </div>
             ) : (
               <>
                 {/* Canvas preview + ROI overlays */}
-                <div className="visualAlertPreviewWrap" ref={containerRef}>
+                <div className="visualAlertPreviewWrap" ref={containerRef}
+                  data-inspector-id="visualAlert.previewWrap"
+                  data-inspector-label="Visual Alert preview wrapper"
+                  data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                >
                   <canvas
                     ref={previewCanvasRef}
                     className="visualAlertPreviewCanvas"
                     onPointerMove={handleROIPointerMove}
                     onPointerUp={handleROIPointerUp}
+                    data-inspector-id="visualAlert.previewCanvas"
+                    data-inspector-label="Visual Alert preview canvas"
+                    data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                   />
                   {/* Render all ROI overlays */}
                   {draftROIs.map(roi => {
@@ -452,14 +504,24 @@ function MultiROISetupModal({
                         onPointerDown={e => handleROIPointerDown(e, roi.id, 'move')}
                         onPointerMove={handleROIPointerMove}
                         onPointerUp={handleROIPointerUp}
+                        data-inspector-id="visualAlert.roiBox"
+                        data-inspector-label={`Visual Alert ROI box: ${roi.name}`}
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                       >
                         {/* ROI label */}
-                        <span className="visualAlertROILabel">{roi.name}</span>
+                        <span className="visualAlertROILabel"
+                          data-inspector-id="visualAlert.roiLabel"
+                          data-inspector-label={`Visual Alert ROI label: ${roi.name}`}
+                          data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                        >{roi.name}</span>
                         {/* Resize handle only for active ROI */}
                         {isActive && (
                           <div
                             className="visualAlertROIResizeHandle"
                             onPointerDown={e => handleROIPointerDown(e, roi.id, 'resize')}
+                            data-inspector-id="visualAlert.roiResizeHandle"
+                            data-inspector-label={`Visual Alert ROI resize handle: ${roi.name}`}
+                            data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                           />
                         )}
                       </div>
@@ -469,7 +531,11 @@ function MultiROISetupModal({
 
                 {/* Active ROI coordinates */}
                 {activeROI && (
-                  <div className="visualAlertROICoords">
+                  <div className="visualAlertROICoords"
+                    data-inspector-id="visualAlert.roiCoords"
+                    data-inspector-label="Visual Alert ROI coordinates"
+                    data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                  >
                     <span>x: {activeROI.x.toFixed(3)}</span>
                     <span>y: {activeROI.y.toFixed(3)}</span>
                     <span>w: {activeROI.w.toFixed(3)}</span>
@@ -478,7 +544,11 @@ function MultiROISetupModal({
                 )}
 
                 {/* Settings */}
-                <div className="visualAlertSettingsGrid" style={{ marginTop: 8, marginBottom: 8 }}>
+                <div className="visualAlertSettingsGrid" style={{ marginTop: 8, marginBottom: 8 }}
+                  data-inspector-id="visualAlert.modalSettingsGrid"
+                  data-inspector-label="Visual Alert modal settings grid"
+                  data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                >
                   <label className="visualAlertSettingItem">
                     <span>Chu kỳ (s)</span>
                     <div className="visualAlertInputWrap">
@@ -490,6 +560,9 @@ function MultiROISetupModal({
                         onChange={e =>
                           setDraftScanIntervalSec(Math.max(1, Math.min(30, Number(e.target.value) || 3)))
                         }
+                        data-inspector-id="visualAlert.modalScanIntervalInput"
+                        data-inspector-label="Visual Alert modal scan interval input"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                       />
                     </div>
                   </label>
@@ -504,6 +577,9 @@ function MultiROISetupModal({
                         onChange={e =>
                           setDraftConfirmCount(Math.max(1, Math.min(10, Number(e.target.value) || 2)))
                         }
+                        data-inspector-id="visualAlert.modalConfirmCountInput"
+                        data-inspector-label="Visual Alert modal confirm count input"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                       />
                     </div>
                   </label>
@@ -518,25 +594,43 @@ function MultiROISetupModal({
                         onChange={e =>
                           setDraftCooldownSec(Math.max(10, Math.min(600, Number(e.target.value) || 60)))
                         }
+                        data-inspector-id="visualAlert.modalCooldownInput"
+                        data-inspector-label="Visual Alert modal cooldown input"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                       />
                     </div>
                   </label>
                 </div>
 
                 {/* ROI List */}
-                <div className="visualAlertROIList">
-                  <div className="visualAlertROIListHeader">
+                <div className="visualAlertROIList"
+                  data-inspector-id="visualAlert.roiList"
+                  data-inspector-label="Visual Alert ROI list"
+                  data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                >
+                  <div className="visualAlertROIListHeader"
+                    data-inspector-id="visualAlert.roiListHeader"
+                    data-inspector-label="Visual Alert ROI list header"
+                    data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                  >
                     <span>Danh sách điểm quét ({draftROIs.length})</span>
                     <button
                       className="visualAlertAddROIBtn"
                       onClick={handleAddROI}
                       title="Thêm điểm quét mới"
+                      data-inspector-id="visualAlert.addRoiButton"
+                      data-inspector-label="Visual Alert add ROI button"
+                      data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                     >
                       Thêm
                     </button>
                   </div>
                   {draftROIs.length === 0 && (
-                    <div className="visualAlertROIEmpty">
+                    <div className="visualAlertROIEmpty"
+                      data-inspector-id="visualAlert.roiEmptyState"
+                      data-inspector-label="Visual Alert ROI empty state"
+                      data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                    >
                       Chưa có điểm quét. Nhấn "+ Thêm" để tạo.
                     </div>
                   )}
@@ -545,6 +639,9 @@ function MultiROISetupModal({
                       key={roi.id}
                       className={`visualAlertROIItem${roi.id === activeROIId ? ' active' : ''}`}
                       onClick={() => setActiveROIId(roi.id)}
+                      data-inspector-id="visualAlert.roiItem"
+                      data-inspector-label={`Visual Alert ROI item: ${roi.name}`}
+                      data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                     >
                       <div className="visualAlertROIItemLeft">
                         {editingNameId === roi.id ? (
@@ -564,6 +661,9 @@ function MultiROISetupModal({
                               }
                               if (e.key === 'Escape') setEditingNameId(null);
                             }}
+                            data-inspector-id="visualAlert.roiNameInput"
+                            data-inspector-label={`Visual Alert ROI name input: ${roi.name}`}
+                            data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                           />
                         ) : (
                           <span
@@ -573,11 +673,18 @@ function MultiROISetupModal({
                               setEditingNameId(roi.id);
                             }}
                             title="Double-click để đổi tên"
+                            data-inspector-id="visualAlert.roiName"
+                            data-inspector-label={`Visual Alert ROI name: ${roi.name}`}
+                            data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                           >
                             {roi.name}
                           </span>
                         )}
-                        <span className="visualAlertROIItemCoords">
+                        <span className="visualAlertROIItemCoords"
+                          data-inspector-id="visualAlert.roiCoordsLabel"
+                          data-inspector-label={`Visual Alert ROI coords label: ${roi.name}`}
+                          data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                        >
                           {roi.w.toFixed(2)}×{roi.h.toFixed(2)}
                         </span>
                       </div>
@@ -588,6 +695,9 @@ function MultiROISetupModal({
                           setPendingDeleteROI(roi.id);
                         }}
                         title="Xoá điểm quét"
+                        data-inspector-id="visualAlert.deleteRoiButton"
+                        data-inspector-label={`Visual Alert delete ROI button: ${roi.name}`}
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -597,9 +707,17 @@ function MultiROISetupModal({
 
                 {/* Test results */}
                 {testResults && testResults.scanned && (
-                  <div className="visualAlertMultiTestResult">
+                  <div className="visualAlertMultiTestResult"
+                    data-inspector-id="visualAlert.multiTestResult"
+                    data-inspector-label="Visual Alert multi test results"
+                    data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                  >
                     {testResults.hits.map(h => (
-                      <div key={h.roiId} className="visualAlertMultiTestRow">
+                      <div key={h.roiId} className="visualAlertMultiTestRow"
+                        data-inspector-id="visualAlert.multiTestRow"
+                        data-inspector-label={`Visual Alert multi-test row: ${h.roiName}`}
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                      >
                         <span>{h.roiName}:</span>
                         <span>{h.redPixelCount} px</span>
                         <span>{h.detected ? '✅' : '❌'}</span>
@@ -609,17 +727,27 @@ function MultiROISetupModal({
                 )}
 
                 {/* Modal Actions */}
-                <div className="visualAlertModalActions">
+                <div className="visualAlertModalActions"
+                  data-inspector-id="visualAlert.modalActions"
+                  data-inspector-label="Visual Alert modal actions container"
+                  data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                >
                   <button
                     className="visualAlertModalBtn secondary"
                     onClick={handleTestInModal}
                     disabled={!draftROIs.length}
+                    data-inspector-id="visualAlert.modalTestScanButton"
+                    data-inspector-label="Visual Alert modal test scan button"
+                    data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                   >
                     Test quét
                   </button>
                   <button
                     className="visualAlertModalBtn secondary"
                     onClick={() => playAlertSound()}
+                    data-inspector-id="visualAlert.modalTestSoundButton"
+                    data-inspector-label="Visual Alert modal test sound button"
+                    data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                   >
                     Test âm thanh
                   </button>
@@ -632,6 +760,9 @@ function MultiROISetupModal({
                         cooldownSec: draftCooldownSec,
                       })
                     }
+                    data-inspector-id="visualAlert.modalSaveButton"
+                    data-inspector-label="Visual Alert modal save button"
+                    data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                   >
                     Lưu
                   </button>
@@ -643,20 +774,43 @@ function MultiROISetupModal({
       </div>
 
       {pendingDeleteROI && (
-        <div className="confirmOverlay" onMouseDown={() => setPendingDeleteROI(null)}>
-          <div className="confirmPanel compact" onMouseDown={e => e.stopPropagation()}>
-            <div className="confirmTitle">Xoá điểm quét?</div>
-            <div className="confirmText">
+        <div className="confirmOverlay" onMouseDown={() => setPendingDeleteROI(null)}
+          data-inspector-id="visualAlert.deleteRoiConfirmOverlay"
+          data-inspector-label="Visual Alert delete ROI confirm overlay"
+          data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+        >
+          <div className="confirmPanel compact" onMouseDown={e => e.stopPropagation()}
+            data-inspector-id="visualAlert.deleteRoiConfirmPanel"
+            data-inspector-label="Visual Alert delete ROI confirm panel"
+            data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+          >
+            <div className="confirmTitle"
+              data-inspector-id="visualAlert.deleteRoiConfirmTitle"
+              data-inspector-label="Visual Alert delete ROI confirm title"
+              data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+            >Xoá điểm quét?</div>
+            <div className="confirmText"
+              data-inspector-id="visualAlert.deleteRoiConfirmText"
+              data-inspector-label="Visual Alert delete ROI confirm text"
+              data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+            >
               Bạn có chắc muốn xoá điểm quét này không?
             </div>
             <div className="confirmActions center">
-              <button className="modalBtn" onClick={() => setPendingDeleteROI(null)}>Huỷ</button>
+              <button className="modalBtn" onClick={() => setPendingDeleteROI(null)}
+                data-inspector-id="visualAlert.deleteRoiCancelButton"
+                data-inspector-label="Visual Alert delete ROI cancel button"
+                data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+              >Huỷ</button>
               <button
                 className="modalBtnDanger"
                 onClick={() => {
                   handleDeleteROI(pendingDeleteROI);
                   setPendingDeleteROI(null);
                 }}
+                data-inspector-id="visualAlert.deleteRoiConfirmButton"
+                data-inspector-label="Visual Alert delete ROI confirm button"
+                data-inspector-component="client/src/components/VisualAlertPanel.tsx"
               >
                 Xác Nhận
               </button>

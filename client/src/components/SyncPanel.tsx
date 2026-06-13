@@ -29,10 +29,20 @@ export function SyncPanel({ orderedUdids }: Props) {
   }, [sortedUdids]);
 
   return (
-    <div className='rcpSection'>
+    <div 
+      className='rcpSection'
+      data-inspector-id="syncPanel.panel"
+      data-inspector-label="Device sync panel section"
+      data-inspector-component="client/src/components/SyncPanel.tsx"
+    >
       <div className='rcpDeviceHeader'>
         <span className='rcpDeviceTitle'>{t('Nhóm thiết bị')}</span>
-        <label className={`rcpSelectPill${allFollowersChecked ? ' on' : ''}`}>
+        <label 
+          className={`rcpSelectPill${allFollowersChecked ? ' on' : ''}`}
+          data-inspector-id="syncPanel.selectAllToggle"
+          data-inspector-label="Toggle select/deselect all follower devices"
+          data-inspector-component="client/src/components/SyncPanel.tsx"
+        >
           <input
             type='checkbox'
             checked={allFollowersChecked}
@@ -48,7 +58,13 @@ export function SyncPanel({ orderedUdids }: Props) {
       <div className='rcpGridWrap'>
         <div className='rcpGrid rcpGridCompact'>
           {sortedUdids.map((id) => (
-            <label key={id} className={`rcpGridItem${syncTargets.includes(id) ? ' on' : ''}`}>
+            <label 
+              key={id} 
+              className={`rcpGridItem${syncTargets.includes(id) ? ' on' : ''}`}
+              data-inspector-id="syncPanel.deviceItem"
+              data-inspector-label={`Device sync checkbox for No. ${idToNumber.get(id)}`}
+              data-inspector-component="client/src/components/SyncPanel.tsx"
+            >
               <input type='checkbox' checked={syncTargets.includes(id)} onChange={() => toggleSyncTarget(id)} />
               <span>{String(idToNumber.get(id) || 0).padStart(2, '0')}</span>
             </label>

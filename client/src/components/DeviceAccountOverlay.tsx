@@ -367,7 +367,13 @@ function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unk
 
   if (type === 'shelter') {
     return (
-      <span title="Shelter" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
+      <span 
+        title="Shelter" 
+        style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}
+        data-inspector-id="deviceAccount.accountTypeBadge"
+        data-inspector-label="Shelter account type badge"
+        data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+      >
         <Briefcase
           size={13}
           color={iconColor}
@@ -379,7 +385,13 @@ function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unk
 
   if (type === 'secure') {
     return (
-      <span title="Secure Folder" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
+      <span 
+        title="Secure Folder" 
+        style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}
+        data-inspector-id="deviceAccount.accountTypeBadge"
+        data-inspector-label="Secure folder account type badge"
+        data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+      >
         <Folder
           size={13}
           color={iconColor}
@@ -391,7 +403,13 @@ function renderAppTypeIcon(type?: 'main' | 'clone' | 'secure' | 'shelter' | 'unk
 
   if (type === 'clone') {
     return (
-      <span title="Clone App" style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}>
+      <span 
+        title="Clone App" 
+        style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' }}
+        data-inspector-id="deviceAccount.accountTypeBadge"
+        data-inspector-label="Clone app account type badge"
+        data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+      >
         <svg
           width="13"
           height="13"
@@ -1703,14 +1721,30 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const activePlatformLabel = platforms.find(p => p.id === activeTab)?.label || 'WeChat';
 
   return (
-    <div className="dav-panel" onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}>
-      <div className="dav-panel-header">
+    <div 
+      className="dav-panel" 
+      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
+      data-inspector-id="deviceAccount.deviceCard"
+      data-inspector-label={`Device account card for device ${order}`}
+      data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+    >
+      <div 
+        className="dav-panel-header"
+        data-inspector-id="deviceAccount.deviceHeader"
+        data-inspector-label="Device card header area"
+        data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+      >
         <div
           className="dav-panel-title-left"
           onMouseDown={handleOpenViewerMiddleClick}
           onAuxClick={handleOpenViewerAuxClick}
         >
-          <span className={`dav-order ${panelHasNearbyEligibleAccount ? 'dav-order-nearby-eligible' : ''}`}>
+          <span 
+            className={`dav-order ${panelHasNearbyEligibleAccount ? 'dav-order-nearby-eligible' : ''}`}
+            data-inspector-id="deviceAccount.deviceNumber"
+            data-inspector-label={`Device order number: ${order}`}
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+          >
             {order.toString().padStart(2, '0')}
           </span>
           <div className="dav-title-dropdown-wrap" ref={accountTitleDropdownRef}>
@@ -1866,6 +1900,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                               fontWeight: 'bold',
                               flexShrink: 0
                             }}
+                            data-inspector-id="deviceAccount.launchProfileBadge"
+                            data-inspector-label={`Launch profile badge for User ${account.wechatLaunchProfile.userId}`}
+                            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                           >
                             U{account.wechatLaunchProfile.userId}
                           </span>
@@ -2079,6 +2116,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   e.stopPropagation();
                   activeDailyReminders.forEach(acc => dismissReminder(acc.id));
                 }}
+                data-inspector-id="deviceAccount.dailyReminderCloseButton"
+                data-inspector-label="Daily reminder tooltip close button"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
                 Đóng
               </button>
@@ -2361,7 +2401,13 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             setCtxMenu({ x: e.clientX, y: e.clientY, accountId: selectedAccount.id });
           }}>
             {/* Tên tài khoản */}
-            <div className="dav-input-wrapper" style={{ marginTop: '10px' }}>
+            <div 
+              className="dav-input-wrapper" 
+              style={{ marginTop: '10px' }}
+              data-inspector-id="deviceAccount.accountNameDisplay"
+              data-inspector-label="Account name display container"
+              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+            >
               <span
                 style={{ color: '#888', userSelect: 'none', fontSize: '11px', fontWeight: 'bold', marginLeft: '2px', cursor: 'default', display: 'inline-flex', alignItems: 'center' }}
               >
@@ -2373,6 +2419,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 placeholder="Tên tài khoản"
                 value={selectedAccount.name || ''}
                 onChange={e => handleUpdateAccount(selectedAccount.id, { name: e.target.value })}
+                data-inspector-id="deviceAccount.accountNameInput"
+                data-inspector-label="Account name text input"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               />
             </div>
 
@@ -2409,7 +2458,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
             {/* Số điện thoại */}
             {!hidePhone && (
-              <div className="dav-input-wrapper">
+              <div className="dav-input-wrapper" style={{ marginTop: '10px' }}>
                 <span
                   className="dav-identity-toggle"
                   title={isIdentityHidden('phone') ? 'Hiện số điện thoại' : 'Ẩn số điện thoại'}
@@ -2435,13 +2484,16 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     if (isIdentityHidden('phone')) return;
                     handleUpdateAccount(selectedAccount.id, { phone: e.target.value });
                   }}
+                  data-inspector-id="deviceAccount.phoneInput"
+                  data-inspector-label="Account phone number text input"
+                  data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                 />
               </div>
             )}
 
             {/* Email */}
             {!hideEmail && (
-              <div className="dav-input-wrapper">
+              <div className="dav-input-wrapper" style={{ marginTop: '10px' }}>
                 <span
                   className="dav-identity-toggle"
                   title={isIdentityHidden('email') ? 'Hiện email' : 'Ẩn email'}
@@ -2467,6 +2519,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     if (isIdentityHidden('email')) return;
                     handleUpdateAccount(selectedAccount.id, { email: e.target.value });
                   }}
+                  data-inspector-id="deviceAccount.emailInput"
+                  data-inspector-label="Account email text input"
+                  data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                 />
               </div>
             )}
@@ -2489,7 +2544,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               if (!showRow) return null;
 
               return (
-                <div className="dav-stats-row">
+                <div 
+                  className="dav-stats-row"
+                  data-inspector-id="deviceAccount.qrCodeRow"
+                  data-inspector-label="WeChat QR Code and Nearby People countdown row"
+                  data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+                >
                   {!hideQR ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <QrCode size={13} color="#ffffff" style={{ flexShrink: 0 }} />
@@ -2547,7 +2607,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
             {/* input_created_at : Nhập ngày tạo tài khoản */}
             {!hideCreatedAt && (
-              <div className="dav-centered-row">
+              <div 
+                className="dav-centered-row"
+                data-inspector-id="deviceAccount.createdDateRow"
+                data-inspector-label="Account created date display/input row"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+              >
                 {!selectedAccount.createdAt || showDateInput ? (
                   <input
                     type="text"
@@ -2961,8 +3026,22 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       )}
 
       {pendingDeleteAccount && ReactDOM.createPortal(
-        <div className="confirmOverlay" style={{ zIndex: 29000, background: 'transparent' }} onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}>
-          <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480, zIndex: 29001 }} onPointerDown={e => e.stopPropagation()}>
+        <div 
+          className="confirmOverlay" 
+          style={{ zIndex: 29000, background: 'transparent' }} 
+          onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}
+          data-inspector-id="deviceAccount.deleteConfirmOverlay"
+          data-inspector-label="Delete account confirmation modal overlay"
+          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+        >
+          <div 
+            className="confirmPanel" 
+            style={{ minWidth: 380, maxWidth: 480, zIndex: 29001 }} 
+            onPointerDown={e => e.stopPropagation()}
+            data-inspector-id="deviceAccount.deleteConfirmModal"
+            data-inspector-label="Delete account confirmation modal card"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+          >
             <div className="confirmTitle">Xác nhận xoá tài khoản</div>
             <div className="confirmText">
               Bạn có chắc chắn muốn xoá tài khoản <strong>{pendingDeleteAccount.name}</strong>?
@@ -2977,6 +3056,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   e.stopPropagation();
                   setPendingDeleteAccount(null);
                 }}
+                data-inspector-id="deviceAccount.deleteConfirmCancelButton"
+                data-inspector-label="Delete account confirmation cancel button"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
                 Huỷ
               </button>
@@ -2989,6 +3071,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   handleDeleteAccount(pendingDeleteAccount.id);
                   setPendingDeleteAccount(null);
                 }}
+                data-inspector-id="deviceAccount.deleteConfirmButton"
+                data-inspector-label="Delete account confirmation confirm button"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
                 Xác nhận
               </button>
@@ -3001,10 +3086,16 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       {historyModalAccount && ReactDOM.createPortal(
         <div
           className="confirmOverlay dav-history-overlay"
+          data-inspector-id="deviceAccount.accountHistoryOverlay"
+          data-inspector-label="Account history modal overlay"
+          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
         >
           <div
             className="confirmPanel dav-history-panel"
             onPointerDown={(e) => e.stopPropagation()}
+            data-inspector-id="deviceAccount.accountHistoryModal"
+            data-inspector-label="Account history modal card"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
           >
             <div className="dav-history-title-row">
               <div className="confirmTitle dav-history-title">Lịch sử tài khoản</div>
@@ -3044,6 +3135,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   e.stopPropagation();
                   setPendingResetHistoryAccount(historyModalAccount);
                 }}
+                data-inspector-id="deviceAccount.accountHistoryResetButton"
+                data-inspector-label="Account history reset button"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
                 Reset
               </button>
@@ -3055,6 +3149,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   e.stopPropagation();
                   setHistoryModalAccountId(null);
                 }}
+                data-inspector-id="deviceAccount.accountHistoryCloseButton"
+                data-inspector-label="Account history close button"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
                 Đóng
               </button>
@@ -3065,8 +3162,22 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       )}
 
       {pendingResetHistoryAccount && ReactDOM.createPortal(
-        <div className="confirmOverlay" style={{ zIndex: 29000, background: 'transparent' }} onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}>
-          <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480, zIndex: 29001 }} onPointerDown={e => e.stopPropagation()}>
+        <div 
+          className="confirmOverlay" 
+          style={{ zIndex: 29000, background: 'transparent' }} 
+          onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}
+          data-inspector-id="deviceAccount.resetHistoryConfirmOverlay"
+          data-inspector-label="Reset history confirmation modal overlay"
+          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+        >
+          <div 
+            className="confirmPanel" 
+            style={{ minWidth: 380, maxWidth: 480, zIndex: 29001 }} 
+            onPointerDown={e => e.stopPropagation()}
+            data-inspector-id="deviceAccount.resetHistoryConfirmModal"
+            data-inspector-label="Reset history confirmation modal card"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+          >
             <div className="confirmTitle">Reset lịch sử tài khoản</div>
             <div className="confirmText">
               Bạn có chắc chắn muốn reset toàn bộ lịch sử trạng thái của tài khoản <strong>{getAccountDisplayName(pendingResetHistoryAccount)}</strong>?
@@ -3081,6 +3192,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   e.stopPropagation();
                   setPendingResetHistoryAccount(null);
                 }}
+                data-inspector-id="deviceAccount.resetHistoryConfirmCancelButton"
+                data-inspector-label="Reset history confirmation cancel button"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
                 Huỷ
               </button>
@@ -3093,6 +3207,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   handleUpdateAccount(pendingResetHistoryAccount.id, { history: [] });
                   setPendingResetHistoryAccount(null);
                 }}
+                data-inspector-id="deviceAccount.resetHistoryConfirmButton"
+                data-inspector-label="Reset history confirmation confirm button"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
                 Xác nhận
               </button>
@@ -3111,6 +3228,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           onClick={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
           onContextMenu={e => e.stopPropagation()}
+          data-inspector-id="deviceAccount.contextMenu"
+          data-inspector-label="Device account action context menu"
+          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
         >
           <button
             type="button"
@@ -3122,6 +3242,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               navigator.clipboard.writeText(textToCopy);
               setAccountActionMenu(null);
             }}
+            data-inspector-id="deviceAccount.contextMenuCopyId"
+            data-inspector-label="Copy account ID menu item"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
           >
             Copy ID ( User name)
           </button>
@@ -3141,6 +3264,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               setAccountTitleDropdownOpen(false);
               setAccountHoverTooltip(null);
             }}
+            data-inspector-id="deviceAccount.contextMenuNotice"
+            data-inspector-label="Edit account notice settings menu item"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
           >
             Thông báo
           </button>
@@ -3150,6 +3276,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               className="dav-ctx-submenu-container"
               onMouseEnter={() => setShowSetSubmenu(true)}
               onMouseLeave={() => setShowSetSubmenu(false)}
+              data-inspector-id="deviceAccount.contextMenuLaunchProfileSubmenu"
+              data-inspector-label="Launch profile mappings submenu"
+              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
             >
               <button
                 type="button"
@@ -3198,6 +3327,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                           setAccountActionMenu(null);
                           setAccountTitleDropdownOpen(false);
                         }}
+                        data-inspector-id="deviceAccount.contextMenuLaunchProfileItem"
+                        data-inspector-label={`Map launch profile to User ${profile.id}`}
+                        data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                       >
                         {label}
                       </button>
@@ -3213,6 +3345,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             className="dav-ctx-submenu-container"
             onMouseEnter={() => setShowClassificationSubmenu(true)}
             onMouseLeave={() => setShowClassificationSubmenu(false)}
+            data-inspector-id="deviceAccount.contextMenuClassificationSubmenu"
+            data-inspector-label="Account classification submenu"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
           >
             <button
               type="button"
@@ -3238,6 +3373,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     setAccountActionMenu(null);
                     setAccountTitleDropdownOpen(false);
                   }}
+                  data-inspector-id="deviceAccount.contextMenuClassificationItem"
+                  data-inspector-label={`Set account classification to ${type}`}
+                  data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                 >
                   {getAppTypeLabel(type)}
                 </button>
@@ -3256,6 +3394,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               setAccountActionMenu(null);
               setAccountTitleDropdownOpen(false);
             }}
+            data-inspector-id="deviceAccount.contextMenuMove"
+            data-inspector-label="Move account to another device menu item"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
           >
             Di chuyển tài khoản
           </button>
@@ -3275,6 +3416,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             style={{ minWidth: '280px' }}
             onMouseDown={e => e.stopPropagation()}
             onPointerDown={e => e.stopPropagation()}
+            data-inspector-id="deviceAccount.moveAccountModal"
+            data-inspector-label="Move account destination dialog"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
           >
             <div className="confirmTitle" style={{ textAlign: 'center', fontSize: '14px' }}>
               Di chuyển tài khoản
@@ -3294,6 +3438,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 value={targetOrderStr}
                 onChange={e => setTargetOrderStr(e.target.value)}
                 autoFocus
+                data-inspector-id="deviceAccount.moveAccountInput"
+                data-inspector-label="Destination device number input"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               />
               {moveError && (
                 <span style={{ fontSize: '11px', color: 'var(--md-danger)', textAlign: 'center', marginTop: '2px' }}>
@@ -3314,6 +3461,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   setTargetOrderStr('');
                   setMoveError('');
                 }}
+                data-inspector-id="deviceAccount.moveAccountCancelButton"
+                data-inspector-label="Cancel move account button"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
                 Hủy
               </button>
@@ -3326,6 +3476,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   e.stopPropagation();
                   handleConfirmMove();
                 }}
+                data-inspector-id="deviceAccount.moveAccountConfirmButton"
+                data-inspector-label="Confirm move account button"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
                 Xác nhận
               </button>
@@ -3924,11 +4077,19 @@ export function DeviceAccountOverlay({
 
   return ReactDOM.createPortal(
     <>
-      <div className={`dav-overlay ${panelOpen ? 'is-open' : 'is-hidden'}`}>
+      <div 
+        className={`dav-overlay ${panelOpen ? 'is-open' : 'is-hidden'}`}
+        data-inspector-id="deviceAccount.overlay"
+        data-inspector-label="Device accounts overlay backdrop"
+        data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+      >
       <div
         ref={floatingPanelRef}
         className="dav-floating-panel"
         style={dragPos ? { position: 'absolute', left: `${dragPos.x}px`, top: `${dragPos.y}px`, transform: 'none' } : {}}
+        data-inspector-id="deviceAccount.panel"
+        data-inspector-label="Device accounts floating card panel"
+        data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
       >
         <div
           className="dav-floating-header"
@@ -3939,10 +4100,20 @@ export function DeviceAccountOverlay({
             setDragPos(null);
             localStorage.removeItem('monviewphone:dav-drag-pos');
           }}
+          data-inspector-id="deviceAccount.header"
+          data-inspector-label="Device accounts header drag area"
+          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
         >
           <div className="dav-floating-title-left" style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <span className="dav-floating-title">Quản lý tài khoản</span>
-
+            <span 
+              className="dav-floating-title"
+              data-inspector-id="deviceAccount.title"
+              data-inspector-label="Device accounts overlay title"
+              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+            >
+              Quản lý tài khoản
+            </span>
+ 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 16 }}>
               <span style={{ fontSize: 11, color: 'var(--md-muted)', userSelect: 'none' }}>Ẩn Tên</span>
               <button
@@ -3967,9 +4138,15 @@ export function DeviceAccountOverlay({
               </button>
             </div>
           </div>
-
+ 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div className="dav-floating-platform-select" style={{ marginRight: 4 }}>
+            <div 
+              className="dav-floating-platform-select" 
+              style={{ marginRight: 4 }}
+              data-inspector-id="deviceAccount.platformTabs"
+              data-inspector-label="Platform selection tab container"
+              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+            >
               {platforms.map(p => (
                 <button
                   key={p.id}
@@ -3986,6 +4163,9 @@ export function DeviceAccountOverlay({
                       platformId: p.id
                     });
                   }}
+                  data-inspector-id={p.id === 'wechat' ? "deviceAccount.wechatTab" : undefined}
+                  data-inspector-label={p.id === 'wechat' ? "WeChat platform tab button" : undefined}
+                  data-inspector-component={p.id === 'wechat' ? "client/src/components/DeviceAccountOverlay.tsx" : undefined}
                 >
                   {p.label}
                 </button>
@@ -3995,11 +4175,14 @@ export function DeviceAccountOverlay({
                 className="dav-floating-platform-btn-add"
                 onClick={() => setShowAddPlatformModal(true)}
                 title="Thêm nhóm mới"
+                data-inspector-id="deviceAccount.addGroupButton"
+                data-inspector-label="Add new platform group button"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
                 <Plus size={12} />
               </button>
             </div>
-
+ 
             {/* btn_dav_settings : Nút cài đặt Quản lý tài khoản */}
             <button
               type="button"
@@ -4010,20 +4193,36 @@ export function DeviceAccountOverlay({
                 e.stopPropagation();
                 setShowAccountSettingsModal(true);
               }}
+              data-inspector-id="deviceAccount.settingsButton"
+              data-inspector-label="Device accounts global settings button"
+              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
             >
               <Settings size={15} />
             </button>
-            <button className="dav-floating-close-btn" onClick={onClose}>
+            <button 
+              className="dav-floating-close-btn" 
+              onClick={onClose}
+              data-inspector-id="deviceAccount.closeButton"
+              data-inspector-label="Device accounts overlay close button"
+              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+            >
               <X size={16} />
             </button>
           </div>
         </div>
-
+ 
         {/* Thanh lọc statistics */}
         <div className="dav-stats-container">
           <div className="dav-stats-row-global">
             <span className="dav-stats-label">Tài khoản:</span>
-            <span className="dav-stats-val-total">{totalAccs}</span>
+            <span 
+              className="dav-stats-val-total"
+              data-inspector-id="deviceAccount.totalAccountsBadge"
+              data-inspector-label="Total accounts count badge"
+              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+            >
+              {totalAccs}
+            </span>
             <span className="dav-stats-divider">|</span>
             <span className={`dav-stats-btn ${activeFilter === 'one_year' ? 'active' : ''}`} onClick={() => handleFilterClick('one_year')}>
               TK 1 năm: <strong style={{ color: '#fff' }}>{oneYearCount}</strong>
@@ -4049,7 +4248,7 @@ export function DeviceAccountOverlay({
               Thiếu Info: <strong style={{ color: '#ffffff' }}>{incompleteInfoCount}</strong>
             </span>
           </div>
-
+ 
           <div className="dav-stats-row-global">
             <span className="dav-stats-label">Thiết bị:</span>
             <span className="dav-stats-val-total">{totalDevices}</span>
@@ -4067,7 +4266,7 @@ export function DeviceAccountOverlay({
             </span>
           </div>
         </div>
-
+ 
         {/* Thanh tìm kiếm ngay phía dưới */}
         <input
           ref={searchInputRef}
@@ -4076,6 +4275,9 @@ export function DeviceAccountOverlay({
           placeholder="Tìm theo Tên, Nickname, SĐT, Email..."
           value={search}
           onChange={e => setSearch(e.target.value)}
+          data-inspector-id="deviceAccount.searchInput"
+          data-inspector-label="Device accounts search query input"
+          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
         />
 
         {/* Nhóm đã tạo sẵn trong Quản lý tài khoản */}
@@ -4322,6 +4524,9 @@ export function DeviceAccountOverlay({
             className="confirmPanel dav-settings-panel"
             style={{ minWidth: 420, maxWidth: 520 }}
             onMouseDown={e => e.stopPropagation()}
+            data-inspector-id="deviceAccount.noticeSettingsPanel"
+            data-inspector-label="Device accounts overlay global settings modal"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
           >
             <div className="confirmTitle">Cài đặt Quản lý tài khoản</div>
 
@@ -4334,6 +4539,9 @@ export function DeviceAccountOverlay({
                   type="button"
                   className={`dav-settings-choice ${nearbyFilterMode === 'priority_sort' ? 'active' : ''}`}
                   onClick={() => updateNearbyFilterMode('priority_sort')}
+                  data-inspector-id="deviceAccount.nearbySortButton"
+                  data-inspector-label="Nearby people priority sort setting button"
+                  data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                 >
                   <strong>Sắp xếp ưu tiên Nearby</strong>
                 </button>
@@ -4343,6 +4551,9 @@ export function DeviceAccountOverlay({
                   type="button"
                   className={`dav-settings-choice ${nearbyFilterMode === 'hide_unmatched' ? 'active' : ''}`}
                   onClick={() => updateNearbyFilterMode('hide_unmatched')}
+                  data-inspector-id="deviceAccount.nearbyFilterButton"
+                  data-inspector-label="Nearby people hide unmatched setting button"
+                  data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                 >
                   <strong>Ẩn title không liên quan</strong>
                 </button>
@@ -4363,6 +4574,9 @@ export function DeviceAccountOverlay({
                     type="button"
                     className={`dav-toggle-switch ${hidePhone ? 'on' : ''}`}
                     onClick={() => updateHideSetting('monviewphone:dav-hide-phone', !hidePhone, setHidePhone)}
+                    data-inspector-id="deviceAccount.hidePhoneToggle"
+                    data-inspector-label="Hide phone number display toggle"
+                    data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                   >
                     <div className="dav-toggle-knob" />
                   </button>
@@ -4380,6 +4594,9 @@ export function DeviceAccountOverlay({
                     type="button"
                     className={`dav-toggle-switch ${hideEmail ? 'on' : ''}`}
                     onClick={() => updateHideSetting('monviewphone:dav-hide-email', !hideEmail, setHideEmail)}
+                    data-inspector-id="deviceAccount.hideEmailToggle"
+                    data-inspector-label="Hide email display toggle"
+                    data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                   >
                     <div className="dav-toggle-knob" />
                   </button>
@@ -4397,6 +4614,9 @@ export function DeviceAccountOverlay({
                     type="button"
                     className={`dav-toggle-switch ${hideQR ? 'on' : ''}`}
                     onClick={() => updateHideSetting('monviewphone:dav-hide-qr', !hideQR, setHideQR)}
+                    data-inspector-id="deviceAccount.hideQrToggle"
+                    data-inspector-label="Hide QR code display toggle"
+                    data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                   >
                     <div className="dav-toggle-knob" />
                   </button>
@@ -4414,6 +4634,9 @@ export function DeviceAccountOverlay({
                     type="button"
                     className={`dav-toggle-switch ${hideCreatedAt ? 'on' : ''}`}
                     onClick={() => updateHideSetting('monviewphone:dav-hide-created-at', !hideCreatedAt, setHideCreatedAt)}
+                    data-inspector-id="deviceAccount.hideCreatedDateToggle"
+                    data-inspector-label="Hide created date display toggle"
+                    data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                   >
                     <div className="dav-toggle-knob" />
                   </button>

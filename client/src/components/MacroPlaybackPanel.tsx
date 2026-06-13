@@ -164,6 +164,9 @@ export function MacroPlaybackPanel() {
         right: 'auto',
         bottom: 'auto',
       } : undefined}
+      data-inspector-id="macroPlayback.panel"
+      data-inspector-label="Automation macro playback status overlay panel"
+      data-inspector-component="client/src/components/MacroPlaybackPanel.tsx"
     >
       {/* startMacroPlaybackDrag : Drag panel header handler */}
       <header className="macroPlaybackHeader" onPointerDown={startMacroPlaybackDrag}>
@@ -177,6 +180,9 @@ export function MacroPlaybackPanel() {
             type="button"
             className="modalBtn macroPlaybackToggleBtn"
             onClick={() => setMacroPlaybackExpanded(prev => !prev)}
+            data-inspector-id="macroPlayback.toggleButton"
+            data-inspector-label="Toggle playback details expand/collapse button"
+            data-inspector-component="client/src/components/MacroPlaybackPanel.tsx"
           >
             {macroPlaybackExpanded ? 'Thu gọn' : 'Mở rộng'}
           </button>
@@ -194,6 +200,9 @@ export function MacroPlaybackPanel() {
               setMacroPlaybackItems([]);
             }}
             title="Đóng panel"
+            data-inspector-id="macroPlayback.closeButton"
+            data-inspector-label="Close playback status panel and stop macros button"
+            data-inspector-component="client/src/components/MacroPlaybackPanel.tsx"
           >
             ✕
           </button>
@@ -202,7 +211,13 @@ export function MacroPlaybackPanel() {
       {macroPlaybackExpanded ? (
         <div className="macroPlaybackList">
           {macroPlaybackItems.map(item => (
-            <div key={item.id} className={`macroPlaybackItem${!item.running ? ' finished' : ''}`}>
+            <div 
+              key={item.id} 
+              className={`macroPlaybackItem${!item.running ? ' finished' : ''}`}
+              data-inspector-id="macroPlayback.itemRow"
+              data-inspector-label={`Macro execution status for: ${item.title}`}
+              data-inspector-component="client/src/components/MacroPlaybackPanel.tsx"
+            >
               <div className="macroPlaybackItemText">
                 <span>
                   {item.running
@@ -222,6 +237,9 @@ export function MacroPlaybackPanel() {
                     window.dispatchEvent(new CustomEvent(MACRO_PLAYBACK_STOP_EVENT, { detail }));
                     setMacroPlaybackItems(prev => prev.filter(progress => progress.id !== item.id));
                   }}
+                  data-inspector-id="macroPlayback.stopButton"
+                  data-inspector-label="Stop macro button"
+                  data-inspector-component="client/src/components/MacroPlaybackPanel.tsx"
                 >
                   Stop
                 </button>
@@ -238,6 +256,9 @@ export function MacroPlaybackPanel() {
                           detail: { appId: item.replayAppId, actionId: item.replayActionId }
                         }));
                       }}
+                      data-inspector-id="macroPlayback.replayButton"
+                      data-inspector-label="Replay macro button"
+                      data-inspector-component="client/src/components/MacroPlaybackPanel.tsx"
                     >
                       ▶ Play
                     </button>
@@ -248,6 +269,9 @@ export function MacroPlaybackPanel() {
                     className="modalBtn macroPlaybackStopBtn"
                     onClick={() => setMacroPlaybackItems(prev => prev.filter(p => p.id !== item.id))}
                     title="Xóa khỏi danh sách"
+                    data-inspector-id="macroPlayback.removeItemButton"
+                    data-inspector-label="Remove macro item from list button"
+                    data-inspector-component="client/src/components/MacroPlaybackPanel.tsx"
                   >
                     ✕
                   </button>

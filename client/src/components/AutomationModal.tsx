@@ -366,15 +366,45 @@ function ConfirmDeleteModal({ state, onClose }: { state: ConfirmModalState; onCl
   if (!state) return null;
   return createPortal(
     <>
-      <div className="confirmOverlay" onMouseDown={onClose}>
-        <div className="confirmPanel compact" onMouseDown={e => e.stopPropagation()}>
+      <div 
+        className="confirmOverlay" 
+        onMouseDown={onClose}
+        data-inspector-id="automation.confirmDeleteOverlay"
+        data-inspector-label="Automation confirm delete modal overlay"
+        data-inspector-component="client/src/components/AutomationModal.tsx"
+      >
+        <div 
+          className="confirmPanel compact" 
+          onMouseDown={e => e.stopPropagation()}
+          data-inspector-id="automation.confirmDeletePanel"
+          data-inspector-label="Automation confirm delete modal card"
+          data-inspector-component="client/src/components/AutomationModal.tsx"
+        >
           <div className="confirmTitle">{state.title}</div>
           <div className="confirmText" style={{ whiteSpace: 'pre-wrap' }}>
             {state.message}
           </div>
           <div className="confirmActions center">
-            <button type='button' className="modalBtn" onClick={onClose}>Huỷ</button>
-            <button type='button' className="modalBtnDanger" onClick={state.onConfirm}>Xác Nhận</button>
+            <button 
+              type='button' 
+              className="modalBtn" 
+              onClick={onClose}
+              data-inspector-id="automation.confirmDeleteCancelButton"
+              data-inspector-label="Cancel button in delete confirmation"
+              data-inspector-component="client/src/components/AutomationModal.tsx"
+            >
+              Huỷ
+            </button>
+            <button 
+              type='button' 
+              className="modalBtnDanger" 
+              onClick={state.onConfirm}
+              data-inspector-id="automation.confirmDeleteConfirmButton"
+              data-inspector-label="Confirm button in delete confirmation"
+              data-inspector-component="client/src/components/AutomationModal.tsx"
+            >
+              Xác Nhận
+            </button>
           </div>
         </div>
       </div>
@@ -400,8 +430,21 @@ function InputModalInner({ state, onClose }: { state: NonNullable<InputModalStat
 
   return createPortal(
     <>
-      <div className="confirmOverlay" onMouseDown={onClose}>
-        <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480 }} onMouseDown={e => e.stopPropagation()}>
+      <div 
+        className="confirmOverlay" 
+        onMouseDown={onClose}
+        data-inspector-id="automation.inputModalOverlay"
+        data-inspector-label="Automation text input modal overlay"
+        data-inspector-component="client/src/components/AutomationModal.tsx"
+      >
+        <div 
+          className="confirmPanel" 
+          style={{ minWidth: 380, maxWidth: 480 }} 
+          onMouseDown={e => e.stopPropagation()}
+          data-inspector-id="automation.inputModalPanel"
+          data-inspector-label="Automation text input modal card"
+          data-inspector-component="client/src/components/AutomationModal.tsx"
+        >
           <div className="confirmTitle">{state.title}</div>
           <div className="confirmText">
             {state.label ? <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>{state.label}</label> : null}
@@ -416,10 +459,22 @@ function InputModalInner({ state, onClose }: { state: NonNullable<InputModalStat
                 if (e.key === 'Enter') handleSubmit();
                 if (e.key === 'Escape') onClose();
               }}
+              data-inspector-id="automation.inputModalField"
+              data-inspector-label="Text input field in modal"
+              data-inspector-component="client/src/components/AutomationModal.tsx"
             />
           </div>
           <div className="confirmActions">
-            <button type='button' className="modalBtn" onClick={onClose}>Huỷ</button>
+            <button 
+              type='button' 
+              className="modalBtn" 
+              onClick={onClose}
+              data-inspector-id="automation.inputModalCancelButton"
+              data-inspector-label="Cancel button in text input modal"
+              data-inspector-component="client/src/components/AutomationModal.tsx"
+            >
+              Huỷ
+            </button>
             <button
               type='button'
               className="modalBtnPrimary"
@@ -429,6 +484,9 @@ function InputModalInner({ state, onClose }: { state: NonNullable<InputModalStat
               }}
               disabled={!value.trim()}
               onClick={handleSubmit}
+              data-inspector-id="automation.inputModalConfirmButton"
+              data-inspector-label="Confirm button in text input modal"
+              data-inspector-component="client/src/components/AutomationModal.tsx"
             >
               {state.confirmText ?? 'Xác Nhận'}
             </button>
@@ -474,8 +532,21 @@ function DeviceAssignModal({
   };
 
   return createPortal(
-    <div className='confirmOverlay' onMouseDown={onClose}>
-      <div className='confirmPanel' onMouseDown={e => e.stopPropagation()} style={{ width: '400px' }}>
+    <div 
+      className='confirmOverlay' 
+      onMouseDown={onClose}
+      data-inspector-id="automation.deviceAssignOverlay"
+      data-inspector-label="Device assign modal overlay"
+      data-inspector-component="client/src/components/AutomationModal.tsx"
+    >
+      <div 
+        className='confirmPanel' 
+        onMouseDown={e => e.stopPropagation()} 
+        style={{ width: '400px' }}
+        data-inspector-id="automation.deviceAssignPanel"
+        data-inspector-label="Device assign modal card"
+        data-inspector-component="client/src/components/AutomationModal.tsx"
+      >
         <div className='confirmTitle'>Gán thiết bị</div>
         <div className='confirmText' style={{ marginBottom: 12 }}>
           Chọn các thiết bị gán cho profile <strong>"{profile.name}"</strong>:
@@ -485,11 +556,20 @@ function DeviceAssignModal({
             const isChecked = checkedUdids.includes(device.udid);
             const otherProfile = deviceProfiles.find(p => p.id !== profileId && p.udids.includes(device.udid));
             return (
-              <label key={device.udid} className='automationDeviceSelectRow'>
+              <label 
+                key={device.udid} 
+                className='automationDeviceSelectRow'
+                data-inspector-id="automation.deviceAssignRow"
+                data-inspector-label={`Device select row for No. ${device.number}`}
+                data-inspector-component="client/src/components/AutomationModal.tsx"
+              >
                 <input
                   type='checkbox'
                   checked={isChecked}
                   onChange={() => toggleUdid(device.udid)}
+                  data-inspector-id="automation.deviceAssignCheckbox"
+                  data-inspector-label={`Device checkbox for No. ${device.number}`}
+                  data-inspector-component="client/src/components/AutomationModal.tsx"
                 />
                 <span className='automationDeviceSelectLabel'>
                   No. {device.number} - {[device.manufacturer, device.model].filter(Boolean).join(' ') || 'Device'} ({device.udid}) {otherProfile ? `[Profile: ${otherProfile.name}]` : ''}
@@ -500,13 +580,23 @@ function DeviceAssignModal({
           {!devices.length ? <div style={{ padding: 12, textAlign: 'center', color: '#888' }}>Không có máy online</div> : null}
         </div>
         <div className='confirmActions center'>
-          <button type='button' className='modalBtn' onClick={onClose}>
+          <button 
+            type='button' 
+            className='modalBtn' 
+            onClick={onClose}
+            data-inspector-id="automation.deviceAssignCancelButton"
+            data-inspector-label="Cancel device assignment button"
+            data-inspector-component="client/src/components/AutomationModal.tsx"
+          >
             Huỷ
           </button>
           <button
             type='button'
             className='modalBtnPrimary'
             onClick={() => onSave(checkedUdids)}
+            data-inspector-id="automation.deviceAssignSaveButton"
+            data-inspector-label="Save device assignment button"
+            data-inspector-component="client/src/components/AutomationModal.tsx"
           >
             Lưu
           </button>
@@ -1878,9 +1968,22 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   if (!open) return null;
   /* ══════════════════ RENDER ══════════════════ */
   return (
-    <div className={`automationFloatingLayer${coordinatePanelOpen ? ' withCoordinatePanel' : ''}`} style={{ left: position.x, top: position.y }}>
+    <div 
+      className={`automationFloatingLayer${coordinatePanelOpen ? ' withCoordinatePanel' : ''}`} 
+      style={{ left: position.x, top: position.y }}
+      data-inspector-id="automation.floatingLayer"
+      data-inspector-label="Automation floating overlay layer"
+      data-inspector-component="client/src/components/AutomationModal.tsx"
+    >
       {!coordinatePanelOpen ? (
-      <div className='automationModal modal show d-block' role='dialog' aria-modal='false'>
+      <div 
+        className='automationModal modal show d-block' 
+        role='dialog' 
+        aria-modal='false'
+        data-inspector-id="automation.modalDialog"
+        data-inspector-label="Automation dialog container"
+        data-inspector-component="client/src/components/AutomationModal.tsx"
+      >
         <div className='modal-dialog automationDialog'>
           <div className='modal-content automationContent'>
             <div className='modal-header automationHeader' onPointerDown={startDrag}>
@@ -1895,7 +1998,16 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                   <span className='automationStatus'>{status}</span>
                 </div>
               ) : null}
-              <button className='btn-close automationClose' aria-label='Close' onClick={closeModal}><X size={16} strokeWidth={2} /></button>
+              <button 
+                className='btn-close automationClose' 
+                aria-label='Close' 
+                onClick={closeModal}
+                data-inspector-id="automation.closeButton"
+                data-inspector-label="Automation modal close button"
+                data-inspector-component="client/src/components/AutomationModal.tsx"
+              >
+                <X size={16} strokeWidth={2} />
+              </button>
             </div>
 
             <div className='modal-body automationBody'>
@@ -1904,7 +2016,13 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                 <div className='automationSectionTitle'>
                   <span>Profile</span>
                   {/* btn_app_select : Các nút chọn ứng dụng cha */}
-                  <div className='automationProfileAppTabs' aria-label='Chọn ứng dụng'>
+                  <div 
+                    className='automationProfileAppTabs' 
+                    aria-label='Chọn ứng dụng'
+                    data-inspector-id="automation.appTabs"
+                    data-inspector-label="Automation application tabs selector"
+                    data-inspector-component="client/src/components/AutomationModal.tsx"
+                  >
                     {AUTOMATION_APPS.map(app => (
                       <button
                         key={app.id}
@@ -1912,17 +2030,36 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                         className={`automationAppIconButton${activeActionApp === app.id ? ' active' : ''}`}
                         title={app.label}
                         onClick={() => setActiveActionApp(app.id)}
+                        data-inspector-id="automation.appTabItem"
+                        data-inspector-label={`Switch to application tab: ${app.label}`}
+                        data-inspector-component="client/src/components/AutomationModal.tsx"
                       >
                         <img src={app.icon} alt='' className='automationAppIconOnly' />
                       </button>
                     ))}
                   </div>
                   <div className='automationSectionActions'>
-                    <button type='button' className='automationArrowBtn' onClick={() => addAppAction(activeActionApp)} title='Tạo hành động'>
+                    <button 
+                      type='button' 
+                      className='automationArrowBtn' 
+                      onClick={() => addAppAction(activeActionApp)} 
+                      title='Tạo hành động'
+                      data-inspector-id="automation.createActionButton"
+                      data-inspector-label="Create app action button"
+                      data-inspector-component="client/src/components/AutomationModal.tsx"
+                    >
                       <Plus size={15} />
                       <span>Hành động</span>
                     </button>
-                    <button type='button' className='automationArrowBtn automationProfileCreateBtn' onClick={createProfile} title='Tạo profile'>
+                    <button 
+                      type='button' 
+                      className='automationArrowBtn automationProfileCreateBtn' 
+                      onClick={createProfile} 
+                      title='Tạo profile'
+                      data-inspector-id="automation.createProfileButton"
+                      data-inspector-label="Create new device profile button"
+                      data-inspector-component="client/src/components/AutomationModal.tsx"
+                    >
                       <Plus size={15} />
                       <span>Tạo profile</span>
                     </button>
@@ -1931,6 +2068,9 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                       className='automationArrowBtn'
                       onClick={() => setShowProfileSection(prev => !prev)}
                       style={{ minWidth: 64 }}
+                      data-inspector-id="automation.toggleProfileButton"
+                      data-inspector-label="Toggle profile manager section display button"
+                      data-inspector-component="client/src/components/AutomationModal.tsx"
                     >
                       {showProfileSection ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                       <span>{showProfileSection ? 'Ẩn' : 'Hiện'}</span>
@@ -1946,7 +2086,15 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                           const isActive = profile.id === activeProfileId;
                           return (
                             <div key={profile.id} className={`automationProfileRow${isActive ? ' active' : ''}`}>
-                              <button type='button' className='automationProfileNameBtn' onClick={() => setActiveProfileId(profile.id)} title={profile.name}>
+                              <button 
+                                type='button' 
+                                className='automationProfileNameBtn' 
+                                onClick={() => setActiveProfileId(profile.id)} 
+                                title={profile.name}
+                                data-inspector-id="automation.profileSelectItem"
+                                data-inspector-label={`Select profile: ${profile.name}`}
+                                data-inspector-component="client/src/components/AutomationModal.tsx"
+                              >
                                 <span>{profile.name}</span>
                                 <small>{profile.udids.length} máy</small>
                               </button>
@@ -1956,13 +2104,32 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                                 style={{ width: 'auto', padding: '0 6px', fontSize: 11, color: '#9bc1ff' }}
                                 onClick={() => setDeviceAssigningProfileId(profile.id)}
                                 title='Gán thiết bị'
+                                data-inspector-id="automation.assignDevicesButton"
+                                data-inspector-label="Assign devices to profile button"
+                                data-inspector-component="client/src/components/AutomationModal.tsx"
                               >
                                 Device
                               </button>
-                              <button type='button' className='automationProfileIconBtn' onClick={() => renameProfile(profile)} title='Đổi tên profile'>
+                              <button 
+                                type='button' 
+                                className='automationProfileIconBtn' 
+                                onClick={() => renameProfile(profile)} 
+                                title='Đổi tên profile'
+                                data-inspector-id="automation.renameProfileButton"
+                                data-inspector-label="Rename profile button"
+                                data-inspector-component="client/src/components/AutomationModal.tsx"
+                              >
                                 <Pencil size={13} />
                               </button>
-                              <button type='button' className='automationProfileIconBtn danger' onClick={() => deleteProfile(profile)} title='Xoá profile'>
+                              <button 
+                                type='button' 
+                                className='automationProfileIconBtn danger' 
+                                onClick={() => deleteProfile(profile)} 
+                                title='Xoá profile'
+                                data-inspector-id="automation.deleteProfileButton"
+                                data-inspector-label="Delete profile button"
+                                data-inspector-component="client/src/components/AutomationModal.tsx"
+                              >
                                 <Trash2 size={13} />
                               </button>
                             </div>
@@ -1992,23 +2159,42 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                                   setActiveProfileAction({ appId: item.app.id, actionId: item.action.id });
                                 }}
                                 title={binding ? `${item.action.name} -> ${binding.macroName}` : item.action.name}
+                                data-inspector-id="automation.actionSelectItem"
+                                data-inspector-label={`Select action: ${item.action.name}`}
+                                data-inspector-component="client/src/components/AutomationModal.tsx"
                               >
                                 <img src={item.app.icon} alt='' />
                                 <span>{item.action.name}</span>
                                 <small>{binding ? binding.macroName : 'Chưa áp dụng'}</small>
                               </button>
                               {/* btn_action_edit : Nút sửa tên hành động */}
-                              <button type='button' className='automationProfileIconBtn' onClick={() => {
-                                console.log('Action edit clicked:', item.action.id);
-                                renameAppAction(item.app.id, item.action);
-                              }} title='Đổi tên hành động'>
+                              <button 
+                                type='button' 
+                                className='automationProfileIconBtn' 
+                                onClick={() => {
+                                  console.log('Action edit clicked:', item.action.id);
+                                  renameAppAction(item.app.id, item.action);
+                                }} 
+                                title='Đổi tên hành động'
+                                data-inspector-id="automation.renameActionButton"
+                                data-inspector-label="Rename app action button"
+                                data-inspector-component="client/src/components/AutomationModal.tsx"
+                              >
                                 <Pencil size={13} />
                               </button>
                               {/* btn_action_delete : Nút xoá hành động */}
-                              <button type='button' className='automationProfileIconBtn danger' onClick={() => {
-                                console.log('Action delete clicked:', item.action.id);
-                                deleteAppAction(item.app.id, item.action);
-                              }} title='Xoá hành động'>
+                              <button 
+                                type='button' 
+                                className='automationProfileIconBtn danger' 
+                                onClick={() => {
+                                  console.log('Action delete clicked:', item.action.id);
+                                  deleteAppAction(item.app.id, item.action);
+                                }} 
+                                title='Xoá hành động'
+                                data-inspector-id="automation.deleteActionButton"
+                                data-inspector-label="Delete app action button"
+                                data-inspector-component="client/src/components/AutomationModal.tsx"
+                              >
                                 <Trash2 size={13} />
                               </button>
                             </div>
@@ -2040,6 +2226,9 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                                 }
                               }}
                               title={macro.name}
+                              data-inspector-id="automation.macroSelectItem"
+                              data-inspector-label={`Bind File Macro: ${macro.name}`}
+                              data-inspector-component="client/src/components/AutomationModal.tsx"
                             >
                               <FolderOpen size={14} />
                               <span>{macro.name}</span>
@@ -2053,7 +2242,13 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                 )}
               </div>
 
-              <button className={`automationCoordinateRow${coordinatePanelOpen ? ' open' : ''}`} onClick={openCoordinatePanel}>
+              <button 
+                className={`automationCoordinateRow${coordinatePanelOpen ? ' open' : ''}`} 
+                onClick={openCoordinatePanel}
+                data-inspector-id="automation.openCoordinatePanelButton"
+                data-inspector-label="Open coordinate setup panel button"
+                data-inspector-component="client/src/components/AutomationModal.tsx"
+              >
                 <div className='automationCoordinateTitle'>Thiết Lập Macro</div>
                 <div className='automationCoordinateMeta'>{selectedUdids.length ? `${selectedUdids.length} máy được chọn` : 'Chưa chọn máy'}</div>
                 <div className='automationStatus muted'>Mở bảng Record/Phát tọa độ</div>
@@ -2067,7 +2262,14 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
 
       {/* ── Coordinate Panel (Thiết Lập Macro) ── */}
       {coordinatePanelOpen ? (
-        <div className='automationCoordinatePanel modal show d-block' role='dialog' aria-modal='false'>
+        <div 
+          className='automationCoordinatePanel modal show d-block' 
+          role='dialog' 
+          aria-modal='false'
+          data-inspector-id="automation.coordinatePanel"
+          data-inspector-label="Automation coordinate setup panel modal"
+          data-inspector-component="client/src/components/AutomationModal.tsx"
+        >
           <div className='modal-dialog automationCoordinateDialog'>
             <div className='modal-content automationContent automationCoordinateContent'>
               <div className='modal-header automationHeader' onPointerDown={startDrag}>
@@ -2078,23 +2280,90 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                   </span>
                   {macroStatus ? <span className={`automationStatus${macroStatusIsError ? ' error' : ''}`}>{macroStatus}</span> : null}
                 </div>
-                <button className='btn-close automationClose' aria-label='Close coordinate panel' onClick={() => setCoordinatePanelOpen(false)}><X size={16} strokeWidth={2} /></button>
+                <button 
+                  className='btn-close automationClose' 
+                  aria-label='Close coordinate panel' 
+                  onClick={() => setCoordinatePanelOpen(false)}
+                  data-inspector-id="automation.coordinateCloseButton"
+                  data-inspector-label="Automation coordinate panel close button"
+                  data-inspector-component="client/src/components/AutomationModal.tsx"
+                >
+                  <X size={16} strokeWidth={2} />
+                </button>
               </div>
               <div className='modal-body automationCoordinateBody'>
                 <div className='automationToolbar'>
-                  <button className='btn automationBtn' onClick={newMacro} title='Mới'><Plus size={16} /><span>Mới</span></button>
-                  <button className='btn automationBtn' onClick={saveMacro} disabled={!rows.length} title='Lưu Macro'><Save size={16} /><span>Lưu Macro</span></button>
-                  <button className='btn automationBtn' onClick={addBlankStep} title='Thêm bước'><CirclePlus size={16} /><span>Thêm bước</span></button>
-                  <button className={`btn automationBtn${recording ? ' active' : ''}`} onClick={toggleRecording} title='Ghi Macro'>
+                  <button 
+                    className='btn automationBtn' 
+                    onClick={newMacro} 
+                    title='Mới'
+                    data-inspector-id="automation.newMacroButton"
+                    data-inspector-label="New macro button"
+                    data-inspector-component="client/src/components/AutomationModal.tsx"
+                  >
+                    <Plus size={16} /><span>Mới</span>
+                  </button>
+                  <button 
+                    className='btn automationBtn' 
+                    onClick={saveMacro} 
+                    disabled={!rows.length} 
+                    title='Lưu Macro'
+                    data-inspector-id="automation.saveMacroButton"
+                    data-inspector-label="Save macro button"
+                    data-inspector-component="client/src/components/AutomationModal.tsx"
+                  >
+                    <Save size={16} /><span>Lưu Macro</span>
+                  </button>
+                  <button 
+                    className='btn automationBtn' 
+                    onClick={addBlankStep} 
+                    title='Thêm bước'
+                    data-inspector-id="automation.addStepButton"
+                    data-inspector-label="Add blank step button"
+                    data-inspector-component="client/src/components/AutomationModal.tsx"
+                  >
+                    <CirclePlus size={16} /><span>Thêm bước</span>
+                  </button>
+                  <button 
+                    className={`btn automationBtn${recording ? ' active' : ''}`} 
+                    onClick={toggleRecording} 
+                    title='Ghi Macro'
+                    data-inspector-id="automation.recordMacroButton"
+                    data-inspector-label="Record macro button"
+                    data-inspector-component="client/src/components/AutomationModal.tsx"
+                  >
                     {recording ? <Square size={16} /> : <Video size={16} />}<span>{recording ? 'Dừng ghi' : 'Ghi Macro'}</span>
                   </button>
-                  <button className={`btn automationBtn automationPlayBtn${playing ? ' active' : ''}`} onClick={playMacro} title='Phát'>
+                  <button 
+                    className={`btn automationBtn automationPlayBtn${playing ? ' active' : ''}`} 
+                    onClick={playMacro} 
+                    title='Phát'
+                    data-inspector-id="automation.playMacroButton"
+                    data-inspector-label="Play/Stop macro playback button"
+                    data-inspector-component="client/src/components/AutomationModal.tsx"
+                  >
                     {playing ? <Square size={16} /> : <Play size={16} />}<span>{playing ? 'Dừng' : 'Phát'}</span>
                   </button>
-                  <button className={`btn automationBtn${syncMacroOpen ? ' active' : ''}`} onClick={() => setSyncMacroOpen(v => !v)} title='Sync Macro'>
+                  <button 
+                    className={`btn automationBtn${syncMacroOpen ? ' active' : ''}`} 
+                    onClick={() => setSyncMacroOpen(v => !v)} 
+                    title='Sync Macro'
+                    data-inspector-id="automation.syncMacroSettingsButton"
+                    data-inspector-label="Toggle sync macro panel button"
+                    data-inspector-component="client/src/components/AutomationModal.tsx"
+                  >
                     <Clock3 size={16} /><span>Sync Macro</span>
                   </button>
-                  <button className={`btn automationBtn${settingsPanelOpen ? ' active' : ''}`} onClick={() => setSettingsPanelOpen(v => !v)} title='Settings'><Settings size={16} /><span>Settings</span></button>
+                  <button 
+                    className={`btn automationBtn${settingsPanelOpen ? ' active' : ''}`} 
+                    onClick={() => setSettingsPanelOpen(v => !v)} 
+                    title='Settings'
+                    data-inspector-id="automation.settingsPanelButton"
+                    data-inspector-label="Toggle automation settings panel button"
+                    data-inspector-component="client/src/components/AutomationModal.tsx"
+                  >
+                    <Settings size={16} /><span>Settings</span>
+                  </button>
                 </div>
 
                 {/* ── Settings Panel ── */}
@@ -2279,10 +2548,14 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         const row = rows.find(r => r.id === rowDelayCtxMenu.rowId);
         if (!row) return null;
         return createPortal(
-          <div className='automationRowDelayCtxPanel automationContextMenuPanel contextMenuPanel dropdown-menu show'
+          <div 
+            className='automationRowDelayCtxPanel automationContextMenuPanel contextMenuPanel dropdown-menu show'
             style={{ position: 'fixed', left: rowDelayCtxMenu.x, top: rowDelayCtxMenu.y, zIndex: 27000, minWidth: 210 }}
             onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
             onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
+            data-inspector-id="automation.rowDelayContextMenu"
+            data-inspector-label="Automation step row delay context menu"
+            data-inspector-component="client/src/components/AutomationModal.tsx"
           >
             <button type='button' className='automationContextMenuItem dropdown-item'
               onPointerDown={e => {
@@ -2331,10 +2604,14 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         const bindingCount = AUTOMATION_APPS.reduce((sum, app) =>
           sum + appActions[app.id].reduce((s, a) => s + (a.bindings ?? []).filter(b => b.macroId === macro.id).length, 0), 0);
         return createPortal(
-          <div className='automationMacroCtxPanel automationContextMenuPanel contextMenuPanel dropdown-menu show'
+          <div 
+            className='automationMacroCtxPanel automationContextMenuPanel contextMenuPanel dropdown-menu show'
             style={{ position: 'fixed', left: macroCtxMenu.x, top: macroCtxMenu.y, zIndex: 27000, minWidth: 200 }}
             onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
             onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
+            data-inspector-id="automation.macroContextMenu"
+            data-inspector-label="Automation File Macro actions context menu"
+            data-inspector-component="client/src/components/AutomationModal.tsx"
           >
             <button type='button' className='automationContextMenuItem dropdown-item'
               onPointerDown={e => {

@@ -2293,8 +2293,8 @@ canvas {
 
 .appSettingsClose {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 16px;
+  right: 20px;
   width: 30px;
   height: 30px;
   border-radius: 9px;
@@ -3918,7 +3918,7 @@ body.alignRight .rightConfigPanel.collapsed {
   gap: 7px;
   font-size: 14px;
   font-weight: 700;
-  color: #c8d8ff;
+  color: #ffffff;
 }
 
 /* Inline section title (device number row) */
@@ -3928,7 +3928,7 @@ body.alignRight .rightConfigPanel.collapsed {
   gap: 6px;
   font-size: 14px;
   font-weight: 700;
-  color: #c8d8ff;
+  color: #ffffff;
 }
 
 .vsp-section-title-inline .vsp-input-inline {
@@ -4081,6 +4081,9 @@ body.alignRight .rightConfigPanel.collapsed {
   font-size: 13px;
   cursor: pointer;
   padding: 2px 4px;
+  height: auto !important;
+  min-height: 0 !important;
+  line-height: 1;
 }
 
 .vsp-btn-text:hover {
@@ -4146,7 +4149,7 @@ body.alignRight .rightConfigPanel.collapsed {
 }
 
 .vsp-modal {
-  width: min(720px, 95vw);
+  width: min(920px, 95vw);
   max-height: 88vh;
   background: linear-gradient(145deg, #161616, #111);
   border: 1px solid #2a2a2a;
@@ -4178,7 +4181,7 @@ body.alignRight .rightConfigPanel.collapsed {
 .vsp-modal-udid {
   font-size: 13px;
   font-weight: 400;
-  color: #888;
+  color: #fff;
   padding: 2px 8px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.05);
@@ -4430,10 +4433,9 @@ body.alignRight .rightConfigPanel.collapsed {
 
 .vsp-modal-log {
   flex: 1;
-  min-height: 100px;
-  max-height: 200px;
+  min-height: 80px;
   overflow-y: auto;
-  padding: 0 16px 12px;
+  padding: 0 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -4503,6 +4505,78 @@ body.alignRight .rightConfigPanel.collapsed {
   color: #9bc1ff;
 }
 
+/* === 2-column layout for ADB modal === */
+.vsp-modal-2col {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid #222;
+}
+
+.vsp-modal-2col-left {
+  width: 200px;
+  min-width: 180px;
+  max-width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #2a2a2a;
+}
+
+.vsp-modal-2col-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.vsp-modal-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 36px;
+  box-sizing: border-box;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  border-bottom: 1px solid #222;
+  flex-shrink: 0;
+}
+
+.vsp-modal-cmd-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0;
+  scrollbar-width: thin;
+  scrollbar-color: #444 transparent;
+}
+
+.vsp-cmd-text-item {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #ccc;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vsp-cmd-text-item:hover {
+  background: rgba(77, 161, 255, 0.12);
+  color: #b8e7ff;
+}
+
+.vsp-cmd-text-item.vsp-cmd-warn {
+  color: #ff9c9c;
+}
+
+.vsp-cmd-text-item.vsp-cmd-warn:hover {
+  background: rgba(255, 100, 100, 0.1);
+}
+
 .vsp-spinner-small {
   width: 14px;
   height: 14px;
@@ -4522,7 +4596,8 @@ body.alignRight .rightConfigPanel.collapsed {
   left: -6px;
   bottom: 100%;
   margin-bottom: 4px;
-  width: 220px;
+  width: max-content;
+  max-width: 280px;
   max-height: 360px;
   overflow-y: auto;
   background: var(--vsp-bg, #1e1e1e);
@@ -4530,7 +4605,7 @@ body.alignRight .rightConfigPanel.collapsed {
   border: 1px solid var(--vsp-border, #333);
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  min-width: 200px;
+  min-width: 130px;
   padding: 4px 0;
   z-index: 9999;
   display: flex;
@@ -4541,22 +4616,31 @@ body.alignRight .rightConfigPanel.collapsed {
 }
 
 .vsp-adb-submenu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 7px 10px;
-  border-radius: 7px;
-  border: none;
-  background: transparent;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  text-align: left !important;
+  padding: 6px 12px !important;
+  border-radius: 4px !important;
+  border: none !important;
+  background: transparent !important;
   color: #ddd;
-  font-size: 13px;
-  cursor: pointer;
+  font-size: 15px !important;
+  cursor: pointer !important;
   transition: background 0.12s ease;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: ellipsis !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  line-height: normal !important;
+  box-sizing: border-box !important;
 }
 
 .vsp-adb-submenu-item:hover {
-  background: rgba(77, 161, 255, 0.12);
-  color: #b8e7ff;
+  background: rgba(77, 161, 255, 0.15) !important;
+  color: #b8e7ff !important;
 }
 
 .vsp-adb-submenu-item.vsp-cmd-warn {
@@ -4564,7 +4648,7 @@ body.alignRight .rightConfigPanel.collapsed {
 }
 
 .vsp-adb-submenu-item.vsp-cmd-warn:hover {
-  background: rgba(255, 100, 100, 0.1);
+  background: rgba(255, 100, 100, 0.12) !important;
 }
 
 /* Right-click context menu */
@@ -4746,18 +4830,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   transition: background 0.12s ease;
 }
 
-.vsp-adb-submenu-item:hover {
-  background: rgba(77, 161, 255, 0.12);
-  color: #b8e7ff;
-}
-
-.vsp-adb-submenu-item.vsp-cmd-warn {
-  color: #ff9c9c;
-}
-
-.vsp-adb-submenu-item.vsp-cmd-warn:hover {
-  background: rgba(255, 100, 100, 0.1);
-}
+/* (duplicate submenu hover rules removed — see primary block at .vsp-adb-submenu-item) */
 
 /* Right-click context menu */
 .vsp-ctx-menu {
@@ -7701,9 +7774,12 @@ textarea:focus,
 .pageContextItem,
 .context-menu-item,
 .dropdown-item,
-.vsp-ctx-item,
-.vsp-adb-submenu-item {
+.vsp-ctx-item {
   color: var(--md-text) !important;
+  border-radius: var(--md-radius-sm);
+}
+
+.vsp-adb-submenu-item {
   border-radius: var(--md-radius-sm);
 }
 

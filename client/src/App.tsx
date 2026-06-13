@@ -3192,12 +3192,25 @@ export function App() {
         </div>
       </div>
 
-      <div className={`sidebar-wrapper ${isSidebarPinned ? 'pinned' : (contextMenuOpen || !!groupContextMenu) ? 'auto-hide force-show' : 'auto-hide'}`}>
-        <div className='rightConfigPanel'>
+      <div 
+        className={`sidebar-wrapper ${isSidebarPinned ? 'pinned' : (contextMenuOpen || !!groupContextMenu) ? 'auto-hide force-show' : 'auto-hide'}`}
+        data-inspector-id="rightSidebar.wrapper"
+        data-inspector-label="Right sidebar outer wrapper"
+        data-inspector-component="client/src/App.tsx"
+      >
+        <div 
+          className='rightConfigPanel'
+          data-inspector-id="rightSidebar.panel"
+          data-inspector-label="Right configuration panel"
+          data-inspector-component="client/src/App.tsx"
+        >
           <button
             className='btn-pin'
             aria-label={isSidebarPinned ? t('Bỏ ghim') : t('Ghim')}
             onClick={() => setIsSidebarPinned(!isSidebarPinned)}
+            data-inspector-id="rightSidebar.pinButton"
+            data-inspector-label="Right sidebar pin toggle button"
+            data-inspector-component="client/src/App.tsx"
           >
             {isSidebarPinned ? (
               <PinOff size={16} strokeWidth={2} />
@@ -3210,13 +3223,31 @@ export function App() {
             aria-label='Setting'
             title='Setting'
             onClick={() => setAppSettingsVisible(true)}
+            data-inspector-id="rightSidebar.settingsButton"
+            data-inspector-label="Right sidebar settings button"
+            data-inspector-component="client/src/App.tsx"
           >
             <Settings size={16} strokeWidth={2} />
           </button>
-          <div className='rcpContent'>
-            <div className={`rcpSection rcpDropdown rcpDropdownStatic${streamControlsOpen ? '' : ' rcpSectionCollapsed'}`}>
+          <div 
+            className='rcpContent'
+            data-inspector-id="rightSidebar.content"
+            data-inspector-label="Right configuration panel content area"
+            data-inspector-component="client/src/App.tsx"
+          >
+            <div 
+              className={`rcpSection rcpDropdown rcpDropdownStatic${streamControlsOpen ? '' : ' rcpSectionCollapsed'}`}
+              data-inspector-id="rightSidebar.streamSection"
+              data-inspector-label="Stream configuration section"
+              data-inspector-component="client/src/App.tsx"
+            >
               <div className='rcpTitleBar'>
-                <div className='rcpTitle'>
+                <div 
+                  className='rcpTitle'
+                  data-inspector-id="rightSidebar.streamTitle"
+                  data-inspector-label="Stream configuration section title"
+                  data-inspector-component="client/src/App.tsx"
+                >
                   {viewerUdid ? t('Stream config (viewer)') : t('Stream config')}
                 </div>
                 <div className='rcpTitleActions'>
@@ -3262,6 +3293,9 @@ export function App() {
                         }
                       });
                     }}
+                    data-inspector-id="rightSidebar.streamResetButton"
+                    data-inspector-label="Stream config reset button"
+                    data-inspector-component="client/src/App.tsx"
                   >
                     <RotateCcw size={12} strokeWidth={2} />
                     <span>Reset</span>
@@ -3271,12 +3305,20 @@ export function App() {
                     title={streamControlsOpen ? t('Collapse stream config') : t('Expand stream config')}
                     aria-label={streamControlsOpen ? t('Collapse stream config') : t('Expand stream config')}
                     onClick={() => setStreamControlsOpen(prev => !prev)}
+                    data-inspector-id="rightSidebar.streamCollapseButton"
+                    data-inspector-label="Stream config collapse/expand button"
+                    data-inspector-component="client/src/App.tsx"
                   >
                     {streamControlsOpen ? <ChevronUp size={15} strokeWidth={2} /> : <ChevronDown size={15} strokeWidth={2} />}
                   </button>
                 </div>
               </div>
-              <div className='rcpToggleRow'>
+              <div 
+                className='rcpToggleRow'
+                data-inspector-id="rightSidebar.showTileInfoToggle"
+                data-inspector-label="Toggle row for showing title/nav on tiles"
+                data-inspector-component="client/src/App.tsx"
+              >
                 <span>{t('Hiển thị Title / Nav')}</span>
                 <div style={{ display: 'contents' }}>
                   <button
@@ -3287,13 +3329,21 @@ export function App() {
                   </button>
                 </div>
               </div>
-
-              <div className='rcpSliderRow'>
+ 
+              <div 
+                className='rcpSliderRow'
+                data-inspector-id="rightSidebar.tileSizeRow"
+                data-inspector-label="Tile size setting row container"
+                data-inspector-component="client/src/App.tsx"
+              >
                 <div className='rcpSliderLabel'>Kích thước</div>
                 <button
                   className='rcpStepBtn'
                   aria-label={t('Decrease tile width')}
                   onClick={() => updateWidth(tileDims.width - 5)}
+                  data-inspector-id="rightSidebar.tileSizeDecreaseButton"
+                  data-inspector-label="Tile size decrease button"
+                  data-inspector-component="client/src/App.tsx"
                 >
                   –
                 </button>
@@ -3304,22 +3354,36 @@ export function App() {
                   value={tileDims.width}
                   onChange={e => updateWidth(Number(e.target.value))}
                   className='modalRange'
+                  data-inspector-id="rightSidebar.tileSizeSlider"
+                  data-inspector-label="Tile size range slider"
+                  data-inspector-component="client/src/App.tsx"
                 />
                 <button
                   className='rcpStepBtn'
                   aria-label={t('Increase tile width')}
                   onClick={() => updateWidth(tileDims.width + 5)}
+                  data-inspector-id="rightSidebar.tileSizeIncreaseButton"
+                  data-inspector-label="Tile size increase button"
+                  data-inspector-component="client/src/App.tsx"
                 >
                   +
                 </button>
                 <div className='rcpValue'>{tileDims.width}px</div>
               </div>
-              <div className='rcpSliderRow'>
+              <div 
+                className='rcpSliderRow'
+                data-inspector-id="rightSidebar.viewerSizeRow"
+                data-inspector-label="Viewer screen size setting row container"
+                data-inspector-component="client/src/App.tsx"
+              >
                 <div className='rcpSliderLabel'>Kích thước màn hình lớn</div>
                 <button
                   className='rcpStepBtn'
                   aria-label={t('Decrease viewer width')}
                   onClick={() => updateViewerWidthPx(viewerWidthPx - 20)}
+                  data-inspector-id="rightSidebar.viewerSizeDecreaseButton"
+                  data-inspector-label="Viewer size decrease button"
+                  data-inspector-component="client/src/App.tsx"
                 >
                   –
                 </button>
@@ -3330,17 +3394,28 @@ export function App() {
                   value={viewerWidthPx}
                   onChange={e => updateViewerWidthPx(Number(e.target.value))}
                   className='modalRange'
+                  data-inspector-id="rightSidebar.viewerSizeSlider"
+                  data-inspector-label="Viewer size range slider"
+                  data-inspector-component="client/src/App.tsx"
                 />
                 <button
                   className='rcpStepBtn'
                   aria-label={t('Increase viewer width')}
                   onClick={() => updateViewerWidthPx(viewerWidthPx + 20)}
+                  data-inspector-id="rightSidebar.viewerSizeIncreaseButton"
+                  data-inspector-label="Viewer size increase button"
+                  data-inspector-component="client/src/App.tsx"
                 >
                   +
                 </button>
                 <div className='rcpValue'>{viewerWidthPx}px</div>
               </div>
-              <div className='rcpSliderRow'>
+              <div 
+                className='rcpSliderRow'
+                data-inspector-id="rightSidebar.bitrateRow"
+                data-inspector-label="Bitrate setting row container"
+                data-inspector-component="client/src/App.tsx"
+              >
                 <div className='rcpSliderLabel'>Bitrate</div>
                 <button
                   className='rcpStepBtn'
@@ -3358,6 +3433,9 @@ export function App() {
                       )
                     }
                   }}
+                  data-inspector-id="rightSidebar.bitrateDecreaseButton"
+                  data-inspector-label="Bitrate decrease button"
+                  data-inspector-component="client/src/App.tsx"
                 >
                   –
                 </button>
@@ -3388,6 +3466,9 @@ export function App() {
                   onTouchEnd={onBitratePointerUp}
                   onMouseLeave={onBitratePointerUp}
                   className='modalRange'
+                  data-inspector-id="rightSidebar.bitrateSlider"
+                  data-inspector-label="Bitrate range slider"
+                  data-inspector-component="client/src/App.tsx"
                 />
                 <button
                   className='rcpStepBtn'
@@ -3405,6 +3486,9 @@ export function App() {
                       )
                     }
                   }}
+                  data-inspector-id="rightSidebar.bitrateIncreaseButton"
+                  data-inspector-label="Bitrate increase button"
+                  data-inspector-component="client/src/App.tsx"
                 >
                   +
                 </button>
@@ -3415,7 +3499,12 @@ export function App() {
                   ).toLocaleString()}
                 </div>
               </div>
-              <div className='rcpSliderRow'>
+              <div 
+                className='rcpSliderRow'
+                data-inspector-id="rightSidebar.fpsRow"
+                data-inspector-label="FPS setting row container"
+                data-inspector-component="client/src/App.tsx"
+              >
                 <div className='rcpSliderLabel'>FPS</div>
                 <button
                   className='rcpStepBtn'
@@ -3433,6 +3522,9 @@ export function App() {
                       }))
                     }
                   }}
+                  data-inspector-id="rightSidebar.fpsDecreaseButton"
+                  data-inspector-label="FPS decrease button"
+                  data-inspector-component="client/src/App.tsx"
                 >
                   –
                 </button>
@@ -3460,6 +3552,9 @@ export function App() {
                     }
                   }}
                   className='modalRange'
+                  data-inspector-id="rightSidebar.fpsSlider"
+                  data-inspector-label="FPS range slider"
+                  data-inspector-component="client/src/App.tsx"
                 />
                 <button
                   className='rcpStepBtn'
@@ -3477,6 +3572,9 @@ export function App() {
                       }))
                     }
                   }}
+                  data-inspector-id="rightSidebar.fpsIncreaseButton"
+                  data-inspector-label="FPS increase button"
+                  data-inspector-component="client/src/App.tsx"
                 >
                   +
                 </button>
@@ -3559,7 +3657,12 @@ export function App() {
               }}
             />
 
-            <div className='rcpSection'>
+            <div 
+              className='rcpSection'
+              data-inspector-id="rightSidebar.quickActionsSection"
+              data-inspector-label="Right sidebar quick actions section"
+              data-inspector-component="client/src/App.tsx"
+            >
               <div className='rcpTitleBar'>
                 <div className='rcpTitle'>{t('Điều khiển nhanh')}</div>
                 <button
@@ -3608,7 +3711,12 @@ export function App() {
               </div>
             </div>
 
-            <div className='rcpSection rcpDevicePanel'>
+            <div 
+              className='rcpSection rcpDevicePanel'
+              data-inspector-id="rightSidebar.deviceGroupsSection"
+              data-inspector-label="Right sidebar device groups section"
+              data-inspector-component="client/src/App.tsx"
+            >
 
               <div className='rcpFilters rcpFiltersCompact'>
                 <button
@@ -4071,17 +4179,48 @@ export function App() {
       ) : null}
 
       {appSettingsVisible ? (
-        <div className='appSettingsOverlay'>
-          <div className='confirmPanel appSettingsPanel' onMouseDown={e => e.stopPropagation()}>
-            <button
-              className='appSettingsClose'
-              title={t('Close settings')}
-              aria-label={t('Close settings')}
-              onClick={() => setAppSettingsVisible(false)}
+        <div 
+          className='appSettingsOverlay'
+          data-inspector-id="appSettings.overlay"
+          data-inspector-label="System settings modal overlay background"
+          data-inspector-component="client/src/App.tsx"
+        >
+          <div 
+            className='confirmPanel appSettingsPanel'
+            onMouseDown={e => e.stopPropagation()}
+            data-inspector-id="appSettings.panel"
+            data-inspector-label="System settings card panel"
+            data-inspector-component="client/src/App.tsx"
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <div 
+                className='confirmTitle'
+                style={{ fontSize: 22, fontWeight: 700, background: 'linear-gradient(90deg, #fff, #999)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', borderBottom: 'none', margin: 0 }}
+                data-inspector-id="appSettings.title"
+                data-inspector-label="System settings dialog title"
+                data-inspector-component="client/src/App.tsx"
+              >
+                Cài Đặt Hệ Thống
+              </div>
+              <button
+                className='appSettingsClose'
+                title={t('Close settings')}
+                aria-label={t('Close settings')}
+                onClick={() => setAppSettingsVisible(false)}
+                data-inspector-id="appSettings.closeButton"
+                data-inspector-label="System settings close button"
+                data-inspector-component="client/src/App.tsx"
+                style={{ position: 'static' }}
+              >
+                <X size={16} strokeWidth={2} />
+              </button>
+            </div>
+            <div 
+              style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}
+              data-inspector-id="appSettings.videoEncodingSection"
+              data-inspector-label="Video encoding settings block"
+              data-inspector-component="client/src/App.tsx"
             >
-              <X size={16} strokeWidth={2} />
-            </button>
-            <div className='confirmTitle' style={{ fontSize: 22, fontWeight: 700, background: 'linear-gradient(90deg, #fff, #999)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: 24, borderBottom: 'none' }}>Cài Đặt Hệ Thống</div>            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1, marginRight: 16 }}>Chế độ mã hoá video</div>
                 <select
@@ -4092,6 +4231,9 @@ export function App() {
                     const val = e.target.value === '' ? undefined : e.target.value
                     setStreamConfig(p => ({ ...p, encoderName: val }))
                   }}
+                  data-inspector-id="appSettings.videoEncodingSelect"
+                  data-inspector-label="Video encoder selection dropdown"
+                  data-inspector-component="client/src/App.tsx"
                 >
                   <option value="">Auto</option>
                   <option value="OMX.google.h264.encoder">H.264 (OMX.google)</option>
@@ -4104,6 +4246,9 @@ export function App() {
               <div 
                 style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
                 onClick={() => setHotkeySectionOpen(p => !p)}
+                data-inspector-id="appSettings.hotkeyHeader"
+                data-inspector-label="Hotkey configuration header bar"
+                data-inspector-component="client/src/App.tsx"
               >
                 <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1 }}>
                   Hotkey
@@ -4114,18 +4259,34 @@ export function App() {
                   style={{ background: 'transparent', border: 'none', color: 'var(--md-muted)', cursor: 'pointer', padding: 0 }}
                   title={hotkeySectionOpen ? 'Thu nhỏ' : 'Mở rộng'}
                   aria-label={hotkeySectionOpen ? 'Thu nhỏ' : 'Mở rộng'}
+                  data-inspector-id="appSettings.hotkeyToggleButton"
+                  data-inspector-label="Hotkey section expand toggle button"
+                  data-inspector-component="client/src/App.tsx"
                 >
                   {hotkeySectionOpen ? <ChevronUp size={15} strokeWidth={2} /> : <ChevronDown size={15} strokeWidth={2} />}
                 </button>
               </div>
 
               {hotkeySectionOpen && (
-                <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
+                <div 
+                  style={{ 
+                    marginTop: 14, 
+                    borderTop: '1px solid rgba(255,255,255,0.05)', 
+                    paddingTop: 14,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}
+                  data-inspector-id="appSettings.hotkeySection"
+                  data-inspector-label="Hotkey configuration section"
+                  data-inspector-component="client/src/App.tsx"
+                >
+                  {/* Hotkey 1: Sync Time */}
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: '0 0 200px' }}>
                       Bật/Tắt Sync Time (Delay):
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 210, flexShrink: 0 }}>
                       <input
                         type="text"
                         placeholder="Nhấn tổ hợp phím..."
@@ -4139,12 +4300,15 @@ export function App() {
                           borderRadius: '6px',
                           padding: '6px 10px',
                           fontSize: 12,
-                          width: 160,
+                          width: 150,
                           textAlign: 'center',
                           cursor: 'pointer',
                           fontWeight: 'bold',
                           outline: 'none',
                         }}
+                        data-inspector-id="appSettings.syncTimeHotkeyInput"
+                        data-inspector-label="Sync Time hotkey input"
+                        data-inspector-component="client/src/App.tsx"
                       />
                       {syncTimeHotkey && (
                         <button
@@ -4163,6 +4327,9 @@ export function App() {
                             fontSize: 11,
                             cursor: 'pointer',
                           }}
+                          data-inspector-id="appSettings.syncTimeHotkeyClearButton"
+                          data-inspector-label="Sync Time hotkey clear button"
+                          data-inspector-component="client/src/App.tsx"
                         >
                           Xoá
                         </button>
@@ -4170,11 +4337,12 @@ export function App() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', marginTop: 12, flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: '220px' }}>
-                      <div style={{ fontSize: 12, color: 'var(--md-muted)', marginRight: 4 }}>
-                        Hiện tài khoản máy (Tile):
-                      </div>
+                  {/* Hotkey 2: Tile Account */}
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: '0 0 200px' }}>
+                      Hiện tài khoản máy (Tile):
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 210, flexShrink: 0 }}>
                       <input
                         type="text"
                         placeholder="Nhấn tổ hợp phím..."
@@ -4188,12 +4356,15 @@ export function App() {
                           borderRadius: '6px',
                           padding: '6px 10px',
                           fontSize: 12,
-                          width: 140,
+                          width: 150,
                           textAlign: 'center',
                           cursor: 'pointer',
                           fontWeight: 'bold',
                           outline: 'none',
                         }}
+                        data-inspector-id="appSettings.deviceAccountHotkeyInput"
+                        data-inspector-label="Device account hotkey input"
+                        data-inspector-component="client/src/App.tsx"
                       />
                       {deviceAccountHotkey && (
                         <button
@@ -4212,17 +4383,22 @@ export function App() {
                             fontSize: 11,
                             cursor: 'pointer',
                           }}
+                          data-inspector-id="appSettings.deviceAccountHotkeyClearButton"
+                          data-inspector-label="Device account hotkey clear button"
+                          data-inspector-component="client/src/App.tsx"
                         >
                           Xoá
                         </button>
                       )}
                     </div>
+                  </div>
 
-                    {/* Overlay Header hotkey row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: '220px' }}>
-                      <div style={{ fontSize: 12, color: 'var(--md-muted)', marginRight: 4 }}>
-                        Overlay Header:
-                      </div>
+                  {/* Hotkey 3: Overlay Header */}
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: '0 0 200px' }}>
+                      Overlay Header:
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 210, flexShrink: 0 }}>
                       <input
                         id="input_overlay_header_hotkey"
                         type="text"
@@ -4237,12 +4413,15 @@ export function App() {
                           borderRadius: '6px',
                           padding: '6px 10px',
                           fontSize: 12,
-                          width: 140,
+                          width: 150,
                           textAlign: 'center',
                           cursor: 'pointer',
                           fontWeight: 'bold',
                           outline: 'none',
                         }}
+                        data-inspector-id="appSettings.overlayHeaderHotkeyInput"
+                        data-inspector-label="Overlay header hotkey input"
+                        data-inspector-component="client/src/App.tsx"
                       />
                       {overlayHeaderHotkey && (
                         <button
@@ -4261,17 +4440,22 @@ export function App() {
                             fontSize: 11,
                             cursor: 'pointer',
                           }}
+                          data-inspector-id="appSettings.overlayHeaderHotkeyClearButton"
+                          data-inspector-label="Overlay header hotkey clear button"
+                          data-inspector-component="client/src/App.tsx"
                         >
                           Xoá
                         </button>
                       )}
                     </div>
+                  </div>
 
-                    {/* Account Manager Modal hotkey row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: '220px' }}>
-                      <div style={{ fontSize: 12, color: 'var(--md-muted)', marginRight: 4 }}>
-                        Bảng Quản lý tài khoản:
-                      </div>
+                  {/* Hotkey 4: Account Manager */}
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: '0 0 200px' }}>
+                      Bảng Quản lý tài khoản:
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 210, flexShrink: 0 }}>
                       <input
                         type="text"
                         placeholder="Nhấn tổ hợp phím..."
@@ -4285,12 +4469,15 @@ export function App() {
                           borderRadius: '6px',
                           padding: '6px 10px',
                           fontSize: 12,
-                          width: 140,
+                          width: 150,
                           textAlign: 'center',
                           cursor: 'pointer',
                           fontWeight: 'bold',
                           outline: 'none',
                         }}
+                        data-inspector-id="appSettings.accountManagerHotkeyInput"
+                        data-inspector-label="Account manager hotkey input"
+                        data-inspector-component="client/src/App.tsx"
                       />
                       {accountManagerHotkey && (
                         <button
@@ -4309,17 +4496,22 @@ export function App() {
                             fontSize: 11,
                             cursor: 'pointer',
                           }}
+                          data-inspector-id="appSettings.accountManagerHotkeyClearButton"
+                          data-inspector-label="Account manager hotkey clear button"
+                          data-inspector-component="client/src/App.tsx"
                         >
                           Xoá
                         </button>
                       )}
                     </div>
+                  </div>
 
-                    {/* Inspector ID hotkey row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: '220px' }}>
-                      <div style={{ fontSize: 12, color: 'var(--md-muted)', marginRight: 4 }}>
-                        Bật/Tắt Inspector ID:
-                      </div>
+                  {/* Hotkey 5: Inspector ID */}
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: '0 0 200px' }}>
+                      Bật/Tắt Inspector ID:
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 210, flexShrink: 0 }}>
                       <input
                         type="text"
                         placeholder="Nhấn tổ hợp phím..."
@@ -4333,12 +4525,15 @@ export function App() {
                           borderRadius: '6px',
                           padding: '6px 10px',
                           fontSize: 12,
-                          width: 140,
+                          width: 150,
                           textAlign: 'center',
                           cursor: 'pointer',
                           fontWeight: 'bold',
                           outline: 'none',
                         }}
+                        data-inspector-id="appSettings.inspectorIdHotkeyInput"
+                        data-inspector-label="Inspector ID hotkey input"
+                        data-inspector-component="client/src/App.tsx"
                       />
                       {inspectorIdHotkey && (
                         <button
@@ -4357,23 +4552,32 @@ export function App() {
                             fontSize: 11,
                             cursor: 'pointer',
                           }}
+                          data-inspector-id="appSettings.inspectorIdHotkeyClearButton"
+                          data-inspector-label="Inspector ID hotkey clear button"
+                          data-inspector-component="client/src/App.tsx"
                         >
                           Xoá
                         </button>
                       )}
                     </div>
-
                   </div>
-
                 </div>
               )}
             </div>
 
             {/* Seeding Content Section */}
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}>
+            <div 
+              style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}
+              data-inspector-id="appSettings.seedingSection"
+              data-inspector-label="Seeding content configuration section"
+              data-inspector-component="client/src/App.tsx"
+            >
               <div 
                 style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
                 onClick={() => setSeedingSectionOpen(p => !p)}
+                data-inspector-id="appSettings.seedingHeader"
+                data-inspector-label="Seeding configuration section header"
+                data-inspector-component="client/src/App.tsx"
               >
                 <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1 }}>
                   Nội dung Seeding
@@ -4409,6 +4613,9 @@ export function App() {
                       resize: 'vertical',
                       boxSizing: 'border-box'
                     }}
+                    data-inspector-id="appSettings.seedingTextarea"
+                    data-inspector-label="Seeding sentences input textarea"
+                    data-inspector-component="client/src/App.tsx"
                   />
                   <div style={{ fontSize: 11, color: 'var(--md-muted)', marginTop: 6, textAlign: 'right' }}>
                     Số dòng: <strong style={{ color: 'var(--md-info)' }}>{seedingLineCount}</strong>
@@ -4420,23 +4627,23 @@ export function App() {
 
             <div className='confirmBtns' style={{ marginTop: 32, justifyContent: 'flex-end', display: 'flex' }}>
               <button
-                className='confirmBtn'
+                className='modalBtnPrimary'
                 style={{
-                  background: 'linear-gradient(135deg, #4f7fff, #205cff)',
-                  border: 'none',
-                  color: '#fff',
-                  padding: '10px 24px',
-                  borderRadius: 10,
+                  padding: '0 24px',
+                  height: 38,
+                  borderRadius: 8,
                   fontSize: 14,
                   fontWeight: 600,
                   cursor: 'pointer',
                   outline: 'none',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 4px 15px rgba(32, 92, 255, 0.4)'
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                 onClick={() => setAppSettingsVisible(false)}
+                data-inspector-id="appSettings.confirmButton"
+                data-inspector-label="System settings save confirmation button"
+                data-inspector-component="client/src/App.tsx"
               >
                 Xác Nhận
               </button>
@@ -4449,10 +4656,31 @@ export function App() {
         <div
           className='confirmOverlay'
           onMouseDown={() => setBitrateConfirmVisible(false)}
+          data-inspector-id="confirm.bitrateOverlay"
+          data-inspector-label="Bitrate change confirmation overlay background"
+          data-inspector-component="client/src/App.tsx"
         >
-          <div className='confirmPanel' onMouseDown={e => e.stopPropagation()}>
-            <div className='confirmTitle'>{t('Bitrate cao')}</div>
-            <div className='confirmText'>
+          <div 
+            className='confirmPanel' 
+            onMouseDown={e => e.stopPropagation()}
+            data-inspector-id="confirm.bitratePanel"
+            data-inspector-label="Bitrate change confirmation card panel"
+            data-inspector-component="client/src/App.tsx"
+          >
+            <div 
+              className='confirmTitle'
+              data-inspector-id="confirm.bitrateTitle"
+              data-inspector-label="Bitrate change confirmation title"
+              data-inspector-component="client/src/App.tsx"
+            >
+              {t('Bitrate cao')}
+            </div>
+            <div 
+              className='confirmText'
+              data-inspector-id="confirm.bitrateText"
+              data-inspector-label="Bitrate warning message text"
+              data-inspector-component="client/src/App.tsx"
+            >
               {t(
                 'Kéo bitrate cao trên (60%) có thể làm tăng tải và đôi lúc gây giật/đứt stream. Vẫn tiếp tục?'
               )}
@@ -4469,6 +4697,9 @@ export function App() {
                     bitrate: bitrateLastSafe
                   }))
                 }}
+                data-inspector-id="confirm.bitrateCancelButton"
+                data-inspector-label="Bitrate warning cancel button"
+                data-inspector-component="client/src/App.tsx"
               >
                 {t('Hủy')}
               </button>
@@ -4484,6 +4715,9 @@ export function App() {
                   setDraftConfig(prev => ({ ...prev, bitrate: target }))
                   applyGridDraftConfig()
                 }}
+                data-inspector-id="confirm.bitrateContinueButton"
+                data-inspector-label="Bitrate warning confirm/continue button"
+                data-inspector-component="client/src/App.tsx"
               >
                 {t('Tiếp tục')}
               </button>
@@ -4493,9 +4727,28 @@ export function App() {
       ) : null}
 
       {connectModalOpen ? (
-        <div className='confirmOverlay' onMouseDown={closeConnectModal}>
-          <div className='confirmPanel' onMouseDown={e => e.stopPropagation()}>
-            <div className='confirmTitle'>{t('Connect devices')}</div>
+        <div 
+          className='confirmOverlay' 
+          onMouseDown={closeConnectModal}
+          data-inspector-id="connectModal.overlay"
+          data-inspector-label="Port connector overlay background"
+          data-inspector-component="client/src/App.tsx"
+        >
+          <div 
+            className='confirmPanel' 
+            onMouseDown={e => e.stopPropagation()}
+            data-inspector-id="connectModal.panel"
+            data-inspector-label="Port connector card panel"
+            data-inspector-component="client/src/App.tsx"
+          >
+            <div 
+              className='confirmTitle'
+              data-inspector-id="connectModal.title"
+              data-inspector-label="Port connector modal title"
+              data-inspector-component="client/src/App.tsx"
+            >
+              {t('Connect devices')}
+            </div>
             {targetConnect === 'wifi' ? (
               <>
                 <div className='confirmText'>
@@ -4517,6 +4770,9 @@ export function App() {
                             [id]: Number(e.target.value) || 5555
                           }))
                         }
+                        data-inspector-id="connectModal.portInput"
+                        data-inspector-label={`Port input for device ${id}`}
+                        data-inspector-component="client/src/App.tsx"
                       />
                     </div>
                   ))}
@@ -4532,7 +4788,13 @@ export function App() {
               </div>
             )}
             <div className='confirmActions'>
-              <button className='modalBtn' onClick={closeConnectModal}>
+              <button 
+                className='modalBtn' 
+                onClick={closeConnectModal}
+                data-inspector-id="connectModal.cancelButton"
+                data-inspector-label="Port connector cancel button"
+                data-inspector-component="client/src/App.tsx"
+              >
                 {t('Cancel')}
               </button>
               <button
@@ -4548,6 +4810,9 @@ export function App() {
                   await runConnectRequest(payload, targetConnect)
                   closeConnectModal()
                 }}
+                data-inspector-id="connectModal.saveButton"
+                data-inspector-label="Port connector save button"
+                data-inspector-component="client/src/App.tsx"
               >
                 {t('Save')}
               </button>
@@ -4570,6 +4835,9 @@ export function App() {
             e.preventDefault()
             setPageContextMenu(null)
           }}
+          data-inspector-id="pageContext.menuLayer"
+          data-inspector-label="Page context menu overlay background"
+          data-inspector-component="client/src/App.tsx"
         >
           <div
             className='pageContextMenu'
@@ -4579,6 +4847,9 @@ export function App() {
             }}
             onClick={e => e.stopPropagation()}
             onContextMenu={e => e.stopPropagation()}
+            data-inspector-id="pageContext.menu"
+            data-inspector-label="Page context menu card panel"
+            data-inspector-component="client/src/App.tsx"
           >
             <button
               className='pageContextItem'
@@ -4586,6 +4857,9 @@ export function App() {
                 setPageContextMenu(null)
                 apkInputRef.current?.click()
               }}
+              data-inspector-id="pageContext.installApkItem"
+              data-inspector-label="Page context menu item: Install APK"
+              data-inspector-component="client/src/App.tsx"
             >
               <Package size={15} strokeWidth={1.8} />
               <span>Cài đặt APK</span>
@@ -4596,6 +4870,9 @@ export function App() {
                 setPageContextMenu(null)
                 importInputRef.current?.click()
               }}
+              data-inspector-id="pageContext.importFileItem"
+              data-inspector-label="Page context menu item: Import file to phone"
+              data-inspector-component="client/src/App.tsx"
             >
               <Upload size={15} strokeWidth={1.8} />
               <span>Nhập tệp vào điện thoại</span>
@@ -4606,6 +4883,9 @@ export function App() {
                 setPageContextMenu(null)
                 setGlobalAdbOpen(true)
               }}
+              data-inspector-id="pageContext.globalAdbItem"
+              data-inspector-label="Page context menu item: Run global ADB command"
+              data-inspector-component="client/src/App.tsx"
             >
               <Terminal size={15} strokeWidth={1.8} />
               <span>Chạy lệnh ADB</span>
@@ -4616,25 +4896,65 @@ export function App() {
       ) : null}
 
       {globalAdbOpen ? (
-        <div className='confirmOverlay' onMouseDown={() => setGlobalAdbOpen(false)}>
-          <div className='confirmPanel adbQuickPanel' onMouseDown={e => e.stopPropagation()}>
-            <div className='confirmTitle'>Chạy lệnh ADB</div>
+        <div 
+          className='confirmOverlay' 
+          onMouseDown={() => setGlobalAdbOpen(false)}
+          data-inspector-id="globalAdb.overlay"
+          data-inspector-label="Global ADB console overlay background"
+          data-inspector-component="client/src/App.tsx"
+        >
+          <div 
+            className='confirmPanel adbQuickPanel' 
+            onMouseDown={e => e.stopPropagation()}
+            data-inspector-id="globalAdb.panel"
+            data-inspector-label="Global ADB console card panel"
+            data-inspector-component="client/src/App.tsx"
+          >
+            <div 
+              className='confirmTitle'
+              data-inspector-id="globalAdb.title"
+              data-inspector-label="Global ADB console title"
+              data-inspector-component="client/src/App.tsx"
+            >
+              Chạy lệnh ADB
+            </div>
             <textarea
               className='adbQuickInput'
               placeholder='adb shell pm list packages -3'
               value={globalAdbCommand}
               onChange={e => setGlobalAdbCommand(e.target.value)}
               autoFocus
+              data-inspector-id="globalAdb.input"
+              data-inspector-label="Global ADB command textarea input field"
+              data-inspector-component="client/src/App.tsx"
             />
-            {globalAdbStatus ? <div className='pageContextStatus'>{globalAdbStatus}</div> : null}
+            {globalAdbStatus ? (
+              <div 
+                className='pageContextStatus'
+                data-inspector-id="globalAdb.status"
+                data-inspector-label="Global ADB execution status text feedback"
+                data-inspector-component="client/src/App.tsx"
+              >
+                {globalAdbStatus}
+              </div>
+            ) : null}
             <div className='confirmActions'>
-              <button className='modalBtn' onClick={() => setGlobalAdbOpen(false)}>
+              <button 
+                className='modalBtn' 
+                onClick={() => setGlobalAdbOpen(false)}
+                data-inspector-id="globalAdb.cancelButton"
+                data-inspector-label="Global ADB console close/cancel button"
+                data-inspector-component="client/src/App.tsx"
+              >
                 Hủy
               </button>
               <button
                 className='modalBtnPrimary'
                 disabled={globalAdbRunning || !globalAdbCommand.trim()}
                 onClick={runGlobalAdbCommand}
+                data-inspector-id="globalAdb.executeButton"
+                data-inspector-label="Global ADB console execute button"
+                data-inspector-component="client/src/App.tsx"
               >
                 Chạy
               </button>
@@ -4660,13 +4980,26 @@ export function App() {
         <div
           className='confirmOverlay'
           onMouseDown={() => setGroupModalOpen(false)}
+          data-inspector-id="savedGroups.addOverlay"
+          data-inspector-label="Save group modal overlay background"
+          data-inspector-component="client/src/App.tsx"
         >
           <div
             className='confirmPanel'
             style={{ maxWidth: 360 }}
             onMouseDown={e => e.stopPropagation()}
+            data-inspector-id="savedGroups.addPanel"
+            data-inspector-label="Save group modal card panel"
+            data-inspector-component="client/src/App.tsx"
           >
-            <div className='confirmTitle'>Thêm Nhóm</div>
+            <div 
+              className='confirmTitle'
+              data-inspector-id="savedGroups.addTitle"
+              data-inspector-label="Save group modal title"
+              data-inspector-component="client/src/App.tsx"
+            >
+              Thêm Nhóm
+            </div>
             <div className='confirmText' style={{ marginBottom: 12 }}>
               Đặt tên cho nhóm <strong>{connectSelection.size}</strong> device đang chọn
             </div>
@@ -4688,10 +5021,19 @@ export function App() {
                 }
                 if (e.key === 'Escape') setGroupModalOpen(false)
               }}
+              data-inspector-id="savedGroups.addInput"
+              data-inspector-label="Save group name input field"
+              data-inspector-component="client/src/App.tsx"
             />
 
             <div className='confirmBtns' style={{ marginTop: 16 }}>
-              <button className='modalBtn' onClick={() => setGroupModalOpen(false)}>
+              <button 
+                className='modalBtn' 
+                onClick={() => setGroupModalOpen(false)}
+                data-inspector-id="savedGroups.addCancelButton"
+                data-inspector-label="Save group modal cancel button"
+                data-inspector-component="client/src/App.tsx"
+              >
                 Huỷ
               </button>
               <button
@@ -4705,6 +5047,9 @@ export function App() {
                   ])
                   setGroupModalOpen(false)
                 }}
+                data-inspector-id="savedGroups.addSaveButton"
+                data-inspector-label="Save group modal save button"
+                data-inspector-component="client/src/App.tsx"
               >
                 Lưu Nhóm
               </button>
@@ -4715,15 +5060,40 @@ export function App() {
 
       {/* Modal xác nhận xoá nhóm */}
       {deleteGroupConfirm !== null && (
-        <div className='confirmOverlay' onMouseDown={() => setDeleteGroupConfirm(null)}>
-          <div className='confirmPanel compact' onMouseDown={e => e.stopPropagation()}>
-            <div className='confirmTitle'>Xoá nhóm</div>
+        <div 
+          className='confirmOverlay' 
+          onMouseDown={() => setDeleteGroupConfirm(null)}
+          data-inspector-id="savedGroups.deleteOverlay"
+          data-inspector-label="Delete group confirmation overlay background"
+          data-inspector-component="client/src/App.tsx"
+        >
+          <div 
+            className='confirmPanel compact' 
+            onMouseDown={e => e.stopPropagation()}
+            data-inspector-id="savedGroups.deletePanel"
+            data-inspector-label="Delete group confirmation card panel"
+            data-inspector-component="client/src/App.tsx"
+          >
+            <div 
+              className='confirmTitle'
+              data-inspector-id="savedGroups.deleteTitle"
+              data-inspector-label="Delete group confirmation title"
+              data-inspector-component="client/src/App.tsx"
+            >
+              Xoá nhóm
+            </div>
             <div className='confirmText'>
               Bạn có chắc muốn xoá nhóm{' '}
               <strong>"{savedGroups[deleteGroupConfirm]?.name}"</strong>?
             </div>
             <div className='confirmActions center'>
-              <button className='modalBtn' onClick={() => setDeleteGroupConfirm(null)}>
+              <button 
+                className='modalBtn' 
+                onClick={() => setDeleteGroupConfirm(null)}
+                data-inspector-id="savedGroups.deleteCancelButton"
+                data-inspector-label="Delete group confirmation cancel button"
+                data-inspector-component="client/src/App.tsx"
+              >
                 Huỷ
               </button>
               <button
@@ -4743,6 +5113,9 @@ export function App() {
                   if (expandedGroupIdx === idx) setExpandedGroupIdx(null)
                   setDeleteGroupConfirm(null)
                 }}
+                data-inspector-id="savedGroups.deleteConfirmButton"
+                data-inspector-label="Delete group confirmation execution button"
+                data-inspector-component="client/src/App.tsx"
               >
                 Xoá nhóm
               </button>
@@ -4755,6 +5128,9 @@ export function App() {
         <div
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999998 }}
           onMouseDown={() => setGroupContextMenu(null)}
+          data-inspector-id="savedGroups.contextMenuOverlay"
+          data-inspector-label="Saved groups context menu overlay background"
+          data-inspector-component="client/src/App.tsx"
         />
       )}
       {groupContextMenu && (
@@ -4767,6 +5143,9 @@ export function App() {
             zIndex: 999999,
           }}
           onMouseDown={e => e.stopPropagation()}
+          data-inspector-id="savedGroups.contextMenu"
+          data-inspector-label="Saved groups context menu panel"
+          data-inspector-component="client/src/App.tsx"
         >
           <button
             className='ctxMenuItem'
@@ -4775,6 +5154,9 @@ export function App() {
               setRenameGroupValue(savedGroups[groupContextMenu.idx]?.name || '')
               setGroupContextMenu(null)
             }}
+            data-inspector-id="savedGroups.contextMenuRename"
+            data-inspector-label="Saved groups context menu item: Rename group"
+            data-inspector-component="client/src/App.tsx"
           >
             Đổi tên nhóm
           </button>
@@ -4791,6 +5173,9 @@ export function App() {
               }
               setGroupContextMenu(null)
             }}
+            data-inspector-id="savedGroups.contextMenuFocus"
+            data-inspector-label="Saved groups context menu item: Focus group toggle"
+            data-inspector-component="client/src/App.tsx"
           >
             {focusGroupIdx === groupContextMenu.idx ? '👁 Hiện tất cả' : '👁 Chỉ hiện nhóm này'}
           </button>
@@ -4805,6 +5190,9 @@ export function App() {
               }
               setGroupContextMenu(null)
             }}
+            data-inspector-id="savedGroups.contextMenuSetWallpaper"
+            data-inspector-label="Saved groups context menu item: Set group device wallpaper"
+            data-inspector-component="client/src/App.tsx"
           >
             🖼️ Đặt số hiệu làm hình nền
           </button>
@@ -4824,6 +5212,9 @@ export function App() {
             setContextMenuOpen(false)
             setSubMenuOpen(false)
           }}
+          data-inspector-id="deviceContext.menuLayer"
+          data-inspector-label="Device tile context menu overlay background"
+          data-inspector-component="client/src/App.tsx"
         >
           <div
             style={{
@@ -4842,6 +5233,9 @@ export function App() {
             }}
             onClick={e => e.stopPropagation()}
             onContextMenu={e => e.stopPropagation()}
+            data-inspector-id="deviceContext.menu"
+            data-inspector-label="Device tile context menu card panel"
+            data-inspector-component="client/src/App.tsx"
           >
             {/* Header: Device # + input số inline trong suốt */}
             <div style={{
@@ -4883,6 +5277,9 @@ export function App() {
                   const n = Math.max(1, parseInt(contextMenuInput, 10))
                   if (!isNaN(n)) setTileNumber(contextMenuTarget!.udid, n)
                 }}
+                data-inspector-id="deviceContext.numberInput"
+                data-inspector-label="Device tile numbering input field"
+                data-inspector-component="client/src/App.tsx"
               />
             </div>
 
@@ -4920,6 +5317,9 @@ export function App() {
               onMouseLeave={e => {
                 e.currentTarget.style.background = 'transparent'
               }}
+              data-inspector-id="deviceContext.setWallpaperItem"
+              data-inspector-label="Device context menu item: Set device wallpaper"
+              data-inspector-component="client/src/App.tsx"
             >
               <span>🖼️</span> <span>Đặt số hiệu làm hình nền</span>
             </button>
@@ -4934,6 +5334,9 @@ export function App() {
                 onMouseLeave={e => {
                   e.currentTarget.style.background = 'transparent'
                 }}
+                data-inspector-id="deviceContext.profileSubmenu"
+                data-inspector-label="Device context menu item: Select profile submenu trigger"
+                data-inspector-component="client/src/App.tsx"
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
                   <Users size={14} style={{ flexShrink: 0 }} />
@@ -4979,6 +5382,9 @@ export function App() {
                       fontSize: '13px', cursor: 'pointer', padding: '6px 10px', textAlign: 'left', borderRadius: 4,
                       display: 'none', alignItems: 'center', gap: 8, width: '100%'
                     }}
+                    data-inspector-id="deviceContext.createProfileItem"
+                    data-inspector-label="Device context menu item: Create profile option"
+                    data-inspector-component="client/src/App.tsx"
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
                     onPointerDown={e => {
@@ -5049,6 +5455,9 @@ export function App() {
                           }}
                           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
                           onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                          data-inspector-id="deviceContext.profileItem"
+                          data-inspector-label={`Device context menu item: Assign to profile ${profile.name}`}
+                          data-inspector-component="client/src/App.tsx"
                         >
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {profile.name}
@@ -5693,16 +6102,44 @@ export function App() {
       </div>
 
       {confirmState && (
-        <div className="confirmOverlay" onMouseDown={() => setConfirmState(null)}>
-          <div className={`confirmPanel${confirmState.danger ? ' compact' : ''}`} onMouseDown={e => e.stopPropagation()}>
-            <div className="confirmTitle">
+        <div 
+          className="confirmOverlay" 
+          onMouseDown={() => setConfirmState(null)}
+          data-inspector-id="genericConfirm.overlay"
+          data-inspector-label="Generic confirmation overlay background"
+          data-inspector-component="client/src/App.tsx"
+        >
+          <div 
+            className={`confirmPanel${confirmState.danger ? ' compact' : ''}`} 
+            onMouseDown={e => e.stopPropagation()}
+            data-inspector-id="genericConfirm.panel"
+            data-inspector-label="Generic confirmation card panel"
+            data-inspector-component="client/src/App.tsx"
+          >
+            <div 
+              className="confirmTitle"
+              data-inspector-id="genericConfirm.title"
+              data-inspector-label="Generic confirmation title"
+              data-inspector-component="client/src/App.tsx"
+            >
               {confirmState.title}
             </div>
-            <div className="confirmText">
+            <div 
+              className="confirmText"
+              data-inspector-id="genericConfirm.text"
+              data-inspector-label="Generic confirmation message text"
+              data-inspector-component="client/src/App.tsx"
+            >
               {confirmState.message}
             </div>
             <div className={`confirmActions${confirmState.danger ? ' center' : ''}`}>
-              <button className="modalBtn" onClick={() => setConfirmState(null)}>
+              <button 
+                className="modalBtn" 
+                onClick={() => setConfirmState(null)}
+                data-inspector-id="genericConfirm.cancelButton"
+                data-inspector-label="Generic confirmation cancel button"
+                data-inspector-component="client/src/App.tsx"
+              >
                 {confirmState.cancelText || 'Huỷ'}
               </button>
               <button
@@ -5712,6 +6149,9 @@ export function App() {
                   setConfirmState(null);
                   fn();
                 }}
+                data-inspector-id="genericConfirm.confirmButton"
+                data-inspector-label="Generic confirmation execution button"
+                data-inspector-component="client/src/App.tsx"
               >
                 {confirmState.confirmText || 'Xác Nhận'}
               </button>
@@ -5804,9 +6244,29 @@ function InputModalOverlayInner({ state, onClose }: { state: NonNullable<InputMo
 
   return createPortal(
     <>
-      <div className="confirmOverlay" onMouseDown={onClose}>
-        <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480 }} onMouseDown={e => e.stopPropagation()}>
-          <div className="confirmTitle">{state.title}</div>
+      <div 
+        className="confirmOverlay" 
+        onMouseDown={onClose}
+        data-inspector-id="genericInput.overlay"
+        data-inspector-label="Generic input modal overlay background"
+        data-inspector-component="client/src/App.tsx"
+      >
+        <div 
+          className="confirmPanel" 
+          style={{ minWidth: 380, maxWidth: 480 }} 
+          onMouseDown={e => e.stopPropagation()}
+          data-inspector-id="genericInput.panel"
+          data-inspector-label="Generic input modal card panel"
+          data-inspector-component="client/src/App.tsx"
+        >
+          <div 
+            className="confirmTitle"
+            data-inspector-id="genericInput.title"
+            data-inspector-label="Generic input modal title"
+            data-inspector-component="client/src/App.tsx"
+          >
+            {state.title}
+          </div>
           <div className="confirmText">
             {state.label ? <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>{state.label}</label> : null}
             <input
@@ -5820,10 +6280,22 @@ function InputModalOverlayInner({ state, onClose }: { state: NonNullable<InputMo
                 if (e.key === 'Enter') handleSubmit();
                 if (e.key === 'Escape') onClose();
               }}
+              data-inspector-id="genericInput.field"
+              data-inspector-label="Generic input text field"
+              data-inspector-component="client/src/App.tsx"
             />
           </div>
           <div className="confirmActions">
-            <button type='button' className="modalBtn" onClick={onClose}>Huỷ</button>
+            <button 
+              type='button' 
+              className="modalBtn" 
+              onClick={onClose}
+              data-inspector-id="genericInput.cancelButton"
+              data-inspector-label="Generic input modal cancel button"
+              data-inspector-component="client/src/App.tsx"
+            >
+              Huỷ
+            </button>
             <button
               type='button'
               className="modalBtnPrimary"
@@ -5833,6 +6305,9 @@ function InputModalOverlayInner({ state, onClose }: { state: NonNullable<InputMo
               }}
               disabled={!value.trim()}
               onClick={handleSubmit}
+              data-inspector-id="genericInput.confirmButton"
+              data-inspector-label="Generic input modal confirm button"
+              data-inspector-component="client/src/App.tsx"
             >
               Xác Nhận
             </button>
