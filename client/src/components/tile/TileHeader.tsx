@@ -57,7 +57,10 @@ export function TileHeader({
         : '';
 
   return (
-    <div className="tileHeader" onClick={onHeaderClick} title={udid}>
+    <div className="tileHeader" onClick={(e) => {
+      if (e.ctrlKey) return;
+      onHeaderClick(e);
+    }} title={udid}>
       <div className="left">
         <div className="udidRow">
           {typeof order === 'number' ? (

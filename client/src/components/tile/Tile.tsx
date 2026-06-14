@@ -260,8 +260,9 @@ function TileComponent({
         clickDevice(udid);
     }, [selectOnly, clickDevice, udid]);
 
-    const onPointerEnter = useCallback(() => {
+    const onPointerEnter = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
         if (isDisconnected || isViewing) return;
+        if (e.ctrlKey) return;
         selectOnly(udid);
         canvasRef.current?.focus?.({ preventScroll: true });
     }, [isDisconnected, isViewing, selectOnly, udid]);

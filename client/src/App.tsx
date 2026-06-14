@@ -2283,6 +2283,7 @@ export function App() {
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return
       e.preventDefault()
+      e.stopPropagation()
       const step = e.deltaY > 0 ? -10 : 10
       updateWidth(dimsRef.current.width + step)
     }
@@ -2420,6 +2421,8 @@ export function App() {
   // Cùng logic với button toggle trong DeviceAccountOverlay.tsx: flip localStorage + dispatch event
   useEffect(() => {
     const handleOverlayHeaderHotkey = (e: KeyboardEvent) => {
+      if (e.repeat) return; // Prevent double toggle on auto-repeat
+
       const active = document.activeElement as HTMLElement | null;
 
       // Chú ý: Đã gỡ bỏ block chặn khi hover/focus stream theo yêu cầu, 
