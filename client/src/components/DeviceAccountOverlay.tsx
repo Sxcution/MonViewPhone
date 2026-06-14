@@ -834,6 +834,19 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     }
   }, [nearbyAutoOpenEnabled, activeTab, panelHasNearbyRelevantAccount]);
   const [accountActionMenu, setAccountActionMenu] = useState<{ x: number; y: number; sourceUdid: string; account: Account } | null>(null);
+  const [showAddToGroupSubmenu, setShowAddToGroupSubmenu] = useState(false);
+
+  const handleAddDeviceToGroup = (groupIndex: number, udid: string) => {
+    const nextGroups = savedGroups.map((g, i) => {
+      if (i !== groupIndex) return g;
+      const existingSet = new Set(g.udids);
+      if (existingSet.has(udid)) return g;
+      return { ...g, udids: [...g.udids, udid] };
+    });
+    localStorage.setItem('savedGroups', JSON.stringify(nextGroups));
+    window.dispatchEvent(new Event('saved-groups-updated'));
+  };
+
   const [accountHoverTooltip, setAccountHoverTooltip] = useState<{ x: number; y: number; account: Account } | null>(null);
   const [badgeHoverTooltip, setBadgeHoverTooltip] = useState<{ x: number; y: number } | null>(null);
   const accountActionMenuRef = useRef<HTMLDivElement>(null);
@@ -912,6 +925,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
         return;
       }
       setAccountActionMenu(null);
+      setShowSetSubmenu(false);
+      setShowClassificationSubmenu(false);
+      setShowAddToGroupSubmenu(false);
     };
     window.addEventListener('mousedown', hide, true);
     return () => window.removeEventListener('mousedown', hide, true);
@@ -1084,14 +1100,23 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     return (data.platforms[activeTab] || []).filter(acc => acc.notice && acc.notice.title);
   }, [data.platforms, activeTab]);
 
+  const headerNoticeAccounts = useMemo(() => {
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    return (data.platforms[activeTab] || []).filter(acc => {
+      if (!acc.notice || !acc.notice.title || !acc.notice.dueDate) return false;
+      const diffMs = acc.notice.dueDate - Date.now();
+      return diffMs < sevenDaysMs;
+    });
+  }, [data.platforms, activeTab]);
+
   const deviceNoticeStatus = useMemo(() => {
-    if (accountsWithNotices.length === 0) return 'none';
-    const hasExpired = accountsWithNotices.some(acc => acc.notice?.dueDate && acc.notice.dueDate <= Date.now());
+    if (headerNoticeAccounts.length === 0) return 'none';
+    const hasExpired = headerNoticeAccounts.some(acc => acc.notice?.dueDate && acc.notice.dueDate <= Date.now());
     return hasExpired ? 'expired' : 'counting';
-  }, [accountsWithNotices]);
+  }, [headerNoticeAccounts]);
 
   const noticeTooltipText = useMemo(() => {
-    return accountsWithNotices.map(acc => {
+    return headerNoticeAccounts.map(acc => {
       const accName = acc.name || acc.phone || acc.nickname || 'Không tên';
       const accNameColor = getAccountListNameColor(acc);
       const title = acc.notice?.title || '';
@@ -1112,16 +1137,16 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
         </div>
       );
     });
-  }, [accountsWithNotices]);
+  }, [headerNoticeAccounts]);
 
   const handleNoticeIconClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (accountsWithNotices.length === 0) return;
+    if (headerNoticeAccounts.length === 0) return;
 
-    const expired = accountsWithNotices.filter(acc => acc.notice?.dueDate && acc.notice.dueDate <= Date.now());
-    const nonExpired = accountsWithNotices.filter(acc => !acc.notice?.dueDate || acc.notice.dueDate > Date.now());
+    const expired = headerNoticeAccounts.filter(acc => acc.notice?.dueDate && acc.notice.dueDate <= Date.now());
+    const nonExpired = headerNoticeAccounts.filter(acc => !acc.notice?.dueDate || acc.notice.dueDate > Date.now());
     const ordered = [...expired, ...nonExpired];
 
     if (ordered.length === 0) return;
@@ -3380,6 +3405,57 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   {getAppTypeLabel(type)}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Submenu Thêm Vào Nhóm */}
+          <div
+            className="dav-ctx-submenu-container"
+            onMouseEnter={() => setShowAddToGroupSubmenu(true)}
+            onMouseLeave={() => setShowAddToGroupSubmenu(false)}
+            data-inspector-id="deviceAccount.contextMenuAddToGroupSubmenu"
+            data-inspector-label="Add device to group submenu"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+          >
+            <button
+              type="button"
+              className="dav-ctx-item dav-ctx-has-sub"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowAddToGroupSubmenu(v => !v);
+              }}
+            >
+              Thêm vào nhóm
+            </button>
+            <div className={`dav-ctx-submenu ${showAddToGroupSubmenu ? 'is-open' : ''}`}>
+              {savedGroups.length === 0 ? (
+                <div className="dav-ctx-item" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+                  Không có nhóm nào
+                </div>
+              ) : (
+                savedGroups.map((group, idx) => {
+                  const alreadyIn = group.udids.includes(accountActionMenu.sourceUdid);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`dav-ctx-item ${alreadyIn ? 'active' : ''}`}
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!alreadyIn) {
+                          handleAddDeviceToGroup(idx, accountActionMenu.sourceUdid);
+                        }
+                        setAccountActionMenu(null);
+                        setAccountTitleDropdownOpen(false);
+                      }}
+                    >
+                      {group.name} {alreadyIn ? '(Đã có)' : ''}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
 

@@ -25,7 +25,6 @@ import {
   installApk,
   installUploadedApk,
   runAdbCommandApi,
-  setDeviceWallpaper,
   setDeviceDisplayPower
 } from '@/lib/serverApi'
 import { SyncPanel } from '@/components/SyncPanel'
@@ -1127,14 +1126,25 @@ export function App() {
   useEffect(() => {
     try {
       const normalized = normalizeSavedGroups(savedGroups)
-      localStorage.setItem(SAVED_GROUPS_KEY, JSON.stringify(normalized))
-      backupSavedGroups(normalized)
+      const currentInStorageStr = localStorage.getItem(SAVED_GROUPS_KEY)
+      const normalizedStr = JSON.stringify(normalized)
+      if (currentInStorageStr !== normalizedStr) {
+        localStorage.setItem(SAVED_GROUPS_KEY, normalizedStr)
+        backupSavedGroups(normalized)
+        window.dispatchEvent(new Event('saved-groups-updated'));
+      }
     } catch { }
   }, [savedGroups])
 
   useEffect(() => {
     const handleUpdate = () => {
-      setSavedGroups(loadSavedGroups());
+      const newGroups = loadSavedGroups();
+      setSavedGroups(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(newGroups)) {
+          return prev;
+        }
+        return newGroups;
+      });
     };
     window.addEventListener('saved-groups-updated', handleUpdate);
     return () => window.removeEventListener('saved-groups-updated', handleUpdate);
@@ -2063,43 +2073,6 @@ export function App() {
     [pushFile, quickCommandTargets]
   )
 
-  const handleSetWallpaperForDevices = useCallback(
-    async (udids: string[]) => {
-      if (!udids.length) return
-      setGlobalAdbStatus(`Đang đặt hình nền cho ${udids.length} thiết bị...`)
-      try {
-        await Promise.allSettled(
-          udids.map(async (udid) => {
-            const num = getTileNumber(udid, 0)
-            const padded = String(num).padStart(2, '0')
-            
-            const canvas = document.createElement('canvas')
-            canvas.width = 1080
-            canvas.height = 1920
-            const ctx = canvas.getContext('2d')
-            if (ctx) {
-              ctx.fillStyle = '#000000'
-              ctx.fillRect(0, 0, canvas.width, canvas.height)
-              
-              ctx.fillStyle = '#2BD03C'
-              ctx.font = 'bold 450px Roboto, sans-serif'
-              ctx.textAlign = 'center'
-              ctx.textBaseline = 'middle'
-              ctx.fillText(padded, canvas.width / 2, canvas.height / 2)
-              
-              const base64Image = canvas.toDataURL('image/png')
-              await setDeviceWallpaper(wsServer, udid, base64Image)
-            }
-          })
-        )
-        setGlobalAdbStatus('Đã đặt hình nền xong')
-      } catch (err: any) {
-        setGlobalAdbStatus(`Lỗi đặt hình nền: ${err?.message || err}`)
-      }
-    },
-    [getTileNumber, wsServer]
-  )
-
 
   const runGlobalAdbCommand = useCallback(async () => {
     const commands = globalAdbCommand
@@ -2449,17 +2422,8 @@ export function App() {
     const handleOverlayHeaderHotkey = (e: KeyboardEvent) => {
       const active = document.activeElement as HTMLElement | null;
 
-      // Bỏ qua khi đang hover/focus trên phone tile
-      const isHoveringPhone =
-        document.querySelector('.tile:hover') !== null ||
-        document.querySelector('.viewerCanvas:hover') !== null ||
-        document.querySelector('#viewerPanel:hover') !== null;
-
-      const isCanvasFocused =
-        active &&
-        (active.tagName === 'CANVAS' || active.classList.contains('viewerCanvas'));
-
-      if (isHoveringPhone || isCanvasFocused) return;
+      // Chú ý: Đã gỡ bỏ block chặn khi hover/focus stream theo yêu cầu, 
+      // cho phép hotkey Overlay Header hoạt động xuyên qua stream.
 
       // Bỏ qua khi focus vào input thường (ngoài overlay)
       if (
@@ -4282,11 +4246,11 @@ export function App() {
                   data-inspector-component="client/src/App.tsx"
                 >
                   {/* Hotkey 1: Sync Time */}
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: '0 0 200px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
                       Bật/Tắt Sync Time (Delay):
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 210, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
                         type="text"
                         placeholder="Nhấn tổ hợp phím..."
@@ -4338,11 +4302,11 @@ export function App() {
                   </div>
 
                   {/* Hotkey 2: Tile Account */}
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: '0 0 200px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
                       Hiện tài khoản máy (Tile):
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 210, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
                         type="text"
                         placeholder="Nhấn tổ hợp phím..."
@@ -4394,11 +4358,11 @@ export function App() {
                   </div>
 
                   {/* Hotkey 3: Overlay Header */}
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: '0 0 200px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
                       Overlay Header:
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 210, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
                         id="input_overlay_header_hotkey"
                         type="text"
@@ -4451,11 +4415,11 @@ export function App() {
                   </div>
 
                   {/* Hotkey 4: Account Manager */}
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: '0 0 200px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
                       Bảng Quản lý tài khoản:
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 210, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
                         type="text"
                         placeholder="Nhấn tổ hợp phím..."
@@ -4507,11 +4471,11 @@ export function App() {
                   </div>
 
                   {/* Hotkey 5: Inspector ID */}
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: '0 0 200px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
                       Bật/Tắt Inspector ID:
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 210, flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input
                         type="text"
                         placeholder="Nhấn tổ hợp phím..."
@@ -5179,23 +5143,6 @@ export function App() {
           >
             {focusGroupIdx === groupContextMenu.idx ? '👁 Hiện tất cả' : '👁 Chỉ hiện nhóm này'}
           </button>
-          {/* btn_set_wallpaper_group : Nút đặt số hiệu làm hình nền cho toàn bộ nhóm */}
-          <button
-            className='ctxMenuItem'
-            style={{ color: '#2BD03C' }}
-            onClick={() => {
-              const group = savedGroups[groupContextMenu.idx]
-              if (group && group.udids.length > 0) {
-                handleSetWallpaperForDevices(group.udids)
-              }
-              setGroupContextMenu(null)
-            }}
-            data-inspector-id="savedGroups.contextMenuSetWallpaper"
-            data-inspector-label="Saved groups context menu item: Set group device wallpaper"
-            data-inspector-component="client/src/App.tsx"
-          >
-            🖼️ Đặt số hiệu làm hình nền
-          </button>
         </div>
       )}
       {contextMenuTarget ? (
@@ -5282,47 +5229,6 @@ export function App() {
                 data-inspector-component="client/src/App.tsx"
               />
             </div>
-
-            {/* btn_set_wallpaper_device : Nút đặt số hiệu làm hình nền */}
-            <button
-              className='ctxMenuItem'
-              onPointerDown={e => {
-                e.preventDefault()
-                e.stopPropagation()
-                const clickedUdid = contextMenuTarget!.udid
-                const ctxTargets = connectSelection.size > 0 && connectSelection.has(clickedUdid)
-                  ? Array.from(connectSelection)
-                  : [clickedUdid]
-                handleSetWallpaperForDevices(ctxTargets)
-                setContextMenuTarget(null)
-                setContextMenuOpen(false)
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#2BD03C',
-                fontSize: '13px',
-                cursor: 'pointer',
-                padding: '7px 8px',
-                textAlign: 'left',
-                width: '100%',
-                borderRadius: 4,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(43,208,60,0.1)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'transparent'
-              }}
-              data-inspector-id="deviceContext.setWallpaperItem"
-              data-inspector-label="Device context menu item: Set device wallpaper"
-              data-inspector-component="client/src/App.tsx"
-            >
-              <span>🖼️</span> <span>Đặt số hiệu làm hình nền</span>
-            </button>
 
             {/* === Device Profile section === */}
             <div style={{ position: 'relative' }} className='ctxAddToGroupWrap' onMouseEnter={() => setCtxSub({ main: 'profileList' })} onMouseLeave={() => setCtxSub(null)}>

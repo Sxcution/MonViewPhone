@@ -153,6 +153,9 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       // Don't block F12 key (allow browser dev tools)
       if (e.code === 'F12') return;
 
+      // Ignore Tab key so user can use it for custom hotkeys
+      if (e.key === 'Tab') return;
+
       // Don't block the assigned Sync Time hotkey
       const syncTimeHotkey = localStorage.getItem('monviewphone:sync-time-hotkey') || '';
       if (syncTimeHotkey && matchesHotkey(e, syncTimeHotkey)) {
@@ -189,12 +192,11 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       const isWin = e.key === 'Meta' || e.code === 'MetaLeft' || e.code === 'MetaRight';
       const isAlt = e.key === 'Alt' || e.code === 'AltLeft' || e.code === 'AltRight';
       const isCtrl = e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight';
-      const isTab = e.key === 'Tab';
       const isFn = e.key === 'Fn' || e.code === 'Fn';
 
       const hasModifierCombo = e.altKey || e.ctrlKey || e.metaKey; // Shift still allowed
 
-      if (isWin || isAlt || isCtrl || isFn || hasModifierCombo || isTab) {
+      if (isWin || isAlt || isCtrl || isFn || hasModifierCombo) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation?.();
@@ -235,6 +237,8 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
 
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'F12') return;
+
+      if (e.key === 'Tab') return;
 
       const syncTimeHotkey = localStorage.getItem('monviewphone:sync-time-hotkey') || '';
       if (syncTimeHotkey && matchesHotkey(e, syncTimeHotkey)) {

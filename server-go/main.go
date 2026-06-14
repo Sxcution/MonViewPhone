@@ -277,9 +277,6 @@ func main() {
 			case "/api/goog/device/account-vault":
 				handleAccountVault(w, r)
 				return
-			case "/api/goog/device/set-wallpaper":
-				handleSetWallpaper(w, r)
-				return
 			case "/api/goog/device/display-power":
 				handleDisplayPower(w, r)
 				return
