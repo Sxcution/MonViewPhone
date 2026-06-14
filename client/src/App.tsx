@@ -2424,24 +2424,40 @@ export function App() {
       if (e.repeat) return; // Prevent double toggle on auto-repeat
 
       const active = document.activeElement as HTMLElement | null;
+      const isPasteSink = active?.id === '__scrcpy_paste_sink';
+      const hotkeyStr = localStorage.getItem('monviewphone:overlay-header-hotkey') || '';
+
+      console.log('[OverlayHeaderHotkey]', {
+        key: e.key,
+        code: e.code,
+        repeat: e.repeat,
+        activeTag: active?.tagName,
+        activeId: active?.id,
+        activeClass: active?.className,
+        hotkeyStr,
+        matched: hotkeyStr ? matchesHotkey(e, hotkeyStr) : false,
+        before: localStorage.getItem('monviewphone:dav-always-show-header'),
+      });
 
       // Chú ý: Đã gỡ bỏ block chặn khi hover/focus stream theo yêu cầu, 
       // cho phép hotkey Overlay Header hoạt động xuyên qua stream.
 
       // Bỏ qua khi focus vào input thường (ngoài overlay)
-      if (
+      const isRealEditable =
         active &&
+        !isPasteSink &&
         (['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) || active.isContentEditable) &&
         !active.closest('.dav-overlay') &&
-        !active.closest('.tile-account-overlay')
-      ) {
+        !active.closest('.tile-account-overlay');
+
+      if (isRealEditable) {
         return;
       }
 
-      const hotkeyStr = localStorage.getItem('monviewphone:overlay-header-hotkey') || '';
       if (hotkeyStr && matchesHotkey(e, hotkeyStr)) {
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation?.();
         // Toggle alwaysShowHeader: đọc giá trị hiện tại, flip, lưu, dispatch event
         const current = localStorage.getItem('monviewphone:dav-always-show-header') === 'true';
         const nextVal = !current;
