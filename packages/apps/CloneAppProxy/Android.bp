@@ -1,0 +1,18 @@
+android_app {
+    name: "CloneAppProxy",
+    srcs: ["src/**/*.java"],
+    resource_dirs: ["res"],
+    certificate: "platform",
+    privileged: true,
+    platform_apis: true,
+    optimize: {
+        enabled: false,
+    },
+    required: ["privapp-permissions-cloneappproxy"],
+}
+
+prebuilt_etc {
+    name: "privapp-permissions-cloneappproxy",
+    src: "privapp-permissions-cloneappproxy.xml",
+    sub_dir: "permissions",
+}

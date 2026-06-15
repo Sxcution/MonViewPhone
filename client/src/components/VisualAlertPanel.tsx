@@ -19,6 +19,7 @@ import {
   type VisualAlertConfig,
   type VisualAlertROI,
   type MultiROIResult,
+  type RedThreshold,
   loadVisualAlertConfig,
   saveVisualAlertConfig,
   scanCanvasROIs,
@@ -73,7 +74,7 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
   }, []);
 
   const handleROISave = useCallback(
-    (rois: VisualAlertROI[], settings: { scanIntervalSec: number; confirmCount: number; cooldownSec: number }) => {
+    (rois: VisualAlertROI[], settings: { scanIntervalSec: number; confirmCount: number; cooldownSec: number; redThreshold: RedThreshold }) => {
       updateConfig({
         rois,
         ...settings,
@@ -160,7 +161,7 @@ type MultiROISetupModalProps = {
   redThreshold: VisualAlertConfig['redThreshold'];
   onSave: (
     rois: VisualAlertROI[],
-    settings: { scanIntervalSec: number; confirmCount: number; cooldownSec: number }
+    settings: { scanIntervalSec: number; confirmCount: number; cooldownSec: number; redThreshold: RedThreshold }
   ) => void;
   onClose: () => void;
   viewerUdid?: string | null;
@@ -199,6 +200,7 @@ function MultiROISetupModal({
   const [draftScanIntervalSec, setDraftScanIntervalSec] = useState(scanIntervalSec);
   const [draftConfirmCount, setDraftConfirmCount] = useState(confirmCount);
   const [draftCooldownSec, setDraftCooldownSec] = useState(cooldownSec);
+  const [draftRedThreshold, setDraftRedThreshold] = useState<RedThreshold>(redThreshold);
 
   // Offset position for dragging
   const [modalPos, setModalPos] = useState({ x: 0, y: 0 });
@@ -390,10 +392,10 @@ function MultiROISetupModal({
   // Test scan inside modal (multi-ROI)
   const handleTestInModal = useCallback(() => {
     if (!selectedUdid || !activeCanvas || !draftROIs.length) return;
-    const result = scanCanvasROIs(activeCanvas, draftROIs, redThreshold);
+    const result = scanCanvasROIs(activeCanvas, draftROIs, draftRedThreshold);
     setTestResults(result);
     setTimeout(() => setTestResults(null), 8000);
-  }, [selectedUdid, activeCanvas, draftROIs, redThreshold]);
+  }, [selectedUdid, activeCanvas, draftROIs, draftRedThreshold]);
 
   // Active ROI object
   const activeROI = draftROIs.find(r => r.id === activeROIId) ?? null;
@@ -600,6 +602,70 @@ function MultiROISetupModal({
                       />
                     </div>
                   </label>
+                  <label className="visualAlertSettingItem">
+                    <span title="Giá trị R tối thiểu (0-255). Mặc định: 180">Màu Đỏ</span>
+                    <div className="visualAlertInputWrap">
+                      <input
+                        type="number"
+                        min={0} max={255}
+                        value={draftRedThreshold.rMin}
+                        onChange={e =>
+                          setDraftRedThreshold(prev => ({ ...prev, rMin: Math.max(0, Math.min(255, Number(e.target.value) || 0)) }))
+                        }
+                        data-inspector-id="visualAlert.modalRedThresholdR"
+                        data-inspector-label="Visual Alert modal red threshold R min"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                      />
+                    </div>
+                  </label>
+                  <label className="visualAlertSettingItem">
+                    <span title="Giá trị G tối đa (0-255). Giảm để loại bỏ màu Cam/Vàng. Mặc định: 100">Lọc Cam</span>
+                    <div className="visualAlertInputWrap">
+                      <input
+                        type="number"
+                        min={0} max={255}
+                        value={draftRedThreshold.gMax}
+                        onChange={e =>
+                          setDraftRedThreshold(prev => ({ ...prev, gMax: Math.max(0, Math.min(255, Number(e.target.value) || 0)) }))
+                        }
+                        data-inspector-id="visualAlert.modalRedThresholdG"
+                        data-inspector-label="Visual Alert modal red threshold G max"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                      />
+                    </div>
+                  </label>
+                  <label className="visualAlertSettingItem">
+                    <span title="Giá trị B tối đa (0-255). Giảm để loại bỏ màu Tím/Hồng. Mặc định: 100">Lọc Tím</span>
+                    <div className="visualAlertInputWrap">
+                      <input
+                        type="number"
+                        min={0} max={255}
+                        value={draftRedThreshold.bMax}
+                        onChange={e =>
+                          setDraftRedThreshold(prev => ({ ...prev, bMax: Math.max(0, Math.min(255, Number(e.target.value) || 0)) }))
+                        }
+                        data-inspector-id="visualAlert.modalRedThresholdB"
+                        data-inspector-label="Visual Alert modal red threshold B max"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                      />
+                    </div>
+                  </label>
+
+                  <div className="visualAlertSettingItem" style={{ marginLeft: 'auto', justifyContent: 'flex-end', paddingBottom: 2 }}>
+                    <div className="visualAlertROIListHeader" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                      <span>DS điểm quét ({draftROIs.length})</span>
+                      <button
+                        className="visualAlertAddROIBtn"
+                        onClick={handleAddROI}
+                        title="Thêm điểm quét mới"
+                        data-inspector-id="visualAlert.addRoiButton"
+                        data-inspector-label="Visual Alert add ROI button"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                      >
+                        Thêm
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* ROI List */}
@@ -608,23 +674,6 @@ function MultiROISetupModal({
                   data-inspector-label="Visual Alert ROI list"
                   data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                 >
-                  <div className="visualAlertROIListHeader"
-                    data-inspector-id="visualAlert.roiListHeader"
-                    data-inspector-label="Visual Alert ROI list header"
-                    data-inspector-component="client/src/components/VisualAlertPanel.tsx"
-                  >
-                    <span>Danh sách điểm quét ({draftROIs.length})</span>
-                    <button
-                      className="visualAlertAddROIBtn"
-                      onClick={handleAddROI}
-                      title="Thêm điểm quét mới"
-                      data-inspector-id="visualAlert.addRoiButton"
-                      data-inspector-label="Visual Alert add ROI button"
-                      data-inspector-component="client/src/components/VisualAlertPanel.tsx"
-                    >
-                      Thêm
-                    </button>
-                  </div>
                   {draftROIs.length === 0 && (
                     <div className="visualAlertROIEmpty"
                       data-inspector-id="visualAlert.roiEmptyState"
@@ -758,6 +807,7 @@ function MultiROISetupModal({
                         scanIntervalSec: draftScanIntervalSec,
                         confirmCount: draftConfirmCount,
                         cooldownSec: draftCooldownSec,
+                        redThreshold: draftRedThreshold,
                       })
                     }
                     data-inspector-id="visualAlert.modalSaveButton"

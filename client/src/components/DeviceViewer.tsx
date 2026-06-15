@@ -185,7 +185,8 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
       c,
       () => getInputTargetsForSource(udid),
       onActivate,
-      udid
+      udid,
+      { ctrlWheelPinch: true }
     );
 
     return () => {

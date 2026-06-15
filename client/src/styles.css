@@ -7947,9 +7947,9 @@ textarea:focus,
 
 /* Settings grid */
 .visualAlertSettingsGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .visualAlertSettingItem {
@@ -7973,8 +7973,8 @@ textarea:focus,
 
 .visualAlertInputWrap input,
 .visualAlertThresholdItem input {
-  width: 100%;
-  min-width: 0;
+  width: 44px;
+  min-width: 44px;
   height: 28px;
   padding: 2px 6px;
   color: #f8fafc;

@@ -8,6 +8,8 @@
 - `rule.md`: Local development rules and UI interaction notes.
 - [NEW] [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw): Windows tray launcher and process manager. Starts the Go backend server and executes a preflight data safety check before opening Chrome in App mode pointing to `http://localhost:11000/`. Does not run Vite or NPM. Loads the custom tray icon from `assets/IconMonViewPhone.png`.
 - [NEW] [Backup/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/Backup): Local directory for backup data (ignored by Git). Contains `Backup/adb/` for copying and restoring ADB host keys (`adbkey` and `adbkey.pub`) when starting the application.
+- [NEW] [packages/apps/CloneAppProxy/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/packages/apps/CloneAppProxy): Android 13 AOSP privileged proxy app. Launches WeChat clone inside the clone profile from user 0 launcher icon.
+
 
 Removed legacy layers:
 - Root Electron wrapper.

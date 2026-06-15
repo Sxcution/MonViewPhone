@@ -6,6 +6,10 @@ import { loadSyncTimeSettings, syncTimeDelayRangeMs, SYNC_TIME_SETTINGS_EVENT, t
 
 type TargetsGetter = () => InputTarget[];
 
+export type TouchControlOptions = {
+  ctrlWheelPinch?: boolean;
+};
+
 type TouchTarget = {
   target: InputTarget;
   dxPx: number;
@@ -154,10 +158,78 @@ export function attachTouchControls(
   getTargets: TargetsGetter,
   onActivate?: () => void,
   udid?: string,
+  options?: TouchControlOptions,
 ): () => void {
   const ptr = makePointerIdAllocator();
   const active = new Map<number, ActivePointerState>();
   let raf = 0;
+  let lastPinchAt = 0;
+  const PINCH_THROTTLE_MS = 80;
+
+  async function sendPinchGestureFromWheel(e: WheelEvent) {
+    if (!canSend()) return;
+
+    const { x01, y01 } = mapClientToNormXY(canvas, e.clientX, e.clientY);
+
+    const zoomIn = e.deltaY < 0;  // wheel up = zoom in / pinch out
+    const zoomOut = e.deltaY > 0; // wheel down = zoom out / pinch in
+
+    const startDist = zoomIn ? 0.035 : 0.105;
+    const endDist = zoomIn ? 0.105 : 0.035;
+
+    const durationMs = 120;
+    const steps = 8;
+    const pid1 = 90;
+    const pid2 = 91;
+
+    const syncSettings = loadSyncTimeSettings();
+    const prepared = prepareTouchTargets(e.altKey, syncSettings);
+    if (!prepared.source) return;
+    const slowSync = syncSettings.delayEnabled && prepared.followers.length > 0;
+    const touchTargets = slowSync ? [prepared.source] : [prepared.source, ...prepared.followers];
+
+    function clamp01(v: number) {
+      return Math.max(0.02, Math.min(0.98, v));
+    }
+
+    function pointPair(dist: number) {
+      return {
+        a: { x01: clamp01(x01 - dist), y01: clamp01(y01) },
+        b: { x01: clamp01(x01 + dist), y01: clamp01(y01) },
+      };
+    }
+
+    const startPair = pointPair(startDist);
+    const endPair = pointPair(endDist);
+
+    // DOWN
+    for (const tt of touchTargets) {
+      sendTouch(tt, MotionAction.DOWN, pid1, startPair.a.x01, startPair.a.y01, 1, 1);
+      sendTouch(tt, MotionAction.DOWN, pid2, startPair.b.x01, startPair.b.y01, 1, 1);
+    }
+
+    // MOVE
+    const startT = Date.now();
+    for (let i = 1; i <= steps; i++) {
+      const a = i / steps;
+      const currentDist = startDist + (endDist - startDist) * a;
+      const curPair = pointPair(currentDist);
+      for (const tt of touchTargets) {
+        sendTouch(tt, MotionAction.MOVE, pid1, curPair.a.x01, curPair.a.y01, 1, 1);
+        sendTouch(tt, MotionAction.MOVE, pid2, curPair.b.x01, curPair.b.y01, 1, 1);
+      }
+      const elapsed = Date.now() - startT;
+      const targetElapsed = (durationMs * i) / steps;
+      const wait = Math.max(0, Math.round(targetElapsed - elapsed));
+      if (wait) await sleep(wait);
+    }
+
+    // UP
+    for (const tt of touchTargets) {
+      sendTouch(tt, MotionAction.UP, pid1, endPair.a.x01, endPair.a.y01, 0, 0);
+      sendTouch(tt, MotionAction.UP, pid2, endPair.b.x01, endPair.b.y01, 0, 0);
+    }
+  }
 
   function canSend() {
     const targets = getTargets();
@@ -417,6 +489,21 @@ export function attachTouchControls(
 
   function onWheel(e: WheelEvent) {
     if (!canSend()) return;
+
+    if (options?.ctrlWheelPinch && e.ctrlKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation?.();
+      onActivate?.();
+      
+      const now = Date.now();
+      if (now - lastPinchAt < PINCH_THROTTLE_MS) return;
+      lastPinchAt = now;
+
+      sendPinchGestureFromWheel(e);
+      return;
+    }
+
     e.preventDefault();
     onActivate?.();
 
