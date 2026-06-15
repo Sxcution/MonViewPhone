@@ -354,6 +354,11 @@ function TileComponent({
             data-udid={udid}
             onPointerEnter={onPointerEnter}
             onPointerLeave={onPointerLeave}
+            onPointerDown={(e) => {
+                if (visualAlertActive) {
+                    onClearVisualAlert?.(udid);
+                }
+            }}
             onMouseDown={(e) => {
                 if (e.button === 1) {
                     e.preventDefault();

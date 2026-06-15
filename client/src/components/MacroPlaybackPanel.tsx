@@ -21,9 +21,6 @@ export function MacroPlaybackPanel() {
     }
   });
 
-  // Keep track of timeouts for auto-removing finished items
-  const autoRemoveTimeoutsRef = useRef<Record<string, number>>({});
-
   const macroPlaybackDragRef = useRef<{
     active: boolean;
     startX: number;
@@ -44,25 +41,8 @@ export function MacroPlaybackPanel() {
       setMacroPlaybackItems(prev => {
         // If the item is marked as stopped/not running
         if (!detail.running) {
-          // Clear any existing timeout for this item
-          if (autoRemoveTimeoutsRef.current[detail.id]) {
-            window.clearTimeout(autoRemoveTimeoutsRef.current[detail.id]);
-          }
-
-          // Schedule auto-removal in 5 seconds
-          autoRemoveTimeoutsRef.current[detail.id] = window.setTimeout(() => {
-            setMacroPlaybackItems(current => current.filter(item => item.id !== detail.id));
-            delete autoRemoveTimeoutsRef.current[detail.id];
-          }, 5000);
-
           // Return updated item with running state set to false
           return prev.map(item => item.id === detail.id ? { ...detail, running: false } : item);
-        }
-
-        // If it is running, clear any pending auto-remove timeout
-        if (autoRemoveTimeoutsRef.current[detail.id]) {
-          window.clearTimeout(autoRemoveTimeoutsRef.current[detail.id]);
-          delete autoRemoveTimeoutsRef.current[detail.id];
         }
 
         const next = prev.filter(item => item.id !== detail.id);
@@ -75,8 +55,6 @@ export function MacroPlaybackPanel() {
     window.addEventListener(MACRO_PLAYBACK_PROGRESS_EVENT, handleProgress);
     return () => {
       window.removeEventListener(MACRO_PLAYBACK_PROGRESS_EVENT, handleProgress);
-      // Clean up all pending timeouts on unmount
-      Object.values(autoRemoveTimeoutsRef.current).forEach(tId => window.clearTimeout(tId));
     };
   }, []);
 
