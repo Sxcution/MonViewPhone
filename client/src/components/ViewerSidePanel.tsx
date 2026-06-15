@@ -224,6 +224,17 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
   const [adbCommand, setAdbCommand] = useState('');
   const [adbLogs, setAdbLogs] = useState<AdbLogEntry[]>([]);
   const [adbRunning, setAdbRunning] = useState(false);
+
+  const textareaRef = useCallback((node: HTMLTextAreaElement | null) => {
+    if (node !== null) {
+      if (!adbCommand.includes('\n')) {
+        node.style.height = '36px';
+      } else {
+        node.style.height = '36px'; // reset to measure
+        node.style.height = `${Math.min(node.scrollHeight + 2, 120)}px`;
+      }
+    }
+  }, [adbCommand]);
   const [adbTab, setAdbTab] = useState<'preset' | 'history' | 'custom'>('preset');
   const [cmdHistory, setCmdHistory] = useState<string[]>(() => loadJson(LS_CMD_HISTORY, []));
   const [newCmdLabel, setNewCmdLabel] = useState('');
@@ -642,20 +653,77 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
       }
     });
 
+    const extractMainErrorLine = (output: string): string => {
+      const clean = output.trim();
+      if (!clean) return 'Error';
+
+      const lines = clean.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length === 0) return 'Error';
+
+      for (const line of lines) {
+        if (line.includes('** Error:') || line.includes('** Error')) {
+          return line.length > 500 ? line.slice(0, 500) + '...' : line;
+        }
+      }
+      for (const line of lines) {
+        if (line.toLowerCase().includes('error:')) {
+          return line.length > 500 ? line.slice(0, 500) + '...' : line;
+        }
+      }
+
+      const firstLine = lines[0];
+      if (firstLine.length > 500) {
+        return firstLine.slice(0, 500) + '...';
+      }
+      return firstLine;
+    };
+
     const formatBatchLog = (stepLogs: StepLog[]): string => {
-      let logStr = `Tổng số command sau khi parse: ${parsedCommands.length}\n`;
-      stepLogs.forEach((step, idx) => {
-        logStr += `----------------------------------------\n`;
-        logStr += `[Step ${idx + 1}/${parsedCommands.length}]\n`;
-        logStr += `Original: ${step.original}\n`;
-        logStr += `Normalized: ${step.normalized}\n`;
-        logStr += `Result: ${step.success ? 'SUCCESS' : 'FAILED'}\n`;
-        logStr += `Output:\n${step.output.trim()}\n`;
-        if (!step.success) {
-          logStr += `\n[Step ${idx + 1} failed. Stopping batch.]\n`;
+      if (parsedCommands.length === 1) {
+        const step = stepLogs[0];
+        if (!step) return '';
+        if (step.success) {
+          const cleanOutput = step.output.trim();
+          if (cleanOutput && cleanOutput !== 'No output') {
+            return cleanOutput;
+          }
+          return '✅ Thành công';
+        } else {
+          const errorLine = extractMainErrorLine(step.output);
+          return `❌ Thất bại\n${errorLine}`;
+        }
+      }
+
+      const lastStep = stepLogs[stepLogs.length - 1];
+      const hasFailure = lastStep && !lastStep.success;
+
+      let logStr = '';
+      stepLogs.forEach((step) => {
+        if (step.success) {
+          const cleanOutput = step.output.trim();
+          if (cleanOutput && cleanOutput !== 'No output') {
+            if (logStr) logStr += '\n';
+            logStr += cleanOutput;
+          }
         }
       });
-      return logStr;
+
+      if (!hasFailure) {
+        const header = `✅ Thành công ${parsedCommands.length}/${parsedCommands.length} lệnh`;
+        if (logStr) {
+          return `${header}\n\n${logStr}`;
+        }
+        return header;
+      } else {
+        const failingStepIdx = stepLogs.length;
+        const failedHeader = `❌ Lỗi ở lệnh ${failingStepIdx}/${parsedCommands.length}\n${lastStep.original}`;
+        const errorLine = extractMainErrorLine(lastStep.output);
+        
+        if (logStr) {
+          return `${logStr}\n\n${failedHeader}\n\n${errorLine}`;
+        }
+        return `${failedHeader}\n\n${errorLine}`;
+      }
     };
 
     const id = ++logIdRef.current;
@@ -1004,6 +1072,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
             </div>
             <div className="vsp-modal-input-row" style={{ alignItems: 'flex-start' }}>
               <textarea
+                ref={textareaRef}
                 className="vsp-modal-input"
                 placeholder={t('Nhập lệnh ADB (VD: pm list packages -3)')}
                 value={adbCommand}
@@ -1013,7 +1082,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
                 data-inspector-id="viewerSidePanel.adbModalInput"
                 data-inspector-label="ADB command text field input"
                 data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-                rows={3}
+                rows={1}
               />
               <button
                 className="vsp-btn vsp-btn-primary"

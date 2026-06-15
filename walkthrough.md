@@ -654,3 +654,43 @@ Chúng tôi đã thực hiện cải tiến thiết kế hiển thị danh sách
 4. **Xác Thực**:
    - Chạy lệnh `npm run build` biên dịch thành công 100% không gặp bất kỳ lỗi nào.
 
+## Đơn Giản Hóa Định Dạng Nhật Ký Thực Hiện ADB
+
+Chúng tôi đã cải tiến và rút gọn định dạng hiển thị logs của các câu lệnh ADB (cả lệnh đơn và batch) để hiển thị thông tin trực quan hơn:
+
+1. **Rút gọn Log hiển thị của Batch lệnh**:
+   - Loại bỏ hoàn toàn các thông tin gạch nối kỹ thuật, Original/Normalized/Result/Step rườm rà.
+   - Khi chạy thành công toàn bộ batch: Chỉ hiển thị tiêu đề trạng thái dạng `✅ Thành công X/Y lệnh` và in ra các output của từng câu lệnh, bỏ qua hoàn toàn các bước không có output hoặc trả về `"No output"`.
+   - Khi chạy gặp lỗi tại bước nào đó: Chỉ hiển thị tiêu đề `❌ Lỗi ở lệnh X/Y` kèm theo câu lệnh gốc bị lỗi và dòng thông tin lỗi chính bên dưới.
+
+2. **Trích xuất dòng lỗi chính và Cắt bớt Stderr dài**:
+   - Viết helper `extractMainErrorLine` quét dòng lỗi chính từ luồng output/stderr:
+     * Ưu tiên các dòng chứa `** Error:` hoặc `Error:`.
+     * Nếu không tìm thấy, lấy dòng stderr không rỗng đầu tiên.
+     * Hạn chế độ dài tối đa 500 ký tự (nếu quá dài thì tự động cắt bớt và thêm dấu `...` ở cuối) để tránh làm tràn giao diện bởi các hướng dẫn sử dụng (usage/help) dài của lệnh.
+
+3. **Tối ưu hóa hiển thị cho Lệnh đơn**:
+   - Nếu chạy thành công và có output: Hiển thị trực tiếp output.
+   - Nếu chạy thành công và không có output: Hiển thị `✅ Thành công`.
+   - Nếu chạy thất bại: Hiển thị tiêu đề `❌ Thất bại` kèm theo dòng thông tin lỗi chính được trích xuất.
+
+4. **Xác Thực**:
+   - Biên dịch frontend (`npm run build`) và backend Go (`go build ./...`) thành công 100%.
+
+## Ô Nhập Lệnh ADB Co Giãn Tự Động (Auto-Grow Textarea)
+
+Chúng tôi đã tối ưu hóa giao diện của ô nhập lệnh ADB để tự động mở rộng theo nội dung và giữ kích thước gọn gàng:
+
+1. **Khởi Tạo Gọn Gàng**:
+   - Thiết lập số dòng mặc định `rows={1}` để ô nhập xuất hiện như một input 1 dòng thông thường khi rỗng hoặc chỉ có 1 dòng lệnh.
+   - Sửa đổi CSS trong `styles.css` (`textarea.vsp-modal-input`) đặt chiều cao cơ sở `36px` và vô hiệu hóa tính năng kéo thủ công (`resize: none`).
+   - Thiết lập `box-sizing: border-box;` cho cả `.vsp-modal-input` và `textarea.vsp-modal-input` để trình duyệt áp dụng đúng chiều cao tổng thể là `36px` (không bị đội lên `54px` do mô hình `content-box` mặc định), căn chỉnh lại `padding: 6px 12px;` để văn bản được căn lề giữa hoàn hảo, khớp chính xác với nút bấm bên cạnh.
+
+2. **Chỉ Tự Động Mở Rộng Khi Có Nhiều Dòng (Có ký tự \n)**:
+   - Sử dụng `useCallback` ref (`textareaRef`) để tự động tính toán lại chiều cao.
+   - Bổ sung logic kiểm tra ký tự xuống dòng: Nếu `adbCommand` không chứa ký tự xuống dòng (`\n`), chiều cao của ô nhập sẽ luôn được khóa cứng ở mức `36px` (giữ nguyên giao diện gọn gàng 1 dòng kể cả khi nhập câu lệnh rất dài).
+   - Chỉ khi người dùng nhấn `Shift + Enter` (hoặc dán đoạn mã nhiều dòng có chứa `\n`), hệ thống mới cho phép mở rộng chiều cao dựa trên `scrollHeight + 2px` (tương thích mô hình `border-box`) lên tối đa `120px` (quá 120px sẽ xuất hiện thanh cuộn dọc).
+
+3. **Xác Thực**:
+   - Biên dịch frontend (`npm run build`) và backend Go (`go build ./...`) thành công 100%.
+

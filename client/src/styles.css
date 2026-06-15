@@ -4215,6 +4215,7 @@ body.alignRight .rightConfigPanel.collapsed {
 }
 
 .vsp-modal-input {
+  box-sizing: border-box;
   flex: 1;
   height: 36px;
   border-radius: 10px;
@@ -4228,9 +4229,13 @@ body.alignRight .rightConfigPanel.collapsed {
 }
 
 textarea.vsp-modal-input {
-  height: 80px;
-  padding: 8px 12px;
-  resize: vertical;
+  box-sizing: border-box;
+  height: 36px;
+  min-height: 36px;
+  max-height: 120px;
+  padding: 6px 12px;
+  resize: none;
+  overflow-y: auto;
 }
 
 .vsp-modal-input:focus {
