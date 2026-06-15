@@ -4227,6 +4227,12 @@ body.alignRight .rightConfigPanel.collapsed {
   font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 }
 
+textarea.vsp-modal-input {
+  height: 80px;
+  padding: 8px 12px;
+  resize: vertical;
+}
+
 .vsp-modal-input:focus {
   border-color: rgba(77, 161, 255, 0.6);
   box-shadow: 0 0 0 2px rgba(77, 161, 255, 0.15);

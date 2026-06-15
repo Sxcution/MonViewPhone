@@ -10,6 +10,8 @@ import {
   runAdbCommandApi,
   openPcFileDialog,
   pushLocalFileApi,
+  splitCommandBatchSmart,
+  normalizeAdbSegment,
 } from '@/lib/serverApi';
 import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Save, Trash2, Palette, Plus, Copy } from 'lucide-react';
 
@@ -549,17 +551,74 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
   }, [wsServer, udid, selectedProfile, connectSelection]);
 
   // ADB execution
-  const executeAdbCommand = useCallback(async (cmd: string) => {
-    if (!cmd.trim()) return;
+  const executeAdbCommand = useCallback(async (rawInput: string) => {
+    if (!rawInput.trim()) return;
     setAdbRunning(true);
-    setCmdHistory(prev => { const next = [cmd, ...prev.filter(c => c !== cmd)].slice(0, 50); saveJson(LS_CMD_HISTORY, next); return next; });
+    setCmdHistory(prev => {
+      const next = [rawInput, ...prev.filter(c => c !== rawInput)].slice(0, 50);
+      saveJson(LS_CMD_HISTORY, next);
+      return next;
+    });
+
+    const segments = splitCommandBatchSmart(rawInput);
+    const parsedCommands = segments.map(normalizeAdbSegment);
 
     const targets = connectSelection && connectSelection.has(udid)
       ? Array.from(connectSelection)
       : [udid];
 
-    let mainResult: any = null;
-    let mainError: any = null;
+    interface StepLog {
+      original: string;
+      normalized: string;
+      success: boolean;
+      output: string;
+    }
+
+    const executeBatchOnDevice = async (targetUdid: string): Promise<StepLog[]> => {
+      const stepLogs: StepLog[] = [];
+      for (let stepIdx = 0; stepIdx < parsedCommands.length; stepIdx++) {
+        const parsed = parsedCommands[stepIdx];
+        if (parsed.kind === 'invalid') {
+          stepLogs.push({
+            original: parsed.original,
+            normalized: 'INVALID',
+            success: false,
+            output: parsed.error,
+          });
+          break; // Stop batch on error
+        }
+
+        let success = false;
+        let output = '';
+        try {
+          let result;
+          if (parsed.kind === 'shell') {
+            result = await runAdbCommandApi(wsServer, targetUdid, parsed.command, 'shell');
+          } else {
+            result = await runAdbCommandApi(wsServer, targetUdid, '', 'host-adb', parsed.args);
+          }
+          success = result.success;
+          output = result.output;
+        } catch (err: any) {
+          success = false;
+          output = err?.message || 'Error executing command';
+        }
+
+        stepLogs.push({
+          original: parsed.original,
+          normalized: parsed.kind === 'shell' ? `shell: ${parsed.command}` : `host-adb: ${parsed.args.join(' ')}`,
+          success,
+          output,
+        });
+
+        if (!success) {
+          break; // Stop batch on failure
+        }
+      }
+      return stepLogs;
+    };
+
+    let mainDeviceLogs: StepLog[] = [];
 
     const runWithConcurrency = async <T,>(
       items: T[],
@@ -577,25 +636,43 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
     };
 
     await runWithConcurrency(targets, 8, async (targetUdid) => {
-      try {
-        const result = await runAdbCommandApi(wsServer, targetUdid, cmd);
-        if (targetUdid === udid) {
-          mainResult = result;
-        }
-      } catch (err: any) {
-        if (targetUdid === udid) {
-          mainError = err;
-        }
+      const stepLogs = await executeBatchOnDevice(targetUdid);
+      if (targetUdid === udid) {
+        mainDeviceLogs = stepLogs;
       }
     });
 
+    const formatBatchLog = (stepLogs: StepLog[]): string => {
+      let logStr = `Tổng số command sau khi parse: ${parsedCommands.length}\n`;
+      stepLogs.forEach((step, idx) => {
+        logStr += `----------------------------------------\n`;
+        logStr += `[Step ${idx + 1}/${parsedCommands.length}]\n`;
+        logStr += `Original: ${step.original}\n`;
+        logStr += `Normalized: ${step.normalized}\n`;
+        logStr += `Result: ${step.success ? 'SUCCESS' : 'FAILED'}\n`;
+        logStr += `Output:\n${step.output.trim()}\n`;
+        if (!step.success) {
+          logStr += `\n[Step ${idx + 1} failed. Stopping batch.]\n`;
+        }
+      });
+      return logStr;
+    };
+
     const id = ++logIdRef.current;
     const time = new Date().toLocaleTimeString('vi-VN');
-    if (mainError) {
-      setAdbLogs(prev => [{ id, time, command: cmd, output: mainError?.message || 'Error', success: false }, ...prev]);
-    } else {
-      setAdbLogs(prev => [{ id, time, command: cmd, output: mainResult.output, success: mainResult.success }, ...prev]);
-    }
+    const isOverallSuccess = mainDeviceLogs.length === parsedCommands.length && mainDeviceLogs.every(s => s.success);
+    const formattedOutput = formatBatchLog(mainDeviceLogs);
+
+    setAdbLogs(prev => [
+      {
+        id,
+        time,
+        command: rawInput,
+        output: formattedOutput,
+        success: isOverallSuccess,
+      },
+      ...prev,
+    ]);
     setAdbRunning(false);
   }, [wsServer, udid, connectSelection]);
 
@@ -925,8 +1002,8 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
               </div>
               <button className="vsp-modal-close" onClick={() => setShowAdbModal(false)}><X size={16} /></button>
             </div>
-            <div className="vsp-modal-input-row">
-              <input
+            <div className="vsp-modal-input-row" style={{ alignItems: 'flex-start' }}>
+              <textarea
                 className="vsp-modal-input"
                 placeholder={t('Nhập lệnh ADB (VD: pm list packages -3)')}
                 value={adbCommand}
@@ -936,6 +1013,7 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
                 data-inspector-id="viewerSidePanel.adbModalInput"
                 data-inspector-label="ADB command text field input"
                 data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+                rows={3}
               />
               <button
                 className="vsp-btn vsp-btn-primary"

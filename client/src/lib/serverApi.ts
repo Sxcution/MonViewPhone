@@ -605,18 +605,20 @@ export async function runAdbCommandApi(
   wsServer: string,
   udid: string,
   command: string,
+  kind?: 'shell' | 'host-adb',
+  args?: string[],
 ): Promise<{ success: boolean; output: string }> {
   const isDebug = typeof window !== 'undefined' && localStorage.getItem('monviewphone:dav-debug-open-wechat') === 'true';
   const endpoint = `${httpBase(wsServer)}api/goog/device/adb-command`;
   if (isDebug) {
-    console.log('[DAV_OPEN_WECHAT] ADB_API_REQUEST:', { endpoint, udid, command });
+    console.log('[DAV_OPEN_WECHAT] ADB_API_REQUEST:', { endpoint, udid, command, kind, args });
   }
   let res: Response;
   try {
     res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ udid, command }),
+      body: JSON.stringify({ udid, command, kind, args }),
     });
   } catch (err: any) {
     if (isDebug) {
@@ -739,5 +741,164 @@ export async function pushLocalFileApi(
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json?.success) {
     throw new Error(json?.error || `Push local file failed (status ${res.status})`);
+  }
+}
+
+export type ParsedCommand =
+  | { kind: 'shell'; original: string; command: string }
+  | { kind: 'host-adb'; original: string; args: string[] }
+  | { kind: 'invalid'; original: string; error: string };
+
+function unquote(str: string): string {
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    return str.slice(1, -1);
+  }
+  return str;
+}
+
+interface TokenInfo {
+  text: string;
+  startIndex: number;
+  endIndex: number;
+}
+
+function tokenizeCommandWithIndices(input: string): TokenInfo[] {
+  const tokens: TokenInfo[] = [];
+  let i = 0;
+  const len = input.length;
+
+  while (i < len) {
+    // Skip whitespace
+    while (i < len && /\s/.test(input[i])) {
+      i++;
+    }
+    if (i >= len) break;
+
+    const startIndex = i;
+    let current = '';
+    let inDoubleQuote = false;
+    let inSingleQuote = false;
+
+    while (i < len) {
+      const char = input[i];
+      if (char === '"' && !inSingleQuote) {
+        inDoubleQuote = !inDoubleQuote;
+        current += char;
+        i++;
+      } else if (char === "'" && !inDoubleQuote) {
+        inSingleQuote = !inSingleQuote;
+        current += char;
+        i++;
+      } else if (!inDoubleQuote && !inSingleQuote && /\s/.test(char)) {
+        break;
+      } else {
+        current += char;
+        i++;
+      }
+    }
+    tokens.push({
+      text: current,
+      startIndex,
+      endIndex: i
+    });
+  }
+  return tokens;
+}
+
+export function splitCommandBatchSmart(input: string): string[] {
+  const segments: string[] = [];
+  let currentSegment = '';
+  let inDoubleQuote = false;
+  let inSingleQuote = false;
+  let i = 0;
+
+  while (i < input.length) {
+    const char = input[i];
+
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      currentSegment += char;
+      i++;
+    } else if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      currentSegment += char;
+      i++;
+    } else if (!inDoubleQuote && !inSingleQuote && char === '\n') {
+      segments.push(currentSegment);
+      currentSegment = '';
+      i++;
+    } else if (!inDoubleQuote && !inSingleQuote && char === '&' && input[i + 1] === '&') {
+      segments.push(currentSegment);
+      currentSegment = '';
+      i += 2; // skip both '&'
+    } else {
+      currentSegment += char;
+      i++;
+    }
+  }
+  if (currentSegment) {
+    segments.push(currentSegment);
+  }
+
+  return segments
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+}
+
+export function normalizeAdbSegment(segment: string): ParsedCommand {
+  const original = segment;
+  let cleanSegment = segment.trim();
+  if (cleanSegment.startsWith('$')) {
+    cleanSegment = cleanSegment.slice(1).trim();
+  }
+
+  if (!cleanSegment) {
+    return { kind: 'invalid', original, error: 'Command is empty' };
+  }
+
+  const tokens = tokenizeCommandWithIndices(cleanSegment);
+  if (tokens.length === 0) {
+    return { kind: 'invalid', original, error: 'Command is empty' };
+  }
+
+  const firstTokenText = tokens[0].text.toLowerCase();
+  if (firstTokenText === 'adb' || firstTokenText === 'adb.exe') {
+    let tokenIdx = 1;
+    if (tokenIdx < tokens.length && tokens[tokenIdx].text === '-s') {
+      tokenIdx += 2; // skip -s and SERIAL
+    }
+
+    if (tokenIdx >= tokens.length) {
+      return { kind: 'invalid', original, error: 'Missing adb command' };
+    }
+
+    if (tokens[tokenIdx].text.toLowerCase() === 'shell') {
+      const shellCmdStartIdx = tokens[tokenIdx].endIndex;
+      const shellCmd = cleanSegment.slice(shellCmdStartIdx).trim();
+      if (!shellCmd) {
+        return { kind: 'invalid', original, error: 'Missing shell command after adb shell' };
+      }
+      return { kind: 'shell', original, command: shellCmd };
+    } else {
+      // It's a host-adb command
+      const args = tokens.slice(tokenIdx).map(t => unquote(t.text));
+      if (args.length === 0) {
+        return { kind: 'invalid', original, error: 'Missing adb command arguments' };
+      }
+      
+      const hostCmd = args[0].toLowerCase();
+      if (hostCmd === 'reboot') {
+        return { kind: 'host-adb', original, args };
+      } else {
+        return {
+          kind: 'invalid',
+          original,
+          error: 'Host adb command này chưa được hỗ trợ trong khung ADB batch. Hãy dùng chức năng riêng hoặc chỉ dùng adb shell.'
+        };
+      }
+    }
+  } else {
+    // If not starting with adb, it's treated as shell command
+    return { kind: 'shell', original, command: cleanSegment };
   }
 }

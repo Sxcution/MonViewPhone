@@ -38,7 +38,7 @@ Removed legacy layers:
 - `client/src/context/ServerContext.tsx`: Backend URL state.
 - `client/src/hooks/useVisualAlert.ts`: React hook managing stagger-scan loop, per-device confirm count, cooldown tracking, and alert triggering for Visual Alert. Uses `scanCanvasROIs` for multi-ROI detection.
 - `client/src/lib/visualAlertEngine.ts`: Pure logic engine for Visual Alert — supports Multi-ROI scanning via `scanCanvasROIs` (iterates each ROI, getImageData per region, counts red pixels per ROI), single-ROI `scanCanvasROI` for modal testing, AudioContext beep sound, browser Notification API. Includes migration from old single-ROI `roi` to new `rois[]` format. Settings persisted in localStorage key: `visualAlertGlobalSettingsV1`.
-- `client/src/lib/serverApi.ts`: HTTP API client for the Go backend.
+- `client/src/lib/serverApi.ts`: HTTP API client for the Go backend, containing smart ADB batch parsing helpers (splitCommandBatchSmart and normalizeAdbSegment) and type definitions.
 - [NEW] [backendSettings.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/backendSettings.ts): Client-side safety thresholds validator (devices >= 35, WeChat accounts >= 104, contains "Emma Zhao") and explicit REST API poster for device account vault data to `settings` endpoint.
 - `client/src/store/useTileOrder.ts`: Persistent device numbering and ordering.
 - `client/src/styles.css`: Main application styling. Defines design tokens, layout styles, the standardized, unified CSS overlay confirm modal styling system, and the `.is-dragging-modal` rule to disable pointer events on background stream tiles/canvases during dragging.

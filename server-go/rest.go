@@ -291,43 +291,70 @@ func handleAdbCommand(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		UDID    string `json:"udid"`
-		Command string `json:"command"`
+		UDID    string   `json:"udid"`
+		Command string   `json:"command"`
+		Kind    string   `json:"kind"`
+		Args    []string `json:"args"`
 	}
-	if err := readJSON(r, &req); err != nil || strings.TrimSpace(req.UDID) == "" || strings.TrimSpace(req.Command) == "" {
-		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": `Invalid "udid" or "command"`})
+	if err := readJSON(r, &req); err != nil || strings.TrimSpace(req.UDID) == "" {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": `Invalid "udid"`})
 		return
 	}
 
 	udid := strings.TrimSpace(req.UDID)
 	command := strings.TrimSpace(req.Command)
+	kind := strings.TrimSpace(req.Kind)
+
+	if kind == "host-adb" {
+		if len(req.Args) == 0 {
+			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": `Invalid "args" for host-adb`})
+			return
+		}
+	} else if kind == "shell" {
+		if command == "" {
+			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": `Invalid "command" for shell`})
+			return
+		}
+	} else if kind == "" {
+		if command == "" {
+			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": `Invalid "command"`})
+			return
+		}
+		// Backward compatibility fallback
+		if strings.HasPrefix(command, "adb ") {
+			kind = "host-adb"
+			parts := strings.Fields(command)
+			cleaned := make([]string, 0, len(parts))
+			for i := 1; i < len(parts); i++ {
+				if parts[i] == "-s" && i+1 < len(parts) {
+					i++
+					continue
+				}
+				cleaned = append(cleaned, parts[i])
+			}
+			req.Args = cleaned
+		} else {
+			kind = "shell"
+		}
+	} else {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": fmt.Sprintf(`Unsupported kind: %q`, kind)})
+		return
+	}
 
 	isDebugEnabled := os.Getenv("MONVIEWPHONE_ADB_DEBUG") == "1" || strings.Contains(command, "com.tencent.mm/com.tencent.mm.ui.LauncherUI")
 	if isDebugEnabled {
-		log.Printf("[ADB_COMMAND_DEBUG] request received method: %s, path: %s, udid: %s, command: %s", r.Method, r.URL.Path, udid, command)
+		log.Printf("[ADB_COMMAND_DEBUG] request received - udid: %s, kind: %s, command: %s, args: %v", udid, kind, command, req.Args)
 	}
 
 	startTime := time.Now()
 	var out string
 	var err error
-	var mode string
 
-	if strings.HasPrefix(command, "adb ") {
-		mode = "adb-command"
-		parts := strings.Fields(command)
-		cleaned := make([]string, 0, len(parts)+1)
-		for i := 1; i < len(parts); i++ {
-			if parts[i] == "-s" && i+1 < len(parts) {
-				i++
-				continue
-			}
-			cleaned = append(cleaned, parts[i])
-		}
-		args := append([]string{"-s", udid}, cleaned...)
-		out, err = adb.Command(args...)
+	if kind == "host-adb" {
+		adbArgs := append([]string{"-s", udid}, req.Args...)
+		out, err = adb.CommandTimeout(60*time.Second, adbArgs...)
 	} else {
-		mode = "adb-shell"
-		out, err = adb.Shell(udid, command)
+		out, err = adb.CommandTimeout(60*time.Second, "-s", udid, "shell", command)
 	}
 
 	durationMs := time.Since(startTime).Milliseconds()
@@ -336,7 +363,7 @@ func handleAdbCommand(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errStr = err.Error()
 		}
-		log.Printf("[ADB_COMMAND_DEBUG] result - mode: %s, duration: %d ms, error: %s, output: %s", mode, durationMs, errStr, out)
+		log.Printf("[ADB_COMMAND_DEBUG] result - duration: %d ms, error: %s, output: %s", durationMs, errStr, out)
 	}
 
 	if err != nil {
