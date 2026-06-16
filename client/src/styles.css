@@ -9808,7 +9808,7 @@ select.dav-input {
   left: calc(100% - 1px);
   top: 0;
   margin-left: 0;
-  background: #252525;
+  background: var(--md-card);
   border: 1px solid #333;
   border-radius: 8px;
   padding: 6px;
@@ -10445,9 +10445,9 @@ input[type=number] {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.055) !important;
+  border: 1px solid var(--md-border) !important;
+  border-radius: var(--md-radius-sm, 8px) !important;
   padding: 4px 8px;
   width: calc(100% - 24px);
   margin: 4px auto;
@@ -10455,8 +10455,10 @@ input[type=number] {
 }
 
 .tile-account-overlay .dav-input-wrapper:focus-within {
-  border-color: #eab308;
-  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--md-info) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .tile-account-overlay .dav-transparent-input {
@@ -11025,6 +11027,7 @@ input[type=number] {
 .automationRowDelayCtxPanel,
 .automationMacroSortMenu,
 .dav-ctx-menu,
+.dav-ctx-submenu,
 .vsp-ctx-menu {
   background: var(--md-card) !important;
 }
@@ -11511,6 +11514,91 @@ body.is-dragging-modal iframe {
 }
 .vsp-import-path-btn.danger:active {
   background: #991b1b;
+}
+
+/* System-wide input fields design unification (non-glowing xenon blue focus) */
+/* Đồng bộ hóa giao diện trường nhập liệu toàn hệ thống (viền xanh xenon không bóng mờ khi focus) */
+input[type="text"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline),
+input[type="number"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline),
+input[type="password"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline),
+input[type="email"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline),
+input[type="tel"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline),
+input[type="search"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline),
+textarea,
+select,
+.modalInput,
+.tileNumber,
+.tileIndexInput,
+.vsp-select,
+.vsp-input,
+.vsp-modal-input,
+.confirmInput,
+.automationActionSelect,
+.automationDelayInput,
+.automationNoteInput,
+.automationSyncTimeInput,
+.visualAlertInputWrap input,
+.visualAlertThresholdItem input,
+.syncTimeInput,
+.dav-input,
+.tile-account-overlay .dav-input,
+.account-search-input,
+.vsp-import-path-input {
+  background: rgba(255, 255, 255, 0.055) !important;
+  border: 1px solid var(--md-border) !important;
+  border-radius: var(--md-radius-sm, 8px) !important;
+  color: var(--md-text) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+input[type="text"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline):focus,
+input[type="number"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline):focus,
+input[type="password"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline):focus,
+input[type="email"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline):focus,
+input[type="tel"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline):focus,
+input[type="search"]:not(.dav-transparent-input):not(.dav-centered-input):not(.dav-input-inline):focus,
+textarea:focus,
+select:focus,
+.modalInput:focus,
+.tileNumber:focus,
+.tileIndexInput:focus,
+.vsp-select:focus,
+.vsp-input:focus,
+.vsp-modal-input:focus,
+.confirmInput:focus,
+.automationActionSelect:focus,
+.automationDelayInput:focus,
+.automationNoteInput:focus,
+.automationSyncTimeInput:focus,
+.visualAlertInputWrap input:focus,
+.visualAlertThresholdItem input:focus,
+.syncTimeInput:focus,
+.dav-input:focus,
+.tile-account-overlay .dav-input:focus,
+.account-search-input:focus,
+.vsp-import-path-input:focus {
+  border-color: var(--md-info) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Explicit resets for transparent inputs on focus to block default glowing border-shadows */
+/* Khôi phục và xóa bỏ viền bóng mờ mặc định khi focus cho các ô nhập liệu trong suốt */
+.tile-account-overlay .dav-transparent-input,
+.tile-account-overlay .dav-transparent-input:focus,
+.tile-account-overlay .dav-centered-input,
+.tile-account-overlay .dav-centered-input:focus {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.dav-input-inline,
+.dav-input-inline:focus {
+  box-shadow: none !important;
 }
 
 

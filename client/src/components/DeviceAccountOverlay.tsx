@@ -589,8 +589,27 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     const handleUpdate = () => {
       setPlatforms(getSavedPlatforms());
     };
+    // Listen to global open/close dropdown events (holding/pressing hotkey)
+    // Lắng nghe sự kiện mở/đóng toàn bộ danh sách dropdown (khi đè/nhấn hotkey)
+    const handleOpenAll = () => {
+      setAccountTitleDropdownOpen(true);
+    };
+    const handleCloseAll = () => {
+      setAccountTitleDropdownOpen(false);
+    };
+
     window.addEventListener('device-account-platforms-updated', handleUpdate);
-    return () => window.removeEventListener('device-account-platforms-updated', handleUpdate);
+    window.addEventListener('monviewphone:open-all-dropdowns', handleOpenAll);
+    window.addEventListener('monviewphone:close-all-dropdowns', handleCloseAll);
+
+    return () => {
+      window.removeEventListener('device-account-platforms-updated', handleUpdate);
+      window.removeEventListener('monviewphone:open-all-dropdowns', handleOpenAll);
+      window.removeEventListener('monviewphone:close-all-dropdowns', handleCloseAll);
+      if (dropdownCloseTimeoutRef.current) {
+        clearTimeout(dropdownCloseTimeoutRef.current);
+      }
+    };
   }, []);
 
   // States for hiding fields on tile/panel
@@ -615,6 +634,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [ctxMenu, setCtxMenu] = useState<{ x: number, y: number, accountId: string } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const lastDropdownActivateRef = useRef<{ accountId: string; ts: number } | null>(null);
+  const dropdownCloseTimeoutRef = useRef<any>(null);
   const [activeLevel1, setActiveLevel1] = useState<'tai_khoan' | 'trang_thai' | 'nearby' | 'quet_qr' | 'phan_loai' | null>(null);
   const [activeLevel2, setActiveLevel2] = useState<string | null>(null);
   const [activeLevel3, setActiveLevel3] = useState<string | null>(null);
@@ -1669,49 +1689,47 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     e.stopPropagation();
 
     const now = Date.now();
-    if (
+    const isDoubleClick =
       lastDropdownActivateRef.current?.accountId === account.id &&
-      now - lastDropdownActivateRef.current.ts < 500
-    ) {
-      davDebug('ITEM_ACTIVATE_DEDUPED', { accountId: account.id, accUdid });
-      return;
-    }
-    lastDropdownActivateRef.current = { accountId: account.id, ts: now };
+      now - lastDropdownActivateRef.current.ts < 300;
 
     const latestAccount =
       (data.platforms[activeTab] || []).find(a => a.id === account.id) || account;
 
-    const activeAccs = data.platforms[activeTab] || [];
-    const selAccId = data.selectedAccountByPlatform[activeTab];
-    const selAcc = activeAccs.find(a => a.id === selAccId) || activeAccs[0];
+    if (!isDoubleClick) {
+      // Single click: update selected account / header display immediately
+      // Click đơn: cập nhật tài khoản được chọn / hiển thị header ngay lập tức
+      lastDropdownActivateRef.current = { accountId: account.id, ts: now };
 
-    davDebug('ITEM_ACTIVATE_START', {
-      eventType: e.type,
-      accUdid,
-      accountId: account.id,
-      latestAccountId: latestAccount.id,
-      name: latestAccount.name,
-      phone: latestAccount.phone,
-      nickname: latestAccount.nickname,
-      activeTab,
-      hasWechatLaunchProfile: !!latestAccount.wechatLaunchProfile,
-      wechatLaunchProfile: latestAccount.wechatLaunchProfile,
-      appType: latestAccount.appType,
-      selectedAccountId: selAcc?.id,
-    });
-
-    if (!account.wechatLaunchProfile && latestAccount.wechatLaunchProfile) {
-      davDebug('STALE_ACCOUNT_OBJECT_DETECTED', {
-        accountId: account.id,
-        latestProfile: latestAccount.wechatLaunchProfile,
+      davDebug('ITEM_ACTIVATE_SINGLE_CLICK', {
+        accountId: latestAccount.id,
+        accUdid,
       });
+
+      handleSetMain(latestAccount.id);
+
+      // Delay closing the dropdown to allow double click detection
+      // Trì hoãn đóng dropdown để cho phép phát hiện click đúp
+      if (dropdownCloseTimeoutRef.current) {
+        clearTimeout(dropdownCloseTimeoutRef.current);
+      }
+      dropdownCloseTimeoutRef.current = setTimeout(() => {
+        setAccountTitleDropdownOpen(false);
+        setAccountHoverTooltip(null);
+        dropdownCloseTimeoutRef.current = null;
+      }, 300);
+
+      return;
     }
 
-    davDebug('ITEM_CALL_HANDLE_SET_MAIN_FROM_MOUSE_DOWN', {
-      accountId: latestAccount.id,
-      accUdid,
-    });
-    handleSetMain(latestAccount.id);
+    // Double click: clear close timer, close dropdown immediately, and launch WeChat
+    // Click đúp: xóa bộ hẹn giờ đóng, đóng dropdown ngay lập tức và mở WeChat
+    if (dropdownCloseTimeoutRef.current) {
+      clearTimeout(dropdownCloseTimeoutRef.current);
+      dropdownCloseTimeoutRef.current = null;
+    }
+
+    lastDropdownActivateRef.current = null; // reset to avoid third click double detection
 
     setAccountTitleDropdownOpen(false);
     setAccountHoverTooltip(null);
@@ -1723,24 +1741,15 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
         showAccountOverlay,
         alwaysShowHeader,
       });
-      davDebug('ITEM_ACTIVATE_DONE_SELECT_ONLY', {
-        accountId: latestAccount.id,
-        accUdid,
-      });
       return;
     }
 
-    davDebug('ITEM_CALL_OPEN_WECHAT_FROM_MOUSE_DOWN', {
+    davDebug('ITEM_CALL_OPEN_WECHAT_FROM_DOUBLE_CLICK', {
       accountId: latestAccount.id,
       accUdid,
       wechatLaunchProfile: latestAccount.wechatLaunchProfile,
     });
-    openWechatForAccount(latestAccount, accUdid, 'header-dropdown-account-mousedown');
-
-    davDebug('ITEM_ACTIVATE_DONE', {
-      accountId: latestAccount.id,
-      accUdid,
-    });
+    openWechatForAccount(latestAccount, accUdid, 'header-dropdown-account-doubleclick');
   };
 
   const activePlatformLabel = platforms.find(p => p.id === activeTab)?.label || 'WeChat';

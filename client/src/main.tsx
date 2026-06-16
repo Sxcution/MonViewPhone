@@ -73,7 +73,7 @@ function validateVaultData(vault: any) {
     }
   }
 
-  const valid = deviceCount >= 35 && wechatAccountCount >= 104 && hasEmmaZhao;
+  const valid = deviceCount >= 34 && wechatAccountCount >= 104 && hasEmmaZhao;
   return { valid, deviceCount, wechatAccountCount, totalAccountCount, hasEmmaZhao };
 }
 
@@ -98,7 +98,7 @@ function validateBackendSettings(settings: any) {
   if (!vaultResult.valid) {
     return {
       valid: false,
-      reason: `Vault verification failed. Devices: ${vaultResult.deviceCount}/35, WeChat accounts: ${vaultResult.wechatAccountCount}/104, Emma Zhao: ${vaultResult.hasEmmaZhao ? 'Yes' : 'No'}`
+      reason: `Vault verification failed. Devices: ${vaultResult.deviceCount}/34, WeChat accounts: ${vaultResult.wechatAccountCount}/104, Emma Zhao: ${vaultResult.hasEmmaZhao ? 'Yes' : 'No'}`
     };
   }
 

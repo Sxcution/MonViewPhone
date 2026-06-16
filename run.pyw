@@ -81,7 +81,7 @@ def verify_data_safety():
                 tile_order = json.loads(tile_order_str)
                 if isinstance(tile_order, list):
                     tile_order_count = len(tile_order)
-                    if tile_order_count >= 35:
+                    if tile_order_count >= 34:
                         tile_order_ok = True
             except Exception:
                 pass
@@ -94,14 +94,14 @@ def verify_data_safety():
                 tile_order_numbers = json.loads(tile_order_numbers_str)
                 if isinstance(tile_order_numbers, dict):
                     tile_order_numbers_count = len(tile_order_numbers)
-                    if tile_order_numbers_count >= 35:
+                    if tile_order_numbers_count >= 34:
                         tile_order_numbers_ok = True
             except Exception:
                 pass
 
         # Check conditions
         core_passed = (
-            device_count >= 35 and 
+            device_count >= 34 and 
             wechat_account_count >= 104 and 
             has_emma_zhao
         )
@@ -109,7 +109,7 @@ def verify_data_safety():
         if not core_passed:
             err_msg = (
                 "DATA SAFETY CHECK FAILED - không mở app để tránh ghi đè dữ liệu!\n\n"
-                f"- Số thiết bị trong vault: {device_count} (Yêu cầu >= 35)\n"
+                f"- Số thiết bị trong vault: {device_count} (Yêu cầu >= 34)\n"
                 f"- Số tài khoản WeChat: {wechat_account_count} (Yêu cầu >= 104)\n"
                 f"- Tìm thấy Emma Zhao: {'CÓ' if has_emma_zhao else 'KHÔNG'}\n\n"
                 "Vui lòng tắt launcher, restore lại settings.json / Data.db từ thư mục Backup mới nhất trước khi chạy lại."

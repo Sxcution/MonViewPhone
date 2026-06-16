@@ -1199,11 +1199,17 @@ export function App() {
   const modalPostTimerRef = useRef<number | null>(null)
   const groupClickTimeoutRef = useRef<any>(null)
   const lastGroupClickIdxRef = useRef<number | null>(null)
+  const overlayHeaderHotkeyTimerRef = useRef<any>(null);
+  const overlayHeaderHotkeyHeldRef = useRef<boolean>(false);
+  const overlayHeaderHotkeyKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
       if (groupClickTimeoutRef.current) {
         clearTimeout(groupClickTimeoutRef.current)
+      }
+      if (overlayHeaderHotkeyTimerRef.current) {
+        clearTimeout(overlayHeaderHotkeyTimerRef.current)
       }
     }
   }, [])
@@ -2421,26 +2427,9 @@ export function App() {
   // Cùng logic với button toggle trong DeviceAccountOverlay.tsx: flip localStorage + dispatch event
   useEffect(() => {
     const handleOverlayHeaderHotkey = (e: KeyboardEvent) => {
-      if (e.repeat) return; // Prevent double toggle on auto-repeat
-
       const active = document.activeElement as HTMLElement | null;
       const isPasteSink = active?.id === '__scrcpy_paste_sink';
       const hotkeyStr = localStorage.getItem('monviewphone:overlay-header-hotkey') || '';
-
-      console.log('[OverlayHeaderHotkey]', {
-        key: e.key,
-        code: e.code,
-        repeat: e.repeat,
-        activeTag: active?.tagName,
-        activeId: active?.id,
-        activeClass: active?.className,
-        hotkeyStr,
-        matched: hotkeyStr ? matchesHotkey(e, hotkeyStr) : false,
-        before: localStorage.getItem('monviewphone:dav-always-show-header'),
-      });
-
-      // Chú ý: Đã gỡ bỏ block chặn khi hover/focus stream theo yêu cầu, 
-      // cho phép hotkey Overlay Header hoạt động xuyên qua stream.
 
       // Bỏ qua khi focus vào input thường (ngoài overlay)
       const isRealEditable =
@@ -2458,17 +2447,65 @@ export function App() {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation?.();
-        // Toggle alwaysShowHeader: đọc giá trị hiện tại, flip, lưu, dispatch event
-        const current = localStorage.getItem('monviewphone:dav-always-show-header') === 'true';
-        const nextVal = !current;
-        localStorage.setItem('monviewphone:dav-always-show-header', String(nextVal));
-        saveBackendSetting('monviewphone:dav-always-show-header', String(nextVal));
-        window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+
+        if (e.repeat) return; // Prevent double toggle on auto-repeat
+
+        overlayHeaderHotkeyKeyRef.current = e.code || e.key;
+        if (overlayHeaderHotkeyTimerRef.current) {
+          clearTimeout(overlayHeaderHotkeyTimerRef.current);
+        }
+        overlayHeaderHotkeyHeldRef.current = false;
+        overlayHeaderHotkeyTimerRef.current = setTimeout(() => {
+          overlayHeaderHotkeyHeldRef.current = true;
+          // Hold action: auto show alwaysShowHeader and open all dropdowns
+          // Đè phím: tự động hiển thị overlay header và mở toàn bộ dropdown
+          const alwaysShowHeader = localStorage.getItem('monviewphone:dav-always-show-header') === 'true';
+          if (!alwaysShowHeader) {
+            localStorage.setItem('monviewphone:dav-always-show-header', 'true');
+            saveBackendSetting('monviewphone:dav-always-show-header', 'true');
+            window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+          }
+          window.dispatchEvent(new CustomEvent('monviewphone:open-all-dropdowns'));
+          (window as any).__allDropdownsOpen = true;
+        }, 500);
+      }
+    };
+
+    const handleOverlayHeaderHotkeyUp = (e: KeyboardEvent) => {
+      const activeKey = e.code || e.key;
+      if (overlayHeaderHotkeyKeyRef.current && overlayHeaderHotkeyKeyRef.current === activeKey) {
+        overlayHeaderHotkeyKeyRef.current = null;
+        if (overlayHeaderHotkeyTimerRef.current) {
+          clearTimeout(overlayHeaderHotkeyTimerRef.current);
+          overlayHeaderHotkeyTimerRef.current = null;
+        }
+
+        if (overlayHeaderHotkeyHeldRef.current) {
+          overlayHeaderHotkeyHeldRef.current = false;
+          return;
+        }
+
+        // Single press action: toggle dropdowns or toggle header visibility
+        // Click đơn: thu gọn dropdown hoặc toggle hiển thị header
+        if ((window as any).__allDropdownsOpen) {
+          window.dispatchEvent(new CustomEvent('monviewphone:close-all-dropdowns'));
+          (window as any).__allDropdownsOpen = false;
+        } else {
+          const current = localStorage.getItem('monviewphone:dav-always-show-header') === 'true';
+          const nextVal = !current;
+          localStorage.setItem('monviewphone:dav-always-show-header', String(nextVal));
+          saveBackendSetting('monviewphone:dav-always-show-header', String(nextVal));
+          window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
+        }
       }
     };
 
     window.addEventListener('keydown', handleOverlayHeaderHotkey, { capture: true, passive: false });
-    return () => window.removeEventListener('keydown', handleOverlayHeaderHotkey, { capture: true } as any);
+    window.addEventListener('keyup', handleOverlayHeaderHotkeyUp, { capture: true, passive: false });
+    return () => {
+      window.removeEventListener('keydown', handleOverlayHeaderHotkey, { capture: true } as any);
+      window.removeEventListener('keyup', handleOverlayHeaderHotkeyUp, { capture: true } as any);
+    };
   }, []);
 
   useEffect(() => {

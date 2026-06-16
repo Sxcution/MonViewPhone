@@ -134,8 +134,51 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 	}
 	safeTmpName := sanitizeFileName(fileName)
 	ext := strings.TrimPrefix(strings.ToLower(path.Ext(fileName)), ".")
-	_, _, _, isMedia := mediaStoreTarget(ext)
+	uri, mimeType, relPath, isMedia := mediaStoreTarget(ext)
 
+	// CASE 1: Work Profile / Secondary User (userID > 0) pushing media files.
+	// We MUST use the MediaStore Content Provider API since direct adb push or cp to /storage/emulated/{userID}/
+	// will fail with Permission Denied due to multi-user storage isolation.
+	if userID > 0 && isMedia {
+		deviceTmp := fmt.Sprintf("/data/local/tmp/%d_%s", time.Now().UnixNano(), safeTmpName)
+		if _, err := adb.Command("-s", udid, "push", tmpPath, deviceTmp); err != nil {
+			return err
+		}
+		defer adb.Shell(udid, "rm "+shellQuote(deviceTmp))
+
+		uniqueFileName := fmt.Sprintf("vsp_%d_%s", time.Now().UnixNano(), safeTmpName)
+
+		// Optimize by chaining all MediaStore operations in a single shell command.
+		// This reduces the number of host-device ADB round-trips from 4 to 1.
+		cmd := fmt.Sprintf(
+			"inserted_out=$(content insert --user %d --uri %s --bind _display_name:s:%s --bind mime_type:s:%s --bind relative_path:s:%s) && "+
+				"uri=$(echo \"$inserted_out\" | cut -d' ' -f2 | tr -d '\\r') && "+
+				"cat %s | content write --user %d --uri \"$uri\" && "+
+				"content update --user %d --uri \"$uri\" --bind _display_name:s:%s",
+			userID, uri, shellQuote(uniqueFileName), shellQuote(mimeType), shellQuote(relPath),
+			shellQuote(deviceTmp), userID,
+			userID, shellQuote(fileName),
+		)
+
+		if _, err := adb.Shell(udid, cmd); err != nil {
+			// Fallback: copy file normally and trigger media scanner
+			parent := path.Dir(remotePath)
+			if parent != "." && parent != "/" {
+				_, _ = adb.Shell(udid, "mkdir -p "+shellQuote(parent))
+			}
+			if _, err := adb.Shell(udid, "cp "+shellQuote(deviceTmp)+" "+shellQuote(remotePath)); err != nil {
+				return err
+			}
+			// Trigger media scanner so Gallery sees it
+			scannerCmd := fmt.Sprintf("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://%s --user %d", shellQuote(remotePath), userID)
+			_, _ = adb.Shell(udid, scannerCmd)
+		}
+
+		return nil
+	}
+
+	// CASE 2: Work Profile / Secondary User (userID > 0) pushing non-media files.
+	// We use the temporary copy method.
 	if userID > 0 {
 		deviceTmp := fmt.Sprintf("/data/local/tmp/%d_%s", time.Now().UnixNano(), safeTmpName)
 		if _, err := adb.Command("-s", udid, "push", tmpPath, deviceTmp); err != nil {
@@ -144,23 +187,17 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 		defer adb.Shell(udid, "rm "+shellQuote(deviceTmp))
 
 		parent := path.Dir(remotePath)
-		var cmd string
 		if parent != "." && parent != "/" {
-			cmd = fmt.Sprintf("mkdir -p %s ; cp %s %s", shellQuote(parent), shellQuote(deviceTmp), shellQuote(remotePath))
-		} else {
-			cmd = fmt.Sprintf("cp %s %s", shellQuote(deviceTmp), shellQuote(remotePath))
+			_, _ = adb.Shell(udid, "mkdir -p "+shellQuote(parent))
 		}
-
-		if isMedia {
-			cmd += fmt.Sprintf(" && am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://%s --user %d", shellQuote(remotePath), userID)
-		}
-
-		if _, err := adb.Shell(udid, cmd); err != nil {
+		if _, err := adb.Shell(udid, "cp "+shellQuote(deviceTmp)+" "+shellQuote(remotePath)); err != nil {
 			return err
 		}
 		return nil
 	}
 
+	// CASE 3: Primary User (userID == 0) pushing any file.
+	// Fast Path: Push directly using optimized ADB sync protocol, then trigger media scanner if it's media.
 	parent := path.Dir(remotePath)
 	if parent != "." && parent != "/" {
 		_, _ = adb.Shell(udid, "mkdir -p "+shellQuote(parent))

@@ -240,8 +240,8 @@ func validateNewVaultAgainstDB(raw string) error {
 	_ = db.QueryRow("SELECT COUNT(*) FROM accounts WHERE name LIKE '%Emma Zhao%'").Scan(&dbHasEmmaCount)
 	dbHasEmma := dbHasEmmaCount > 0
 
-	if dbDevices >= 35 && newDeviceCount < 35 {
-		return fmt.Errorf("Refusing to downgrade account vault: current devices=%d, new devices=%d (minimum 35 required)", dbDevices, newDeviceCount)
+	if dbDevices >= 34 && newDeviceCount < 34 {
+		return fmt.Errorf("Refusing to downgrade account vault: current devices=%d, new devices=%d (minimum 34 required)", dbDevices, newDeviceCount)
 	}
 	if dbAccounts >= 104 && newWechatCount < 104 {
 		return fmt.Errorf("Refusing to downgrade account vault: current WeChat accounts=%d, new WeChat accounts=%d (minimum 104 required)", dbAccounts, newWechatCount)

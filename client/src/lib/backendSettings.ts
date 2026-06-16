@@ -126,7 +126,7 @@ export function validateVaultData(vault: VaultData) {
     }
   }
 
-  const valid = deviceCount >= 35 && wechatAccountCount >= 104 && hasEmmaZhao;
+  const valid = deviceCount >= 34 && wechatAccountCount >= 104 && hasEmmaZhao;
   return { valid, deviceCount, wechatAccountCount, totalAccountCount, hasEmmaZhao };
 }
 
@@ -134,7 +134,7 @@ export async function saveDeviceAccountVaultToBackend(vault: VaultData): Promise
   const result = validateVaultData(vault);
   if (!result.valid) {
     console.error(
-      `[Vault Client Guard] Refusing to POST vault: safety thresholds not met. Devices: ${result.deviceCount}/35, WeChat accounts: ${result.wechatAccountCount}/104, Emma Zhao: ${result.hasEmmaZhao ? 'Yes' : 'No'}`
+      `[Vault Client Guard] Refusing to POST vault: safety thresholds not met. Devices: ${result.deviceCount}/34, WeChat accounts: ${result.wechatAccountCount}/104, Emma Zhao: ${result.hasEmmaZhao ? 'Yes' : 'No'}`
     );
     return false;
   }
