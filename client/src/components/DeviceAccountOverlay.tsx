@@ -2677,7 +2677,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   <span
                     className="dav-centered-input"
                     style={{ fontSize: '10px', color: isOverOneYear ? '#22c55e' : '#fff', cursor: 'pointer' }}
-                    onClick={(e) => {
+                    onDoubleClick={(e) => {
                       e.stopPropagation();
                       setShowDateInput(true);
                     }}
@@ -4360,6 +4360,8 @@ export function DeviceAccountOverlay({
           placeholder="Tìm theo Tên, Nickname, SĐT, Email..."
           value={search}
           onChange={e => setSearch(e.target.value)}
+          onKeyDown={e => e.stopPropagation()}
+          onKeyUp={e => e.stopPropagation()}
           data-inspector-id="deviceAccount.searchInput"
           data-inspector-label="Device accounts search query input"
           data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"

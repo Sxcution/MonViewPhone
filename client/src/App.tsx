@@ -28,6 +28,7 @@ import {
   setDeviceDisplayPower
 } from '@/lib/serverApi'
 import { SyncPanel } from '@/components/SyncPanel'
+import { NotesModal, type Note } from '@/components/NotesModal'
 import { SyncTimeSettingsModal } from '@/components/SyncTimeSettingsModal'
 import {
   loadSyncTimeSettings,
@@ -60,6 +61,7 @@ import {
   type AutomationAppAction,
 } from '@/lib/automationData'
 import {
+  Bell,
   Bot,
   Camera,
   ChevronDown,
@@ -72,6 +74,7 @@ import {
   Package,
   RotateCcw,
   Settings,
+  Notebook,
   Terminal,
   Upload,
   Volume2,
@@ -380,6 +383,9 @@ export function App() {
 
   useEffect(() => {
     const handleThemeInspectorHotkey = (e: KeyboardEvent) => {
+      if (document.activeElement?.classList.contains('account-search-input')) {
+        return;
+      }
       const active = document.activeElement?.nodeName.toLowerCase();
       if (
         ['input', 'textarea', 'select'].includes(active || '') ||
@@ -785,6 +791,10 @@ export function App() {
     startY: 0,
     originX: 0,
     originY: 0,
+    minX: 0,
+    maxX: 0,
+    minY: 0,
+    maxY: 0,
     active: false
   })
   const [viewerWidthPx, setViewerWidthPx] = useState<number>(() => {
@@ -1055,6 +1065,9 @@ export function App() {
   const rubberBandJustFinishedRef = useRef(false)
 
   const [appSettingsVisible, setAppSettingsVisible] = useState(false)
+  const [notesModalOpen, setNotesModalOpen] = useState(false)
+  const [activeReminderNote, setActiveReminderNote] = useState<Note | null>(null)
+  const [reminderOpenNoteId, setReminderOpenNoteId] = useState<string | null>(null)
   const [streamControlsOpen, setStreamControlsOpen] = useState(() =>
     loadBoolKey('rightPanel.streamControlsOpen', true)
   )
@@ -1074,6 +1087,60 @@ export function App() {
       localStorage.setItem('rightPanel.quickControlsOpen', String(quickControlsOpen));
     } catch {}
   }, [quickControlsOpen]);
+
+  // Background note reminder checker
+  useEffect(() => {
+    const checkReminders = () => {
+      try {
+        const savedNotesStr = localStorage.getItem('monviewphone:notes');
+        if (!savedNotesStr) return;
+        const currentNotes: Note[] = JSON.parse(savedNotesStr);
+        const now = Date.now();
+        
+        // Find notes that have a reminder time and the time is due (past or current)
+        const dueNote = currentNotes.find(note => {
+          if (!note.reminderTime) return false;
+          const reminderMs = new Date(note.reminderTime).getTime();
+          return reminderMs <= now;
+        });
+
+        if (dueNote) {
+          // Play a notification sound
+          try {
+            const audio = new Audio('/audio/notification_new.mp3');
+            audio.play().catch(err => console.log('Audio playback prevented', err));
+          } catch (e) {
+            console.error('Audio play error', e);
+          }
+
+          // Show reminder alert modal
+          setActiveReminderNote(dueNote);
+
+          // Clear this reminder time from notes so it doesn't trigger again
+          const updatedNotes = currentNotes.map(n => {
+            if (n.id === dueNote.id) {
+              const { reminderTime, ...rest } = n;
+              return rest; // remove reminderTime
+            }
+            return n;
+          });
+          localStorage.setItem('monviewphone:notes', JSON.stringify(updatedNotes));
+          
+          // Dispatch custom event to notify NotesModal if it's currently open
+          window.dispatchEvent(new CustomEvent('monviewphone:notes-updated-internal', { detail: updatedNotes }));
+        }
+      } catch (err) {
+        console.error('Error in notes reminder checker:', err);
+      }
+    };
+
+    // Check every 5 seconds
+    const interval = setInterval(checkReminders, 5000);
+    // Also check immediately on mount
+    checkReminders();
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     try {
@@ -2315,6 +2382,10 @@ export function App() {
         return
       }
 
+      if (active && active.classList.contains('account-search-input')) {
+        return
+      }
+
       if (
         active &&
         (
@@ -2369,6 +2440,9 @@ export function App() {
   useEffect(() => {
     const handleAccountManagerHotkey = (e: KeyboardEvent) => {
       const active = document.activeElement as HTMLElement | null;
+      if (active && active.classList.contains('account-search-input')) {
+        return;
+      }
 
       // Bỏ qua khi đang hover/focus trên phone tile
       const isHoveringPhone =
@@ -2428,6 +2502,9 @@ export function App() {
   useEffect(() => {
     const handleOverlayHeaderHotkey = (e: KeyboardEvent) => {
       const active = document.activeElement as HTMLElement | null;
+      if (active && active.classList.contains('account-search-input')) {
+        return;
+      }
       const isPasteSink = active?.id === '__scrcpy_paste_sink';
       const hotkeyStr = localStorage.getItem('monviewphone:overlay-header-hotkey') || '';
 
@@ -2765,9 +2842,17 @@ export function App() {
     e.preventDefault()
     const dx = e.clientX - viewerDragRef.current.startX
     const dy = e.clientY - viewerDragRef.current.startY
+    
+    let targetX = viewerDragRef.current.originX + dx
+    let targetY = viewerDragRef.current.originY + dy
+
+    // Clamp the dragging values within precalculated boundaries
+    targetX = Math.max(viewerDragRef.current.minX, Math.min(viewerDragRef.current.maxX, targetX))
+    targetY = Math.max(viewerDragRef.current.minY, Math.min(viewerDragRef.current.maxY, targetY))
+
     setViewerOffset({
-      x: viewerDragRef.current.originX + dx,
-      y: viewerDragRef.current.originY + dy
+      x: targetX,
+      y: targetY
     })
   }, [])
 
@@ -2788,11 +2873,45 @@ export function App() {
       const isHandle = isHeader || (isActions && !isActionBtn)
       if (!isHandle) return
       e.preventDefault()
+
+      let minX = -Infinity
+      let maxX = Infinity
+      let minY = -Infinity
+      let maxY = Infinity
+
+      // Calculate dragging boundaries so the Viewer panel never spills out of the screen (12px padding)
+      const wrapEl = document.querySelector('.viewerOverlayPanelWrap') as HTMLElement | null
+      if (wrapEl) {
+        const rect = wrapEl.getBoundingClientRect()
+        const viewWidth = window.innerWidth
+        const viewHeight = window.innerHeight
+        const panelWidth = rect.width
+        const panelHeight = rect.height
+
+        const originalLeft = (viewWidth - panelWidth) / 2
+        const originalTop = (viewHeight - panelHeight) / 2
+
+        const rawMinX = 12 - originalLeft
+        const rawMaxX = viewWidth - 12 - originalLeft - panelWidth
+        const rawMinY = 12 - originalTop
+        const rawMaxY = viewHeight - 12 - originalTop - panelHeight
+
+        minX = Math.min(rawMinX, rawMaxX)
+        maxX = Math.max(rawMinX, rawMaxX)
+        minY = Math.min(rawMinY, rawMaxY)
+        maxY = Math.max(rawMinY, rawMaxY)
+      }
+
       viewerDragRef.current.startX = e.clientX
       viewerDragRef.current.startY = e.clientY
       viewerDragRef.current.originX = viewerOffset.x
       viewerDragRef.current.originY = viewerOffset.y
+      viewerDragRef.current.minX = minX
+      viewerDragRef.current.maxX = maxX
+      viewerDragRef.current.minY = minY
+      viewerDragRef.current.maxY = maxY
       viewerDragRef.current.active = true
+
       window.addEventListener('pointermove', onViewerPointerMove as any, {
         passive: false
       })
@@ -3248,6 +3367,20 @@ export function App() {
             data-inspector-component="client/src/App.tsx"
           >
             <Settings size={16} strokeWidth={2} />
+          </button>
+          <button
+            className='btn-pin btn-notes'
+            aria-label='Ghi chú'
+            title='Ghi chú'
+            onClick={() => {
+              setReminderOpenNoteId(null);
+              setNotesModalOpen(true);
+            }}
+            data-inspector-id="rightSidebar.notesButton"
+            data-inspector-label="Right sidebar notes button"
+            data-inspector-component="client/src/App.tsx"
+          >
+            <Notebook size={16} strokeWidth={2} />
           </button>
           <div 
             className='rcpContent'
@@ -6167,6 +6300,68 @@ export function App() {
             setContextMenuOpen(true)
           }}
         />
+      )}
+
+      {notesModalOpen && (
+        <NotesModal 
+          initialNoteId={reminderOpenNoteId}
+          onClose={() => setNotesModalOpen(false)} 
+        />
+      )}
+
+      {activeReminderNote && (
+        <div 
+          className="notesReminderOverlay"
+          onMouseDown={() => setActiveReminderNote(null)}
+          data-inspector-id="notes.reminderAlertOverlay"
+          data-inspector-label="Notes reminder overlay background alert"
+          data-inspector-component="client/src/App.tsx"
+        >
+          <div 
+            className="notesReminderPanel"
+            onMouseDown={e => e.stopPropagation()}
+            data-inspector-id="notes.reminderAlertPanel"
+            data-inspector-label="Notes reminder popup panel"
+            data-inspector-component="client/src/App.tsx"
+          >
+            <div className="notesReminderHeader">
+              <Bell size={18} className="dav-bell-counting" />
+              <span>Nhắc Nhở Ghi Chú!</span>
+            </div>
+            <div className="notesReminderTitle">
+              {activeReminderNote.title || 'Ghi chú không có tiêu đề'}
+            </div>
+            {activeReminderNote.content && (
+              <div className="notesReminderContent">
+                {activeReminderNote.content}
+              </div>
+            )}
+            <div className="notesReminderActions">
+              <button
+                className="modalBtn"
+                onClick={() => setActiveReminderNote(null)}
+                data-inspector-id="notes.reminderAlertCloseBtn"
+                data-inspector-label="Notes reminder alert dismiss button"
+                data-inspector-component="client/src/App.tsx"
+              >
+                Đóng
+              </button>
+              <button
+                className="modalBtnPrimary"
+                onClick={() => {
+                  setReminderOpenNoteId(activeReminderNote.id);
+                  setActiveReminderNote(null);
+                  setNotesModalOpen(true);
+                }}
+                data-inspector-id="notes.reminderAlertViewBtn"
+                data-inspector-label="Notes reminder alert view note button"
+                data-inspector-component="client/src/App.tsx"
+              >
+                Xem Ghi Chú
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

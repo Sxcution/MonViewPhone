@@ -4811,8 +4811,15 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
 }
 
 .btn-setting {
-  right: 12px;
-  left: auto;
+  right: 12px !important;
+  left: auto !important;
+  z-index: 20 !important;
+}
+
+.btn-notes {
+  right: 56px !important;
+  left: auto !important;
+  z-index: 20 !important;
 }
 
 .rightConfigPanel {
@@ -4914,112 +4921,7 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Sidebar Auto-Hide Wrapper */
-.sidebar-wrapper {
-  position: fixed;
-  top: 0;
-  height: 100dvh;
-  z-index: 1000;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-}
-
-body:not(.alignRight) .sidebar-wrapper {
-  left: 0;
-}
-
-body.alignRight .sidebar-wrapper {
-  right: 0;
-}
-
-/* Make children static within wrapper to flow naturally */
-.sidebar-wrapper .rightConfigPanel {
-  position: relative !important;
-  left: auto !important;
-  right: auto !important;
-  box-shadow: none !important;
-}
-
-body.alignRight .sidebar-wrapper {
-  box-shadow: -16px 0 50px rgba(0, 0, 0, 0.55);
-}
-
-body:not(.alignRight) .sidebar-wrapper {
-  box-shadow: 16px 0 50px rgba(0, 0, 0, 0.55);
-}
-
-.sidebar-wrapper.auto-hide {
-  /* Leave 3px visible — invisible on dark UI but reliable for hover at screen edge */
-  transform: translateX(calc(100% - 3px));
-}
-
-body:not(.alignRight) .sidebar-wrapper.auto-hide {
-  transform: translateX(calc(-100% + 3px));
-}
-
-
-
-/* Ensure hover has higher specificity */
-body.alignRight .sidebar-wrapper.auto-hide:hover,
-body:not(.alignRight) .sidebar-wrapper.auto-hide:hover {
-  transform: translateX(0);
-}
-
-body.alignRight .sidebar-wrapper.pinned,
-body:not(.alignRight) .sidebar-wrapper.pinned {
-  transform: translateX(0);
-}
-
-/* Pin button styles */
-.btn-pin {
-  position: absolute;
-  top: 14px;
-  left: 12px;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  border: 1px solid #2f2f2f;
-  background: #1c1c1c;
-  color: #e6e6e6;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  z-index: 10;
-}
-
-.btn-pin:active {
-  transform: translateY(1px);
-}
-
-.btn-setting {
-  right: 12px;
-  left: auto;
-}
-
-.rightConfigPanel {
-  padding-top: 60px !important;
-  /* Make room for pin button */
-}
-
-/* Giao diện khung phóng to */
-.device-viewer-container {
-  border: 2px solid #3b3b3b;
-  /* Viền xám đen hiện đại */
-  border-radius: 16px;
-  /* Bo góc nhiều hơn */
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-  /* Đổ bóng tạo chiều sâu */
-  overflow: hidden;
-  display: flex;
-  flex-direction: row;
-  /* Ép màn hình và thanh bên phải nằm ngang */
-}
-
-/* Đảm bảo thanh bên phải cũng bo viền ăn khớp */
-.right-bar-container {
-  border-left: 1px solid #3b3b3b;
-  background-color: #1e1e1e;
-}
+/* Duplicate sidebar auto-hide styles removed to prevent button collision */
 
 /* ===== Full Viewer Layout (ki?u Xiaowei) ===== */
 #fullViewerLayout {
@@ -10981,6 +10883,7 @@ input[type=number] {
 .rcpToggleBtn,
 .btn-pin,
 .btn-setting,
+.btn-notes,
 .rb-btn,
 .modalBtn {
   background-color: var(--mvp-button-bg) !important;
@@ -11600,5 +11503,405 @@ select:focus,
 .dav-input-inline:focus {
   box-shadow: none !important;
 }
+
+/* ======= Notes Sidebar Modal ======= */
+.notesOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 27000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.notesPanel {
+  display: flex;
+  width: min(960px, 95vw);
+  height: min(640px, 90vh);
+  background: var(--md-card);
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-md, 12px);
+  box-shadow: var(--md-shadow-panel);
+  overflow: hidden;
+  position: relative;
+}
+
+.notesSidebar {
+  width: 320px;
+  border-right: 1px solid var(--md-border);
+  display: flex;
+  flex-direction: column;
+  background: var(--md-bg-soft);
+  height: 100%;
+}
+
+.notesSidebarHeader {
+  padding: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid var(--md-border);
+}
+
+.notesSearchInput {
+  flex: 1;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.notesAddBtn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--md-radius-sm, 8px);
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--md-border);
+  color: var(--md-text);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.notesAddBtn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--md-border-strong);
+}
+
+.notesList {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notesListItem {
+  padding: 10px 12px;
+  border-radius: var(--md-radius-sm, 8px);
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+  transition: all 0.15s ease;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.notesListItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--md-border);
+}
+
+.notesListItem.active {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: var(--md-info) !important;
+}
+
+.notesListItemTitle {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--md-text);
+  padding-right: 24px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.notesListItemPreview {
+  font-size: 11px;
+  color: var(--md-muted);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.notesListItemMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.notesListItemDate {
+  font-size: 10px;
+  color: var(--md-muted-2);
+}
+
+.notesListItemDelete {
+  position: absolute;
+  right: 8px;
+  top: 10px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--md-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.notesListItem:hover .notesListItemDelete {
+  opacity: 1;
+}
+
+.notesListItemDelete:hover {
+  color: var(--md-danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.notesContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--md-card);
+  height: 100%;
+}
+
+.notesContentHeader {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--md-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--md-surface);
+}
+
+.notesTitleInput {
+  flex: 1;
+  height: 36px;
+  font-size: 16px;
+  font-weight: 700;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  color: var(--md-text) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.notesToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.notesToolbarBtn {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--md-radius-sm, 8px);
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--md-border);
+  color: var(--md-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.notesToolbarBtn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--md-border-strong);
+}
+
+.notesToolbarBtn.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: var(--md-info);
+  color: var(--md-info);
+}
+
+.notesCloseBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--md-radius-sm, 8px);
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--md-border);
+  color: var(--md-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.notesCloseBtn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--md-danger);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.notesPopoverOverlay {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  z-index: 28000;
+  background: var(--md-surface-2);
+  border: 1px solid var(--md-border-strong);
+  border-radius: var(--md-radius-sm, 8px);
+  box-shadow: var(--md-shadow-panel);
+  padding: 12px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notesPopoverTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--md-text-soft);
+}
+
+.notesPopoverActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.notesFontSizeMenu {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  z-index: 28000;
+  background: var(--md-surface-2);
+  border: 1px solid var(--md-border-strong);
+  border-radius: var(--md-radius-sm, 8px);
+  box-shadow: var(--md-shadow-panel);
+  padding: 6px;
+  width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notesFontSizeItem {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--md-text-soft);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.notesFontSizeItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--md-text);
+}
+
+.notesFontSizeItem.active {
+  color: var(--md-info);
+  font-weight: 600;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.notesEditorBody {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.notesTextarea {
+  flex: 1;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  color: var(--md-text) !important;
+  resize: none !important;
+  font-family: inherit;
+  font-size: var(--note-font-size, 14px) !important;
+  line-height: 1.6;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.notesEmptyState {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--md-muted);
+  font-size: 14px;
+  background: var(--md-card);
+}
+
+.notesReminderOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 29000;
+}
+
+.notesReminderPanel {
+  width: min(400px, 90vw);
+  background: var(--md-card);
+  border: 1px solid var(--md-border-strong);
+  border-radius: var(--md-radius-md, 12px);
+  box-shadow: var(--md-shadow-panel);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.notesReminderHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--md-warning);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.notesReminderTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--md-text);
+  margin-top: 4px;
+}
+
+.notesReminderContent {
+  font-size: 13px;
+  color: var(--md-text-soft);
+  max-height: 120px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 8px 10px;
+  border-radius: 6px;
+  border-left: 3px solid var(--md-warning);
+  white-space: pre-wrap;
+}
+
+.notesReminderActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 
 
