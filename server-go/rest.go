@@ -150,12 +150,21 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 
 		// Optimize by chaining all MediaStore operations in a single shell command.
 		// This reduces the number of host-device ADB round-trips from 4 to 1.
+		// It supports devices where content insert runs silently (e.g. crDroid 9.8 / Android 13)
+		// by querying for the created row's ID using uniqueFileName.
 		cmd := fmt.Sprintf(
-			"inserted_out=$(content insert --user %d --uri %s --bind _display_name:s:%s --bind mime_type:s:%s --bind relative_path:s:%s) && "+
-				"uri=$(echo \"$inserted_out\" | cut -d' ' -f2 | tr -d '\\r') && "+
+			"inserted_out=$(content insert --user %d --uri %s --bind _display_name:s:%s --bind mime_type:s:%s --bind relative_path:s:%s); "+
+				"uri=$(echo \"$inserted_out\" | grep -o -E \"content://[a-zA-Z0-9./_:-]+\"); "+
+				"if [ -z \"$uri\" ]; then "+
+				"id=$(content query --user %d --uri %s --projection _id --where \"_display_name='%s'\" | grep -o -E \"_id=[0-9]+\" | cut -d'=' -f2 | tr -d '\\r'); "+
+				"if [ ! -z \"$id\" ]; then uri=\"%s/$id\"; fi; "+
+				"fi; "+
+				"if [ ! -z \"$uri\" ]; then "+
 				"cat %s | content write --user %d --uri \"$uri\" && "+
-				"content update --user %d --uri \"$uri\" --bind _display_name:s:%s",
+				"content update --user %d --uri \"$uri\" --bind _display_name:s:%s; "+
+				"else false; fi",
 			userID, uri, shellQuote(uniqueFileName), shellQuote(mimeType), shellQuote(relPath),
+			userID, uri, uniqueFileName, uri,
 			shellQuote(deviceTmp), userID,
 			userID, shellQuote(fileName),
 		)
