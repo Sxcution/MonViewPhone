@@ -62,6 +62,7 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
     getCanvasForUdid,
     registeredUdids,
     orderMap,
+    viewerUdid,
   });
 
   // Persist config changes

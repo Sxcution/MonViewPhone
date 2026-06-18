@@ -32,6 +32,7 @@ type UseVisualAlertOpts = {
   getCanvasForUdid: (udid: string) => HTMLCanvasElement | null;
   registeredUdids: string[];
   orderMap: Map<string, number>;
+  viewerUdid?: string | null;
 };
 
 const STAGGER_MS = 150;
@@ -41,9 +42,13 @@ export function useVisualAlert({
   getCanvasForUdid,
   registeredUdids,
   orderMap,
+  viewerUdid,
 }: UseVisualAlertOpts) {
   const [scanning, setScanning] = useState(false);
   const [lastAlert, setLastAlert] = useState<AlertEvent | null>(null);
+
+  const viewerUdidRef = useRef(viewerUdid);
+  viewerUdidRef.current = viewerUdid;
 
   // Keep mutable refs to avoid stale closures in setInterval
   const configRef = useRef(config);
@@ -61,6 +66,18 @@ export function useVisualAlert({
   // Per-device scan state (consecutiveHits + lastAlertAt)
   const deviceStateRef = useRef(new Map<string, DeviceScanState>());
 
+  // Clear alert state immediately when a device enters Viewer mode
+  useEffect(() => {
+    if (viewerUdid) {
+      const state = deviceStateRef.current.get(viewerUdid);
+      if (state && state.currentlyAlerting) {
+        state.currentlyAlerting = false;
+        state.consecutiveHits = 0;
+        window.dispatchEvent(new CustomEvent('visualAlertCleared', { detail: { udid: viewerUdid } }));
+      }
+    }
+  }, [viewerUdid]);
+
   // Request notification permission once when enabled
   useEffect(() => {
     if (config.enabled) {
@@ -71,6 +88,17 @@ export function useVisualAlert({
   // Core scan function for a single device (multi-ROI)
   const scanDevice = useCallback(
     (udid: string): { detected: boolean; totalPixelCount: number } => {
+      // Skip scanning if this device is currently in Viewer mode
+      if (viewerUdidRef.current && udid === viewerUdidRef.current) {
+        const state = deviceStateRef.current.get(udid);
+        if (state && state.currentlyAlerting) {
+          state.currentlyAlerting = false;
+          state.consecutiveHits = 0;
+          window.dispatchEvent(new CustomEvent('visualAlertCleared', { detail: { udid } }));
+        }
+        return { detected: false, totalPixelCount: 0 };
+      }
+
       const cfg = configRef.current;
       // Skip if no ROIs configured
       if (!cfg.rois.length) return { detected: false, totalPixelCount: 0 };
