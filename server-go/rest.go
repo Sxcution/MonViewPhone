@@ -30,6 +30,7 @@ type jsonResponse map[string]interface{}
 var userInfoPattern = regexp.MustCompile(`UserInfo\{(\d+):([^:}]*)`)
 var storageUserPattern = regexp.MustCompile(`^/storage/emulated/(\d+)/`)
 var mediaIDPattern = regexp.MustCompile(`_id=(\d+)`)
+var contentURIPattern = regexp.MustCompile(`content://[a-zA-Z0-9./_:-]+`)
 
 func writeJSON(w http.ResponseWriter, status int, payload jsonResponse) {
 	w.Header().Set("Content-Type", "application/json")
@@ -109,7 +110,7 @@ func mediaStoreTarget(ext string) (uri string, mimeType string, relPath string, 
 	case "mp3", "wav", "ogg", "m4a":
 		return "content://media/external/audio/media", "audio/" + ext, "Music/", true
 	default:
-		return "content://media/external/downloads/media", "application/octet-stream", "Download/", false
+		return "content://media/external/downloads/media", "application/octet-stream", "Download/", true
 	}
 }
 
@@ -125,6 +126,90 @@ func userIDFromRemotePath(remotePath string) int {
 	return id
 }
 
+func mediaStoreInsertURI(udid string, userID int, uri, mimeType, relPath, uniqueFileName string) (string, error) {
+	cmd := fmt.Sprintf(
+		"inserted_out=$(content insert --user %d --uri %s --bind _display_name:s:%s --bind mime_type:s:%s --bind relative_path:s:%s); "+
+			"uri=$(echo \"$inserted_out\" | grep -o -E \"content://[a-zA-Z0-9./_:-]+\"); "+
+			"if [ -z \"$uri\" ]; then "+
+			"row=$(content query --user %d --uri %s --projection _id:_display_name 2>/dev/null | grep -F -- %s | tail -n 1 || true); "+
+			"id=$(echo \"$row\" | grep -o -E \"_id=[0-9]+\" | head -n 1 | cut -d'=' -f2 | tr -d '\\r'); "+
+			"if [ ! -z \"$id\" ]; then uri=\"%s/$id\"; fi; "+
+			"fi; "+
+			"if [ ! -z \"$uri\" ]; then echo \"$uri\"; else echo \"MediaStore row not found for %s\" >&2; false; fi",
+		userID, uri, shellQuote(uniqueFileName), shellQuote(mimeType), shellQuote(relPath),
+		userID, uri, shellQuote(uniqueFileName), uri,
+		shellQuote(uniqueFileName),
+	)
+	out, err := adb.CommandTimeout(30*time.Second, "-s", udid, "shell", cmd)
+	if err != nil {
+		return "", err
+	}
+	matches := contentURIPattern.FindAllString(out, -1)
+	if len(matches) == 0 {
+		return "", fmt.Errorf("MediaStore insert returned no content URI: %q", strings.TrimSpace(out))
+	}
+	return matches[len(matches)-1], nil
+}
+
+func pushMediaStoreViaExecIn(udid, tmpPath, fileName, uri, mimeType, relPath string, userID int) error {
+	uniqueFileName := fmt.Sprintf("vsp_%d_%s", time.Now().UnixNano(), sanitizeFileName(fileName))
+	contentURI, err := mediaStoreInsertURI(udid, userID, uri, mimeType, relPath, uniqueFileName)
+	if err != nil {
+		return err
+	}
+
+	if _, err := adb.CommandWithStdinFileTimeout(3*time.Minute, tmpPath, "-s", udid, "exec-in", "content", "write", "--user", strconv.Itoa(userID), "--uri", contentURI); err != nil {
+		return err
+	}
+
+	updateCmd := fmt.Sprintf("content update --user %d --uri %s --bind _display_name:s:%s", userID, shellQuote(contentURI), shellQuote(fileName))
+	if _, err := adb.CommandTimeout(30*time.Second, "-s", udid, "shell", updateCmd); err != nil {
+		return err
+	}
+	return nil
+}
+
+func pushMediaStoreViaDeviceTmp(udid, tmpPath, fileName, uri, mimeType, relPath string, userID int) error {
+	safeTmpName := sanitizeFileName(fileName)
+	deviceTmp := fmt.Sprintf("/data/local/tmp/%d_%s", time.Now().UnixNano(), safeTmpName)
+	if _, err := adb.Command("-s", udid, "push", tmpPath, deviceTmp); err != nil {
+		return err
+	}
+	defer adb.Shell(udid, "rm "+shellQuote(deviceTmp))
+
+	uniqueFileName := fmt.Sprintf("vsp_%d_%s", time.Now().UnixNano(), safeTmpName)
+
+	// Optimize by chaining all MediaStore operations in a single shell command.
+	// This reduces the number of host-device ADB round-trips from 4 to 1.
+	// It supports devices where content insert runs silently (e.g. crDroid 9.8 / Android 13)
+	// by querying all rows and filtering for the unique name. Do not use SQL --where here:
+	// some Android content CLI builds strip the quotes and turn dotted names into invalid tokens.
+	cmd := fmt.Sprintf(
+		"inserted_out=$(content insert --user %d --uri %s --bind _display_name:s:%s --bind mime_type:s:%s --bind relative_path:s:%s); "+
+			"uri=$(echo \"$inserted_out\" | grep -o -E \"content://[a-zA-Z0-9./_:-]+\"); "+
+			"if [ -z \"$uri\" ]; then "+
+			"row=$(content query --user %d --uri %s --projection _id:_display_name 2>/dev/null | grep -F -- %s | tail -n 1 || true); "+
+			"id=$(echo \"$row\" | grep -o -E \"_id=[0-9]+\" | head -n 1 | cut -d'=' -f2 | tr -d '\\r'); "+
+			"if [ ! -z \"$id\" ]; then uri=\"%s/$id\"; fi; "+
+			"fi; "+
+			"if [ ! -z \"$uri\" ]; then "+
+			"cat %s | content write --user %d --uri \"$uri\" && "+
+			"content update --user %d --uri \"$uri\" --bind _display_name:s:%s; "+
+			"else echo \"MediaStore row not found for %s\" >&2; false; fi",
+		userID, uri, shellQuote(uniqueFileName), shellQuote(mimeType), shellQuote(relPath),
+		userID, uri, shellQuote(uniqueFileName), uri,
+		shellQuote(deviceTmp), userID,
+		userID, shellQuote(fileName),
+		shellQuote(uniqueFileName),
+	)
+
+	if _, err := adb.CommandTimeout(3*time.Minute, "-s", udid, "shell", cmd); err != nil {
+		return fmt.Errorf("MediaStore push failed for user %d path %s: %w", userID, fileName, err)
+	}
+
+	return nil
+}
+
 func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 	remotePath = strings.TrimSpace(remotePath)
 	userID := userIDFromRemotePath(remotePath)
@@ -134,55 +219,18 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 	}
 	safeTmpName := sanitizeFileName(fileName)
 	ext := strings.TrimPrefix(strings.ToLower(path.Ext(fileName)), ".")
-	uri, mimeType, relPath, isMedia := mediaStoreTarget(ext)
+	uri, mimeType, relPath, useMediaStore := mediaStoreTarget(ext)
 
-	// CASE 1: Work Profile / Secondary User (userID > 0) pushing media files.
+	// CASE 1: Work Profile / Secondary User (userID > 0) pushing public media/download files.
 	// We MUST use the MediaStore Content Provider API since direct adb push or cp to /storage/emulated/{userID}/
 	// will fail with Permission Denied due to multi-user storage isolation.
-	if userID > 0 && isMedia {
-		deviceTmp := fmt.Sprintf("/data/local/tmp/%d_%s", time.Now().UnixNano(), safeTmpName)
-		if _, err := adb.Command("-s", udid, "push", tmpPath, deviceTmp); err != nil {
-			return err
+	if userID > 0 && useMediaStore {
+		if err := pushMediaStoreViaExecIn(udid, tmpPath, fileName, uri, mimeType, relPath, userID); err == nil {
+			return nil
 		}
-		defer adb.Shell(udid, "rm "+shellQuote(deviceTmp))
-
-		uniqueFileName := fmt.Sprintf("vsp_%d_%s", time.Now().UnixNano(), safeTmpName)
-
-		// Optimize by chaining all MediaStore operations in a single shell command.
-		// This reduces the number of host-device ADB round-trips from 4 to 1.
-		// It supports devices where content insert runs silently (e.g. crDroid 9.8 / Android 13)
-		// by querying for the created row's ID using uniqueFileName.
-		cmd := fmt.Sprintf(
-			"inserted_out=$(content insert --user %d --uri %s --bind _display_name:s:%s --bind mime_type:s:%s --bind relative_path:s:%s); "+
-				"uri=$(echo \"$inserted_out\" | grep -o -E \"content://[a-zA-Z0-9./_:-]+\"); "+
-				"if [ -z \"$uri\" ]; then "+
-				"id=$(content query --user %d --uri %s --projection _id --where \"_display_name='%s'\" | grep -o -E \"_id=[0-9]+\" | cut -d'=' -f2 | tr -d '\\r'); "+
-				"if [ ! -z \"$id\" ]; then uri=\"%s/$id\"; fi; "+
-				"fi; "+
-				"if [ ! -z \"$uri\" ]; then "+
-				"cat %s | content write --user %d --uri \"$uri\" && "+
-				"content update --user %d --uri \"$uri\" --bind _display_name:s:%s; "+
-				"else false; fi",
-			userID, uri, shellQuote(uniqueFileName), shellQuote(mimeType), shellQuote(relPath),
-			userID, uri, uniqueFileName, uri,
-			shellQuote(deviceTmp), userID,
-			userID, shellQuote(fileName),
-		)
-
-		if _, err := adb.Shell(udid, cmd); err != nil {
-			// Fallback: copy file normally and trigger media scanner
-			parent := path.Dir(remotePath)
-			if parent != "." && parent != "/" {
-				_, _ = adb.Shell(udid, "mkdir -p "+shellQuote(parent))
-			}
-			if _, err := adb.Shell(udid, "cp "+shellQuote(deviceTmp)+" "+shellQuote(remotePath)); err != nil {
-				return err
-			}
-			// Trigger media scanner so Gallery sees it
-			scannerCmd := fmt.Sprintf("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://%s --user %d", shellQuote(remotePath), userID)
-			_, _ = adb.Shell(udid, scannerCmd)
+		if err := pushMediaStoreViaDeviceTmp(udid, tmpPath, fileName, uri, mimeType, relPath, userID); err != nil {
+			return fmt.Errorf("MediaStore push failed for user %d path %s: %w", userID, remotePath, err)
 		}
-
 		return nil
 	}
 
@@ -215,7 +263,7 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 		return err
 	}
 
-	if isMedia {
+	if useMediaStore {
 		scannerCmd := fmt.Sprintf("am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://%s --user %d", shellQuote(remotePath), userID)
 		_, _ = adb.Shell(udid, scannerCmd)
 	}
@@ -771,7 +819,7 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 
 		incomingVaultRaw, hasIncomingVault := temp[deviceAccountVaultKey].(string)
-		
+
 		if incomingOrderNumbersRaw, ok := temp["tileOrderNumbers"].(string); ok {
 			var orderMap map[string]int
 			if err := json.Unmarshal([]byte(incomingOrderNumbersRaw), &orderMap); err == nil && len(orderMap) >= 35 {
@@ -909,19 +957,19 @@ func handleAccountVault(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid request parameters"})
 			return
 		}
-		
+
 		vaultBytes, err := json.Marshal(req.Vault)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid vault JSON"})
 			return
 		}
 		vaultStr := string(vaultBytes)
-		
+
 		if err := validateNewVaultAgainstDB(vaultStr); err != nil {
 			writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": err.Error()})
 			return
 		}
-		
+
 		if err := syncDeviceAccountVaultToDB(vaultStr); err != nil {
 			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
 			return
@@ -933,8 +981,6 @@ func handleAccountVault(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
 }
-
-
 
 func handleOpenFileDialog(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

@@ -89,6 +89,36 @@ func CommandTimeout(timeout time.Duration, args ...string) (string, error) {
 	return stdout.String(), nil
 }
 
+func CommandWithStdinFileTimeout(timeout time.Duration, stdinPath string, args ...string) (string, error) {
+	if timeout <= 0 {
+		timeout = defaultCommandTimeout
+	}
+	path := GetAdbPath()
+	input, err := os.Open(stdinPath)
+	if err != nil {
+		return "", err
+	}
+	defer input.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, path, args...)
+	cmd.Stdin = input
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err = cmd.Run()
+	if ctx.Err() == context.DeadlineExceeded {
+		return "", formatCommandError(path, args, timeout, stderr.String(), context.DeadlineExceeded)
+	}
+	if err != nil {
+		return "", formatCommandError(path, args, timeout, stderr.String(), err)
+	}
+	return stdout.String(), nil
+}
+
 // Push pushes a file to the device
 func Push(udid, localPath, remotePath string) error {
 	_, err := CommandTimeout(pushTimeout, "-s", udid, "push", localPath, remotePath)
