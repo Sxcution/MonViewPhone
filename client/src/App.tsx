@@ -2870,7 +2870,8 @@ export function App() {
       const isHeader = targetEl?.closest('.viewerHeader')
       const isActions = targetEl?.closest('.viewerActions')
       const isActionBtn = targetEl?.closest('.viewerActionBtn')
-      const isHandle = isHeader || (isActions && !isActionBtn)
+      const isCanvasWrap = targetEl?.classList.contains('viewerCanvasWrap') || targetEl?.closest('.viewerDragHandleTop') || targetEl?.classList.contains('viewerDragHandleTop')
+      const isHandle = isHeader || (isActions && !isActionBtn) || isCanvasWrap
       if (!isHandle) return
       e.preventDefault()
 

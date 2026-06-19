@@ -151,6 +151,10 @@ func initDeviceAccountDB(db *sql.DB) error {
 	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
 		return err
 	}
+	_, err = db.Exec(`ALTER TABLE devices ADD COLUMN selected_account_by_platform_json TEXT`)
+	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
+		return err
+	}
 	return nil
 }
 
@@ -283,9 +287,12 @@ func syncDeviceAccountVaultToDB(raw string) error {
 	}
 
 	insertDevice, err := tx.Prepare(`
-		INSERT INTO devices (udid, display_name, updated_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(udid) DO UPDATE SET display_name = excluded.display_name, updated_at = CURRENT_TIMESTAMP
+		INSERT INTO devices (udid, display_name, selected_account_by_platform_json, updated_at)
+		VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(udid) DO UPDATE SET 
+			display_name = excluded.display_name, 
+			selected_account_by_platform_json = excluded.selected_account_by_platform_json, 
+			updated_at = CURRENT_TIMESTAMP
 	`)
 	if err != nil {
 		return err
@@ -312,7 +319,13 @@ func syncDeviceAccountVaultToDB(raw string) error {
 		if udid == "" {
 			continue
 		}
-		if _, err := insertDevice.Exec(udid, device.DisplayName); err != nil {
+		selectedJSON := "{}"
+		if device.SelectedAccountByPlatform != nil {
+			if bytes, err := json.Marshal(device.SelectedAccountByPlatform); err == nil {
+				selectedJSON = string(bytes)
+			}
+		}
+		if _, err := insertDevice.Exec(udid, device.DisplayName, selectedJSON); err != nil {
 			return err
 		}
 		for platform, accounts := range device.Platforms {
@@ -415,7 +428,7 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 			a.app_type, a.notice_json, a.history_json, a.created_at_ms, a.verify_status, a.phone_region,
 			a.scan_count, a.last_scan_date_ms, a.nearby_people_enabled, a.nearby_people_due_date_ms,
 			a.source, a.source_account_id, a.source_card_name, a.source_card_id,
-			d.display_name, a.wechat_launch_profile_json
+			d.display_name, a.wechat_launch_profile_json, d.selected_account_by_platform_json
 		FROM accounts a
 		LEFT JOIN devices d ON d.udid = a.udid
 		ORDER BY d.device_order ASC, a.platform ASC, a.imported_at ASC, a.id ASC
@@ -437,24 +450,29 @@ func loadDeviceAccountVaultFromDB() (string, bool, error) {
 			source, sourceAccountID, sourceCardName, sourceCardID          sql.NullString
 			displayName                                                    sql.NullString
 			wechatLaunchProfileRaw                                         sql.NullString
+			selectedAccountByPlatformRaw                                   sql.NullString
 		)
 		if err := rows.Scan(
 			&id, &udid, &platform, &name, &nickname, &phone, &email, &note, &status,
 			&appType, &noticeRaw, &historyRaw, &createdAt, &verifyStatus, &phoneRegion,
 			&scanCount, &lastScanDate, &nearbyPeopleEnabled, &nearbyPeopleDueDate,
 			&source, &sourceAccountID, &sourceCardName, &sourceCardID,
-			&displayName, &wechatLaunchProfileRaw,
+			&displayName, &wechatLaunchProfileRaw, &selectedAccountByPlatformRaw,
 		); err != nil {
 			return "", false, err
 		}
 
 		device := vault.Devices[udid]
 		if device.UDID == "" {
+			selectedMap := map[string]string{}
+			if selectedAccountByPlatformRaw.Valid && selectedAccountByPlatformRaw.String != "" {
+				_ = json.Unmarshal([]byte(selectedAccountByPlatformRaw.String), &selectedMap)
+			}
 			device = deviceAccountData{
 				UDID:                      udid,
 				DisplayName:               nullableString(displayName),
 				DefaultPlatform:           "wechat",
-				SelectedAccountByPlatform: map[string]string{},
+				SelectedAccountByPlatform: selectedMap,
 				Platforms:                 map[string][]deviceAccount{},
 				UpdatedAt:                 now,
 			}

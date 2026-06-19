@@ -7,6 +7,8 @@ import { encodeKeycodeMessage, KeyEventAction } from '@/lib/control';
 import { AndroidKeycode } from '@/lib/keyEvent';
 import { ShellPage } from '@/pages/ShellPage';
 import { ViewerSidePanel } from './ViewerSidePanel';
+import { DeviceAccountPanel } from './DeviceAccountOverlay';
+import { loadDeviceAccountVault, getDeviceAccountDataFromVault, type DeviceAccountData } from '@/lib/deviceAccountVault';
 import {
   ArrowLeft,
   Camera,
@@ -110,6 +112,47 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
     onChangeOrder?.(udid, n - 1);
     setNewOrderViewer('');
   };
+
+  const [alwaysShowHeader, setAlwaysShowHeader] = useState(() => localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
+  const [headerHideOrder, setHeaderHideOrder] = useState(() => localStorage.getItem('monviewphone:dav-header-hide-order') === 'true');
+  const [headerMinimalBg, setHeaderMinimalBg] = useState(() => localStorage.getItem('monviewphone:dav-header-minimal-bg') === 'true');
+  const [tileTab, setTileTab] = useState<string>('wechat');
+
+  const [accountData, setAccountData] = useState<DeviceAccountData | undefined>(() => {
+    try {
+      const vault = loadDeviceAccountVault();
+      return getDeviceAccountDataFromVault(vault, udid);
+    } catch {
+      return undefined;
+    }
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        const vault = loadDeviceAccountVault();
+        setAccountData(getDeviceAccountDataFromVault(vault, udid));
+      } catch {}
+    };
+    window.addEventListener('device-account-updated', handleUpdate);
+    return () => window.removeEventListener('device-account-updated', handleUpdate);
+  }, [udid]);
+
+  useEffect(() => {
+    if (accountData?.defaultPlatform) {
+      setTileTab(accountData.defaultPlatform);
+    }
+  }, [accountData?.defaultPlatform]);
+
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setAlwaysShowHeader(localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
+      setHeaderHideOrder(localStorage.getItem('monviewphone:dav-header-hide-order') === 'true');
+      setHeaderMinimalBg(localStorage.getItem('monviewphone:dav-header-minimal-bg') === 'true');
+    };
+    window.addEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
+    return () => window.removeEventListener('monviewphone:dav-hide-settings-changed', handleSettingsUpdate);
+  }, []);
 
   const initialAspect = useMemo(() => {
     try {
@@ -470,7 +513,13 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
       <div className={`viewerBody${tab === 'view' ? ' viewMode' : ''}`} ref={bodyRef}>
         {tab === 'view' ? (
           <div className="viewerMain">
-            <div className="viewerCanvasWrap" style={{ transform: 'none' }}>
+            <div className="viewerCanvasWrap" style={{ transform: 'none', position: 'relative' }}>
+              <div 
+                className="viewerDragHandleTop"
+                data-inspector-id="deviceViewer.dragHandleTop"
+                data-inspector-label="Viewer top drag handle"
+                data-inspector-component="client/src/components/DeviceViewer.tsx"
+              />
               <canvas
                 ref={canvasRef}
                 className="viewerCanvas"
@@ -484,6 +533,31 @@ const DeviceViewerComponent = ({ udid, onClose, wsServer, currentOrder, onChange
                 data-inspector-label="Device screen mirroring canvas"
                 data-inspector-component="client/src/components/DeviceViewer.tsx"
               />
+              {alwaysShowHeader && accountData && (
+                <div 
+                  className={`tile-account-overlay is-header-only ${headerHideOrder ? 'header-hide-order' : ''} ${headerMinimalBg ? 'header-minimal-bg' : ''}`}
+                  onMouseDown={e => e.stopPropagation()}
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 9999, pointerEvents: 'none' }}
+                  data-inspector-id="deviceViewer.accountOverlay"
+                  data-inspector-label="Device viewer accounts info overlay cards"
+                  data-inspector-component="client/src/components/DeviceViewer.tsx"
+                >
+                  <div className="tile-account-inner" style={{ height: '100%', display: 'flex', flexDirection: 'column', pointerEvents: 'auto' }}>
+                    <DeviceAccountPanel
+                      udid={udid}
+                      order={(currentOrder ?? 0) + 1}
+                      model={deviceName}
+                      isOnline={status === 'ready'}
+                      orderMap={new Map()}
+                      initialData={accountData}
+                      activeTab={tileTab as any}
+                      setActiveTab={setTileTab as any}
+                      showAccountOverlay={false}
+                      alwaysShowHeader={alwaysShowHeader}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : null}

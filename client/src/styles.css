@@ -8612,7 +8612,7 @@ textarea:focus,
   border-radius: 999px !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
   transition: background 0.2s, transform 0.2s !important;
-  display: block !important;
+  display: none !important; /* Bỏ thanh màu trắng */
 }
 
 .viewerHeader:hover::after {
@@ -8645,16 +8645,27 @@ textarea:focus,
 
 /* Thick blue/indigo border and rounded corners hugging tightly with internal bezel padding */
 .viewerBody.viewMode .viewerCanvasWrap {
-  border: 7.5px solid #4F6EF2 !important;
+  border: 10px solid #4F6EF2 !important; /* Tăng độ dày viền ngoài lên 30% (từ 7.5px lên 10px) */
   border-radius: 38px !important;
   padding: 3px !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   box-sizing: border-box !important;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
   background: #000 !important;
   width: 100% !important;
   height: auto !important;
   aspect-ratio: var(--viewer-aspect, 0.5625) !important;
+}
+
+.viewerDragHandleTop {
+  position: absolute;
+  top: -35px; /* Centered: extends 25px outside/above the 10px top border */
+  left: -10px; /* covers left outer border edge */
+  right: -10px; /* covers right outer border edge */
+  height: 60px; /* Centered: 25px outside + 10px border + 25px inside = 60px total height */
+  z-index: 102;
+  cursor: move;
+  background: transparent;
 }
 
 .viewerBody.viewMode .viewerCanvas {
@@ -10140,6 +10151,7 @@ select.dav-input {
   gap: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   position: relative;
+  background-color: var(--md-card);
 }
 
 .tile-account-overlay .dav-panel-meta {

@@ -584,6 +584,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [showSetSubmenu, setShowSetSubmenu] = useState(false);
   /* showClassificationSubmenu : State hiển thị submenu phân loại của tài khoản trong dropdown */
   const [showClassificationSubmenu, setShowClassificationSubmenu] = useState(false);
+  const [showStatusSubmenu, setShowStatusSubmenu] = useState(false);
+  const [showNearbySubmenu, setShowNearbySubmenu] = useState(false);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -705,13 +707,21 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const platformDropdownRef = useRef<HTMLDivElement>(null);
   const autoOpenedNearbyDropdownRef = useRef(false);
   const [dropdownCoords, setDropdownCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+  const headerNameDisplayRef = useRef<HTMLDivElement>(null);
+  const [dropdownAnchor, setDropdownAnchor] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (accountTitleDropdownOpen && accountTitleDropdownRef.current) {
-      const rect = accountTitleDropdownRef.current.getBoundingClientRect();
+    if (accountTitleDropdownOpen && dropdownAnchor) {
+      const rect = dropdownAnchor.getBoundingClientRect();
       const dropdownWidth = 220;
       const safetyWidth = 280; // Estimated width for edge-collision check
       let left = rect.left;
+      
+      // Căn giữa nếu mở từ tên tài khoản hiển thị ở giữa header overlay
+      if (dropdownAnchor !== accountTitleDropdownRef.current) {
+        left = rect.left + rect.width / 2 - dropdownWidth / 2;
+      }
+
       if (left + safetyWidth > window.innerWidth) {
         left = window.innerWidth - safetyWidth - 10;
       }
@@ -740,7 +750,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       davDebug('DROPDOWN_COORDS_CLEAR');
       setDropdownCoords(null);
     }
-  }, [accountTitleDropdownOpen]);
+  }, [accountTitleDropdownOpen, dropdownAnchor]);
 
   useEffect(() => {
     if (!isDavDebugEnabled()) return;
@@ -814,6 +824,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       showAccountOverlay,
       alwaysShowHeader,
     });
+    setDropdownAnchor(headerNameDisplayRef.current);
     setAccountTitleDropdownOpen(v => !v);
     setPlatformDropdownOpen(false);
   };
@@ -842,6 +853,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       panelHasNearbyRelevantAccount;
 
     if (shouldOpen) {
+      setDropdownAnchor(accountTitleDropdownRef.current);
       setAccountTitleDropdownOpen(true);
       setPlatformDropdownOpen(false);
       autoOpenedNearbyDropdownRef.current = true;
@@ -900,6 +912,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       setDeviceProfiles([]);
       setShowSetSubmenu(false);
       setShowClassificationSubmenu(false);
+      setShowStatusSubmenu(false);
+      setShowNearbySubmenu(false);
     }
   }, [accountActionMenu, wsServer]);
 
@@ -931,6 +945,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
       setAccountTitleDropdownOpen(false);
       setPlatformDropdownOpen(false);
+      setDropdownAnchor(null);
     };
     window.addEventListener('mousedown', hide, true);
     return () => window.removeEventListener('mousedown', hide, true);
@@ -948,6 +963,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       setShowSetSubmenu(false);
       setShowClassificationSubmenu(false);
       setShowAddToGroupSubmenu(false);
+      setShowStatusSubmenu(false);
+      setShowNearbySubmenu(false);
     };
     window.addEventListener('mousedown', hide, true);
     return () => window.removeEventListener('mousedown', hide, true);
@@ -1804,6 +1821,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   dropdownCoords,
                   activeTab,
                 });
+                setDropdownAnchor(accountTitleDropdownRef.current);
                 setAccountTitleDropdownOpen(v => !v);
                 setPlatformDropdownOpen(false);
               }}
@@ -1971,6 +1989,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             )}
             <div
               className="header-name-display-wrapper"
+              ref={headerNameDisplayRef}
               onClick={handleNameClick}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -2937,6 +2956,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 <div className={`dav-ctx-submenu ${activeLevel1 === 'nearby' ? 'is-open' : ''}`}>
                   <button
                     className={`dav-ctx-item ${selectedAccount.nearbyPeopleEnabled ? 'active' : ''}`}
+                    style={{ color: '#3b82f6' }}
                     onPointerDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -2951,10 +2971,11 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       setCtxMenu(null);
                     }}
                   >
-                    Open Nearby
+                    <MapPin size={16} /> Active Nearby
                   </button>
                   <button
                     className="dav-ctx-item"
+                    style={{ color: 'var(--md-warning)' }}
                     onPointerDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -2975,7 +2996,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                       setCtxMenu(null);
                     }}
                   >
-                    Risk Nearby
+                    <MapPin size={16} /> Risk Nearby
                   </button>
                 </div>
               </div>
@@ -3303,6 +3324,182 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
           >
             Thông báo
+          </button>
+
+          {/* Submenu Trạng Thái */}
+          <div
+            className="dav-ctx-submenu-container"
+            onMouseEnter={() => setShowStatusSubmenu(true)}
+            onMouseLeave={() => setShowStatusSubmenu(false)}
+            data-inspector-id="deviceAccount.contextMenuStatusSubmenu"
+            data-inspector-label="Account status submenu"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+          >
+            <button
+              type="button"
+              className="dav-ctx-item dav-ctx-has-sub"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowStatusSubmenu(v => !v);
+              }}
+            >
+              <Activity size={16} /> Trạng Thái
+            </button>
+            <div className={`dav-ctx-submenu ${showStatusSubmenu ? 'is-open' : ''}`}>
+              <button
+                type="button"
+                className={`dav-ctx-item ${accountActionMenu.account.status === 'Live' ? 'active' : ''}`}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleUpdateAccount(accountActionMenu.account.id, { status: 'Live' });
+                  setAccountActionMenu(null);
+                  setAccountTitleDropdownOpen(false);
+                }}
+              >
+                <div className="dav-status-dot live" /> Set Live {accountActionMenu.account.status === 'Live' ? '(Hiện tại)' : ''}
+              </button>
+              <button
+                type="button"
+                className={`dav-ctx-item ${accountActionMenu.account.status === 'Die' ? 'active' : ''}`}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleUpdateAccount(accountActionMenu.account.id, { status: 'Die' });
+                  setAccountActionMenu(null);
+                  setAccountTitleDropdownOpen(false);
+                }}
+              >
+                <div className="dav-status-dot die" /> Set Die {accountActionMenu.account.status === 'Die' ? '(Hiện tại)' : ''}
+              </button>
+              <button
+                type="button"
+                className={`dav-ctx-item ${accountActionMenu.account.status === 'Risk' ? 'active' : ''}`}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleUpdateAccount(accountActionMenu.account.id, { status: 'Risk' });
+                  setAccountActionMenu(null);
+                  setAccountTitleDropdownOpen(false);
+                }}
+              >
+                <div className="dav-status-dot risk" /> Set Risk {accountActionMenu.account.status === 'Risk' ? '(Hiện tại)' : ''}
+              </button>
+              <button
+                type="button"
+                className={`dav-ctx-item ${accountActionMenu.account.status === 'Unverified' ? 'active verified' : ''}`}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const targetStatus = accountActionMenu.account.status === 'Unverified' ? 'Verify' : 'Unverified';
+                  handleUpdateAccount(accountActionMenu.account.id, { status: targetStatus });
+                  setAccountActionMenu(null);
+                  setAccountTitleDropdownOpen(false);
+                }}
+              >
+                {accountActionMenu.account.status === 'Unverified' ? (
+                  <>
+                    <div className="dav-status-dot live" /> Verify Success
+                  </>
+                ) : (
+                  <>
+                    <div className="dav-status-dot verify" /> Set UnVerify
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Submenu Nearby People (Only WeChat) */}
+          {activeTab === 'wechat' && (
+            <div
+              className="dav-ctx-submenu-container"
+              onMouseEnter={() => setShowNearbySubmenu(true)}
+              onMouseLeave={() => setShowNearbySubmenu(false)}
+              data-inspector-id="deviceAccount.contextMenuNearbySubmenu"
+              data-inspector-label="Nearby people submenu"
+              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+            >
+              <button
+                type="button"
+                className="dav-ctx-item dav-ctx-has-sub"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowNearbySubmenu(v => !v);
+                }}
+              >
+                <MapPin size={16} /> Nearby People
+              </button>
+              <div className={`dav-ctx-submenu ${showNearbySubmenu ? 'is-open' : ''}`}>
+                <button
+                  type="button"
+                  className={`dav-ctx-item ${accountActionMenu.account.nearbyPeopleEnabled ? 'active' : ''}`}
+                  style={{ color: '#3b82f6' }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const updates: Partial<Account> = {
+                      nearbyPeopleEnabled: true,
+                      nearbyPeopleDueDate: Date.now() + 30 * 24 * 60 * 60 * 1000
+                    };
+                    if (accountActionMenu.account.status === 'Risk') {
+                      updates.status = 'Live';
+                    }
+                    handleUpdateAccount(accountActionMenu.account.id, updates, 'Open Nearby');
+                    setAccountActionMenu(null);
+                    setAccountTitleDropdownOpen(false);
+                  }}
+                >
+                  <MapPin size={16} /> Active Nearby
+                </button>
+                <button
+                  type="button"
+                  className="dav-ctx-item"
+                  style={{ color: 'var(--md-warning)' }}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const startDate = Date.now();
+                    const dueDate = startDate + 31 * 24 * 60 * 60 * 1000;
+                    handleUpdateAccount(accountActionMenu.account.id, {
+                      status: 'Risk',
+                      nearbyPeopleEnabled: false,
+                      nearbyPeopleDueDate: Date.now() + 30 * 24 * 60 * 60 * 1000,
+                      notice: {
+                        title: 'Dưỡng Hiện',
+                        content: 'Dưỡng Hiện',
+                        days: 31,
+                        startDate,
+                        dueDate
+                      }
+                    }, 'Risk Nearby');
+                    setAccountActionMenu(null);
+                    setAccountTitleDropdownOpen(false);
+                  }}
+                >
+                  <MapPin size={16} /> Risk Nearby
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="dav-ctx-item"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setHistoryModalAccountId(accountActionMenu.account.id);
+              setAccountActionMenu(null);
+              setAccountTitleDropdownOpen(false);
+            }}
+            data-inspector-id="deviceAccount.contextMenuHistory"
+            data-inspector-label="View account history menu item"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+          >
+            <History size={16} /> Lịch sử tài khoản
           </button>
 
           {activeTab === 'wechat' && (

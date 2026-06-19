@@ -496,7 +496,9 @@
     "notes_reminder_alert_overlay": "notes.reminderAlertOverlay",
     "notes_reminder_alert_panel": "notes.reminderAlertPanel",
     "notes_reminder_alert_close_btn": "notes.reminderAlertCloseBtn",
-    "notes_reminder_alert_view_btn": "notes.reminderAlertViewBtn"
+    "notes_reminder_alert_view_btn": "notes.reminderAlertViewBtn",
+    "device_viewer_drag_handle_top": "deviceViewer.dragHandleTop",
+    "device_viewer_account_overlay": "deviceViewer.accountOverlay"
   },
   "project_assets": {
     "app_icon_png": "assets/IconMonViewPhone.png",
