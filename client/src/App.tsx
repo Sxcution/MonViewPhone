@@ -1387,7 +1387,7 @@ export function App() {
 
   const runConnectRequest = useCallback(
     async (payload: any[], connectType: 'usb' | 'wifi') => {
-      if (!payload.length) return
+      if (!payload.length) return []
       setConnectBusy(true)
       setConnectNotification(null)
       try {
@@ -1405,6 +1405,7 @@ export function App() {
         setConnectNotification(
           formatConnectNotification(results, connectType, payload.length)
         )
+        return results
       } catch (err: any) {
         setConnectNotification({
           type: 'error',
@@ -1412,6 +1413,7 @@ export function App() {
             error: err?.message ?? t('Connect failed')
           })} ${t(CONNECT_CHECK_DEVICE_MESSAGE)}`
         })
+        return []
       } finally {
         setConnectBusy(false)
       }
@@ -1626,6 +1628,162 @@ export function App() {
       })
     },
     [remoteDeviceByUdid]
+  )
+
+  const ensureAndSwitchConnectionForDevices = useCallback(
+    async (logicalUdids: string[], mode: ConnectionMode) => {
+      const targets = Array.from(new Set(logicalUdids.map(id => id.trim()).filter(Boolean)))
+      if (!targets.length) return
+
+      if (mode === 'wifi') {
+        // 1. Switch immediately for devices that already have a wifi endpoint
+        const alreadyHasWifi = targets.filter(id => {
+          const endpoints = remoteDeviceByUdid.get(id)?.endpoints
+          return Boolean(endpoints?.wifi)
+        })
+
+        if (alreadyHasWifi.length) {
+          setPreferredConnectionByLogicalUdid(prev => {
+            let changed = false
+            const next = { ...prev }
+            alreadyHasWifi.forEach(id => {
+              if (next[id] !== 'wifi') {
+                next[id] = 'wifi'
+                changed = true
+              }
+            })
+            return changed ? next : prev
+          })
+
+          window.requestAnimationFrame(() => {
+            alreadyHasWifi.forEach(id => {
+              reloadMap.current.get(id)?.({ restart: true })
+            })
+          })
+        }
+
+        // 2. For devices without a wifi endpoint but with an adb (USB) endpoint, connect them
+        const needConnect = targets.filter(id => {
+          const endpoints = remoteDeviceByUdid.get(id)?.endpoints
+          return !endpoints?.wifi && Boolean(endpoints?.adb)
+        })
+
+        if (needConnect.length) {
+          const payload = needConnect.map(id => {
+            const adbSerial = remoteDeviceByUdid.get(id)?.endpoints.adb || id
+            return {
+              device: adbSerial,
+              connect: 'wifi' as const,
+              port: 5555
+            }
+          })
+
+          try {
+            const results = await runConnectRequest(payload, 'wifi')
+            if (Array.isArray(results) && results.length) {
+              const successResults = results.filter(r => r.success && r.endpoint)
+              
+              if (successResults.length) {
+                // Merge WiFi endpoints into remoteDevices state
+                setRemoteDevices(prev => {
+                  return prev.map(d => {
+                    const matchedResult = successResults.find(r => r.device === d.endpoints.adb || r.device === d.udid)
+                    if (matchedResult && matchedResult.endpoint) {
+                      return {
+                        ...d,
+                        endpoints: {
+                          ...d.endpoints,
+                          wifi: matchedResult.endpoint
+                        }
+                      }
+                    }
+                    return d
+                  })
+                })
+
+                // Set preferred connection to wifi
+                setPreferredConnectionByLogicalUdid(prev => {
+                  const next = { ...prev }
+                  let changed = false
+                  successResults.forEach(r => {
+                    const matchedDev = remoteDevices.find(d => d.endpoints.adb === r.device || d.udid === r.device)
+                    if (matchedDev) {
+                      if (next[matchedDev.udid] !== 'wifi') {
+                        next[matchedDev.udid] = 'wifi'
+                        changed = true
+                      }
+                    }
+                  })
+                  return changed ? next : prev
+                })
+
+                // Reload tiles
+                window.requestAnimationFrame(() => {
+                  successResults.forEach(r => {
+                    const matchedDev = remoteDevices.find(d => d.endpoints.adb === r.device || d.udid === r.device)
+                    if (matchedDev) {
+                      reloadMap.current.get(matchedDev.udid)?.({ restart: true })
+                    }
+                  })
+                })
+              }
+            }
+          } catch (err) {
+            console.error('[ensureAndSwitchConnectionForDevices] Connect WiFi failed:', err)
+          }
+        }
+
+        // 3. For devices with no way to connect, display an error
+        const noWay = targets.filter(id => {
+          const endpoints = remoteDeviceByUdid.get(id)?.endpoints
+          return !endpoints?.wifi && !endpoints?.adb
+        })
+        if (noWay.length) {
+          setConnectNotification({
+            type: 'error',
+            text: t('Không tìm thấy kết nối WiFi hoặc USB (ADB) cho {count} thiết bị.', { count: noWay.length })
+          })
+        }
+      } else if (mode === 'adb') {
+        const eligible = targets.filter(id => {
+          const endpoints = remoteDeviceByUdid.get(id)?.endpoints
+          return Boolean(endpoints?.adb)
+        })
+
+        if (eligible.length) {
+          setPreferredConnectionByLogicalUdid(prev => {
+            let changed = false
+            const next = { ...prev }
+            eligible.forEach(id => {
+              if (next[id] !== 'adb') {
+                next[id] = 'adb'
+                changed = true
+              }
+            })
+            return changed ? next : prev
+          })
+
+          window.requestAnimationFrame(() => {
+            eligible.forEach(id => {
+              reloadMap.current.get(id)?.({ restart: true })
+            })
+          })
+        }
+
+        const notEligible = targets.filter(id => {
+          const endpoints = remoteDeviceByUdid.get(id)?.endpoints
+          return !endpoints?.adb
+        })
+
+        if (notEligible.length) {
+          setConnectNotification({
+            type: 'error',
+            text: t('Không tìm thấy kết nối USB (ADB) cho {count} thiết bị. Hãy cắm cáp USB.', { count: notEligible.length })
+          })
+        }
+      }
+    },
+    [remoteDeviceByUdid, remoteDevices, runConnectRequest, t]
   )
 
   const discoveredDevices = useMemo(
@@ -4606,7 +4764,7 @@ export function App() {
                 onChangeConnection={(mode) => {
                   const targets = new Set<string>([viewerUdid])
                   connectSelection.forEach(id => targets.add(id))
-                  switchConnectionForDevices(Array.from(targets), mode)
+                  ensureAndSwitchConnectionForDevices(Array.from(targets), mode)
                 }}
                 currentOrder={
                   viewerUdid

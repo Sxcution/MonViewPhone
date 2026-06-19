@@ -372,7 +372,8 @@
       "handle_confirm_add_platform": "handleConfirmAddPlatform",
       "handle_confirm_delete_platform": "handleConfirmDeletePlatform",
       "handle_header_mouse_down": "handleHeaderMouseDown",
-      "handle_notice_icon_click": "handleNoticeIconClick"
+      "handle_notice_icon_click": "handleNoticeIconClick",
+      "ensure_and_switch_connection_for_devices": "ensureAndSwitchConnectionForDevices"
     },
     "refs": {
       "rubber_band_ref": "rubberBandRef",

@@ -441,11 +441,9 @@ export function ViewerSidePanel({
     e.preventDefault();
     e.stopPropagation();
     if (disabled) {
-      const isAvailable = Boolean(availableConnections?.[mode]);
       const isActive = connectionMode === mode;
       console.warn(`[ConnectionMode] Cannot switch to "${mode}". Details:`, {
         targetMode: mode,
-        isAvailable,
         isActive,
         availableConnections,
         currentMode: connectionMode,
@@ -456,12 +454,10 @@ export function ViewerSidePanel({
         setShowConnectionSubmenu(false);
         return;
       }
-      if (!isAvailable) {
-        if (mode === 'adb') {
-          showToast('Không tìm thấy kết nối USB (ADB) cho thiết bị này. Hãy cắm cáp USB.', 'err');
-        } else if (mode === 'wifi') {
-          showToast('Không tìm thấy kết nối WiFi cho thiết bị này. Hãy kết nối WiFi từ danh sách thiết bị trước.', 'err');
-        }
+      if (mode === 'adb') {
+        showToast('Không tìm thấy kết nối USB (ADB) cho thiết bị này. Hãy cắm cáp USB.', 'err');
+      } else if (mode === 'wifi') {
+        showToast('Không tìm thấy kết nối WiFi hoặc USB (ADB) để tạo WiFi. Hãy cắm cáp USB trước.', 'err');
       }
       return;
     }
@@ -1149,9 +1145,24 @@ export function ViewerSidePanel({
                 {(['adb', 'wifi'] as ConnectionMode[]).map(mode => {
                   const isActive = connectionMode === mode;
                   const isAvailable = Boolean(availableConnections?.[mode]);
-                  const isDisabled = !isAvailable || isActive;
+                  
+                  let isDisabled = false;
+                  if (mode === 'wifi') {
+                    const canCreateWiFi = isAvailable || Boolean(availableConnections?.adb);
+                    isDisabled = isActive || !canCreateWiFi;
+                  } else {
+                    isDisabled = isActive || !isAvailable;
+                  }
+
                   const label = mode === 'adb' ? 'ADB' : 'WiFi';
-                  const reason = isActive ? 'Đang dùng' : isAvailable ? 'Chuyển sang endpoint này' : 'Chưa có endpoint';
+                  const reason = isActive
+                    ? 'Đang dùng'
+                    : isAvailable
+                    ? 'Chuyển sang endpoint này'
+                    : (mode === 'wifi' && Boolean(availableConnections?.adb))
+                    ? 'Có thể tạo kết nối WiFi'
+                    : 'Chưa có endpoint';
+
                   return (
                     <button
                       key={mode}
@@ -1159,7 +1170,7 @@ export function ViewerSidePanel({
                       className={`vsp-adb-submenu-item vsp-connection-submenu-item${isActive ? ' active' : ''}${isDisabled ? ' disabled' : ''}`}
                       aria-disabled={isDisabled}
                       aria-pressed={isActive}
-                      title={isAvailable ? label : `${label} chưa có endpoint cho máy này`}
+                      title={isAvailable ? label : (mode === 'wifi' && Boolean(availableConnections?.adb)) ? 'Có thể tạo kết nối WiFi qua ADB USB' : `${label} chưa có endpoint cho máy này`}
                       onPointerDown={e => handleConnectionModePointerDown(e, mode, isDisabled)}
                     >
                       <span>{label}</span>
