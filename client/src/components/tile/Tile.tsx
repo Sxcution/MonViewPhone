@@ -20,6 +20,8 @@ import { DeviceAccountPanel } from '@/components/DeviceAccountOverlay';
 function TileComponent({
     udid,
     deviceParam,
+    streamUdid,
+    connectionMode = 'unknown',
     wsServer,
     streamConfig,
     order,
@@ -102,6 +104,8 @@ function TileComponent({
 
     const isActive = activeUdid === udid;
     const connectionLabel = useMemo(() => {
+        if (connectionMode === 'adb') return 'ADB';
+        if (connectionMode === 'wifi') return 'WIFI';
         const meta = androidDeviceMap[udid];
         const ifaceNames = meta?.interfaces?.map((i) => i.name.toLowerCase()) || [];
         const hasWifiIface = ifaceNames.some((n) => n.includes('wlan') || n.includes('wifi') || n.includes('wl'));
@@ -110,7 +114,7 @@ function TileComponent({
         if (hasUsbIface) return 'USB';
         if (udid.includes(':')) return 'WIFI';
         return 'USB';
-    }, [androidDeviceMap, udid]);
+    }, [androidDeviceMap, connectionMode, udid]);
     const modelName = useMemo(() => {
         const meta = androidDeviceMap[udid];
         return meta ? [meta.manufacturer, meta['ro.product.model']].filter(Boolean).join(' ') : '';
@@ -191,6 +195,8 @@ function TileComponent({
         enabled: !isDisconnected,
         udid,
         deviceParam,
+        streamUdid,
+        controlUdid: udid,
         wsServer,
         canvasRef,
         bodyRef,

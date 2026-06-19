@@ -39,7 +39,7 @@ import {
   matchesHotkey,
 } from '@/lib/syncTimeSettings'
 import { useTileOrder } from '@/store/useTileOrder'
-import type { StreamReloadOptions } from '@/components/tile/types'
+import type { ConnectionMode, ConnectionState, StreamReloadOptions } from '@/components/tile/types'
 import {
   loadDeviceProfiles,
   saveDeviceProfiles,
@@ -114,7 +114,12 @@ type ConnectRequestPayload = {
   connect: 'usb' | 'wifi'
   port?: number
 }
-type RemoteDevice = { udid: string; type: 'usb' | 'wifi' | 'unknown' }
+type RemoteDeviceEndpoint = { udid: string; type: ConnectionState }
+type RemoteDevice = {
+  udid: string
+  type: ConnectionState
+  endpoints: Partial<Record<ConnectionMode, string>>
+}
 
 const CONNECT_CHECK_DEVICE_MESSAGE =
   'Please check that the device is properly plugged into the host'
@@ -124,8 +129,50 @@ const STREAM_CONFIG_KEY = 'streamConfig'
 const VIEWER_STREAM_CONFIG_KEY = 'viewerStreamConfig'
 const SAVED_GROUPS_BACKUP_KEY = 'savedGroupsBackupV1'
 const SAVED_GROUPS_DELETED_ALL_KEY = 'savedGroupsDeletedAllV1'
+const PREFERRED_CONNECTION_BY_UDID_KEY = 'monviewphone:preferred-connection-by-udid'
 
 type SavedDeviceGroup = { name: string; udids: string[]; selectedAccounts?: Record<string, string> }
+
+function normalizeConnectionMode(device: string, connectType: string): ConnectionState {
+  const ct = connectType.toLowerCase()
+  if (ct.includes('wifi')) return 'wifi'
+  if (ct.includes('usb') || ct.includes('adb')) return 'adb'
+  if (device.includes(':')) return 'wifi'
+  return 'adb'
+}
+
+function connectionModeToDeviceFilter(mode: ConnectionState): 'usb' | 'wifi' | 'unknown' {
+  if (mode === 'adb') return 'usb'
+  return mode
+}
+
+function chooseRemoteDeviceMode(
+  endpoints: Partial<Record<ConnectionMode, string>>,
+  preferred?: ConnectionMode
+): ConnectionState {
+  if (preferred && endpoints[preferred]) return preferred
+  if (endpoints.adb) return 'adb'
+  if (endpoints.wifi) return 'wifi'
+  return 'unknown'
+}
+
+function readPreferredConnections(): Record<string, ConnectionMode> {
+  try {
+    const raw = localStorage.getItem(PREFERRED_CONNECTION_BY_UDID_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const out: Record<string, ConnectionMode> = {}
+    Object.entries(parsed).forEach(([key, value]) => {
+      const id = key.trim()
+      if (!id) return
+      if (value === 'adb' || value === 'wifi') out[id] = value
+    })
+    return out
+  } catch {
+    return {}
+  }
+}
 
 function uniqueStrings(values: unknown): string[] {
   if (!Array.isArray(values)) return []
@@ -860,6 +907,9 @@ export function App() {
     } catch { }
   }, [showTileInfo])
   const [remoteDevices, setRemoteDevices] = useState<RemoteDevice[]>([])
+  const [preferredConnectionByLogicalUdid, setPreferredConnectionByLogicalUdid] =
+    useState<Record<string, ConnectionMode>>(() => readPreferredConnections())
+  const preferredConnectionRef = useRef(preferredConnectionByLogicalUdid)
   const remoteDeviceLastSeenRef = useRef<Map<string, number>>(new Map())
   const wsDevicesRef = useRef<WebSocket | null>(null)
   const [connectSelection, setConnectSelection] = useState<Set<string>>(
@@ -867,6 +917,16 @@ export function App() {
   )
   const [runningMacroUdids, setRunningMacroUdids] = useState<Set<string>>(new Set())
 
+
+  useEffect(() => {
+    preferredConnectionRef.current = preferredConnectionByLogicalUdid
+    try {
+      localStorage.setItem(
+        PREFERRED_CONNECTION_BY_UDID_KEY,
+        JSON.stringify(preferredConnectionByLogicalUdid)
+      )
+    } catch { }
+  }, [preferredConnectionByLogicalUdid])
 
   useEffect(() => {
     const handleMacroRunning = (e: Event) => {
@@ -1170,7 +1230,11 @@ export function App() {
 
       // 2. Check if click was on a context menu element
       const target = event.target as Element;
-      const isClickOnContextMenu = target.closest('.react-contexify') || target.closest('.context-menu') || target.closest('.pageContextLayer');
+      const isClickOnContextMenu =
+        target.closest('.react-contexify') ||
+        target.closest('.context-menu') ||
+        target.closest('.contextMenuPanel') ||
+        target.closest('.pageContextLayer');
 
       // 3. If clicking outside context menu, ensure it closes
       if (!isClickOnContextMenu && contextMenuOpen) {
@@ -1471,6 +1535,80 @@ export function App() {
     } catch { }
   }
 
+  const remoteDeviceByUdid = useMemo(() => {
+    const map = new Map<string, RemoteDevice>()
+    remoteDevices.forEach(device => {
+      map.set(device.udid, device)
+    })
+    return map
+  }, [remoteDevices])
+
+  const getConnectionEndpoints = useCallback(
+    (logicalUdid: string): Partial<Record<ConnectionMode, boolean>> => {
+      const endpoints = remoteDeviceByUdid.get(logicalUdid)?.endpoints
+      return {
+        adb: Boolean(endpoints?.adb),
+        wifi: Boolean(endpoints?.wifi)
+      }
+    },
+    [remoteDeviceByUdid]
+  )
+
+  const getCurrentConnectionMode = useCallback(
+    (logicalUdid: string): ConnectionState => {
+      const remoteDevice = remoteDeviceByUdid.get(logicalUdid)
+      if (remoteDevice) {
+        return chooseRemoteDeviceMode(
+          remoteDevice.endpoints,
+          preferredConnectionByLogicalUdid[logicalUdid]
+        )
+      }
+      if (logicalUdid.includes(':')) return 'wifi'
+      return 'adb'
+    },
+    [preferredConnectionByLogicalUdid, remoteDeviceByUdid]
+  )
+
+  const getStreamEndpointUdid = useCallback(
+    (logicalUdid: string): string => {
+      const remoteDevice = remoteDeviceByUdid.get(logicalUdid)
+      if (!remoteDevice) return logicalUdid
+      const mode = getCurrentConnectionMode(logicalUdid)
+      if (mode !== 'unknown' && remoteDevice.endpoints[mode]) {
+        return remoteDevice.endpoints[mode]!
+      }
+      return remoteDevice.endpoints.adb ?? remoteDevice.endpoints.wifi ?? logicalUdid
+    },
+    [getCurrentConnectionMode, remoteDeviceByUdid]
+  )
+
+  const switchConnectionForDevices = useCallback(
+    (logicalUdids: string[], mode: ConnectionMode) => {
+      const targets = Array.from(new Set(logicalUdids.map(id => id.trim()).filter(Boolean)))
+      const eligible = targets.filter(id => Boolean(remoteDeviceByUdid.get(id)?.endpoints[mode]))
+      if (!eligible.length) return
+
+      setPreferredConnectionByLogicalUdid(prev => {
+        let changed = false
+        const next = { ...prev }
+        eligible.forEach(id => {
+          if (next[id] !== mode) {
+            next[id] = mode
+            changed = true
+          }
+        })
+        return changed ? next : prev
+      })
+
+      window.requestAnimationFrame(() => {
+        eligible.forEach(id => {
+          reloadMap.current.get(id)?.({ restart: true })
+        })
+      })
+    },
+    [remoteDeviceByUdid]
+  )
+
   const discoveredDevices = useMemo(
     () => {
       if (remoteDevices.length) return remoteDevices.map(d => d.udid)
@@ -1494,14 +1632,22 @@ export function App() {
               const dedup = new Map<string, RemoteDevice>()
               payload.forEach((d: any) => {
                 const device = String(d?.device || '').trim()
-                const key = String(d?.uuid || device).trim()
-                if (!device || !key) return
-                const ct = String(d?.connect_type || '').toLowerCase()
-                let type: 'usb' | 'wifi' | 'unknown' = 'unknown'
-                if (ct.includes('wifi')) type = 'wifi'
-                else if (ct.includes('usb')) type = 'usb'
-                else if (device.includes(':')) type = 'wifi'
-                dedup.set(key, { udid: device, type })
+                const logicalUdid = String(d?.uuid || device).trim()
+                if (!device || !logicalUdid) return
+                const endpoint: RemoteDeviceEndpoint = {
+                  udid: device,
+                  type: normalizeConnectionMode(device, String(d?.connect_type || ''))
+                }
+                const current: RemoteDevice =
+                  dedup.get(logicalUdid) ?? { udid: logicalUdid, type: 'unknown' as const, endpoints: {} }
+                if (endpoint.type === 'adb' || endpoint.type === 'wifi') {
+                  current.endpoints[endpoint.type] = endpoint.udid
+                }
+                current.type = chooseRemoteDeviceMode(
+                  current.endpoints,
+                  preferredConnectionRef.current[logicalUdid]
+                )
+                dedup.set(logicalUdid, current)
               })
               const mapped = Array.from(dedup.values())
               const now = Date.now()
@@ -1527,7 +1673,12 @@ export function App() {
                   if (prev.length === nextList.length) {
                     const hasChanged = prev.some((d, idx) => {
                       const nd = nextList[idx]
-                      return d.udid !== nd.udid || d.type !== nd.type
+                      return (
+                        d.udid !== nd.udid ||
+                        d.type !== nd.type ||
+                        d.endpoints.adb !== nd.endpoints.adb ||
+                        d.endpoints.wifi !== nd.endpoints.wifi
+                      )
                     })
                     if (!hasChanged) return prev
                   }
@@ -1588,9 +1739,17 @@ export function App() {
   const connectionTypeByUdid = useMemo(() => {
     const map = new Map<string, 'usb' | 'wifi' | 'unknown'>()
     remoteDevices.forEach(d => {
-      if (d.udid) map.set(d.udid, d.type)
+      if (d.udid) {
+        map.set(
+          d.udid,
+          connectionModeToDeviceFilter(
+            chooseRemoteDeviceMode(d.endpoints, preferredConnectionByLogicalUdid[d.udid])
+          )
+        )
+      }
     })
     androidDevices.forEach(d => {
+      if (map.has(d.udid)) return
       const ifaceNames = d.interfaces?.map(i => i.name.toLowerCase()) || []
       const hasWifiIface = ifaceNames.some(
         n => n.includes('wlan') || n.includes('wifi') || n.includes('wl')
@@ -1606,7 +1765,7 @@ export function App() {
       map.set(d.udid, type)
     })
     return map
-  }, [androidDevices, remoteDevices])
+  }, [androidDevices, preferredConnectionByLogicalUdid, remoteDevices])
   const getDeviceConnectionType = useCallback(
     (udid: string): 'usb' | 'wifi' | 'unknown' => {
       const known = connectionTypeByUdid.get(udid)
@@ -3176,6 +3335,9 @@ export function App() {
                 const isVisible = isMatchedByConnectionAndGroup;
                 const isFilteredOut = deviceAccountOverlayOpen && accountManagerOpen && isMatchedByConnectionAndGroup && !isAccountMatched;
 
+                const streamUdid = getStreamEndpointUdid(udid)
+                const connectionMode = getCurrentConnectionMode(udid)
+
                 return (
                   <div
                     key={udid}
@@ -3281,7 +3443,9 @@ export function App() {
                     <Tile
                       udid={udid}
                       order={orderMap.get(udid) ?? idx + 1}
-                      deviceParam={udid}
+                      deviceParam={streamUdid}
+                      streamUdid={streamUdid}
+                      connectionMode={connectionMode}
                       wsServer={wsServer}
                       isViewing={viewerUdid === udid}
                       selected={connectSelection.has(udid)}
@@ -4317,6 +4481,13 @@ export function App() {
                 wsServer={wsServer}
                 onClose={() => setViewerUdid(null)}
                 connectSelection={connectSelection}
+                connectionMode={getCurrentConnectionMode(viewerUdid)}
+                availableConnections={getConnectionEndpoints(viewerUdid)}
+                onChangeConnection={(mode) => {
+                  const targets = new Set<string>([viewerUdid])
+                  connectSelection.forEach(id => targets.add(id))
+                  switchConnectionForDevices(Array.from(targets), mode)
+                }}
                 currentOrder={
                   viewerUdid
                     ? getTileNumber(

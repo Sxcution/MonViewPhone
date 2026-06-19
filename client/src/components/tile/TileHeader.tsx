@@ -50,7 +50,7 @@ export function TileHeader({
   };
 
   const connClass =
-    connectionLabel?.toLowerCase() === 'usb'
+    connectionLabel?.toLowerCase() === 'usb' || connectionLabel?.toLowerCase() === 'adb'
       ? ' usb'
       : connectionLabel?.toLowerCase() === 'wifi'
         ? ' wifi'

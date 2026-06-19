@@ -9,6 +9,8 @@ import type { StreamReloadOptions } from './types';
 type Args = {
     udid: string;
     deviceParam: string | null;
+    streamUdid?: string;
+    controlUdid?: string;
     wsServer: string;
     enabled?: boolean;
     suppressLoadingOverlay?: boolean;
@@ -139,6 +141,8 @@ export function useTileStream(args: Args) {
     const {
         udid,
         deviceParam,
+        streamUdid,
+        controlUdid,
         wsServer,
         enabled = true,
         suppressLoadingOverlay = false,
@@ -160,11 +164,15 @@ export function useTileStream(args: Args) {
         reloadRef,
         onVideoDims,
     } = args;
+    const logicalUdid = controlUdid || udid;
+    const streamEndpointUdid = streamUdid || deviceParam || udid;
+    const streamDeviceParam = streamUdid || deviceParam;
+    const streamSessionKey = streamEndpointUdid;
     const { t } = useI18n();
     const tRef = useRef(t);
     const ownerRef = useRef<symbol | null>(null);
     if (ownerRef.current == null) {
-        ownerRef.current = Symbol(udid);
+        ownerRef.current = Symbol(logicalUdid);
     }
     useEffect(() => {
         tRef.current = t;
@@ -305,11 +313,11 @@ export function useTileStream(args: Args) {
         let pendingFrame: { width: number; height: number; data: ArrayBuffer } | null = null;
         let frameId = 1;
 
-        const onActivate = () => selectOnly(udid);
+        const onActivate = () => selectOnly(logicalUdid);
 
         const handlePointerEnter = () => {
             if (getIsAltHeldRef.current?.()) {
-                setAltSoloUdidRef.current?.(udid);
+                setAltSoloUdidRef.current?.(logicalUdid);
             }
         };
         const handlePointerLeave = () => {
@@ -325,9 +333,9 @@ export function useTileStream(args: Args) {
 
         detachControlsRef.current = attachTouchControls(
             canvas,
-            () => getInputTargetsRef.current(udid),
+            () => getInputTargetsRef.current(logicalUdid),
             onActivate,
-            udid
+            logicalUdid
         );
 
         function makeDecoder() {
@@ -613,7 +621,7 @@ export function useTileStream(args: Args) {
                 }
             }
             wsRef.current = null;
-            releaseStreamSession(udid, owner);
+            releaseStreamSession(streamSessionKey, owner);
 
             // Stop decoder worker + reset stream state
             if (worker) {
@@ -662,7 +670,7 @@ export function useTileStream(args: Args) {
         function connect(opts?: { restart?: boolean; immediate?: boolean }) {
             if (!opts?.immediate) {
                 cleanupWs();
-                if (!claimStreamSession(udid, owner, 'queued')) {
+                if (!claimStreamSession(streamSessionKey, owner, 'queued')) {
                     if (!isSilent()) {
                         setStatus(tRef.current('Dang co phien stream dang mo'));
                         setLoading(false);
@@ -675,10 +683,10 @@ export function useTileStream(args: Args) {
                 }
                 const generation = ++connectGeneration;
                 const restart = Boolean(opts?.restart);
-                queuedConnectCancel = scheduleBatchedConnect(udid, owner, () => {
+                queuedConnectCancel = scheduleBatchedConnect(streamSessionKey, owner, () => {
                     queuedConnectCancel = null;
                     if (destroyedRef.current || generation !== connectGeneration) {
-                        releaseStreamSession(udid, owner);
+                        releaseStreamSession(streamSessionKey, owner);
                         return;
                     }
                     connect({ restart, immediate: true });
@@ -686,14 +694,19 @@ export function useTileStream(args: Args) {
                 return;
             }
 
-            updateStreamSession(udid, owner, 'connecting');
+            updateStreamSession(streamSessionKey, owner, 'connecting');
             makeDecoder();
 
             let url: string;
             try {
-                url = makeWsUrl({ wsServer, deviceParam, udid, restart: Boolean(opts?.restart) });
+                url = makeWsUrl({
+                    wsServer,
+                    deviceParam: streamDeviceParam,
+                    udid: streamEndpointUdid,
+                    restart: Boolean(opts?.restart)
+                });
             } catch (err) {
-                releaseStreamSession(udid, owner);
+                releaseStreamSession(streamSessionKey, owner);
                 setStatus(tRef.current('❌ thiếu tham số thiết bị'));
                 setLoading(false);
                 return;
@@ -703,7 +716,7 @@ export function useTileStream(args: Args) {
             ws.binaryType = 'arraybuffer';
             closingRef.current = false;
             wsRef.current = ws;
-            updateStreamSession(udid, owner, 'connecting', ws);
+            updateStreamSession(streamSessionKey, owner, 'connecting', ws);
 
             if (!isSilent()) {
                 setStatus(tRef.current('Đang kết nối…'));
@@ -734,7 +747,7 @@ export function useTileStream(args: Args) {
             }, INITIAL_FRAME_TIMEOUT_MS);
 
             ws.onopen = () => {
-                updateStreamSession(udid, owner, 'connected', ws);
+                updateStreamSession(streamSessionKey, owner, 'connected', ws);
                 if (!isSilent()) {
                     setStatus(tRef.current('WS mở → gửi config BINARY…'));
                 }
@@ -761,7 +774,7 @@ export function useTileStream(args: Args) {
             ws.onerror = () => setStatus(tRef.current('❌ lỗi WS'));
 
             ws.onclose = (e) => {
-                releaseStreamSession(udid, owner, ws);
+                releaseStreamSession(streamSessionKey, owner, ws);
                 if (closingRef.current || destroyedRef.current) return;
                 const restartBeforeFirstFrame = !firstFrame;
                 if (initialLoadTimer != null) {
@@ -886,5 +899,14 @@ export function useTileStream(args: Args) {
             closeWs();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [enabled, udid, deviceParam, wsServer, selectOnly]);
+    }, [
+        enabled,
+        udid,
+        logicalUdid,
+        streamDeviceParam,
+        streamEndpointUdid,
+        streamSessionKey,
+        wsServer,
+        selectOnly
+    ]);
 }

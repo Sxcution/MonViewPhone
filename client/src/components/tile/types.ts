@@ -6,12 +6,17 @@ export type StreamReloadOptions = {
     restart?: boolean;
 };
 
+export type ConnectionMode = 'adb' | 'wifi';
+export type ConnectionState = ConnectionMode | 'unknown';
+
 /**
  * Minimal props for a single device tile (stream + basic actions).
  */
 export type TileProps = {
     udid: string;
     deviceParam: string | null;
+    streamUdid?: string;
+    connectionMode?: ConnectionState;
     wsServer: string;
     streamConfig: StreamConfig;
     order?: number;
@@ -36,4 +41,3 @@ export type TileProps = {
     highlightFilterMatched?: 'blue' | 'orange' | 'red' | 'yellow' | boolean;
     onOpenDeviceViewer?: (udid: string) => void;
 };
-
