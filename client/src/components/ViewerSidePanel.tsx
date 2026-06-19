@@ -14,7 +14,7 @@ import {
   normalizeAdbSegment,
 } from '@/lib/serverApi';
 import type { ConnectionMode, ConnectionState } from '@/components/tile/types';
-import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Save, Trash2, Palette, Plus, Copy } from 'lucide-react';
+import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Save, Trash2, Palette, Plus, Copy, ChevronRight } from 'lucide-react';
 
 type ViewerSidePanelProps = {
   udid: string;
@@ -368,7 +368,9 @@ export function ViewerSidePanel({
 
   // ADB submenu on hover
   const [showAdbSubmenu, setShowAdbSubmenu] = useState(false);
+  const [showConnectionSubmenu, setShowConnectionSubmenu] = useState(false);
   const adbHoverTimer = useRef<number | null>(null);
+  const connectionHoverTimer = useRef<number | null>(null);
 
 
 
@@ -402,24 +404,54 @@ export function ViewerSidePanel({
 
   const adbSectionRef = useRef<HTMLDivElement>(null);
   const [adbSubmenuPos, setAdbSubmenuPos] = useState({ x: 0, y: 0 });
+  const connectionSectionRef = useRef<HTMLDivElement>(null);
+  const [connectionSubmenuPos, setConnectionSubmenuPos] = useState({ x: 0, y: 0 });
+
+  const positionSideSubmenu = (section: HTMLDivElement | null, setPosition: (pos: { x: number; y: number }) => void) => {
+    if (!section) return;
+    const rect = section.getBoundingClientRect();
+    const menuWidth = 220;
+    let x = rect.right + 4;
+    if (x + menuWidth > window.innerWidth) {
+      x = rect.left - menuWidth - 4;
+    }
+    setPosition({ x, y: rect.bottom });
+  };
 
   const handleAdbEnter = () => {
     if (adbHoverTimer.current) clearTimeout(adbHoverTimer.current);
-    if (adbSectionRef.current) {
-      const rect = adbSectionRef.current.getBoundingClientRect();
-      const menuWidth = 220;
-      let x = rect.right + 4;
-      if (x + menuWidth > window.innerWidth) {
-        x = rect.left - menuWidth - 4;
-      }
-      setAdbSubmenuPos({ x, y: rect.bottom });
-    }
+    positionSideSubmenu(adbSectionRef.current, setAdbSubmenuPos);
     setShowAdbSubmenu(true);
   };
 
   const handleAdbLeave = () => {
     adbHoverTimer.current = window.setTimeout(() => setShowAdbSubmenu(false), 100);
   };
+
+  const handleConnectionEnter = () => {
+    if (connectionHoverTimer.current) clearTimeout(connectionHoverTimer.current);
+    positionSideSubmenu(connectionSectionRef.current, setConnectionSubmenuPos);
+    setShowConnectionSubmenu(true);
+  };
+
+  const handleConnectionLeave = () => {
+    connectionHoverTimer.current = window.setTimeout(() => setShowConnectionSubmenu(false), 100);
+  };
+
+  const handleConnectionModePointerDown = (e: React.PointerEvent<HTMLButtonElement>, mode: ConnectionMode, disabled: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (disabled) return;
+    setShowConnectionSubmenu(false);
+    onChangeConnection?.(mode);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (adbHoverTimer.current) window.clearTimeout(adbHoverTimer.current);
+      if (connectionHoverTimer.current) window.clearTimeout(connectionHoverTimer.current);
+    };
+  }, []);
 
   // Push file via HTTP API
   const pushFileToDevice = async (targetUdid: string, file: File, remotePath: string) => {
@@ -1051,41 +1083,72 @@ export function ViewerSidePanel({
 
           <div
             className="vsp-section vsp-connection-section"
+            ref={connectionSectionRef}
+            onMouseEnter={handleConnectionEnter}
+            onMouseLeave={handleConnectionLeave}
             data-inspector-id="viewerSidePanel.connectionSwitch"
             data-inspector-label="Device stream connection mode switch"
             data-inspector-component="client/src/components/ViewerSidePanel.tsx"
           >
-            <div className="vsp-section-title vsp-connection-title">
-              <Terminal size={15} />
-              <span>Kết Nối</span>
+            <div
+              className="vsp-section-title vsp-clickable vsp-connection-title"
+              onClick={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (showConnectionSubmenu) {
+                  setShowConnectionSubmenu(false);
+                  return;
+                }
+                handleConnectionEnter();
+              }}
+            >
+              <span className="vsp-connection-title-left">
+                <Terminal size={15} />
+                <span>Kết Nối</span>
+              </span>
+              <span className="vsp-connection-title-right">
+                <span>{connectionMode === 'wifi' ? 'WiFi' : connectionMode === 'adb' ? 'ADB' : 'Chưa rõ'}</span>
+                <ChevronRight size={14} />
+              </span>
             </div>
-            <div className="vsp-connection-options" role="group" aria-label="Kết Nối">
-              {(['adb', 'wifi'] as ConnectionMode[]).map(mode => {
-                const isActive = connectionMode === mode;
-                const isAvailable = Boolean(availableConnections?.[mode]);
-                const isDisabled = !isAvailable || isActive;
-                const label = mode === 'adb' ? 'ADB' : 'WiFi';
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    className={`vsp-connection-option${isActive ? ' active' : ''}`}
-                    disabled={isDisabled}
-                    aria-pressed={isActive}
-                    title={isAvailable ? label : `${label} không có endpoint`}
-                    onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (isDisabled) return;
-                      onChangeConnection?.(mode);
-                    }}
-                  >
-                    <span>{label}</span>
-                    {isActive ? <span className="vsp-connection-current">Đang dùng</span> : null}
-                  </button>
-                );
-              })}
-            </div>
+            {showConnectionSubmenu && ReactDOM.createPortal(
+              <div
+                className="vsp-adb-submenu vsp-connection-submenu"
+                style={{ position: 'fixed', left: connectionSubmenuPos.x, bottom: window.innerHeight - connectionSubmenuPos.y, margin: 0 }}
+                onMouseEnter={() => {
+                  if (connectionHoverTimer.current) clearTimeout(connectionHoverTimer.current);
+                  setShowConnectionSubmenu(true);
+                }}
+                onMouseLeave={handleConnectionLeave}
+                data-inspector-id="viewerSidePanel.connectionSubmenu"
+                data-inspector-label="Device stream connection mode submenu"
+                data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+              >
+                {(['adb', 'wifi'] as ConnectionMode[]).map(mode => {
+                  const isActive = connectionMode === mode;
+                  const isAvailable = Boolean(availableConnections?.[mode]);
+                  const isDisabled = !isAvailable || isActive;
+                  const label = mode === 'adb' ? 'ADB' : 'WiFi';
+                  const reason = isActive ? 'Đang dùng' : isAvailable ? 'Chuyển sang endpoint này' : 'Chưa có endpoint';
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={`vsp-adb-submenu-item vsp-connection-submenu-item${isActive ? ' active' : ''}`}
+                      disabled={isDisabled}
+                      aria-disabled={isDisabled}
+                      aria-pressed={isActive}
+                      title={isAvailable ? label : `${label} chưa có endpoint cho máy này`}
+                      onPointerDown={e => handleConnectionModePointerDown(e, mode, isDisabled)}
+                    >
+                      <span>{label}</span>
+                      <span className="vsp-connection-submenu-status">{reason}</span>
+                    </button>
+                  );
+                })}
+              </div>,
+              document.body
+            )}
           </div>
         </div>
       </div>
