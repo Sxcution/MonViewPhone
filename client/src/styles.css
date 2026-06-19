@@ -4700,9 +4700,16 @@ textarea.vsp-modal-input {
   background: rgba(255, 255, 255, .09) !important;
 }
 
-.vsp-connection-submenu-item:disabled {
+.vsp-connection-submenu-item:disabled,
+.vsp-connection-submenu-item.disabled {
   opacity: .52 !important;
   cursor: not-allowed;
+}
+
+.vsp-adb-submenu-item.disabled:hover {
+  background: transparent !important;
+  color: #ddd !important;
+  cursor: not-allowed !important;
 }
 
 .vsp-connection-submenu-status {

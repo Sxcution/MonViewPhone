@@ -1653,6 +1653,13 @@ export function App() {
                 const device = String(d?.device || '').trim()
                 const logicalUdid = String(d?.uuid || device).trim()
                 if (!device || !logicalUdid) return
+
+                // Guard: skip unmapped WiFi endpoints that would create rogue tiles
+                if (device.includes(':') && (!logicalUdid || logicalUdid === device)) {
+                  console.warn('[devices-list] skipped unmapped wifi endpoint', device)
+                  return
+                }
+
                 const endpoint: RemoteDeviceEndpoint = {
                   udid: device,
                   type: normalizeConnectionMode(device, String(d?.connect_type || ''))

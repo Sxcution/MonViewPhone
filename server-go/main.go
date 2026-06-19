@@ -7,9 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"server-go/adb"
 	"server-go/websocket"
+	"strings"
 	"time"
 )
 
@@ -81,7 +81,7 @@ func ensureAdbKeys() {
 			log.Printf("[ADB] Failed to create backup directory: %v", err)
 			return
 		}
-		
+
 		// Copy key
 		if err := copyFile(androidKey, backupKey); err != nil {
 			log.Printf("[ADB] Failed to backup adbkey: %v", err)
@@ -123,7 +123,7 @@ func ensureAdbKeys() {
 	} else if xiaoweiKeyExists {
 		// Scenario C: Both missing, but xiaowei backup key exists. Sync from xiaowei to both.
 		log.Println("[ADB] Keys missing in both locations but found in xiaowei backup. Syncing from xiaowei...")
-		
+
 		// Ensure both dirs exist
 		if err := os.MkdirAll(backupDir, 0755); err != nil {
 			log.Printf("[ADB] Failed to create backup directory: %v", err)
@@ -219,6 +219,9 @@ func main() {
 
 	// Warm up ADB trước khi làm gì khác
 	warmUpAdb()
+
+	// Load WiFi endpoint -> serial mapping tu disk
+	adb.InitWifiMappingPersistence("wifi_mapping.json")
 
 	// Start ADB Tracker
 	tracker := adb.NewTracker()

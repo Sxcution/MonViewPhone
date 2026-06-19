@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"server-go/adb"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -34,16 +33,11 @@ type SimpleDevicePayload struct {
 	ConnectType  string `json:"connect_type"`
 }
 
-var wifiDeviceUUIDCache sync.Map
-
 func physicalUUIDForDevice(id string, connectType string) string {
 	if connectType != "wifi" {
 		return id
 	}
-	adb.WifiEndpointMu.RLock()
-	serial, exists := adb.WifiEndpointToSerial[id]
-	adb.WifiEndpointMu.RUnlock()
-	if exists && serial != "" {
+	if serial, ok := adb.ResolveWifiSerial(id); ok {
 		return serial
 	}
 	return id
@@ -67,11 +61,19 @@ func simpleDevicePayloads(tracker *adb.Tracker) []SimpleDevicePayload {
 				}
 			}
 		}
+		uuid := physicalUUIDForDevice(id, connectType)
+
+		// Khong emit WiFi endpoint chua resolve duoc serial goc
+		if connectType == "wifi" && strings.Contains(uuid, ":") {
+			log.Printf("[devices-list] skipped unmapped wifi endpoint %s", id)
+			continue
+		}
+
 		payloads = append(payloads, SimpleDevicePayload{
 			Device:       id,
 			StatusRecodd: "stop",
 			IPv4:         ipv4,
-			UUID:         physicalUUIDForDevice(id, connectType),
+			UUID:         uuid,
 			ConnectType:  connectType,
 		})
 	}

@@ -694,3 +694,49 @@ Chúng tôi đã tối ưu hóa giao diện của ô nhập lệnh ADB để t�
 3. **Xác Thực**:
    - Biên dịch frontend (`npm run build`) và backend Go (`go build ./...`) thành công 100%.
 
+## Khắc phục lỗi Endpoint WiFi tạo Tile/Title mới trùng lặp
+
+Chúng tôi đã sửa lỗi khi thiết bị kết nối qua WiFi (ví dụ: `192.168.1.3:5555`) bị tạo thành một Tile riêng biệt (ví dụ: Tile số 37) thay vì gộp chung vào Tile của thiết bị gốc kết nối USB (ví dụ: `6294909c` số 6).
+
+Các thay đổi cụ thể gồm:
+
+1. **Lưu trữ & Ánh xạ WiFi Endpoint ở Backend (`server-go/adb/wifi_mapping.go`)**:
+   - Triển khai cơ chế lưu ánh xạ từ WiFi Endpoint sang Serial gốc xuống tệp cấu hình JSON `wifi_mapping.json` ở đĩa cứng để tránh bị mất thông tin khi khởi động lại server.
+   - Thêm bộ nhớ cache các endpoint tra cứu thất bại (`resolveFailedCache`) kèm theo thời gian hết hạn (5 phút) để tránh việc liên tục gọi lệnh `adb shell getprop` gây nghẽn tiến trình/giảm hiệu năng.
+   - Thêm hàm `ResolveWifiSerial` kiểm tra nhanh trong memory map, nếu không thấy sẽ thử chạy `adb -s <endpoint> shell getprop ro.serialno` để truy vấn trực tiếp số serial gốc từ thiết bị, sau đó lưu lại vào ánh xạ.
+
+2. **Lọc thiết bị chưa ánh xạ ở danh sách thiết bị WebSocket (`server-go/websocket/devicelist.go`)**:
+   - Sử dụng hàm `ResolveWifiSerial` mới để phân giải ID thiết bị kết nối qua WiFi.
+   - Lọc bỏ các thiết bị kết nối WiFi chưa xác định được serial gốc (nếu UUID vẫn chứa dấu hai chấm `:`) để ngăn chặn việc gửi endpoint WiFi thô lên frontend tạo thành tile rác.
+
+3. **Khởi tạo cơ chế ghi đĩa khi khởi chạy ứng dụng (`server-go/main.go`)**:
+   - Gọi hàm `adb.InitWifiMappingPersistence("wifi_mapping.json")` ngay khi khởi động server, sau bước warm up ADB, giúp khôi phục các ánh xạ đã lưu trước đó.
+
+4. **Lớp bảo vệ dự phòng ở Frontend (`client/src/App.tsx`)**:
+   - Bổ sung thêm một chốt chặn an toàn (guard): nếu backend bằng cách nào đó gửi lên thiết bị kết nối WiFi mà không phân giải được uuid (cả `device` và `uuid` đều chứa dấu `:`), frontend sẽ tự động bỏ qua để không tạo tile mới cho endpoint này.
+
+5. **Biên dịch và Kiểm thử**:
+   - Biên dịch thành công backend Go (`go build .`) và frontend (`npm run build`).
+
+## Cải tiến Tương tác và Hiển thị Debug/Toast cho Menu Kết Nối (ADB / WiFi)
+
+Để giải đáp thắc mắc và hỗ trợ người dùng nhận biết lý do không thể chuyển đổi giữa các chế độ kết nối (ADB USB / WiFi), chúng tôi đã thực hiện cải tiến giao diện tương tác:
+
+1. **Cho phép Click vào các hàng Kết nối bị vô hiệu hóa (`client/src/components/ViewerSidePanel.tsx`)**:
+   - Thay thế thuộc tính `disabled` gốc của HTML button bằng CSS class `.disabled` để các sự kiện pointer/click không bị trình duyệt chặn đứng.
+   - Khi người dùng click vào dòng kết nối không khả dụng (ví dụ: đang ở WiFi muốn chọn ADB nhưng đã rút cáp USB), hệ thống sẽ không im lặng vô hiệu hóa mà phản hồi trực quan.
+
+2. **Hiển thị Toast Thông Báo & Log Chi Tiết vào Console**:
+   - Nếu kết nối không có endpoint (chưa kết nối), hiển thị một Toast cảnh báo màu đỏ trực tiếp trên màn hình:
+     * Đối với ADB: `"Không tìm thấy kết nối USB (ADB) cho thiết bị này. Hãy cắm cáp USB."`
+     * Đối với WiFi: `"Không tìm thấy kết nối WiFi cho thiết bị này. Hãy kết nối WiFi từ danh sách thiết bị trước."`
+   - Đồng thời in ra `console.warn` toàn bộ dữ liệu debug bao gồm: UDID của thiết bị, `availableConnections` (các kết nối khả dụng) và `connectionMode` hiện tại giúp nhà phát triển dễ dàng kiểm tra.
+
+3. **Cập Nhật Giao Diện CSS (`client/src/styles.css`)**:
+   - Thiết lập CSS `.disabled` đồng bộ độ mờ (`opacity: .52`), con trỏ cấm (`cursor: not-allowed`) giống như `:disabled` nguyên bản.
+   - Vô hiệu hóa hiệu ứng hover khi nút đang ở trạng thái `.disabled` để giữ giao diện chuẩn xác.
+
+4. **Biên Dịch & Xác Thực**:
+   - Chạy lệnh `npm run build` thành công 100% không gặp bất kỳ lỗi nào.
+
+

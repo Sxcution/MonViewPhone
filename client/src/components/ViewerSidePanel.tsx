@@ -437,15 +437,37 @@ export function ViewerSidePanel({
   const handleConnectionLeave = () => {
     connectionHoverTimer.current = window.setTimeout(() => setShowConnectionSubmenu(false), 100);
   };
-
   const handleConnectionModePointerDown = (e: React.PointerEvent<HTMLButtonElement>, mode: ConnectionMode, disabled: boolean) => {
     e.preventDefault();
     e.stopPropagation();
-    if (disabled) return;
+    if (disabled) {
+      const isAvailable = Boolean(availableConnections?.[mode]);
+      const isActive = connectionMode === mode;
+      console.warn(`[ConnectionMode] Cannot switch to "${mode}". Details:`, {
+        targetMode: mode,
+        isAvailable,
+        isActive,
+        availableConnections,
+        currentMode: connectionMode,
+        udid
+      });
+
+      if (isActive) {
+        setShowConnectionSubmenu(false);
+        return;
+      }
+      if (!isAvailable) {
+        if (mode === 'adb') {
+          showToast('Không tìm thấy kết nối USB (ADB) cho thiết bị này. Hãy cắm cáp USB.', 'err');
+        } else if (mode === 'wifi') {
+          showToast('Không tìm thấy kết nối WiFi cho thiết bị này. Hãy kết nối WiFi từ danh sách thiết bị trước.', 'err');
+        }
+      }
+      return;
+    }
     setShowConnectionSubmenu(false);
     onChangeConnection?.(mode);
   };
-
   useEffect(() => {
     return () => {
       if (adbHoverTimer.current) window.clearTimeout(adbHoverTimer.current);
@@ -1134,8 +1156,7 @@ export function ViewerSidePanel({
                     <button
                       key={mode}
                       type="button"
-                      className={`vsp-adb-submenu-item vsp-connection-submenu-item${isActive ? ' active' : ''}`}
-                      disabled={isDisabled}
+                      className={`vsp-adb-submenu-item vsp-connection-submenu-item${isActive ? ' active' : ''}${isDisabled ? ' disabled' : ''}`}
                       aria-disabled={isDisabled}
                       aria-pressed={isActive}
                       title={isAvailable ? label : `${label} chưa có endpoint cho máy này`}
@@ -1144,8 +1165,7 @@ export function ViewerSidePanel({
                       <span>{label}</span>
                       <span className="vsp-connection-submenu-status">{reason}</span>
                     </button>
-                  );
-                })}
+                  );                })}
               </div>,
               document.body
             )}

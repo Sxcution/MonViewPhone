@@ -68,10 +68,9 @@ Removed legacy layers:
 - [MODIFY] [main.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/main.go): Registered the `/api/goog/device/display-power` route.
 - [NEW] [build-scrcpy-server.ps1](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/build-scrcpy-server.ps1): PowerShell script to recompile and package scrcpy-server.jar from decompiled sources after patching reflection signatures.
 - [MODIFY] [scrcpy-server.jar](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/scrcpy-server.jar): Patched scrcpy server JAR containing the updated ClipboardManager class supporting Android 12+ / Pixel ROM clipboard signatures.
-- [NEW] [wifi_mapping.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/adb/wifi_mapping.go): Thread-safe in-memory mapping storage for active ADB WiFi endpoints (`IP:PORT -> USB SERIAL`).
-- [NEW] [device_connect.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/device_connect.go): Go backend service implementation for the `/api/devices/connect` API, handling batch connections for USB devices via TCP/IP and disconnection of mapped WiFi endpoints.
-- [MODIFY] [main.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/main.go): Registered the `/api/devices/connect` route case.
-- [MODIFY] [devicelist.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/websocket/devicelist.go): Updated simple device payloads mapping to resolve WiFi IP:PORT endpoints to their matching original USB serial UUIDs using the thread-safe `wifi_mapping.go` data structures.
+- [MODIFY] [wifi_mapping.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/adb/wifi_mapping.go): WiFi endpoint-to-serial mapping module. Now persists mappings to `wifi_mapping.json` on disk (survives server restarts), auto-resolves unmapped WiFi endpoints via ADB `getprop ro.serialno` (with fallbacks to `ro.boot.serialno` and `ro.product.serial`), and includes a failed-resolution cache to avoid spamming getprop every 2 seconds.
+- [NEW] [wifi_mapping.json](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/wifi_mapping.json): Auto-generated JSON file persisting WiFi endpoint-to-USB-serial mappings. Created/updated automatically by the backend when WiFi connections are established.
+- [MODIFY] [devicelist.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/websocket/devicelist.go): Updated `physicalUUIDForDevice` to use `ResolveWifiSerial` (tries in-memory map, then ADB getprop). WiFi entries whose serial cannot be resolved are now skipped entirely from the device list emission to prevent frontend from creating rogue tiles.
 
 
 
