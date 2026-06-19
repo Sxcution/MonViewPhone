@@ -247,6 +247,9 @@ func main() {
 		// Route APIs explicitly
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			switch r.URL.Path {
+			case "/api/devices/connect":
+				handleDevicesConnect(w, r)
+				return
 			case "/api/goog/device/user-profiles":
 				handleUserProfiles(w, r)
 				return

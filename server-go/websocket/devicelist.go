@@ -40,23 +40,12 @@ func physicalUUIDForDevice(id string, connectType string) string {
 	if connectType != "wifi" {
 		return id
 	}
-	if cached, ok := wifiDeviceUUIDCache.Load(id); ok {
-		if uuid, ok := cached.(string); ok && uuid != "" {
-			return uuid
-		}
+	adb.WifiEndpointMu.RLock()
+	serial, exists := adb.WifiEndpointToSerial[id]
+	adb.WifiEndpointMu.RUnlock()
+	if exists && serial != "" {
+		return serial
 	}
-	for _, prop := range []string{"ro.serialno", "ro.boot.serialno"} {
-		out, err := adb.CommandTimeout(2*time.Second, "-s", id, "shell", "getprop", prop)
-		if err != nil {
-			continue
-		}
-		uuid := strings.TrimSpace(out)
-		if uuid != "" && strings.ToLower(uuid) != "unknown" {
-			wifiDeviceUUIDCache.Store(id, uuid)
-			return uuid
-		}
-	}
-	wifiDeviceUUIDCache.Store(id, id)
 	return id
 }
 
