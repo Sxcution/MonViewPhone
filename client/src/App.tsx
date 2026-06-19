@@ -120,6 +120,7 @@ type RemoteDevice = {
   type: ConnectionState
   endpoints: Partial<Record<ConnectionMode, string>>
 }
+const CONNECTION_MODES: ConnectionMode[] = ['adb', 'wifi']
 
 const CONNECT_CHECK_DEVICE_MESSAGE =
   'Please check that the device is properly plugged into the host'
@@ -1543,6 +1544,24 @@ export function App() {
     return map
   }, [remoteDevices])
 
+  const endpointLogicalByUdid = useMemo(() => {
+    const map = new Map<string, string>()
+    remoteDevices.forEach(device => {
+      CONNECTION_MODES.forEach(mode => {
+        const endpoint = device.endpoints[mode]
+        if (endpoint && endpoint !== device.udid) {
+          map.set(endpoint, device.udid)
+        }
+      })
+    })
+    return map
+  }, [remoteDevices])
+
+  const endpointAliasUdids = useMemo(
+    () => Array.from(endpointLogicalByUdid.keys()),
+    [endpointLogicalByUdid]
+  )
+
   const getConnectionEndpoints = useCallback(
     (logicalUdid: string): Partial<Record<ConnectionMode, boolean>> => {
       const endpoints = remoteDeviceByUdid.get(logicalUdid)?.endpoints
@@ -1650,6 +1669,13 @@ export function App() {
                 dedup.set(logicalUdid, current)
               })
               const mapped = Array.from(dedup.values())
+              const endpointAliases = new Set<string>()
+              mapped.forEach(d => {
+                CONNECTION_MODES.forEach(mode => {
+                  const endpoint = d.endpoints[mode]
+                  if (endpoint && endpoint !== d.udid) endpointAliases.add(endpoint)
+                })
+              })
               const now = Date.now()
               const lastSeen = remoteDeviceLastSeenRef.current
               mapped.forEach(d => lastSeen.set(d.udid, now))
@@ -1685,15 +1711,16 @@ export function App() {
                   return nextList
                 })
                 setAllKnownDevices(prev => {
+                  const base = prev.filter(item => !endpointAliases.has(item.udid))
                   let hasNew = false
                   for (const d of mapped) {
-                    if (!prev.some(item => item.udid === d.udid)) {
+                    if (!base.some(item => item.udid === d.udid)) {
                       hasNew = true
                       break
                     }
                   }
-                  if (!hasNew) return prev;
-                  const next = [...prev]
+                  if (!hasNew && base.length === prev.length) return prev;
+                  const next = [...base]
                   mapped.forEach((d) => {
                     if (!next.some(item => item.udid === d.udid)) {
                       next.push({ udid: d.udid, name: `P${next.length + 1}` })
@@ -1789,10 +1816,11 @@ export function App() {
     const onlineSet = new Set(gridDevices)
     const allUdids = [...gridDevices]
     allKnownDevices.forEach(d => {
+      if (endpointLogicalByUdid.has(d.udid)) return
       if (!onlineSet.has(d.udid)) allUdids.push(d.udid)
     })
     return allUdids
-  }, [deviceParam, gridDevices, allKnownDevices])
+  }, [deviceParam, gridDevices, allKnownDevices, endpointLogicalByUdid])
 
   const connectedUdids = useMemo(() => new Set(gridDevices), [gridDevices])
   const filteredGridDevices = useMemo(() => {
@@ -1806,8 +1834,93 @@ export function App() {
     }
     return list
   }, [deviceFilter, gridDevices, getDeviceConnectionType, focusGroupIdx, savedGroups])
-  const { mergedOrder, moveTile, getTileNumber, setTileNumber } =
+  const { mergedOrder, moveTile, removeTile, getTileNumber, setTileNumber } =
     useTileOrder(allGridUdids)
+
+  const removeUiDeviceEntries = useCallback((udids: string[]) => {
+    const targetSet = new Set(udids.map(id => id.trim()).filter(Boolean))
+    if (!targetSet.size) return
+
+    setAllKnownDevices(prev => {
+      const next = prev.filter(device => !targetSet.has(device.udid))
+      return next.length === prev.length ? prev : next
+    })
+
+    setSavedGroups(prev => {
+      let changed = false
+      const next = prev.map(group => {
+        const nextUdids = group.udids.filter(udid => !targetSet.has(udid))
+        let nextSelectedAccounts = group.selectedAccounts
+        let groupChanged = nextUdids.length !== group.udids.length
+
+        if (group.selectedAccounts) {
+          const cleanedSelectedAccounts = { ...group.selectedAccounts }
+          targetSet.forEach(udid => {
+            if (Object.prototype.hasOwnProperty.call(cleanedSelectedAccounts, udid)) {
+              delete cleanedSelectedAccounts[udid]
+              groupChanged = true
+            }
+          })
+          if (groupChanged) {
+            nextSelectedAccounts = Object.keys(cleanedSelectedAccounts).length
+              ? cleanedSelectedAccounts
+              : undefined
+          }
+        }
+
+        if (!groupChanged) return group
+        changed = true
+        return { ...group, udids: nextUdids, selectedAccounts: nextSelectedAccounts }
+      })
+      return changed ? next : prev
+    })
+
+    setConnectSelection(prev => {
+      let changed = false
+      const next = new Set(prev)
+      targetSet.forEach(udid => {
+        if (next.delete(udid)) changed = true
+      })
+      return changed ? next : prev
+    })
+
+    const nextSyncTargets = syncTargets.filter(udid => !targetSet.has(udid))
+    if (nextSyncTargets.length !== syncTargets.length) {
+      setSyncTargetsList(nextSyncTargets)
+    }
+
+    setPreferredConnectionByLogicalUdid(prev => {
+      let changed = false
+      const next = { ...prev }
+      targetSet.forEach(udid => {
+        if (Object.prototype.hasOwnProperty.call(next, udid)) {
+          delete next[udid]
+          changed = true
+        }
+      })
+      return changed ? next : prev
+    })
+
+    setRemoteDevices(prev => {
+      const next = prev.filter(device => !targetSet.has(device.udid))
+      return next.length === prev.length ? prev : next
+    })
+
+    targetSet.forEach(udid => {
+      remoteDeviceLastSeenRef.current.delete(udid)
+      removeTile(udid)
+    })
+
+    if (viewerUdid && targetSet.has(viewerUdid)) {
+      setViewerUdid(null)
+    }
+  }, [removeTile, setSyncTargetsList, syncTargets, viewerUdid])
+
+  useEffect(() => {
+    if (!endpointAliasUdids.length) return
+    removeUiDeviceEntries(endpointAliasUdids)
+  }, [endpointAliasUdids, removeUiDeviceEntries])
+
   const filteredRegistered = useMemo(() => {
     return registeredUdids.filter(id => {
       if (displayFilter === 'online' && !connectedUdids.has(id)) return false;
@@ -6297,6 +6410,23 @@ export function App() {
               </div>
             )}
 
+            {contextMenuTarget.sourceGrid === 'group' ? (
+              <button
+                className="ctxMenuItem ctxMenuItemDanger"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  removeUiDeviceEntries([contextMenuTarget.udid]);
+                  setContextMenuTarget(null);
+                  setContextMenuOpen(false);
+                  setSubMenuOpen(false);
+                }}
+              >
+                <Trash2 size={14} />
+                <span>Xoá Máy</span>
+              </button>
+            ) : null}
+
             {/* === Xoá khỏi nhóm — hiện khi click từ grid dropdown nhóm, HOẶC khi đang load nhóm và click từ grid tổng === */}
             {contextMenuTarget.groupIdx !== undefined && (() => {
               const grp = savedGroups[contextMenuTarget.groupIdx]
@@ -6304,9 +6434,7 @@ export function App() {
               if (!isInGroup) return null
               return (
                 <button
-                  style={{ background: 'transparent', border: 'none', color: '#ff6060', fontSize: '13px', cursor: 'pointer', padding: '7px 8px', textAlign: 'left', width: '100%', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 8 }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,96,96,0.1)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  className="ctxMenuItem ctxMenuItemDanger"
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -6343,7 +6471,8 @@ export function App() {
                     setSubMenuOpen(false);
                   }}
                 >
-                  <span>🗑</span> Xoá khỏi nhóm <strong style={{ color: '#ff8080', fontSize: 11 }}>"{savedGroups[contextMenuTarget.groupIdx!]?.name}"</strong>
+                  <Trash2 size={14} />
+                  <span>Xoá khỏi nhóm <strong className="ctxMenuItemTarget">"{savedGroups[contextMenuTarget.groupIdx!]?.name}"</strong></span>
                 </button>
               )
             })()}

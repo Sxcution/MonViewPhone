@@ -1,5 +1,4 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useActive } from '@/context/ActiveContext';
 import { useServer } from '@/context/ServerContext';
 import { attachTouchControls } from '@/lib/touchControls';
@@ -182,57 +181,10 @@ const DeviceViewerComponent = ({
   const viewerAspectRef = useRef<number>(initialAspect);
   const [viewerAspect, setViewerAspect] = useState<number>(initialAspect);
   const bodyRef = useRef<HTMLDivElement | null>(null);
-  const [contextMenuPoint, setContextMenuPoint] = useState<{ x: number; y: number } | null>(null);
-  const [connectionSubmenuOpen, setConnectionSubmenuOpen] = useState(false);
-
-  const availableConnectionFlags = useMemo(
-    () => ({
-      adb: Boolean(availableConnections?.adb),
-      wifi: Boolean(availableConnections?.wifi),
-    }),
-    [availableConnections?.adb, availableConnections?.wifi]
-  );
-
-  const closeContextMenu = useCallback(() => {
-    setContextMenuPoint(null);
-    setConnectionSubmenuOpen(false);
-  }, []);
-
-  const openContextMenu = useCallback((e: React.MouseEvent) => {
-    if (tab !== 'view') return;
+  const suppressStreamContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenuPoint({ x: e.clientX, y: e.clientY });
-    setConnectionSubmenuOpen(false);
-  }, [tab]);
-
-  useEffect(() => {
-    if (!contextMenuPoint) return;
-
-    const handleOutsideMouseDown = (event: MouseEvent) => {
-      const target = event.target as Element | null;
-      if (target?.closest('.contextMenuPanel')) return;
-      closeContextMenu();
-    };
-
-    window.addEventListener('mousedown', handleOutsideMouseDown, true);
-    return () => window.removeEventListener('mousedown', handleOutsideMouseDown, true);
-  }, [closeContextMenu, contextMenuPoint]);
-
-  useEffect(() => {
-    if (!contextMenuPoint) setConnectionSubmenuOpen(false);
-  }, [contextMenuPoint]);
-
-  const handleConnectionModePointerDown = useCallback(
-    (e: React.PointerEvent<HTMLButtonElement>, mode: ConnectionMode) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!availableConnectionFlags[mode]) return;
-      onChangeConnection?.(mode);
-      closeContextMenu();
-    },
-    [availableConnectionFlags, closeContextMenu, onChangeConnection]
-  );
+  }, []);
 
   const sendKeyToThis = (keycode: number) => {
     const targets = getInputTargetsForSource(udid);
@@ -530,76 +482,6 @@ const DeviceViewerComponent = ({
     return apps.filter((a) => a.name.toLowerCase().includes(q) || a.path.toLowerCase().includes(q));
   }, [apps, appsFilter]);
 
-  const connectionContextMenu = contextMenuPoint
-    ? createPortal(
-        <div
-          className="deviceViewerContextMenu contextMenuPanel"
-          style={{
-            ['--context-menu-x' as any]: `${Math.min(contextMenuPoint.x, window.innerWidth - 240)}px`,
-            ['--context-menu-y' as any]: `${Math.min(contextMenuPoint.y, window.innerHeight - 140)}px`,
-          }}
-          onMouseDown={e => e.stopPropagation()}
-          onClick={e => e.stopPropagation()}
-          onContextMenu={e => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          data-inspector-id="deviceViewer.connectionContextMenu"
-          data-inspector-label="Device viewer connection switch context menu"
-          data-inspector-component="client/src/components/DeviceViewer.tsx"
-        >
-          <div
-            className="deviceViewerContextMenuGroup"
-            onPointerEnter={() => setConnectionSubmenuOpen(true)}
-            onPointerLeave={() => setConnectionSubmenuOpen(false)}
-          >
-            <button
-              type="button"
-              className="deviceViewerContextMenuItem"
-              onPointerDown={e => {
-                e.preventDefault();
-                e.stopPropagation();
-                setConnectionSubmenuOpen(true);
-              }}
-            >
-              <span>Kết Nối</span>
-              <span className="deviceViewerContextMenuArrow">▶</span>
-            </button>
-            {connectionSubmenuOpen ? (
-              <div
-                className="deviceViewerContextSubmenu contextMenuPanel"
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => e.stopPropagation()}
-                onContextMenu={e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-              >
-                {(['adb', 'wifi'] as ConnectionMode[]).map(mode => {
-                  const isCurrent = connectionMode === mode;
-                  const isDisabled = !availableConnectionFlags[mode];
-                  const label = mode === 'adb' ? 'ADB' : 'Wifi';
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      className={`deviceViewerContextMenuItem${isDisabled ? ' is-disabled' : ''}`}
-                      aria-disabled={isDisabled}
-                      tabIndex={isDisabled ? -1 : 0}
-                      onPointerDown={e => handleConnectionModePointerDown(e, mode)}
-                    >
-                      <span>{isCurrent ? `${label} (Hiện tại)` : label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-        </div>,
-        document.body
-      )
-    : null;
-
   return (
     <>
     <div
@@ -614,7 +496,7 @@ const DeviceViewerComponent = ({
           e.stopPropagation();
         }
       }}
-      onContextMenu={openContextMenu}
+      onContextMenu={suppressStreamContextMenu}
       data-inspector-id="deviceViewer.panel"
       data-inspector-label="Single device viewer main panel"
       data-inspector-component="client/src/components/DeviceViewer.tsx"
@@ -650,7 +532,7 @@ const DeviceViewerComponent = ({
       <div className={`viewerBody${tab === 'view' ? ' viewMode' : ''}`} ref={bodyRef}>
         {tab === 'view' ? (
           <div className="viewerMain">
-            <div className="viewerCanvasWrap" style={{ transform: 'none', position: 'relative' }} onContextMenu={openContextMenu}>
+            <div className="viewerCanvasWrap" style={{ transform: 'none', position: 'relative' }} onContextMenu={suppressStreamContextMenu}>
               <div 
                 className="viewerDragHandleTop"
                 data-inspector-id="deviceViewer.dragHandleTop"
@@ -662,7 +544,7 @@ const DeviceViewerComponent = ({
                 className="viewerCanvas"
                 style={{ touchAction: 'none' }}
                 tabIndex={0}
-                onContextMenu={openContextMenu}
+                onContextMenu={suppressStreamContextMenu}
                 data-inspector-id="deviceViewer.canvas"
                 data-inspector-label="Device screen mirroring canvas"
                 data-inspector-component="client/src/components/DeviceViewer.tsx"
@@ -852,8 +734,10 @@ const DeviceViewerComponent = ({
       onChangeOrder={onChangeOrder}
       onCloseViewer={onClose}
       connectSelection={connectSelection}
+      connectionMode={connectionMode}
+      availableConnections={availableConnections}
+      onChangeConnection={onChangeConnection}
     />
-    {connectionContextMenu}
     </>
   );
 }

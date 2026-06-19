@@ -13,6 +13,7 @@ import {
   splitCommandBatchSmart,
   normalizeAdbSegment,
 } from '@/lib/serverApi';
+import type { ConnectionMode, ConnectionState } from '@/components/tile/types';
 import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Save, Trash2, Palette, Plus, Copy } from 'lucide-react';
 
 type ViewerSidePanelProps = {
@@ -21,6 +22,9 @@ type ViewerSidePanelProps = {
   onChangeOrder?: (udid: string, newIndex: number) => void;
   onCloseViewer: () => void;
   connectSelection?: Set<string>;
+  connectionMode?: ConnectionState;
+  availableConnections?: Partial<Record<ConnectionMode, boolean>>;
+  onChangeConnection?: (mode: ConnectionMode) => void;
 };
 type AdbLogEntry = { id: number; time: string; command: string; output: string; success: boolean };
 type ToastMsg = { id: number; text: string; type: 'ok' | 'err' };
@@ -59,7 +63,16 @@ const LS_PRESET_COLORS = 'vsp_preset_colors';
 function loadJson<T>(key: string, def: T): T { try { return JSON.parse(localStorage.getItem(key) || '') ?? def; } catch { return def; } }
 function saveJson(key: string, v: any) { localStorage.setItem(key, JSON.stringify(v)); }
 
-export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseViewer, connectSelection }: ViewerSidePanelProps) {
+export function ViewerSidePanel({
+  udid,
+  currentOrder,
+  onChangeOrder,
+  onCloseViewer,
+  connectSelection,
+  connectionMode = 'unknown',
+  availableConnections,
+  onChangeConnection,
+}: ViewerSidePanelProps) {
   const { wsServer } = useServer();
   const { t } = useI18n();
 
@@ -1034,6 +1047,45 @@ export function ViewerSidePanel({ udid, currentOrder, onChangeOrder, onCloseView
               </div>,
               document.body
             )}
+          </div>
+
+          <div
+            className="vsp-section vsp-connection-section"
+            data-inspector-id="viewerSidePanel.connectionSwitch"
+            data-inspector-label="Device stream connection mode switch"
+            data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+          >
+            <div className="vsp-section-title vsp-connection-title">
+              <Terminal size={15} />
+              <span>Kết Nối</span>
+            </div>
+            <div className="vsp-connection-options" role="group" aria-label="Kết Nối">
+              {(['adb', 'wifi'] as ConnectionMode[]).map(mode => {
+                const isActive = connectionMode === mode;
+                const isAvailable = Boolean(availableConnections?.[mode]);
+                const isDisabled = !isAvailable || isActive;
+                const label = mode === 'adb' ? 'ADB' : 'WiFi';
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`vsp-connection-option${isActive ? ' active' : ''}`}
+                    disabled={isDisabled}
+                    aria-pressed={isActive}
+                    title={isAvailable ? label : `${label} không có endpoint`}
+                    onClick={e => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (isDisabled) return;
+                      onChangeConnection?.(mode);
+                    }}
+                  >
+                    <span>{label}</span>
+                    {isActive ? <span className="vsp-connection-current">Đang dùng</span> : null}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

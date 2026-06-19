@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { saveTileOrderToBackend, saveTileOrderNumbersToBackend } from '../lib/backendSettings';
 
 const TILE_NUMBER_KEY = 'tileOrderNumbers';
@@ -227,13 +227,13 @@ export function useTileOrder(defaultDevices: string[]) {
     });
   }, [mergedOrder, orderNumbers]);
 
-  const setTileNumber = (udid: string, nextNumber: number) => {
+  const setTileNumber = useCallback((udid: string, nextNumber: number) => {
     if (!defaultDevices.includes(udid)) return;
     const normalized = Math.max(1, Math.floor(nextNumber));
     setOrderNumbers((prev) => ({ ...prev, [udid]: normalized }));
-  };
+  }, [defaultDevices]);
 
-  const moveTile = (udid: string, toIndex: number) => {
+  const moveTile = useCallback((udid: string, toIndex: number) => {
     const idx = mergedOrder.indexOf(udid);
     if (idx < 0) return;
     const clampedIndex = Math.max(0, Math.min(mergedOrder.length - 1, toIndex));
@@ -242,9 +242,22 @@ export function useTileOrder(defaultDevices: string[]) {
     next.splice(idx, 1);
     next.splice(clampedIndex, 0, udid);
     setOrder(next);
-  };
+  }, [mergedOrder]);
 
-  const getTileNumber = (udid: string, fallback: number) => orderNumbers[udid] ?? fallback;
+  const removeTile = useCallback((udid: string) => {
+    setOrder((prev) => (prev.includes(udid) ? prev.filter((id) => id !== udid) : prev));
+    setOrderNumbers((prev) => {
+      if (!Object.prototype.hasOwnProperty.call(prev, udid)) return prev;
+      const next = { ...prev };
+      delete next[udid];
+      return next;
+    });
+  }, []);
 
-  return { mergedOrder: sortedOrder, moveTile, getTileNumber, setTileNumber };
+  const getTileNumber = useCallback(
+    (udid: string, fallback: number) => orderNumbers[udid] ?? fallback,
+    [orderNumbers]
+  );
+
+  return { mergedOrder: sortedOrder, moveTile, removeTile, getTileNumber, setTileNumber };
 }

@@ -4662,6 +4662,62 @@ textarea.vsp-modal-input {
   background: rgba(255, 100, 100, 0.12) !important;
 }
 
+.vsp-connection-section {
+  gap: 8px;
+}
+
+.vsp-connection-title {
+  justify-content: flex-start;
+}
+
+.vsp-connection-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.vsp-connection-option {
+  min-height: 34px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--md-radius-sm);
+  border: 1px solid var(--md-border);
+  background: rgba(255, 255, 255, .055);
+  color: var(--md-text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vsp-connection-option:hover:not(:disabled) {
+  background: rgba(255, 255, 255, .09);
+  border-color: var(--md-border-strong);
+}
+
+.vsp-connection-option.active {
+  color: var(--md-text);
+  border-color: var(--md-info);
+  background: linear-gradient(135deg, var(--md-info), var(--md-blue));
+  cursor: default;
+}
+
+.vsp-connection-option:disabled:not(.active) {
+  color: var(--md-muted);
+  opacity: .52;
+  cursor: not-allowed;
+}
+
+.vsp-connection-current {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--md-text);
+  opacity: .85;
+}
+
 /* Right-click context menu */
 .vsp-ctx-menu {
   position: fixed;
@@ -4710,78 +4766,6 @@ textarea.vsp-modal-input {
   padding: 4px 12px;
   font-size: 12px;
   color: #888;
-}
-
-.deviceViewerContextMenu,
-.deviceViewerContextSubmenu {
-  position: fixed;
-  z-index: 27000;
-  min-width: 176px;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  color: var(--md-text);
-  background: var(--md-card);
-  border: 1px solid var(--md-border);
-  border-radius: var(--md-radius-sm);
-  box-shadow: var(--md-shadow-panel);
-}
-
-.deviceViewerContextMenu {
-  left: var(--context-menu-x);
-  top: var(--context-menu-y);
-}
-
-.deviceViewerContextMenuGroup {
-  position: relative;
-}
-
-.deviceViewerContextSubmenu {
-  position: absolute;
-  top: 0;
-  left: calc(100% - 4px);
-  z-index: 27001;
-  min-width: 156px;
-}
-
-.deviceViewerContextMenuItem {
-  width: 100%;
-  height: 32px;
-  padding: 0 10px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border: 1px solid transparent;
-  border-radius: var(--md-radius-sm);
-  background: transparent;
-  color: var(--md-text);
-  font-size: 13px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}
-
-.deviceViewerContextMenuItem:hover {
-  background: rgba(255, 255, 255, .09);
-  border-color: var(--md-border-strong);
-}
-
-.deviceViewerContextMenuItem.is-disabled {
-  color: var(--md-muted);
-  opacity: .55;
-  cursor: default;
-}
-
-.deviceViewerContextMenuItem.is-disabled:hover {
-  background: transparent;
-  border-color: transparent;
-}
-
-.deviceViewerContextMenuArrow {
-  color: var(--md-muted);
-  font-size: 10px;
 }
 
 .vsp-ctx-colors {
@@ -5517,6 +5501,23 @@ input[type="number"] {
 .ctxMenuItem:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
+}
+
+.ctxMenuItem.ctxMenuItemDanger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--md-danger);
+}
+
+.ctxMenuItem.ctxMenuItemDanger:hover {
+  background: color-mix(in srgb, var(--md-danger) 16%, transparent);
+  color: var(--md-danger);
+}
+
+.ctxMenuItemTarget {
+  color: var(--md-danger);
+  font-size: 11px;
 }
 
 /* === Drag reorder nhóm === */
