@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
 import { saveHotkeySettingToBackend, saveBackendSetting } from '@/lib/backendSettings'
@@ -20,7 +20,12 @@ import { MacroPlaybackPanel } from '@/components/MacroPlaybackPanel'
 import { applyThemeOverrides, loadThemeOverrides } from '@/lib/themeInspector'
 import { useActive } from '@/context/ActiveContext'
 import { AndroidKeycode } from '@/lib/keyEvent'
-import { encodeKeycodeMessage, KeyEventAction } from '@/lib/control'
+import {
+  encodeKeycodeMessage,
+  encodeSetScreenPowerModeMessage,
+  KeyEventAction,
+  ScreenPowerMode
+} from '@/lib/control'
 import {
   installApk,
   installUploadedApk,
@@ -2463,22 +2468,50 @@ export function App() {
     }
   }, [connectedUdids, wsServer]);
 
-  // callback_runPhysicalScreenOffWithStayAwake : Chạy stay awake trước rồi tắt màn hình vật lý
+  const stayAwakePreparedRef = useRef<Set<string>>(new Set())
+
+  const ensureStayAwakeForDevice = useCallback(
+    async (udid: string) => {
+      if (stayAwakePreparedRef.current.has(udid)) return
+      try {
+        await runAdbCommandApi(
+          wsServer,
+          udid,
+          'adb shell settings put global stay_on_while_plugged_in 7'
+        )
+        stayAwakePreparedRef.current.add(udid)
+      } catch (err) {
+        console.warn('[stay-awake] failed', udid, err)
+      }
+    },
+    [wsServer]
+  )
+
+  const sendPhysicalScreenPowerViaControl = useCallback(
+    (udid: string, mode: ScreenPowerMode): boolean => {
+      const resolved = getTargetsByUdids([udid])
+      const target = resolved[0]
+      if (!target?.ws || target.ws.readyState !== WebSocket.OPEN) return false
+
+      try {
+        target.ws.send(encodeSetScreenPowerModeMessage(mode))
+        return true
+      } catch (err) {
+        console.warn('[display-power] screen power ws failed', udid, err)
+        return false
+      }
+    },
+    [getTargetsByUdids]
+  )
+
+  // callback_runPhysicalScreenOffWithStayAwake : Tắt panel qua control channel trước, rồi đảm bảo Stay Awake
   const runPhysicalScreenOffWithStayAwake = useCallback(
     async (targets: string[]) => {
       if (!targets.length) return
 
       await Promise.allSettled(
         targets.map(async (udid) => {
-          try {
-            await runAdbCommandApi(
-              wsServer,
-              udid,
-              'adb shell settings put global stay_on_while_plugged_in 7'
-            )
-          } catch (err) {
-            console.warn('[stay-awake] failed', udid, err)
-          }
+          const stayAwakePromise = ensureStayAwakeForDevice(udid)
 
           try {
             const d = androidDeviceMap[udid]
@@ -2487,9 +2520,18 @@ export function App() {
               const isAndroid15 = sdk >= 35 || d['ro.build.version.release'] === '15'
               if (isAndroid15 || udid === 'R3CR200MXTR' || udid === 'RFCRB1CQ2VE') {
                 console.warn('[display-power] skipped physical off for Android 15 / blocked udid', udid)
+                await stayAwakePromise
                 return
               }
             }
+
+            const sentViaControl = sendPhysicalScreenPowerViaControl(udid, ScreenPowerMode.OFF)
+            if (sentViaControl) {
+              await stayAwakePromise
+              return
+            }
+
+            await stayAwakePromise
             await setDeviceDisplayPower(wsServer, udid, 'off')
           } catch (err) {
             console.warn('[display-power] physical off failed', udid, err)
@@ -2497,7 +2539,7 @@ export function App() {
         })
       )
     },
-    [wsServer, androidDeviceMap]
+    [androidDeviceMap, ensureStayAwakeForDevice, sendPhysicalScreenPowerViaControl, wsServer]
   )
 
   // ref_autoScreenPrepared : Lưu danh sách thiết bị đã được chuẩn bị tự động để tránh spam
@@ -2519,6 +2561,7 @@ export function App() {
     for (const udid of Array.from(autoScreenPreparedRef.current)) {
       if (!connectedUdids.has(udid)) {
         autoScreenPreparedRef.current.delete(udid)
+        stayAwakePreparedRef.current.delete(udid)
       }
     }
   }, [orderedRegistered, connectedUdids, runPhysicalScreenOffWithStayAwake])
@@ -4236,6 +4279,7 @@ export function App() {
                   px
                 </div>
               </div>
+
             </div>
 
             {/* visualAlertPanel : Section Visual Alert - quét chấm đỏ notification */}
@@ -4840,6 +4884,8 @@ export function App() {
                 >
                   <option value="">Auto</option>
                   <option value="OMX.google.h264.encoder">H.264 (OMX.google)</option>
+                  <option value="OMX.Exynos.AVC.Encoder">H.264 (OMX.Exynos.AVC.Encoder)</option>
+                  <option value="c2.android.avc.encoder">H.264 (c2.android.avc.encoder - Software)</option>
                 </select>
               </div>
             </div>
@@ -6941,3 +6987,6 @@ function InputModalOverlayInner({ state, onClose }: { state: NonNullable<InputMo
     document.body
   );
 }
+
+
+

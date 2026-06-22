@@ -5,6 +5,7 @@ export enum ControlMessageType {
   SCROLL = 3,
   GET_CLIPBOARD = 8,
   SET_CLIPBOARD = 9,
+  SET_SCREEN_POWER_MODE = 10,
 }
 
 export enum MotionAction {
@@ -16,6 +17,11 @@ export enum MotionAction {
 export enum KeyEventAction {
   DOWN = 0,
   UP = 1,
+}
+
+export enum ScreenPowerMode {
+  OFF = 0,
+  NORMAL = 2,
 }
 
 export function clamp(n: number, min: number, max: number): number {
@@ -108,6 +114,13 @@ export function encodeKeycodeMessage(
   o += 4;
   dv.setUint32(o, meta >>> 0, false);
   return new Uint8Array(buf);
+}
+
+export function encodeSetScreenPowerModeMessage(mode: ScreenPowerMode): Uint8Array {
+  const u8 = new Uint8Array(2);
+  u8[0] = ControlMessageType.SET_SCREEN_POWER_MODE;
+  u8[1] = mode & 0xff;
+  return u8;
 }
 
 export function encodeTextMessage(text: string): Uint8Array {

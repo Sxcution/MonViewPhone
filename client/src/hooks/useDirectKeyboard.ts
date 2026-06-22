@@ -194,9 +194,14 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       const isCtrl = e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight';
       const isFn = e.key === 'Fn' || e.code === 'Fn';
 
-      const hasModifierCombo = e.altKey || e.ctrlKey || e.metaKey; // Shift still allowed
+      // Vô hiệu hoá hoàn toàn phím Ctrl đối với device grid
+      if (isCtrl || e.ctrlKey) {
+        return;
+      }
 
-      if (isWin || isAlt || isCtrl || isFn || hasModifierCombo) {
+      const hasModifierCombo = e.altKey || e.metaKey; // Shift still allowed
+
+      if (isWin || isAlt || isFn || hasModifierCombo) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation?.();
@@ -267,9 +272,12 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
       const isAlt = e.key === 'Alt' || e.code === 'AltLeft' || e.code === 'AltRight';
       const isCtrl = e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight';
       const isFn = e.key === 'Fn' || e.code === 'Fn';
-      const hasModifierCombo = e.altKey || e.ctrlKey || e.metaKey;
 
-      if (isWin || isAlt || isCtrl || isFn || hasModifierCombo) {
+      if (isCtrl || e.ctrlKey) return;
+
+      const hasModifierCombo = e.altKey || e.metaKey;
+
+      if (isWin || isAlt || isFn || hasModifierCombo) {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation?.();
