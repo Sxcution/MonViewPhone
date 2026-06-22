@@ -210,6 +210,14 @@ func pushMediaStoreViaDeviceTmp(udid, tmpPath, fileName, uri, mimeType, relPath 
 	return nil
 }
 
+func mediaStoreCandidateURIs(uri string) []string {
+	candidates := []string{uri}
+	if strings.Contains(uri, "content://media/external/") {
+		candidates = append(candidates, strings.Replace(uri, "content://media/external/", "content://media/external_primary/", 1))
+	}
+	return candidates
+}
+
 func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 	remotePath = strings.TrimSpace(remotePath)
 	userID := userIDFromRemotePath(remotePath)
@@ -225,13 +233,24 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 	// We MUST use the MediaStore Content Provider API since direct adb push or cp to /storage/emulated/{userID}/
 	// will fail with Permission Denied due to multi-user storage isolation.
 	if userID > 0 && useMediaStore {
-		if err := pushMediaStoreViaExecIn(udid, tmpPath, fileName, uri, mimeType, relPath, userID); err == nil {
-			return nil
+		var errs []string
+		for _, candidateURI := range mediaStoreCandidateURIs(uri) {
+			if err := pushMediaStoreViaExecIn(udid, tmpPath, fileName, candidateURI, mimeType, relPath, userID); err == nil {
+				return nil
+			} else {
+				errs = append(errs, fmt.Sprintf("exec-in uri=%s err=%v", candidateURI, err))
+				log.Printf("[PUSH_FILE_FALLBACK] exec-in failed udid=%s user=%d uri=%s file=%s err=%v", udid, userID, candidateURI, fileName, err)
+			}
+
+			if err := pushMediaStoreViaDeviceTmp(udid, tmpPath, fileName, candidateURI, mimeType, relPath, userID); err == nil {
+				return nil
+			} else {
+				errs = append(errs, fmt.Sprintf("device-tmp uri=%s err=%v", candidateURI, err))
+				log.Printf("[PUSH_FILE_FALLBACK] device-tmp failed udid=%s user=%d uri=%s file=%s err=%v", udid, userID, candidateURI, fileName, err)
+			}
 		}
-		if err := pushMediaStoreViaDeviceTmp(udid, tmpPath, fileName, uri, mimeType, relPath, userID); err != nil {
-			return fmt.Errorf("MediaStore push failed for user %d path %s: %w", userID, remotePath, err)
-		}
-		return nil
+
+		return fmt.Errorf("MediaStore push failed for user %d path %s: %s", userID, remotePath, strings.Join(errs, " | "))
 	}
 
 	// CASE 2: Work Profile / Secondary User (userID > 0) pushing non-media files.
