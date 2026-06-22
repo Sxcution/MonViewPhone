@@ -218,6 +218,68 @@ func mediaStoreCandidateURIs(uri string) []string {
 	return candidates
 }
 
+func rootShell(udid, cmd string) (string, error) {
+	candidates := []string{
+		"su 0 sh -c " + shellQuote(cmd),
+		"su -c " + shellQuote(cmd),
+	}
+
+	var errs []string
+	for _, candidate := range candidates {
+		out, err := adb.CommandTimeout(30*time.Second, "-s", udid, "shell", candidate)
+		if err == nil {
+			return out, nil
+		}
+		errs = append(errs, fmt.Sprintf("%s => %v", candidate, err))
+	}
+	return "", fmt.Errorf(strings.Join(errs, " | "))
+}
+
+func pushDataMediaRootFallback(udid, tmpPath, fileName, relPath string, userID int) error {
+	safeTmpName := sanitizeFileName(fileName)
+	deviceTmp := fmt.Sprintf("/data/local/tmp/%d_%s", time.Now().UnixNano(), safeTmpName)
+
+	if _, err := adb.Command("-s", udid, "push", tmpPath, deviceTmp); err != nil {
+		return err
+	}
+	defer adb.Shell(udid, "rm "+shellQuote(deviceTmp))
+
+	cleanRelPath := strings.Trim(relPath, "/")
+	dataDir := path.Join("/data/media", strconv.Itoa(userID), cleanRelPath)
+	dataPath := path.Join(dataDir, fileName)
+
+	cmd := fmt.Sprintf(
+		"mkdir -p %s && cp %s %s && (chown media_rw:media_rw %s 2>/dev/null || chown 1023:1023 %s 2>/dev/null || true) && chmod 664 %s && (restorecon %s 2>/dev/null || true) && ls -lZ %s",
+		shellQuote(dataDir),
+		shellQuote(deviceTmp),
+		shellQuote(dataPath),
+		shellQuote(dataPath),
+		shellQuote(dataPath),
+		shellQuote(dataPath),
+		shellQuote(dataPath),
+		shellQuote(dataPath),
+	)
+
+	out, err := rootShell(udid, cmd)
+	if err != nil {
+		return fmt.Errorf("root /data/media fallback failed: %w", err)
+	}
+
+	log.Printf("[PUSH_FILE_ROOT_FALLBACK] copied udid=%s user=%d file=%s out=%s", udid, userID, dataPath, strings.TrimSpace(out))
+
+	scanPath := path.Join("/storage/emulated", strconv.Itoa(userID), cleanRelPath, fileName)
+	scanCmd := fmt.Sprintf(
+		"am broadcast --user %d -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d %s",
+		userID,
+		shellQuote("file://" + scanPath),
+	)
+	if scanOut, scanErr := adb.Shell(udid, scanCmd); scanErr != nil {
+		log.Printf("[PUSH_FILE_ROOT_FALLBACK] media scan ignored udid=%s user=%d path=%s err=%v out=%s", udid, userID, scanPath, scanErr, scanOut)
+	}
+
+	return nil
+}
+
 func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 	remotePath = strings.TrimSpace(remotePath)
 	userID := userIDFromRemotePath(remotePath)
@@ -248,6 +310,13 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 				errs = append(errs, fmt.Sprintf("device-tmp uri=%s err=%v", candidateURI, err))
 				log.Printf("[PUSH_FILE_FALLBACK] device-tmp failed udid=%s user=%d uri=%s file=%s err=%v", udid, userID, candidateURI, fileName, err)
 			}
+		}
+
+		if err := pushDataMediaRootFallback(udid, tmpPath, fileName, relPath, userID); err == nil {
+			return nil
+		} else {
+			log.Printf("[PUSH_FILE_ROOT_FALLBACK] failed udid=%s user=%d file=%s err=%v", udid, userID, fileName, err)
+			errs = append(errs, fmt.Sprintf("root-data-media err=%v", err))
 		}
 
 		return fmt.Errorf("MediaStore push failed for user %d path %s: %s", userID, remotePath, strings.Join(errs, " | "))
