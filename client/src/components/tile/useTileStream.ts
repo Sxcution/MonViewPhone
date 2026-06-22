@@ -413,10 +413,9 @@ export function useTileStream(args: Args) {
           // Advance stage index
           currentStageIdxRef.current++;
           if (currentStageIdxRef.current >= fallbackStagesRef.current.length) {
-            // We have exhausted all trial stages. Force legacy tinyh264 fallback
-            streamCfgRef.current.engine = 'legacy-tinyh264';
+            // We have exhausted all trial stages. Keep trying WebCodecs
             currentStageIdxRef.current = 0;
-            fallbackReasonRef.current = 'All encoders failed. Using software tinyh264';
+            fallbackReasonRef.current = 'All encoders failed. Retrying WebCodecs...';
           }
 
           reconnectCountRef.current++;
@@ -513,7 +512,7 @@ export function useTileStream(args: Args) {
             // Resolve target stream parameters based on active stage
             const trialConfig: StreamConfig = {
               ...streamCfgRef.current,
-              encoderName: currentStage.encoderName !== undefined ? currentStage.encoderName : streamCfgRef.current.encoderName,
+              encoderName: 'encoderName' in currentStage ? currentStage.encoderName : streamCfgRef.current.encoderName,
               bitrate: currentStage.bitrate || streamCfgRef.current.bitrate,
               maxFps: currentStage.maxFps || streamCfgRef.current.maxFps,
               bounds: currentStage.bounds ? { ...streamCfgRef.current.bounds, ...currentStage.bounds } : streamCfgRef.current.bounds
@@ -559,10 +558,10 @@ export function useTileStream(args: Args) {
 
                 if (nextIndex >= totalStages) {
                   // Reached end of pipeline, force legacy fallback
-                  streamCfgRef.current.engine = 'legacy-tinyh264';
+                  // DISABLED: Do not fallback to tinyh264 now
                   currentStageIdxRef.current = 0;
-                  fallbackReasonRef.current = 'Initial frame timed out. Fallback to software tinyh264';
-                  setStatus(tRef.current('Đang đổi sang tinyh264 software…'));
+                  fallbackReasonRef.current = 'Initial frame timed out. Retrying WebCodecs...';
+                  setStatus(tRef.current('Đang chờ phản hồi WebCodecs…'));
                 } else {
                   currentStageIdxRef.current = nextIndex;
                   const reason = `Frame timeout on stage ${currentStage.description}`;
@@ -616,9 +615,9 @@ export function useTileStream(args: Args) {
                 if (!firstFrame) {
                   const nextIndex = currentStageIdxRef.current + 1;
                   if (nextIndex >= fallbackStagesRef.current.length) {
-                    streamCfgRef.current.engine = 'legacy-tinyh264';
+                    // DISABLED: Do not fallback to tinyh264 now
                     currentStageIdxRef.current = 0;
-                    fallbackReasonRef.current = 'WS Closed. Fallback to software tinyh264';
+                    fallbackReasonRef.current = 'WS Closed. Retrying WebCodecs...';
                   } else {
                     currentStageIdxRef.current = nextIndex;
                     fallbackReasonRef.current = `WS closed (Code ${e.code})`;

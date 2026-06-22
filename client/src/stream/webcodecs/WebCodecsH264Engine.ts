@@ -1,5 +1,4 @@
 import { StreamCallbacks, StreamEngine, StreamStats } from '../StreamEngine';
-import { AnnexBSplitter } from '@/lib/video';
 import { AccessUnitAssembler } from '../h264/AccessUnitAssembler';
 import { Canvas2DVideoFrameRenderer } from '../render/Canvas2DVideoFrameRenderer';
 
@@ -25,7 +24,6 @@ export class WebCodecsH264Engine implements StreamEngine {
   private decoder: VideoDecoder | null = null;
   private renderer: Canvas2DVideoFrameRenderer | null = null;
   private assembler: AccessUnitAssembler | null = null;
-  private splitter: AnnexBSplitter | null = null;
 
   private isReadyState = false;
   private firstFrame = false;
@@ -59,14 +57,11 @@ export class WebCodecsH264Engine implements StreamEngine {
 
     this.renderer = new Canvas2DVideoFrameRenderer(this.canvas);
     this.assembler = new AccessUnitAssembler((frameBytes, isKey) => {
+      console.log(`[WebCodecs Debug] Access unit emitted, length: ${frameBytes.length}, isKey: ${isKey}`);
       this.handleAssembledFrame(frameBytes, isKey);
     });
 
     this.initDecoder();
-
-    this.splitter = new AnnexBSplitter((naluWithStartCode) => {
-      this.assembler?.feedNalu(naluWithStartCode);
-    });
 
     this.isReadyState = true;
   }
@@ -78,6 +73,7 @@ export class WebCodecsH264Engine implements StreamEngine {
 
     this.decoder = new VideoDecoder({
       output: (frame) => {
+        console.log(`[WebCodecs Debug] Decoder output frame: ${frame.displayWidth}x${frame.displayHeight}`);
         this.renderedFramesCount++;
         this.width = frame.displayWidth;
         this.height = frame.displayHeight;
@@ -87,14 +83,20 @@ export class WebCodecsH264Engine implements StreamEngine {
           this.callbacks.onFirstFrame?.({ width: this.width, height: this.height });
         }
 
-        this.renderer?.draw(frame);
+        try {
+          this.renderer?.draw(frame);
+          console.log(`[WebCodecs Debug] Render success`);
+        } catch (e) {
+          console.error('[WebCodecs Debug] Render failed:', e);
+        }
+
         frame.close();
         this.callbacks.onFrame?.();
       },
       error: (e) => {
-        console.error('[WebCodecsH264Engine decoder error]', e);
+        console.error('[WebCodecs Debug] Decoder error callback triggered:', e);
         this.callbacks.onError?.(e);
-        this.callbacks.onFallbackRequested?.('Decoder reported error: ' + e.message);
+        // Fallback disabled to keep WebCodecs active for debugging
       }
     });
   }
@@ -138,7 +140,7 @@ export class WebCodecsH264Engine implements StreamEngine {
 
     // Config verification guard
     if (this.activeCodec === '') {
-      // No SPS yet, can't parse format or decode
+      console.log(`[WebCodecs Debug] activeCodec is empty, skipping chunk decode`);
       return;
     }
 
@@ -147,12 +149,14 @@ export class WebCodecsH264Engine implements StreamEngine {
       if (isKey) {
         this.keyframeReceived = true;
       } else {
+        console.log(`[WebCodecs Debug] Keyframe not received yet, skipping delta frame`);
         return;
       }
     }
 
     // Backpressure: drop stale delta frames if decode queue starts to pile up
     if (this.decoder.decodeQueueSize > 8 && !isKey) {
+      console.log(`[WebCodecs Debug] Backpressure dropping frame (queue: ${this.decoder.decodeQueueSize})`);
       this.droppedFramesCount++;
       return;
     }
@@ -163,14 +167,12 @@ export class WebCodecsH264Engine implements StreamEngine {
         timestamp: Date.now() * 1000, // microseconds
         data: frameBytes.buffer
       });
+      console.log(`[WebCodecs Debug] Decode called for chunk type: ${chunk.type}, timestamp: ${chunk.timestamp}`);
       this.decoder.decode(chunk);
       this.decodedFramesCount++;
     } catch (e: any) {
-      console.error('[WebCodecs decode chunk failed]', e);
-      if (isKey) {
-        // Fatal decode error on keyframe, request fallback
-        this.callbacks.onFallbackRequested?.('Chunk decode failed: ' + e.message);
-      }
+      console.error('[WebCodecs Debug] decode chunk failed:', e);
+      // Fallback disabled to keep WebCodecs active for debugging
     }
   }
 
@@ -180,14 +182,16 @@ export class WebCodecsH264Engine implements StreamEngine {
     try {
       const codec = getCodecString(this.lastSps);
       this.activeCodec = codec;
+      console.log(`[WebCodecs Debug] Codec string determined: ${codec}`);
 
       this.decoder.configure({
         codec,
         optimizeForLatency: true
       });
+      console.log(`[WebCodecs Debug] Decoder configured successfully`);
     } catch (e: any) {
-      console.error('[WebCodecs reconfigure failed]', e);
-      this.callbacks.onFallbackRequested?.('Reconfigure failed: ' + e.message);
+      console.error('[WebCodecs Debug] configure failed:', e);
+      // Fallback disabled to keep WebCodecs active for debugging
     }
   }
 
@@ -213,11 +217,11 @@ export class WebCodecsH264Engine implements StreamEngine {
       this.renderer = null;
     }
     this.assembler = null;
-    this.splitter = null;
   }
 
   feedBytes(data: Uint8Array) {
-    this.splitter?.push(data);
+    console.log(`[WebCodecs Debug] Received bytes length: ${data.length}`);
+    this.assembler?.feedPacket(data);
   }
 
   isReady(): boolean {
