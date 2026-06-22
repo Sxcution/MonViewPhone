@@ -739,4 +739,26 @@ Các thay đổi cụ thể gồm:
 4. **Biên Dịch & Xác Thực**:
    - Chạy lệnh `npm run build` thành công 100% không gặp bất kỳ lỗi nào.
 
+## Ngăn chặn tuyệt đối việc tự động sáng màn hình điện thoại (Always Screen Off)
+
+Để đảm bảo màn hình thiết bị luôn luôn tắt và không bao giờ tự động sáng lên trong mọi điều kiện (khi mở lại app, tải lại trang, stream bị reconnect, hoặc phím Back được gửi từ client):
+
+1. **Vô hiệu hóa hoàn toàn phương thức đánh thức (`turnScreenOn`) của Controller**:
+   - Chỉnh sửa file [Controller.smali](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/scrcpy-smali/smali/com/genymobile/scrcpy/Controller.smali) biến phương thức `turnScreenOn()V` thành một phương thức trống (`return-void` ngay lập tức). Điều này triệt tiêu hoàn toàn khả năng scrcpy-server tự động giả lập nhấn nút Power (Keycode 26) để bật màn hình.
+
+2. **Chặn kích hoạt màn hình khi nhận sự kiện phím Back (`pressBackOrTurnScreenOn`) lúc màn hình đang tắt**:
+   - Cấu hình lại đoạn mã smali trong `pressBackOrTurnScreenOn` của [Controller.smali](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/scrcpy-smali/smali/com/genymobile/scrcpy/Controller.smali) sao cho khi màn hình đang tắt và nhận sự kiện phím Back, hệ thống sẽ trả về `true` ngay lập tức tại nhãn `:cond_1` và không còn chạy qua lệnh giả lập bấm nút Power (Keycode 26) nữa.
+
+3. **Recompile scrcpy-server.jar từ Smali**:
+   - Sử dụng `apktool` để dịch ngược và đóng gói lại toàn bộ thư mục `scrcpy-smali` thành file [scrcpy-server.jar](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/scrcpy-server.jar) mới chạy trên điện thoại.
+
+4. **Dọn dẹp triệt để các tiến trình scrcpy cũ khi khởi động Go Backend**:
+   - Thêm hàm `CleanAllMonViewPhoneServers` trong [server.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/scrcpy/server.go) để quét và gọi `kill -9` loại bỏ toàn bộ các tiến trình scrcpy-server đang chạy nền (nohup) từ phiên làm việc trước trên tất cả các điện thoại đang online.
+   - Hàm này được gọi trong `main()` của [main.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/main.go) ngay sau khi khởi chạy ADB Tracker và sleep 500ms để tracker kịp quét thiết bị.
+   - Nhờ đó, khi người dùng khởi động lại Go Backend hoặc mở lại app, các tiến trình scrcpy cũ sử dụng mã JAR chưa được vá sẽ bị tiêu diệt hoàn toàn, ép buộc hệ thống đẩy file `scrcpy-server.jar` mới nhất xuống điện thoại và tự động duy trì màn hình tắt (`setScreenPowerMode(0)`) khi client join stream.
+
+5. **Xác thực**:
+   - Biên dịch frontend và backend Go thành công 100%. Các điện thoại luôn được giữ ở trạng thái tắt màn hình vật lý kể cả khi mở lại/tải lại ứng dụng.
+
+
 

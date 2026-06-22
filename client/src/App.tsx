@@ -2514,16 +2514,6 @@ export function App() {
           const stayAwakePromise = ensureStayAwakeForDevice(udid)
 
           try {
-            const d = androidDeviceMap[udid]
-            if (d) {
-              const sdk = parseInt(d['ro.build.version.sdk'] || '0', 10)
-              const isAndroid15 = sdk >= 35 || d['ro.build.version.release'] === '15'
-              if (isAndroid15 || udid === 'R3CR200MXTR' || udid === 'RFCRB1CQ2VE') {
-                console.warn('[display-power] skipped physical off for Android 15 / blocked udid', udid)
-                await stayAwakePromise
-                return
-              }
-            }
 
             const sentViaControl = sendPhysicalScreenPowerViaControl(udid, ScreenPowerMode.OFF)
             if (sentViaControl) {

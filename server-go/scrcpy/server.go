@@ -256,3 +256,15 @@ func ForwardPort(udid string) (string, error) {
 	}
 	return port, nil
 }
+
+func CleanAllMonViewPhoneServers(tracker *adb.Tracker) {
+	devices := tracker.GetDevices()
+	log.Printf("[Startup] Cleaning up existing scrcpy servers on %d devices...", len(devices))
+	for id, dev := range devices {
+		if dev.Status == adb.StatusOnline {
+			log.Printf("[%s] Startup cleanup: force killing existing scrcpy server", id)
+			_ = killMonViewPhoneScrcpyServers(id)
+			_ = shellSafe(id, "rm -f "+PidFilePath+" "+LogFilePath)
+		}
+	}
+}

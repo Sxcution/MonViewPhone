@@ -689,22 +689,7 @@
 
     .line 257
     :cond_1
-    iget-boolean p1, p0, Lcom/genymobile/scrcpy/Controller;->keepPowerModeOff:Z
-
-    if-eqz p1, :cond_2
-
-    .line 258
-    invoke-static {}, Lcom/genymobile/scrcpy/Controller;->schedulePowerModeOff()V
-
-    .line 260
-    :cond_2
-    iget-object p1, p0, Lcom/genymobile/scrcpy/Controller;->device:Lcom/genymobile/scrcpy/Device;
-
-    const/16 v0, 0x1a
-
-    invoke-virtual {p1, v0}, Lcom/genymobile/scrcpy/Device;->pressReleaseKeycode(I)Z
-
-    move-result p1
+    const/4 p1, 0x1
 
     return p1
 .end method
@@ -1085,14 +1070,7 @@
 .end method
 
 .method public turnScreenOn()V
-    .locals 2
-
-    .line 278
-    iget-object v0, p0, Lcom/genymobile/scrcpy/Controller;->device:Lcom/genymobile/scrcpy/Device;
-
-    const/16 v1, 0x1a
-
-    invoke-virtual {v0, v1}, Lcom/genymobile/scrcpy/Device;->pressReleaseKeycode(I)Z
+    .locals 0
 
     return-void
 .end method

@@ -698,12 +698,14 @@
 
     move-result p1
 
-    .line 30
     iget-object v0, p0, Lcom/genymobile/scrcpy/WebSocketConnection;->wsServer:Lcom/genymobile/scrcpy/WSServer;
 
     invoke-virtual {v0}, Lcom/genymobile/scrcpy/WSServer;->sendInitialInfoToAll()V
 
-    .line 31
+    const/4 v0, 0x0
+
+    invoke-static {v0}, Lcom/genymobile/scrcpy/Device;->setScreenPowerMode(I)Z
+
     :cond_0
     iget-object v0, p0, Lcom/genymobile/scrcpy/WebSocketConnection;->screenEncoder:Lcom/genymobile/scrcpy/ScreenEncoder;
 

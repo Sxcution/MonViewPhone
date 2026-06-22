@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"server-go/adb"
+	"server-go/scrcpy"
 	"server-go/websocket"
 	"strings"
 	"time"
@@ -226,6 +227,12 @@ func main() {
 	// Start ADB Tracker
 	tracker := adb.NewTracker()
 	tracker.Start()
+
+	// Wait a moment for tracker to poll devices first
+	time.Sleep(500 * time.Millisecond)
+
+	// Clean up existing scrcpy servers
+	scrcpy.CleanAllMonViewPhoneServers(tracker)
 
 	// Setup HTTP handler with action query param router
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
