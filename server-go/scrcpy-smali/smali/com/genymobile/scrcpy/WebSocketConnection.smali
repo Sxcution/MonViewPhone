@@ -704,18 +704,6 @@
     invoke-virtual {v0}, Lcom/genymobile/scrcpy/WSServer;->sendInitialInfoToAll()V
 
     .line 31
-    invoke-static {}, Lcom/genymobile/scrcpy/Device;->isScreenOn()Z
-
-    move-result v0
-
-    if-nez v0, :cond_0
-
-    .line 32
-    iget-object v0, p0, Lcom/genymobile/scrcpy/WebSocketConnection;->controller:Lcom/genymobile/scrcpy/Controller;
-
-    invoke-virtual {v0}, Lcom/genymobile/scrcpy/Controller;->turnScreenOn()V
-
-    .line 34
     :cond_0
     iget-object v0, p0, Lcom/genymobile/scrcpy/WebSocketConnection;->screenEncoder:Lcom/genymobile/scrcpy/ScreenEncoder;
 
