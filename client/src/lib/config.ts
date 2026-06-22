@@ -14,6 +14,8 @@ export type StreamConfig = {
   displayId: number;
   codecOptions?: string;
   encoderName?: string;
+  engine?: 'auto' | 'webcodecs' | 'legacy-tinyh264';
+  encoderMode?: 'auto' | 'hardware' | 'software' | 'custom';
 };
 
 export const STREAM_CONFIG: StreamConfig = {
@@ -24,4 +26,6 @@ export const STREAM_CONFIG: StreamConfig = {
   sendFrameMeta: false,
   displayId: 0,
   encoderName: 'OMX.google.h264.encoder',
+  engine: 'auto',
+  encoderMode: 'auto',
 };

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
 import { saveHotkeySettingToBackend, saveBackendSetting } from '@/lib/backendSettings'
@@ -4865,28 +4865,80 @@ export function App() {
             <div 
               style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}
               data-inspector-id="appSettings.videoEncodingSection"
-              data-inspector-label="Video encoding settings block"
+              data-inspector-label="Video stream settings block"
               data-inspector-component="client/src/App.tsx"
             >
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1, marginRight: 16 }}>Chế độ mã hoá video</div>
-                <select
-                  className='headerLangSelect'
-                  style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', borderRadius: '6px', padding: '6px 8px', fontSize: 12, width: 160 }}
-                  value={streamConfig.encoderName || ''}
-                  onChange={e => {
-                    const val = e.target.value === '' ? undefined : e.target.value
-                    setStreamConfig(p => ({ ...p, encoderName: val }))
-                  }}
-                  data-inspector-id="appSettings.videoEncodingSelect"
-                  data-inspector-label="Video encoder selection dropdown"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  <option value="">Auto</option>
-                  <option value="OMX.google.h264.encoder">H.264 (OMX.google)</option>
-                  <option value="OMX.Exynos.AVC.Encoder">H.264 (OMX.Exynos.AVC.Encoder)</option>
-                  <option value="c2.android.avc.encoder">H.264 (c2.android.avc.encoder - Software)</option>
-                </select>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* 1. Stream Engine Selection */}
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1, marginRight: 16 }}>Bộ giải mã video (Stream Engine)</div>
+                  <select
+                    className='headerLangSelect'
+                    style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', borderRadius: '6px', padding: '6px 8px', fontSize: 12, width: 220 }}
+                    value={streamConfig.engine || 'auto'}
+                    onChange={e => {
+                      const val = e.target.value as any;
+                      setStreamConfig(p => ({ ...p, engine: val }));
+                      setViewerStreamConfig(p => ({ ...p, engine: val }));
+                      localStorage.removeItem('monviewphone:device-stream-cache');
+                      setTimeout(() => reloadAllTiles(), 100);
+                    }}
+                    data-inspector-id="appSettings.streamEngineSelect"
+                    data-inspector-label="Stream engine selection dropdown"
+                    data-inspector-component="client/src/App.tsx"
+                  >
+                    <option value="auto">Tự động (WebCodecs / tinyh264)</option>
+                    <option value="webcodecs">WebCodecs (H.264 Hardware)</option>
+                    <option value="legacy-tinyh264">Legacy (tinyh264 Software)</option>
+                  </select>
+                </div>
+
+                {/* 2. Encoder Mode Selection */}
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1, marginRight: 16 }}>Bộ mã hoá thiết bị (Encoder Mode)</div>
+                  <select
+                    className='headerLangSelect'
+                    style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', borderRadius: '6px', padding: '6px 8px', fontSize: 12, width: 220 }}
+                    value={streamConfig.encoderMode || 'auto'}
+                    onChange={e => {
+                      const val = e.target.value as any;
+                      setStreamConfig(p => ({ ...p, encoderMode: val }));
+                      setViewerStreamConfig(p => ({ ...p, encoderMode: val }));
+                      localStorage.removeItem('monviewphone:device-stream-cache');
+                      setTimeout(() => reloadAllTiles(), 100);
+                    }}
+                    data-inspector-id="appSettings.encoderModeSelect"
+                    data-inspector-label="Device encoder mode selection dropdown"
+                    data-inspector-component="client/src/App.tsx"
+                  >
+                    <option value="auto">Tự động (Ưu tiên Hardware)</option>
+                    <option value="hardware">Chỉ dùng Hardware (Hardware Only)</option>
+                    <option value="software">Chỉ dùng Software (Software Only)</option>
+                    <option value="custom">Tuỳ chỉnh (Custom)</option>
+                  </select>
+                </div>
+
+                {/* 3. Custom Encoder Name Input (Only visible if encoderMode is custom) */}
+                {streamConfig.encoderMode === 'custom' && (
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1, marginRight: 16 }}>Tên Encoder Tuỳ chỉnh</div>
+                    <input
+                      type="text"
+                      className="dav-form-input"
+                      style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', borderRadius: '6px', padding: '6px 8px', fontSize: 12, width: 220 }}
+                      placeholder="e.g. OMX.qcom.video.encoder.avc"
+                      value={streamConfig.encoderName || ''}
+                      onChange={e => {
+                        const val = e.target.value.trim() === '' ? undefined : e.target.value.trim();
+                        setStreamConfig(p => ({ ...p, encoderName: val }));
+                        setViewerStreamConfig(p => ({ ...p, encoderName: val }));
+                      }}
+                      data-inspector-id="appSettings.customEncoderNameInput"
+                      data-inspector-label="Custom encoder name text input field"
+                      data-inspector-component="client/src/App.tsx"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

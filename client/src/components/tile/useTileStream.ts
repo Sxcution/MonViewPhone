@@ -1,10 +1,23 @@
-import { useEffect, useRef, type MutableRefObject } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { attachTouchControls } from '@/lib/touchControls';
-import { AnnexBSplitter, buildConfigBinary, makeWsUrl } from '@/lib/video';
+import { buildConfigBinary, makeWsUrl } from '@/lib/video';
 import { useI18n } from '@/context/I18nContext';
 import type { StreamConfig } from '@/lib/config';
 import type { InputTarget } from '@/context/ActiveContext';
 import type { StreamReloadOptions } from './types';
+import { useServer } from '@/context/ServerContext';
+
+// Stream Engine V2 Imports
+import { StreamEngine, StreamStats } from '@/stream/StreamEngine';
+import { LegacyTinyH264Engine } from '@/stream/legacy/LegacyTinyH264Engine';
+import { WebCodecsH264Engine } from '@/stream/webcodecs/WebCodecsH264Engine';
+import {
+  getCachedDeviceStream,
+  cacheSuccessfulStream,
+  clearDeviceStreamCache,
+  getFallbackStages,
+  FallbackStage
+} from '@/lib/deviceStreamCache';
 
 type Args = {
     udid: string;
@@ -49,11 +62,8 @@ type Args = {
 
 const STREAM_CONNECT_BATCH_SIZE = 6;
 const STREAM_CONNECT_BATCH_DELAY_MS = 1000;
-const INITIAL_FRAME_TIMEOUT_MS = 35_000;
-const MAX_INITIAL_FRAME_RESTARTS = 3;
+const INITIAL_FRAME_TIMEOUT_MS = 15_000; // Lower timeout to trigger fallback stages faster
 const RECONNECT_DELAY_MS = 1200;
-const SCRCPY_RESTARTING_STATUS = 'ADB online but scrcpy WS not responding - restarting server on device...';
-const SCRCPY_FAILED_STATUS = 'ADB online but scrcpy WS not responding after retries';
 
 type StreamSessionState = 'queued' | 'connecting' | 'connected';
 
@@ -73,6 +83,36 @@ type QueuedConnect = {
 const activeStreamSessions = new Map<string, StreamSession>();
 const connectQueue: QueuedConnect[] = [];
 let connectQueueTimer: number | null = null;
+
+// Static feature detection state for WebCodecs
+let webCodecsSupported = false;
+let webCodecsChecked = false;
+
+async function checkWebCodecsSupport(): Promise<boolean> {
+  if (webCodecsChecked) return webCodecsSupported;
+  if (!window.isSecureContext) {
+    webCodecsChecked = true;
+    webCodecsSupported = false;
+    return false;
+  }
+  if (typeof VideoDecoder === 'undefined' || typeof EncodedVideoChunk === 'undefined') {
+    webCodecsChecked = true;
+    webCodecsSupported = false;
+    return false;
+  }
+  try {
+    const config: VideoDecoderConfig = {
+      codec: 'avc1.42e01f',
+      optimizeForLatency: true
+    };
+    const res = await VideoDecoder.isConfigSupported(config);
+    webCodecsSupported = !!res.supported;
+  } catch {
+    webCodecsSupported = false;
+  }
+  webCodecsChecked = true;
+  return webCodecsSupported;
+}
 
 function flushConnectQueue() {
     connectQueueTimer = null;
@@ -127,16 +167,6 @@ function releaseStreamSession(udid: string, owner: symbol, ws?: WebSocket) {
     activeStreamSessions.delete(udid);
 }
 
-/**
- * Handles the *streaming pipeline* for a tile:
- * - WebSocket connect/reconnect
- * - tinyh264 decode worker
- * - YUV->ImageBitmap render worker
- * - canvas fit (ResizeObserver + viewport listeners)
- * - touch controls attachment
- *
- * Logic is moved from the original monolithic Tile.tsx WITHOUT changing behavior.
- */
 export function useTileStream(args: Args) {
     const {
         udid,
@@ -164,6 +194,7 @@ export function useTileStream(args: Args) {
         reloadRef,
         onVideoDims,
     } = args;
+
     const logicalUdid = controlUdid || udid;
     const streamEndpointUdid = streamUdid || deviceParam || udid;
     const streamDeviceParam = streamUdid || deviceParam;
@@ -178,13 +209,25 @@ export function useTileStream(args: Args) {
         tRef.current = t;
     }, [t]);
 
+    const { androidDeviceMap } = useServer();
+
+    // Stream Stats state exposed to Tile Component
+    const [streamStats, setStreamStats] = useState<StreamStats | null>(null);
+
+    // Fallback Machine State
+    const fallbackStagesRef = useRef<FallbackStage[]>([]);
+    const currentStageIdxRef = useRef<number>(0);
+    const activeStageRef = useRef<FallbackStage | null>(null);
+    const reconnectCountRef = useRef<number>(0);
+    const activeEngineNameRef = useRef<string>('');
+    const fallbackReasonRef = useRef<string>('');
+
     // Keep latest targets getter in a ref so touch controls always see newest sync state.
     const getInputTargetsRef = useRef(getInputTargetsForSource);
     useEffect(() => {
         getInputTargetsRef.current = getInputTargetsForSource;
     }, [getInputTargetsForSource]);
 
-    // Keep ref cho getIsAltHeld và setAltSoloUdid để tránh stale closure
     const getIsAltHeldRef = useRef(getIsAltHeld);
     useEffect(() => {
         getIsAltHeldRef.current = getIsAltHeld;
@@ -221,9 +264,6 @@ export function useTileStream(args: Args) {
         const body = frameRef.current || bodyRef.current;
         if (!canvas || !body) return;
 
-        // NOTE: bitmaprenderer is faster but has been observed to render "white tiles" on some GPUs after
-        // mid-stream resolution/orientation changes. Use 2D context for stability.
-        const bitmapCtx: ImageBitmapRenderingContext | null = null;
         const ctx2d = canvas.getContext("2d", { alpha: false }) as CanvasRenderingContext2D | null;
 
         function fitCanvasToBody() {
@@ -238,19 +278,12 @@ export function useTileStream(args: Args) {
             const scale = Math.min(bw / canvas.width, bh / canvas.height);
             const dw = Math.ceil(canvas.width * scale);
             const dh = Math.ceil(canvas.height * scale);
-
-            // Đã nhường quyền điều khiển size cho CSS (object-fit: contain)
-            // canvas.style.width = `${dw}px`;
-            // canvas.style.height = `${dh}px`;
         }
 
         const ro = new ResizeObserver(fitCanvasToBody);
         ro.observe(body);
 
-        // Fallback for devices/browsers where ResizeObserver is missing or
-        // doesn't fire reliably on orientation changes (common on older iOS WebView).
         const scheduleFit = () => {
-            // Delay 1 frame to let layout settle after rotation.
             requestAnimationFrame(() => fitCanvasToBody());
         };
         window.addEventListener('resize', scheduleFit, { passive: true } as any);
@@ -259,10 +292,7 @@ export function useTileStream(args: Args) {
         window.visualViewport?.addEventListener('scroll', scheduleFit, { passive: true } as any);
 
         function ensureCanvasSize(w: number, h: number) {
-            if (!canvas) {
-                return;
-            }
-            // even numbers
+            if (!canvas) return;
             w = w & ~1;
             h = h & ~1;
             if (canvas.width !== w || canvas.height !== h) {
@@ -273,45 +303,15 @@ export function useTileStream(args: Args) {
             return { w, h };
         }
 
-        function fnv1a32(u8: Uint8Array): number {
-            let h = 0x811c9dc5;
-            for (let i = 0; i < u8.length; i++) {
-                h ^= u8[i];
-                h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
-            }
-            return h >>> 0;
-        }
-
         let firstFrame = false;
-        let worker: Worker | null = null; // tinyh264 decoder
-        let renderWorker: Worker | null = null; // YUV->ImageBitmap renderer
-        let decoderReady = false;
-        let renderStateId = 1;
-        let splitter: AnnexBSplitter | null = null;
-
-        // Watchdog timestamps. If decoding/rendering stalls for too long, we reconnect.
-        // This prevents the "white tile until reload" symptom when a worker silently dies
-        // or the WS stays open but stops delivering usable frames.
+        let engine: StreamEngine | null = null;
         let lastPacketAt = Date.now();
         let lastBitmapAt = 0;
-        let lastVideoW = 0;
-        let lastVideoH = 0;
-        let lastDimRestartAt = 0;
-        let lastSpsHash = 0;
-        let lastPpsHash = 0;
-        let lastParamRestartAt = 0;
-        // Changing stream config legitimately changes dimensions/SPS/PPS.
-        // Reconnecting on those successful frames causes the "Đang chờ phản hồi" loop.
-        const reconnectOnStreamParamChange = false;
+
         let watchdogTimer: number | null = null;
         let initialLoadTimer: number | null = null;
         let queuedConnectCancel: (() => void) | null = null;
         let connectGeneration = 0;
-        let initialFrameRestartAttempts = 0;
-        // Render throttling: keep at most 1 in-flight render per tile, drop older frames.
-        let renderBusy = false;
-        let pendingFrame: { width: number; height: number; data: ArrayBuffer } | null = null;
-        let frameId = 1;
 
         const onActivate = () => selectOnly(logicalUdid);
 
@@ -321,8 +321,6 @@ export function useTileStream(args: Args) {
             }
         };
         const handlePointerLeave = () => {
-            // Khi chuột rời tile, nếu tile này đang là solo thì clear
-            // Để resolveTargets biết không còn solo nữa khi chuột ra ngoài
             if (!getIsAltHeldRef.current?.()) {
                 setAltSoloUdidRef.current?.(null);
             }
@@ -338,266 +336,91 @@ export function useTileStream(args: Args) {
             logicalUdid
         );
 
-        function makeDecoder() {
+        async function makeStreamEngine() {
             firstFrame = false;
             if (!isSilent()) {
                 setLoading(true);
             }
-            decoderReady = false;
 
-            // Tear down previous worker if any
-            if (worker) {
-                try {
-                    worker.postMessage({ type: 'release', renderStateId });
-                } catch {
-                    // ignore
-                }
-                try {
-                    worker.terminate();
-                } catch {
-                    // ignore
-                }
-                worker = null;
+            if (engine) {
+                try { engine.stop(); } catch {}
+                engine = null;
             }
 
-            const myStateId = renderStateId;
+            // Engine Decision Block
+            const mode = streamCfgRef.current.engine || 'auto';
+            const hasWebCodecs = await checkWebCodecsSupport();
 
-            // Create tinyh264 decoder worker (WASM inside the package)
-            worker = new Worker(new URL('../../workers/device_worker.worker.ts', import.meta.url), { type: 'module' });
+            const useWebCodecs = mode === 'webcodecs' || (mode === 'auto' && hasWebCodecs);
+            activeEngineNameRef.current = useWebCodecs ? 'webcodecs' : 'legacy-tinyh264';
 
-            // Create per-tile render worker to move YUV->RGBA + bitmap creation off the main thread.
-            renderBusy = false;
-            pendingFrame = null;
-            frameId = 1;
+            const callbacks = {
+              onFirstFrame: (meta: { width: number; height: number }) => {
+                if (destroyedRef.current) return;
+                firstFrame = true;
+                reconnectCountRef.current = 0;
+                fallbackReasonRef.current = '';
 
-            if (renderWorker) {
-                try {
-                    renderWorker.postMessage({ type: 'release' });
-                } catch {
-                    // ignore
+                // Cache successful stream params for this device!
+                if (activeStageRef.current) {
+                  cacheSuccessfulStream(udid, {
+                    workingEncoder: activeStageRef.current.encoderName,
+                    workingWidth: activeStageRef.current.bounds?.width,
+                    workingHeight: activeStageRef.current.bounds?.height,
+                    workingFps: activeStageRef.current.maxFps,
+                    workingBitrate: activeStageRef.current.bitrate
+                  });
                 }
-                try {
-                    renderWorker.terminate();
-                } catch {
-                    // ignore
+
+                if (initialLoadTimer != null) {
+                    clearTimeout(initialLoadTimer);
+                    initialLoadTimer = null;
                 }
-                renderWorker = null;
+                setLoading(false);
+                setStatus('');
+                silentReconnectRef.current = false;
+                lastBitmapAt = Date.now();
+
+                ensureCanvasSize(meta.width, meta.height);
+                fitCanvasToBody();
+                onVideoDims?.(meta.width, meta.height);
+              },
+              onFrame: () => {
+                lastBitmapAt = Date.now();
+              },
+              onError: (err: any) => {
+                console.error('[StreamEngine error]', udid, err);
+              },
+              onFallbackRequested: (reason: string) => {
+                fallbackReasonRef.current = reason;
+                triggerFallbackConnection(reason);
+              }
+            };
+
+            if (useWebCodecs) {
+              engine = new WebCodecsH264Engine(canvas!, callbacks);
+            } else {
+              engine = new LegacyTinyH264Engine(canvas!, callbacks);
             }
 
-            renderWorker = new Worker(new URL('../../workers/yuvRender.worker.ts', import.meta.url), { type: 'module' });
+            engine.start();
+        }
 
-            renderWorker.onerror = (e) => {
-                console.error('[yuv render worker error]', udid, e);
-                setStatus(tRef.current('❌ lỗi worker render YUV'));
-                setLoading(true);
-                // Small async hop to avoid reentrancy issues.
-                window.setTimeout(() => {
-                    if (!destroyedRef.current) connect({ restart: !firstFrame });
-                }, 0);
-            };
+        function triggerFallbackConnection(reason: string) {
+          if (destroyedRef.current || closingRef.current) return;
+          console.warn(`[Stream V2 Fallback] Fallback requested on device ${udid} due to: ${reason}`);
 
-            renderWorker.onmessage = (event: MessageEvent) => {
-                const msg: any = event.data;
-                if (!msg || typeof msg.type !== 'string') return;
+          // Advance stage index
+          currentStageIdxRef.current++;
+          if (currentStageIdxRef.current >= fallbackStagesRef.current.length) {
+            // We have exhausted all trial stages. Force legacy tinyh264 fallback
+            streamCfgRef.current.engine = 'legacy-tinyh264';
+            currentStageIdxRef.current = 0;
+            fallbackReasonRef.current = 'All encoders failed. Using software tinyh264';
+          }
 
-                if (msg.type === 'bitmap') {
-                    const width: number = msg.width;
-                    const height: number = msg.height;
-                    const bitmap: ImageBitmap = msg.bitmap;
-
-                    // If canvas has no size yet, set it once (for aspect ratio / CSS fit)
-                    if (width && height) {
-                        ensureCanvasSize(width, height);
-                        fitCanvasToBody();
-                        onVideoDims?.(width, height);
-                    }
-
-                    try {
-                        if (bitmapCtx) {
-                            bitmapCtx.transferFromImageBitmap(bitmap);
-                        } else if (ctx2d) {
-                            ctx2d.drawImage(bitmap, 0, 0);
-                        }
-                        try {
-                            bitmap.close?.();
-                        } catch {
-                            // ignore
-                        }
-                    } catch (e) {
-                        console.error('[present bitmap]', udid, e);
-                    }
-
-                    if (!firstFrame) {
-                        if (!canvas) {
-                            return;
-                        }
-                        firstFrame = true;
-                        initialFrameRestartAttempts = 0;
-                        if (initialLoadTimer != null) {
-                            clearTimeout(initialLoadTimer);
-                            initialLoadTimer = null;
-                        }
-                        setLoading(false);
-                        setStatus('');
-                        silentReconnectRef.current = false;
-                    }
-
-                    // Mark render as healthy.
-                    lastBitmapAt = Date.now();
-
-                    renderBusy = false;
-                    if (pendingFrame && renderWorker) {
-                        const f = pendingFrame;
-                        pendingFrame = null;
-                        renderBusy = true;
-                        const id = ++frameId;
-                        try {
-                            renderWorker.postMessage(
-                                { type: 'render', width: f.width, height: f.height, data: f.data, frameId: id },
-                                [f.data],
-                            );
-                        } catch (e) {
-                            renderBusy = false;
-                            console.error('[renderWorker postMessage]', udid, e);
-                        }
-                    }
-                    return;
-                }
-
-                if (msg.type === 'error') {
-                    renderBusy = false;
-                    return;
-                }
-            };
-
-            worker.onmessage = (event: MessageEvent) => {
-                const msg: any = event.data;
-                if (!msg || typeof msg.type !== 'string') return;
-
-                // Ignore late frames from old states
-                if (typeof msg.renderStateId === 'number' && msg.renderStateId !== myStateId) return;
-
-                if (msg.type === 'decoderReady') {
-                    decoderReady = true;
-                    return;
-                }
-
-                if (msg.type === 'pictureReady') {
-                    const width: number = msg.width;
-                    const height: number = msg.height;
-                    const data: ArrayBuffer = msg.data;
-
-                    if (!data || !width || !height || !renderWorker) return;
-
-                    // Some devices switch resolution on rotation (portrait<->landscape).
-                    // A subset of devices/decoders can get stuck (white screen) after that.
-                    // When enabled, reconnect after a dimension change without forcing
-                    // server-side restart.
-                    if (reconnectOnStreamParamChange && firstFrame && (width !== lastVideoW || height !== lastVideoH)) {
-                        const now = Date.now();
-                        // Throttle: avoid loops if device toggles frequently.
-                        if (now - lastDimRestartAt > 1500) {
-                            lastDimRestartAt = now;
-                            lastVideoW = width;
-                            lastVideoH = height;
-                            setStatus(tRef.current('Thay đổi xoay/kích thước - khởi động lại…'));
-                            setLoading(true);
-                            // reconnect (recreate workers + fresh GOP)
-                            connect();
-                            return;
-                        }
-                    }
-
-                    // Update dims baseline
-                    lastVideoW = width;
-                    lastVideoH = height;
-
-                    // Offload YUV->bitmap to render worker; keep only newest if worker is busy.
-                    if (renderBusy) {
-                        pendingFrame = { width, height, data };
-                        return;
-                    }
-
-                    renderBusy = true;
-                    const id = ++frameId;
-                    try {
-                        renderWorker.postMessage({ type: 'render', width, height, data, frameId: id }, [data]);
-                    } catch (e) {
-                        renderBusy = false;
-                        console.error('[renderWorker postMessage]', udid, e);
-                    }
-                    return;
-                }
-
-                // Unknown message type
-            };
-
-            worker.onerror = (e) => {
-                console.error('[tinyh264 worker error]', udid, e);
-                setStatus(tRef.current('❌ lỗi worker tinyh264'));
-                setLoading(true);
-                // Same symptom as "white tile": the decoder worker crashed.
-                window.setTimeout(() => {
-                    if (!destroyedRef.current) connect({ restart: !firstFrame });
-                }, 0);
-            };
-
-            splitter = new AnnexBSplitter((naluWithStartCode) => {
-                if (!worker || !decoderReady) return;
-
-                // Copy before transferring (splitter may hand us a view)
-                const payload = new Uint8Array(naluWithStartCode);
-                if (payload.length < 5) return;
-
-                // Detect SPS/PPS changes mid-stream (common on some devices when rotating).
-                // When enabled, reconnect after such changes without forcing server-side restart.
-                let startLen = 0;
-                if (payload[2] === 0x01) startLen = 3;
-                else if (payload[2] === 0x00 && payload[3] === 0x01) startLen = 4;
-                if (reconnectOnStreamParamChange && startLen) {
-                    const nalType = payload[startLen] & 0x1f;
-                    if (nalType === 7 || nalType === 8) {
-                        const now = Date.now();
-                        const h = fnv1a32(payload.subarray(startLen));
-                        if (nalType === 7) {
-                            if (firstFrame && lastSpsHash && h !== lastSpsHash && now - lastParamRestartAt > 1500) {
-                                lastParamRestartAt = now;
-                                lastSpsHash = h;
-                                setStatus(tRef.current('SPS đổi - khởi động lại…'));
-                                setLoading(true);
-                                connect();
-                                return;
-                            }
-                            lastSpsHash = h;
-                        } else {
-                            if (firstFrame && lastPpsHash && h !== lastPpsHash && now - lastParamRestartAt > 1500) {
-                                lastParamRestartAt = now;
-                                lastPpsHash = h;
-                                setStatus(tRef.current('PPS đổi - khởi động lại…'));
-                                setLoading(true);
-                                connect();
-                                return;
-                            }
-                            lastPpsHash = h;
-                        }
-                    }
-                }
-
-                try {
-                    worker.postMessage(
-                        {
-                            type: "decode",
-                            data: payload.buffer,
-                            offset: 0,
-                            length: payload.byteLength,
-                            renderStateId: myStateId,
-                        },
-                        [payload.buffer],
-                    );
-                } catch (e) {
-                    console.error("[decode]", udid, e);
-                }
-            });
+          reconnectCountRef.current++;
+          connect({ restart: true });
         }
 
         function cleanupWs() {
@@ -609,52 +432,21 @@ export function useTileStream(args: Args) {
             }
             const prev = wsRef.current;
             if (prev) {
-                // prevent onclose from scheduling a reconnect when we intentionally close
                 prev.onopen = null;
                 prev.onmessage = null;
                 prev.onerror = null;
                 prev.onclose = null;
                 try {
                     prev.close();
-                } catch {
-                    // ignore
-                }
+                } catch {}
             }
             wsRef.current = null;
             releaseStreamSession(streamSessionKey, owner);
 
-            // Stop decoder worker + reset stream state
-            if (worker) {
-                try {
-                    worker.postMessage({ type: 'release', renderStateId });
-                } catch {
-                    // ignore
-                }
-                try {
-                    worker.terminate();
-                } catch {
-                    // ignore
-                }
-                worker = null;
+            if (engine) {
+              try { engine.stop(); } catch {}
+              engine = null;
             }
-
-            if (renderWorker) {
-                try {
-                    renderWorker.postMessage({ type: 'release' });
-                } catch {
-                    // ignore
-                }
-                try {
-                    renderWorker.terminate();
-                } catch {
-                    // ignore
-                }
-                renderWorker = null;
-            }
-
-            decoderReady = false;
-            renderStateId++;
-            splitter = null;
 
             if (reconnectTimerRef.current != null) {
                 clearTimeout(reconnectTimerRef.current);
@@ -667,19 +459,19 @@ export function useTileStream(args: Args) {
             }
         }
 
-        function connect(opts?: { restart?: boolean; immediate?: boolean }) {
+        async function connect(opts?: { restart?: boolean; immediate?: boolean }) {
             if (!opts?.immediate) {
                 cleanupWs();
                 if (!claimStreamSession(streamSessionKey, owner, 'queued')) {
                     if (!isSilent()) {
-                        setStatus(tRef.current('Dang co phien stream dang mo'));
+                        setStatus(tRef.current('Đang có phiên stream khác mở…'));
                         setLoading(false);
                     }
                     return;
                 }
                 if (!isSilent()) {
                     setLoading(true);
-                    setStatus(tRef.current('Dang doi luot ket noi...'));
+                    setStatus(tRef.current('Đang đợi lượt kết nối...'));
                 }
                 const generation = ++connectGeneration;
                 const restart = Boolean(opts?.restart);
@@ -695,7 +487,37 @@ export function useTileStream(args: Args) {
             }
 
             updateStreamSession(streamSessionKey, owner, 'connecting');
-            makeDecoder();
+            await makeStreamEngine();
+
+            // Populate fallback stages list if empty
+            if (fallbackStagesRef.current.length === 0) {
+              const meta = androidDeviceMap[udid];
+              fallbackStagesRef.current = getFallbackStages(streamCfgRef.current, meta);
+
+              // Pre-fill cached successful config if it exists
+              const cached = getCachedDeviceStream(udid);
+              if (cached) {
+                fallbackStagesRef.current.unshift({
+                  encoderName: cached.workingEncoder,
+                  bounds: cached.workingWidth ? { width: cached.workingWidth, height: cached.workingHeight || 1280 } : undefined,
+                  maxFps: cached.workingFps,
+                  bitrate: cached.workingBitrate,
+                  description: `Cached parameters (${cached.workingEncoder || 'default'})`
+                });
+              }
+            }
+
+            const currentStage = fallbackStagesRef.current[currentStageIdxRef.current] || { description: 'Default' };
+            activeStageRef.current = currentStage;
+
+            // Resolve target stream parameters based on active stage
+            const trialConfig: StreamConfig = {
+              ...streamCfgRef.current,
+              encoderName: currentStage.encoderName !== undefined ? currentStage.encoderName : streamCfgRef.current.encoderName,
+              bitrate: currentStage.bitrate || streamCfgRef.current.bitrate,
+              maxFps: currentStage.maxFps || streamCfgRef.current.maxFps,
+              bounds: currentStage.bounds ? { ...streamCfgRef.current.bounds, ...currentStage.bounds } : streamCfgRef.current.bounds
+            };
 
             let url: string;
             try {
@@ -719,40 +541,46 @@ export function useTileStream(args: Args) {
             updateStreamSession(streamSessionKey, owner, 'connecting', ws);
 
             if (!isSilent()) {
-                setStatus(tRef.current('Đang kết nối…'));
+                setStatus(tRef.current(`Đang kết nối: ${currentStage.description}…`));
             }
 
-            // If we don't get the first decoded frame within 35 seconds,
-            // auto-reload this tile (same device) to recover from the stuck 'loading' state.
             if (initialLoadTimer != null) {
                 clearTimeout(initialLoadTimer);
                 initialLoadTimer = null;
             }
+            
+            // Watchdog for initial frame timeouts triggers fallback stages
             initialLoadTimer = window.setTimeout(() => {
                 if (destroyedRef.current || closingRef.current) return;
                 if (firstFrame) return;
-                if (initialFrameRestartAttempts >= MAX_INITIAL_FRAME_RESTARTS) {
-                    cleanupWs();
-                    silentReconnectRef.current = false;
-                    setStatus(tRef.current(SCRCPY_FAILED_STATUS));
-                    setLoading(false);
-                    return;
+
+                const nextIndex = currentStageIdxRef.current + 1;
+                const totalStages = fallbackStagesRef.current.length;
+
+                if (nextIndex >= totalStages) {
+                  // Reached end of pipeline, force legacy fallback
+                  streamCfgRef.current.engine = 'legacy-tinyh264';
+                  currentStageIdxRef.current = 0;
+                  fallbackReasonRef.current = 'Initial frame timed out. Fallback to software tinyh264';
+                  setStatus(tRef.current('Đang đổi sang tinyh264 software…'));
+                } else {
+                  currentStageIdxRef.current = nextIndex;
+                  const reason = `Frame timeout on stage ${currentStage.description}`;
+                  fallbackReasonRef.current = reason;
+                  setStatus(tRef.current(`Lỗi kết nối: thử ${fallbackStagesRef.current[nextIndex].description}…`));
                 }
-                initialFrameRestartAttempts++;
-                if (!isSilent()) {
-                    setStatus(tRef.current(SCRCPY_RESTARTING_STATUS));
-                    setLoading(true);
-                }
+
+                reconnectCountRef.current++;
                 connect({ restart: true });
             }, INITIAL_FRAME_TIMEOUT_MS);
 
             ws.onopen = () => {
                 updateStreamSession(streamSessionKey, owner, 'connected', ws);
                 if (!isSilent()) {
-                    setStatus(tRef.current('WS mở → gửi config BINARY…'));
+                    setStatus(tRef.current('Gửi cấu hình stream...'));
                 }
                 try {
-                    ws.send(buildConfigBinary(streamCfgRef.current));
+                    ws.send(buildConfigBinary(trialConfig));
                     if (!isSilent()) {
                         setStatus(tRef.current("Đang chờ phản hồi"));
                     }
@@ -768,7 +596,7 @@ export function useTileStream(args: Args) {
                 else if (ev.data instanceof Blob) ab = await ev.data.arrayBuffer();
                 if (!ab) return;
                 lastPacketAt = Date.now();
-                splitter?.push(new Uint8Array(ab));
+                engine?.feedBytes(new Uint8Array(ab));
             };
 
             ws.onerror = () => setStatus(tRef.current('❌ lỗi WS'));
@@ -776,50 +604,36 @@ export function useTileStream(args: Args) {
             ws.onclose = (e) => {
                 releaseStreamSession(streamSessionKey, owner, ws);
                 if (closingRef.current || destroyedRef.current) return;
-                const restartBeforeFirstFrame = !firstFrame;
+                
                 if (initialLoadTimer != null) {
                     clearTimeout(initialLoadTimer);
                     initialLoadTimer = null;
                 }
-                // When WS closes unexpectedly, fall back to normal non-silent connection state
+                
                 silentReconnectRef.current = false;
-                if (restartBeforeFirstFrame) {
-                    if (initialFrameRestartAttempts >= MAX_INITIAL_FRAME_RESTARTS) {
-                        cleanupWs();
-                        setStatus(tRef.current(SCRCPY_FAILED_STATUS));
-                        setLoading(false);
-                        return;
-                    }
-                    initialFrameRestartAttempts++;
-                    setStatus(tRef.current(SCRCPY_RESTARTING_STATUS));
-
-                    let delay = RECONNECT_DELAY_MS;
-                    if (initialFrameRestartAttempts === 1) delay = 5000;
-                    else if (initialFrameRestartAttempts === 2) delay = 10000;
-                    else delay = 20000;
-
-                    setLoading(true);
-                    reconnectTimerRef.current = window.setTimeout(() => {
-                        if (destroyedRef.current) return;
-                        connect({ restart: true });
-                    }, delay);
-                } else {
-                    setStatus(
-                        tRef.current('WS đóng ({code}{reason}) - thử lại…', {
-                            code: e.code,
-                            reason: e.reason ? `: ${e.reason}` : '',
-                        }),
-                    );
-                    setLoading(true);
-                    reconnectTimerRef.current = window.setTimeout(() => {
-                        if (destroyedRef.current) return;
-                        connect({ restart: false });
-                    }, RECONNECT_DELAY_MS);
+                
+                // On close before first frame, trigger next fallback stage immediately
+                if (!firstFrame) {
+                  const nextIndex = currentStageIdxRef.current + 1;
+                  if (nextIndex >= fallbackStagesRef.current.length) {
+                    streamCfgRef.current.engine = 'legacy-tinyh264';
+                    currentStageIdxRef.current = 0;
+                    fallbackReasonRef.current = 'WS Closed. Fallback to software tinyh264';
+                  } else {
+                    currentStageIdxRef.current = nextIndex;
+                    fallbackReasonRef.current = `WS closed (Code ${e.code})`;
+                  }
                 }
+
+                reconnectCountRef.current++;
+                reconnectTimerRef.current = window.setTimeout(() => {
+                    if (destroyedRef.current) return;
+                    connect({ restart: !firstFrame });
+                }, RECONNECT_DELAY_MS);
             };
         }
 
-        // Allow user to manually reload this tile (recreate workers + reconnect WS).
+        // Allow user to manually reload this tile.
         reloadRef.current = (opts?: StreamReloadOptions) => {
             if (destroyedRef.current) return;
             silentReconnectRef.current = Boolean(opts?.silent);
@@ -827,28 +641,29 @@ export function useTileStream(args: Args) {
                 setLoading(true);
                 setStatus(tRef.current('Đang reload…'));
             }
-            initialFrameRestartAttempts = 0;
+            
+            // Clear fallback state and cache on user manual action
+            clearDeviceStreamCache(udid);
+            currentStageIdxRef.current = 0;
+            fallbackStagesRef.current = [];
+            fallbackReasonRef.current = '';
+
             connect({ restart: Boolean(opts?.restart) });
         };
 
         connect();
 
-        // Periodically detect "stuck" tiles: WS open but no packets or no rendered bitmaps.
-        // When it happens the canvas often goes white (canvas resize clears pixels) and never recovers
-        // until manual reload. This auto-recovers without user action.
+        // Watchdog: auto-reconnects when decoding stalls
         watchdogTimer = window.setInterval(() => {
             if (destroyedRef.current || closingRef.current) return;
             const ws = wsRef.current;
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
-            if (!firstFrame) return; // don't trigger while still connecting / before first frame
+            if (!firstFrame) return;
 
             const now = Date.now();
             const packetAge = now - lastPacketAt;
             const bitmapAge = lastBitmapAt ? now - lastBitmapAt : 1e9;
 
-            // Only reconnect when we have evidence of a "stuck" decoder:
-            // - packets still arrive, but we stop producing bitmaps
-            // Avoid reconnecting just because the screen is static and no frames arrive.
             const packetsStillArriving = packetAge < 2500;
             const outputStalled = bitmapAge > 8000;
             if (packetsStillArriving && outputStalled) {
@@ -858,22 +673,29 @@ export function useTileStream(args: Args) {
                 return;
             }
 
-            // Safety net: if absolutely nothing arrives for a long time, try reconnecting occasionally.
-            // Keep this very conservative to avoid annoying auto-reloads.
+            // Expose updated stats periodically
+            if (engine) {
+              const stats = engine.getStats();
+              setStreamStats({
+                ...stats,
+                reconnectCount: reconnectCountRef.current,
+                encoderName: activeStageRef.current?.encoderName || 'default',
+                fallbackReason: fallbackReasonRef.current || undefined
+              });
+            }
+
             if (packetAge > 300000 && bitmapAge > 300000) {
                 setStatus(tRef.current('⚠️ idle lâu - kết nối lại…'));
                 setLoading(true);
                 connect();
             }
-        }, 3000);
+        }, 1000);
 
         const closeWs = () => {
             cleanupWs();
             try {
                 detachControlsRef.current?.();
-            } catch {
-                // ignore
-            }
+            } catch {}
         };
 
         window.addEventListener('beforeunload', closeWs);
@@ -898,7 +720,6 @@ export function useTileStream(args: Args) {
             }
             closeWs();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         enabled,
         udid,
@@ -909,4 +730,8 @@ export function useTileStream(args: Args) {
         wsServer,
         selectOnly
     ]);
+
+    return {
+      streamStats
+    };
 }

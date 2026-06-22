@@ -33,16 +33,26 @@ Removed legacy layers:
 - [NEW] [themeInspector.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/themeInspector.ts): Logic and definitions for Theme Inspector mode, manages COLOR_ROLES, matches hovered elements to active CSS variables via dynamic stylesheet scans, resolves data-inspector-id logic targets, and reads/writes overrides to local storage.
 - [MODIFY] [VisualAlertPanel.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/VisualAlertPanel.tsx): Simplified Visual Alert UI panel for multi-ROI red-dot notification detection. Removed sidebar expand behavior, status notification feeds, and action buttons. Settings inputs (Chu kỳ, Lần check, Báo lại) are moved into the Multi-ROI setup modal (renamed to 'Thiết lập Visual Alert'). A Settings gear icon button is added in the panel header actions.
 - [NEW] [ThemeInspector.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/ThemeInspector.tsx): Theme color inspector UI. When active, hovers elements to show active theme variables, property matches, and logical target details. Handles normal clicks to copy logical targets, Alt/Shift+Click to copy CSS variables, and Ctrl+Click to open the color editor card.
-- `client/src/components/tile/`: Tile-specific helpers, headers, stream hook, phone controls, and account overlay filter dimming wrapper.
+- `client/src/components/tile/`: Tile-specific helpers, headers, phone controls, and account overlay filter dimming wrapper.
+  - [MODIFY] `Tile.tsx`: Integrates the per-tile Stream Debug Overlay displaying engine, active encoder, resolution, FPS, drops, queue size, and reconnect stats.
+  - [MODIFY] `useTileStream.ts`: Refactored to orchestrate stream lifecycle using the new pluggable `StreamEngine`, implementing the sequential connection retry/fallback loop on connection/decode errors.
 - `client/src/context/ActiveContext.tsx`: Active device, multi-control, and focus state.
 - `client/src/context/I18nContext.tsx`: Translation helper.
 - `client/src/context/ServerContext.tsx`: Backend URL state.
 - `client/src/hooks/useVisualAlert.ts`: React hook managing stagger-scan loop, per-device confirm count, cooldown tracking, and alert triggering for Visual Alert. Uses `scanCanvasROIs` for multi-ROI detection.
 - `client/src/lib/visualAlertEngine.ts`: Pure logic engine for Visual Alert — supports Multi-ROI scanning via `scanCanvasROIs` (iterates each ROI, getImageData per region, counts red pixels per ROI), single-ROI `scanCanvasROI` for modal testing, AudioContext beep sound, browser Notification API. Includes migration from old single-ROI `roi` to new `rois[]` format. Settings persisted in localStorage key: `visualAlertGlobalSettingsV1`.
 - `client/src/lib/serverApi.ts`: HTTP API client for the Go backend, containing smart ADB batch parsing helpers (splitCommandBatchSmart and normalizeAdbSegment) and type definitions.
+- [MODIFY] `client/src/lib/config.ts`: Defines `STREAM_CONFIG` with default values for `engine` ('auto') and `encoderMode` ('auto').
+- [NEW] `client/src/lib/deviceStreamCache.ts`: Caches working encoders, resolutions, and configurations for device streams to ensure instant, stable subsequent connections.
+- [NEW] `client/src/stream/StreamEngine.ts`: Interface and types defining start/stop, feedBytes, stats reporting, and callback hooks.
+- [NEW] `client/src/stream/render/VideoFrameRenderer.ts`: Abstract base interface for presenting video frames.
+- [NEW] `client/src/stream/render/Canvas2DVideoFrameRenderer.ts`: Hardware-accelerated frame rendering using 2D Canvas context for high stability.
+- [NEW] `client/src/stream/h264/AccessUnitAssembler.ts`: Re-assembles H.264 slice NAL units into proper Annex-B Access Units required by WebCodecs.
+- [NEW] `client/src/stream/legacy/LegacyTinyH264Engine.ts`: Integrates the legacy tinyh264 WASM software decoder and CPU YUV-to-RGBA conversion worker.
+- [NEW] `client/src/stream/webcodecs/WebCodecsH264Engine.ts`: Integrates the browser hardware `VideoDecoder` engine with active frame dropping for backpressure control.
 - [NEW] [backendSettings.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/backendSettings.ts): Client-side safety thresholds validator (devices >= 35, WeChat accounts >= 104, contains "Emma Zhao") and explicit REST API poster for device account vault data to `settings` endpoint.
 - `client/src/store/useTileOrder.ts`: Persistent device numbering and ordering.
-- `client/src/styles.css`: Main application styling. Defines design tokens, layout styles, the standardized, unified CSS overlay confirm modal styling system, and the `.is-dragging-modal` rule to disable pointer events on background stream tiles/canvases during dragging.
+- [MODIFY] `client/src/styles.css`: Added styling classes for `.stream-debug-overlay` and layout metrics.
 - [NEW] [deviceAccountNearby.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/deviceAccountNearby.ts): Centralized helper for Nearby People logic. Exports `getNearbyAccountState()` (returns `'eligible'`, `'upcoming'`, or `'none'`), `hasNearbyRelevantAccount()`, and `getNearestNearbyHours()`. Uses 3-day window for upcoming state. Imported by both App.tsx and DeviceAccountOverlay.tsx.
 - `client/public/audio/`: Directory containing static audio assets, including `notification_new.mp3` for the default alert sound.
 - 

@@ -19,6 +19,7 @@
     },
     "css_classes": {
       "account_search_input": "account-search-input",
+      "stream_debug_overlay": "stream-debug-overlay",
       "dav_floating_settings_btn": "dav-floating-settings-btn",
       "dav_settings_overlay": "dav-settings-overlay",
       "dav_settings_panel": "dav-settings-panel",
@@ -499,7 +500,11 @@
     "notes_reminder_alert_close_btn": "notes.reminderAlertCloseBtn",
     "notes_reminder_alert_view_btn": "notes.reminderAlertViewBtn",
     "device_viewer_drag_handle_top": "deviceViewer.dragHandleTop",
-    "device_viewer_account_overlay": "deviceViewer.accountOverlay"
+    "device_viewer_account_overlay": "deviceViewer.accountOverlay",
+    "app_settings_video_encoding_section": "appSettings.videoEncodingSection",
+    "app_settings_stream_engine_select": "appSettings.streamEngineSelect",
+    "app_settings_encoder_mode_select": "appSettings.encoderModeSelect",
+    "app_settings_custom_encoder_name_input": "appSettings.customEncoderNameInput"
   },
   "project_assets": {
     "app_icon_png": "assets/IconMonViewPhone.png",

@@ -2268,6 +2268,25 @@ canvas {
   gap: 6px;
 }
 
+.stream-debug-overlay {
+  position: absolute;
+  top: 36px;
+  left: 8px;
+  background: rgba(10, 10, 10, 0.85);
+  color: var(--md-info);
+  font-family: monospace;
+  font-size: 10px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--md-border);
+  z-index: 100;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  box-shadow: var(--md-shadow-soft);
+}
+
 .appSettingsOverlay {
   position: fixed;
   inset: 0;

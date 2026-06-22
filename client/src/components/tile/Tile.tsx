@@ -191,7 +191,7 @@ function TileComponent({
     }, [udid, getWs, getCanvas, registerDevice, unregisterDevice]);
 
     // ===== Streaming pipeline (WS + workers + canvas fit + touch controls) =====
-    useTileStream({
+    const { streamStats } = useTileStream({
         enabled: !isDisconnected,
         udid,
         deviceParam,
@@ -428,6 +428,21 @@ function TileComponent({
                         ) : null}
 
                         {videoFrame}
+
+                        {showTileInfo && streamStats && (
+                            /* [stream_debug_overlay] : [Khung hiển thị thông số debug luồng stream video] */
+                            <div className="stream-debug-overlay">
+                                <div>Engine: {streamStats.engineName}</div>
+                                <div>Encoder: {streamStats.encoderName || 'default'}</div>
+                                <div>Res: {streamStats.width}x{streamStats.height}</div>
+                                <div>FPS: {streamStats.decodedFps}/{streamStats.renderedFps}</div>
+                                {streamStats.droppedFrames > 0 && <div style={{ color: 'red' }}>Dropped: {streamStats.droppedFrames}</div>}
+                                {streamStats.decodeQueueSize > 0 && <div>Queue: {streamStats.decodeQueueSize}</div>}
+                                {streamStats.reconnectCount > 0 && <div>Reconnects: {streamStats.reconnectCount}</div>}
+                                {streamStats.fallbackReason && <div style={{ color: 'orange', fontSize: '9px' }}>{streamStats.fallbackReason}</div>}
+                                <div>Profile: {isViewing ? 'viewer' : 'grid'}</div>
+                            </div>
+                        )}
 
                         {accountOverlayMounted && (
                             <div 
