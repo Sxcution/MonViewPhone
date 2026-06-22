@@ -97,20 +97,45 @@ func shellDoubleQuote(s string) string {
 	return `"` + s + `"`
 }
 
-func mediaStoreTarget(ext string) (uri string, mimeType string, relPath string, ok bool) {
+func mediaStoreTarget(ext string) (kind string, mimeType string, relPath string, ok bool) {
 	ext = strings.ToLower(strings.TrimPrefix(ext, "."))
 	switch ext {
 	case "jpg", "jpeg", "png", "gif", "webp", "bmp":
 		if ext == "jpg" {
 			ext = "jpeg"
 		}
-		return "content://media/external/images/media", "image/" + ext, "DCIM/Camera/", true
+		return "images", "image/" + ext, "DCIM/Camera/", true
 	case "mp4", "mkv", "avi", "mov":
-		return "content://media/external/video/media", "video/" + ext, "DCIM/Camera/", true
+		return "video", "video/" + ext, "DCIM/Camera/", true
 	case "mp3", "wav", "ogg", "m4a":
-		return "content://media/external/audio/media", "audio/" + ext, "Music/", true
+		return "audio", "audio/" + ext, "Music/", true
 	default:
-		return "content://media/external/downloads/media", "application/octet-stream", "Download/", true
+		return "downloads", "application/octet-stream", "Download/", true
+	}
+}
+
+func mediaStoreURIsForKind(kind string) []string {
+	switch kind {
+	case "images":
+		return []string{
+			"content://media/external_primary/images/media",
+			"content://media/external/images/media",
+		}
+	case "video":
+		return []string{
+			"content://media/external_primary/video/media",
+			"content://media/external/video/media",
+		}
+	case "audio":
+		return []string{
+			"content://media/external_primary/audio/media",
+			"content://media/external/audio/media",
+		}
+	default:
+		return []string{
+			"content://media/external_primary/downloads/media",
+			"content://media/external/downloads/media",
+		}
 	}
 }
 
@@ -126,88 +151,126 @@ func userIDFromRemotePath(remotePath string) int {
 	return id
 }
 
-func mediaStoreInsertURI(udid string, userID int, uri, mimeType, relPath, uniqueFileName string) (string, error) {
-	cmd := fmt.Sprintf(
-		"inserted_out=$(content insert --user %d --uri %s --bind _display_name:s:%s --bind mime_type:s:%s --bind relative_path:s:%s); "+
-			"uri=$(echo \"$inserted_out\" | grep -o -E \"content://[a-zA-Z0-9./_:-]+\"); "+
-			"if [ -z \"$uri\" ]; then "+
-			"row=$(content query --user %d --uri %s --projection _id:_display_name 2>/dev/null | grep -F -- %s | tail -n 1 || true); "+
-			"id=$(echo \"$row\" | grep -o -E \"_id=[0-9]+\" | head -n 1 | cut -d'=' -f2 | tr -d '\\r'); "+
-			"if [ ! -z \"$id\" ]; then uri=\"%s/$id\"; fi; "+
-			"fi; "+
-			"if [ ! -z \"$uri\" ]; then echo \"$uri\"; else echo \"MediaStore row not found for %s\" >&2; false; fi",
-		userID, uri, shellQuote(uniqueFileName), shellQuote(mimeType), shellQuote(relPath),
-		userID, uri, shellQuote(uniqueFileName), uri,
-		shellQuote(uniqueFileName),
-	)
-	out, err := adb.CommandTimeout(30*time.Second, "-s", udid, "shell", cmd)
-	if err != nil {
-		return "", err
-	}
-	matches := contentURIPattern.FindAllString(out, -1)
-	if len(matches) == 0 {
-		return "", fmt.Errorf("MediaStore insert returned no content URI: %q", strings.TrimSpace(out))
-	}
-	return matches[len(matches)-1], nil
+type mediaStoreAttempt struct {
+	URI       string
+	InsertOut string
+	QueryOut  string
+	Err       error
 }
 
-func pushMediaStoreViaExecIn(udid, tmpPath, fileName, uri, mimeType, relPath string, userID int) error {
+func isRomMimeError(text string) bool {
+	lower := strings.ToLower(text)
+	keywords := []string{
+		"missingresourceexception",
+		"android.mime.types",
+		"debian.mime.types",
+		"vendor.mime.types",
+		"mimeutils",
+		"mediaprovider",
+	}
+	for _, kw := range keywords {
+		if strings.Contains(lower, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func pushMediaStoreForURI(udid, tmpPath, fileName, uri, mimeType, relPath string, userID int, useExecIn bool) (*mediaStoreAttempt, error) {
+	attempt := &mediaStoreAttempt{URI: uri}
 	uniqueFileName := fmt.Sprintf("vsp_%d_%s", time.Now().UnixNano(), sanitizeFileName(fileName))
-	contentURI, err := mediaStoreInsertURI(udid, userID, uri, mimeType, relPath, uniqueFileName)
-	if err != nil {
-		return err
+
+	// 1. Insert row with is_pending=1. Put --uri first.
+	insertCmd := fmt.Sprintf(
+		"content insert --uri %s --user %d --bind _display_name:s:%s --bind mime_type:s:%s --bind relative_path:s:%s --bind is_pending:i:1",
+		shellQuote(uri), userID, shellQuote(uniqueFileName), shellQuote(mimeType), shellQuote(relPath),
+	)
+	insertOut, insertErr := adb.CommandTimeout(30*time.Second, "-s", udid, "shell", insertCmd+" 2>&1")
+	attempt.InsertOut = strings.TrimSpace(insertOut)
+
+	contentURI := ""
+	if insertErr == nil {
+		matches := contentURIPattern.FindAllString(insertOut, -1)
+		if len(matches) > 0 {
+			contentURI = matches[len(matches)-1]
+		}
 	}
 
-	if _, err := adb.CommandWithStdinFileTimeout(3*time.Minute, tmpPath, "-s", udid, "exec-in", "content", "write", "--user", strconv.Itoa(userID), "--uri", contentURI); err != nil {
-		return err
+	// 2. Query fallback if URI not returned on stdout
+	if contentURI == "" {
+		queryCmd := fmt.Sprintf("content query --uri %s --user %d --projection _id:_display_name 2>&1", shellQuote(uri), userID)
+		queryOut, queryErr := adb.CommandTimeout(30*time.Second, "-s", udid, "shell", queryCmd)
+		attempt.QueryOut = strings.TrimSpace(queryOut)
+
+		if queryErr == nil {
+			lines := strings.Split(queryOut, "\n")
+			var row string
+			for _, line := range lines {
+				if strings.Contains(line, uniqueFileName) {
+					row = line
+				}
+			}
+			if row != "" {
+				idMatch := regexp.MustCompile(`_id=([0-9]+)`).FindStringSubmatch(row)
+				if len(idMatch) > 1 {
+					contentURI = fmt.Sprintf("%s/%s", uri, idMatch[1])
+				}
+			}
+		}
 	}
 
-	updateCmd := fmt.Sprintf("content update --user %d --uri %s --bind _display_name:s:%s", userID, shellQuote(contentURI), shellQuote(fileName))
-	if _, err := adb.CommandTimeout(30*time.Second, "-s", udid, "shell", updateCmd); err != nil {
-		return err
+	if contentURI == "" {
+		attempt.Err = fmt.Errorf("could not retrieve content URI from insert or query")
+		return attempt, attempt.Err
 	}
-	return nil
+
+	// 3. Write data to URI
+	if useExecIn {
+		if _, err := adb.CommandWithStdinFileTimeout(3*time.Minute, tmpPath, "-s", udid, "exec-in", "content", "write", "--user", strconv.Itoa(userID), "--uri", contentURI); err != nil {
+			attempt.Err = fmt.Errorf("content write via exec-in failed: %w", err)
+			return attempt, attempt.Err
+		}
+	} else {
+		safeTmpName := sanitizeFileName(fileName)
+		deviceTmp := fmt.Sprintf("/data/local/tmp/%d_%s", time.Now().UnixNano(), safeTmpName)
+		if _, err := adb.Command("-s", udid, "push", tmpPath, deviceTmp); err != nil {
+			attempt.Err = fmt.Errorf("push to device tmp failed: %w", err)
+			return attempt, attempt.Err
+		}
+		defer adb.Shell(udid, "rm "+shellQuote(deviceTmp))
+
+		writeCmd := fmt.Sprintf("content write --uri %s --user %d < %s 2>&1", shellQuote(contentURI), userID, shellQuote(deviceTmp))
+		writeOut, writeErr := adb.CommandTimeout(3*time.Minute, "-s", udid, "shell", writeCmd)
+		if writeErr != nil {
+			attempt.Err = fmt.Errorf("content write via tmp file failed (out: %s): %w", strings.TrimSpace(writeOut), writeErr)
+			return attempt, attempt.Err
+		}
+	}
+
+	// 4. Update row: rename and publish (is_pending=0)
+	updateCmd := fmt.Sprintf(
+		"content update --uri %s --user %d --bind _display_name:s:%s --bind is_pending:i:0 2>&1",
+		shellQuote(contentURI), userID, shellQuote(fileName),
+	)
+	updateOut, updateErr := adb.CommandTimeout(30*time.Second, "-s", udid, "shell", updateCmd)
+	if updateErr != nil {
+		attempt.Err = fmt.Errorf("content update failed (out: %s): %w", strings.TrimSpace(updateOut), updateErr)
+		return attempt, attempt.Err
+	}
+
+	return attempt, nil
 }
 
-func pushMediaStoreViaDeviceTmp(udid, tmpPath, fileName, uri, mimeType, relPath string, userID int) error {
-	safeTmpName := sanitizeFileName(fileName)
-	deviceTmp := fmt.Sprintf("/data/local/tmp/%d_%s", time.Now().UnixNano(), safeTmpName)
-	if _, err := adb.Command("-s", udid, "push", tmpPath, deviceTmp); err != nil {
-		return err
-	}
-	defer adb.Shell(udid, "rm "+shellQuote(deviceTmp))
+func pushMediaStoreViaExecIn(udid, tmpPath, fileName, uri, mimeType, relPath string, userID int, attempts *[]*mediaStoreAttempt) error {
+	attempt, err := pushMediaStoreForURI(udid, tmpPath, fileName, uri, mimeType, relPath, userID, true)
+	*attempts = append(*attempts, attempt)
+	return err
+}
 
-	uniqueFileName := fmt.Sprintf("vsp_%d_%s", time.Now().UnixNano(), safeTmpName)
-
-	// Optimize by chaining all MediaStore operations in a single shell command.
-	// This reduces the number of host-device ADB round-trips from 4 to 1.
-	// It supports devices where content insert runs silently (e.g. crDroid 9.8 / Android 13)
-	// by querying all rows and filtering for the unique name. Do not use SQL --where here:
-	// some Android content CLI builds strip the quotes and turn dotted names into invalid tokens.
-	cmd := fmt.Sprintf(
-		"inserted_out=$(content insert --user %d --uri %s --bind _display_name:s:%s --bind mime_type:s:%s --bind relative_path:s:%s); "+
-			"uri=$(echo \"$inserted_out\" | grep -o -E \"content://[a-zA-Z0-9./_:-]+\"); "+
-			"if [ -z \"$uri\" ]; then "+
-			"row=$(content query --user %d --uri %s --projection _id:_display_name 2>/dev/null | grep -F -- %s | tail -n 1 || true); "+
-			"id=$(echo \"$row\" | grep -o -E \"_id=[0-9]+\" | head -n 1 | cut -d'=' -f2 | tr -d '\\r'); "+
-			"if [ ! -z \"$id\" ]; then uri=\"%s/$id\"; fi; "+
-			"fi; "+
-			"if [ ! -z \"$uri\" ]; then "+
-			"cat %s | content write --user %d --uri \"$uri\" && "+
-			"content update --user %d --uri \"$uri\" --bind _display_name:s:%s; "+
-			"else echo \"MediaStore row not found for %s\" >&2; false; fi",
-		userID, uri, shellQuote(uniqueFileName), shellQuote(mimeType), shellQuote(relPath),
-		userID, uri, shellQuote(uniqueFileName), uri,
-		shellQuote(deviceTmp), userID,
-		userID, shellQuote(fileName),
-		shellQuote(uniqueFileName),
-	)
-
-	if _, err := adb.CommandTimeout(3*time.Minute, "-s", udid, "shell", cmd); err != nil {
-		return fmt.Errorf("MediaStore push failed for user %d path %s: %w", userID, fileName, err)
-	}
-
-	return nil
+func pushMediaStoreViaDeviceTmp(udid, tmpPath, fileName, uri, mimeType, relPath string, userID int, attempts *[]*mediaStoreAttempt) error {
+	attempt, err := pushMediaStoreForURI(udid, tmpPath, fileName, uri, mimeType, relPath, userID, false)
+	*attempts = append(*attempts, attempt)
+	return err
 }
 
 func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
@@ -219,19 +282,67 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 	}
 	safeTmpName := sanitizeFileName(fileName)
 	ext := strings.TrimPrefix(strings.ToLower(path.Ext(fileName)), ".")
-	uri, mimeType, relPath, useMediaStore := mediaStoreTarget(ext)
+	kind, mimeType, relPath, useMediaStore := mediaStoreTarget(ext)
 
 	// CASE 1: Work Profile / Secondary User (userID > 0) pushing public media/download files.
 	// We MUST use the MediaStore Content Provider API since direct adb push or cp to /storage/emulated/{userID}/
 	// will fail with Permission Denied due to multi-user storage isolation.
 	if userID > 0 && useMediaStore {
-		if err := pushMediaStoreViaExecIn(udid, tmpPath, fileName, uri, mimeType, relPath, userID); err == nil {
+		uris := mediaStoreURIsForKind(kind)
+		var attempts []*mediaStoreAttempt
+
+		// 1. Try exec-in first on all URIs
+		execInSuccess := false
+		for _, u := range uris {
+			if err := pushMediaStoreViaExecIn(udid, tmpPath, fileName, u, mimeType, relPath, userID, &attempts); err == nil {
+				execInSuccess = true
+				break
+			}
+		}
+		if execInSuccess {
 			return nil
 		}
-		if err := pushMediaStoreViaDeviceTmp(udid, tmpPath, fileName, uri, mimeType, relPath, userID); err != nil {
-			return fmt.Errorf("MediaStore push failed for user %d path %s: %w", userID, remotePath, err)
+
+		// 2. Try device-tmp on all URIs
+		tmpSuccess := false
+		for _, u := range uris {
+			if err := pushMediaStoreViaDeviceTmp(udid, tmpPath, fileName, u, mimeType, relPath, userID, &attempts); err == nil {
+				tmpSuccess = true
+				break
+			}
 		}
-		return nil
+		if tmpSuccess {
+			return nil
+		}
+
+		// Check if any attempt hit the ROM-level MIME bug
+		hasRomMimeErr := false
+		for _, att := range attempts {
+			if isRomMimeError(att.InsertOut) || isRomMimeError(att.QueryOut) || (att.Err != nil && isRomMimeError(att.Err.Error())) {
+				hasRomMimeErr = true
+				break
+			}
+		}
+
+		var sb strings.Builder
+		if hasRomMimeErr {
+			sb.WriteString(fmt.Sprintf("ROM MIME error: MediaProvider on secondary user profile failed due to missing MIME resources (debian.mime.types/MimeUtils) for user %d. Please apply the ROM MIME fix/patch.\n", userID))
+		} else {
+			sb.WriteString(fmt.Sprintf("MediaStore push failed for user %d. Tried volumes:\n", userID))
+		}
+		for _, att := range attempts {
+			sb.WriteString(fmt.Sprintf("- Volume: %s\n", att.URI))
+			if att.InsertOut != "" {
+				sb.WriteString(fmt.Sprintf("  [Insert Out]: %s\n", att.InsertOut))
+			}
+			if att.QueryOut != "" {
+				sb.WriteString(fmt.Sprintf("  [Query Out]: %s\n", att.QueryOut))
+			}
+			if att.Err != nil {
+				sb.WriteString(fmt.Sprintf("  [Error]: %v\n", att.Err))
+			}
+		}
+		return fmt.Errorf("%s", sb.String())
 	}
 
 	// CASE 2: Work Profile / Secondary User (userID > 0) pushing non-media files.
