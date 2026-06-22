@@ -224,7 +224,6 @@
 
     goto :goto_1
 
-    .line 185
     :cond_4
     invoke-static {p0}, Lcom/genymobile/scrcpy/CleanUp$Config;->access$300(Lcom/genymobile/scrcpy/CleanUp$Config;)Z
 
@@ -232,15 +231,15 @@
 
     if-eqz p0, :cond_5
 
-    const-string p0, "Restoring normal power mode"
+    const-string p0, "Restoring normal power mode (disabled)"
 
     .line 186
     invoke-static {p0}, Lcom/genymobile/scrcpy/Ln;->i(Ljava/lang/String;)V
 
-    const/4 p0, 0x2
+    # const/4 p0, 0x2
 
-    .line 187
-    invoke-static {p0}, Lcom/genymobile/scrcpy/Device;->setScreenPowerMode(I)Z
+    # .line 187
+    # invoke-static {p0}, Lcom/genymobile/scrcpy/Device;->setScreenPowerMode(I)Z
 
     :cond_5
     :goto_1
