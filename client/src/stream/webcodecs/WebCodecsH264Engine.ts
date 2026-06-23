@@ -96,7 +96,7 @@ export class WebCodecsH264Engine implements StreamEngine {
       error: (e) => {
         console.error('[WebCodecs Debug] Decoder error callback triggered:', e);
         this.callbacks.onError?.(e);
-        // Fallback disabled to keep WebCodecs active for debugging
+        this.callbacks.onFallbackRequested?.('Decoder error: ' + (e?.message || 'unknown'));
       }
     });
   }
@@ -143,19 +143,19 @@ export class WebCodecsH264Engine implements StreamEngine {
       return;
     }
 
+    // Backpressure: if decode queue is too large, drop everything until the next keyframe
+    if (this.decoder.decodeQueueSize > 30) {
+      this.keyframeReceived = false;
+    }
+
     // Drop delta frames if keyframe hasn't arrived
     if (!this.keyframeReceived) {
       if (isKey) {
         this.keyframeReceived = true;
       } else {
+        this.droppedFramesCount++;
         return;
       }
-    }
-
-    // Backpressure: drop stale delta frames if decode queue starts to pile up
-    if (this.decoder.decodeQueueSize > 8 && !isKey) {
-      this.droppedFramesCount++;
-      return;
     }
 
     try {

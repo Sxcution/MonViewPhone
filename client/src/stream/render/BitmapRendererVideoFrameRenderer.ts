@@ -16,19 +16,31 @@ export class BitmapRendererVideoFrameRenderer implements VideoFrameRenderer {
     }
   }
 
+  private inFlight = false;
+
   draw(frame: VideoFrame) {
     if (this.closed || !this.ctx) return;
+
+    // Drop frame if another async conversion is already in-flight
+    if (this.inFlight) return;
+    this.inFlight = true;
+
+    // Capture dimensions before the async boundary
+    const displayWidth = frame.displayWidth;
+    const displayHeight = frame.displayHeight;
 
     // Clone the frame so it remains valid during the async createImageBitmap call
     let frameClone: VideoFrame | null = null;
     try {
       frameClone = frame.clone();
     } catch {
+      this.inFlight = false;
       return; // Return silently if the source frame is already invalid or closed
     }
 
     createImageBitmap(frameClone)
       .then((bitmap) => {
+        this.inFlight = false;
         if (frameClone) {
           try { frameClone.close(); } catch {}
         }
@@ -39,14 +51,15 @@ export class BitmapRendererVideoFrameRenderer implements VideoFrameRenderer {
         }
 
         // Adjust canvas dimensions if needed
-        if (this.canvas.width !== frame.displayWidth || this.canvas.height !== frame.displayHeight) {
-          this.canvas.width = frame.displayWidth;
-          this.canvas.height = frame.displayHeight;
+        if (this.canvas.width !== displayWidth || this.canvas.height !== displayHeight) {
+          this.canvas.width = displayWidth;
+          this.canvas.height = displayHeight;
         }
 
         this.ctx.transferFromImageBitmap(bitmap);
       })
       .catch(() => {
+        this.inFlight = false;
         if (frameClone) {
           try { frameClone.close(); } catch {}
         }

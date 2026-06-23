@@ -824,6 +824,17 @@ Chúng tôi đã di chuyển và tối ưu hóa kích thước thanh tìm kiếm
    - Di chuyển ô nhập liệu tìm kiếm lên khu vực tiêu đề (`dav-floating-header`), đặt kế bên công tắc Toggle switch `"Ẩn Tên"`.
    - Loại bỏ hoàn toàn ô tìm kiếm rộng bản cũ nằm giữa hàng thông số thống kê (`dav-stats-container`) và khu vực danh sách nhóm (`dav-saved-groups-section`).
 
+## Hỗ Trợ Double-Click Để Chỉnh Sửa Ngày Tạo Tài Khoản
+
+Chúng tôi đã gia cố sự kiện double-click cho trường Ngày tạo (`createdAt`) trong giao diện quản lý tài khoản:
+
+1. **Gán sự kiện double-click lên Wrapper Row (`.dav-centered-row`):**
+   - Thay vì chỉ lắng nghe sự kiện `onDoubleClick` trên thẻ `span` chứa chuỗi văn bản ngày tạo (dễ bị bấm hụt do diện tích văn bản nhỏ), chúng tôi đã đưa handler `onDoubleClick` và thuộc tính `style={{ cursor: 'pointer' }}` lên toàn bộ container `.dav-centered-row` bao quanh.
+   - Thao tác này giúp người dùng dễ dàng nhấp đúp vào bất kỳ vị trí nào trên hàng ngày tạo để mở ô nhập liệu ngày (inline date editor).
+   - **Chặn bôi đen chữ khi nhấp đúp (Disable Selection)**: Thiết lập `userSelect: 'none'` và `WebkitUserSelect: 'none'` trên container, đồng thời gọi `window.getSelection()?.removeAllRanges()` trong sự kiện double-click để triệt tiêu hoàn toàn hiệu ứng bôi đen màu xanh mặc định của trình duyệt, giúp sự kiện double-click kích hoạt chế độ sửa ngày một cách tức thì và mượt mà.
+
+
+
 
 
 

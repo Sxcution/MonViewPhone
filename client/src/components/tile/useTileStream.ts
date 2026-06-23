@@ -479,7 +479,7 @@ export function useTileStream(args: Args) {
                     setStatus(tRef.current('Đang đợi lượt kết nối...'));
                 }
                 const generation = ++connectGeneration;
-                const restart = Boolean(opts?.restart);
+                const restart = opts?.restart !== false;
                 queuedConnectCancel = scheduleBatchedConnect(streamSessionKey, owner, () => {
                     queuedConnectCancel = null;
                     if (destroyedRef.current || generation !== connectGeneration) {
@@ -537,7 +537,7 @@ export function useTileStream(args: Args) {
                     wsServer,
                     deviceParam: streamDeviceParam,
                     udid: streamEndpointUdid,
-                    restart: Boolean(opts?.restart)
+                    restart: opts?.restart !== false
                 });
             } catch (err) {
                 releaseStreamSession(streamSessionKey, owner);
@@ -640,7 +640,7 @@ export function useTileStream(args: Args) {
                 reconnectCountRef.current++;
                 reconnectTimerRef.current = window.setTimeout(() => {
                     if (destroyedRef.current) return;
-                    connect({ restart: !firstFrame });
+                    connect({ restart: true });
                 }, RECONNECT_DELAY_MS);
             };
         }
@@ -681,7 +681,7 @@ export function useTileStream(args: Args) {
             if (packetsStillArriving && outputStalled) {
                 setStatus(tRef.current('⚠️ decode đứng - kết nối lại…'));
                 setLoading(true);
-                connect();
+                connect({ restart: true });
                 return;
             }
 
@@ -699,7 +699,7 @@ export function useTileStream(args: Args) {
             if (packetAge > 300000 && bitmapAge > 300000) {
                 setStatus(tRef.current('⚠️ idle lâu - kết nối lại…'));
                 setLoading(true);
-                connect();
+                connect({ restart: true });
             }
         }, 1000);
 

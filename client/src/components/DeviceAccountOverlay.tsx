@@ -2791,6 +2791,12 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             {!hideCreatedAt && (
               <div 
                 className="dav-centered-row"
+                style={{ cursor: 'pointer', userSelect: 'none', WebkitUserSelect: 'none' }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  window.getSelection()?.removeAllRanges();
+                  setShowDateInput(true);
+                }}
                 data-inspector-id="deviceAccount.createdDateRow"
                 data-inspector-label="Account created date display/input row"
                 data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
