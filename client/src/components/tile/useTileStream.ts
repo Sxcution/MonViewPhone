@@ -336,7 +336,7 @@ export function useTileStream(args: Args) {
             logicalUdid
         );
 
-        async function makeStreamEngine(streamMaxFps?: number) {
+        async function makeStreamEngine() {
             firstFrame = false;
             if (!isSilent()) {
                 setLoading(true);
@@ -404,7 +404,7 @@ export function useTileStream(args: Args) {
             };
 
             if (useWebCodecs) {
-              engine = new WebCodecsH264Engine(canvas!, callbacks, streamMaxFps);
+              engine = new WebCodecsH264Engine(canvas!, callbacks);
             } else {
               engine = new LegacyTinyH264Engine(canvas!, callbacks);
             }
@@ -479,7 +479,7 @@ export function useTileStream(args: Args) {
                     setStatus(tRef.current('Đang đợi lượt kết nối...'));
                 }
                 const generation = ++connectGeneration;
-                const restart = opts?.restart !== false;
+                const restart = Boolean(opts?.restart);
                 queuedConnectCancel = scheduleBatchedConnect(streamSessionKey, owner, () => {
                     queuedConnectCancel = null;
                     if (destroyedRef.current || generation !== connectGeneration) {
@@ -490,6 +490,9 @@ export function useTileStream(args: Args) {
                 });
                 return;
             }
+
+            updateStreamSession(streamSessionKey, owner, 'connecting');
+            await makeStreamEngine();
 
             // Populate fallback stages list if empty
             if (fallbackStagesRef.current.length === 0) {
@@ -528,16 +531,13 @@ export function useTileStream(args: Args) {
               bounds: currentStage.bounds ? { ...streamCfgRef.current.bounds, ...currentStage.bounds } : streamCfgRef.current.bounds
             };
 
-            updateStreamSession(streamSessionKey, owner, 'connecting');
-            await makeStreamEngine(trialConfig.maxFps);
-
             let url: string;
             try {
                 url = makeWsUrl({
                     wsServer,
                     deviceParam: streamDeviceParam,
                     udid: streamEndpointUdid,
-                    restart: opts?.restart !== false
+                    restart: Boolean(opts?.restart)
                 });
             } catch (err) {
                 releaseStreamSession(streamSessionKey, owner);
@@ -640,7 +640,7 @@ export function useTileStream(args: Args) {
                 reconnectCountRef.current++;
                 reconnectTimerRef.current = window.setTimeout(() => {
                     if (destroyedRef.current) return;
-                    connect({ restart: true });
+                    connect({ restart: !firstFrame });
                 }, RECONNECT_DELAY_MS);
             };
         }
@@ -681,7 +681,7 @@ export function useTileStream(args: Args) {
             if (packetsStillArriving && outputStalled) {
                 setStatus(tRef.current('⚠️ decode đứng - kết nối lại…'));
                 setLoading(true);
-                connect({ restart: true });
+                connect();
                 return;
             }
 
@@ -699,7 +699,7 @@ export function useTileStream(args: Args) {
             if (packetAge > 300000 && bitmapAge > 300000) {
                 setStatus(tRef.current('⚠️ idle lâu - kết nối lại…'));
                 setLoading(true);
-                connect({ restart: true });
+                connect();
             }
         }, 1000);
 

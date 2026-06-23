@@ -3,12 +3,9 @@ import { VideoFrameRenderer } from './VideoFrameRenderer';
 export class Canvas2DVideoFrameRenderer implements VideoFrameRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null;
-  private lastDrawTime = 0;
-  public maxFps: number;
 
-  constructor(canvas: HTMLCanvasElement, maxFps: number = 15) {
+  constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.maxFps = maxFps;
     this.ctx = canvas.getContext('2d', { alpha: false });
   }
 

@@ -1,7 +1,6 @@
 import { StreamCallbacks, StreamEngine, StreamStats } from '../StreamEngine';
 import { AccessUnitAssembler } from '../h264/AccessUnitAssembler';
-import { VideoFrameRenderer } from '../render/VideoFrameRenderer';
-import { createBestVideoFrameRenderer } from '../render/VideoFrameRendererFactory';
+import { Canvas2DVideoFrameRenderer } from '../render/Canvas2DVideoFrameRenderer';
 
 function getCodecString(sps: Uint8Array): string {
   // Constructed H.264 profile string: avc1.[profile_idc][profile_compatibility][level_idc]
@@ -23,7 +22,7 @@ export class WebCodecsH264Engine implements StreamEngine {
   private canvas: HTMLCanvasElement;
   private callbacks: StreamCallbacks;
   private decoder: VideoDecoder | null = null;
-  private renderer: VideoFrameRenderer | null = null;
+  private renderer: Canvas2DVideoFrameRenderer | null = null;
   private assembler: AccessUnitAssembler | null = null;
 
   private isReadyState = false;
@@ -42,12 +41,10 @@ export class WebCodecsH264Engine implements StreamEngine {
   private renderedFps = 0;
   private width = 0;
   private height = 0;
-  private maxFps: number;
 
-  constructor(canvas: HTMLCanvasElement, callbacks: StreamCallbacks, maxFps?: number) {
+  constructor(canvas: HTMLCanvasElement, callbacks: StreamCallbacks) {
     this.canvas = canvas;
     this.callbacks = callbacks;
-    this.maxFps = maxFps !== undefined ? maxFps : 15;
   }
 
   start() {
@@ -58,7 +55,7 @@ export class WebCodecsH264Engine implements StreamEngine {
     this.lastPps = null;
     this.activeCodec = '';
 
-    this.renderer = createBestVideoFrameRenderer(this.canvas, this.maxFps);
+    this.renderer = new Canvas2DVideoFrameRenderer(this.canvas);
     this.assembler = new AccessUnitAssembler((frameBytes, isKey) => {
       this.handleAssembledFrame(frameBytes, isKey);
     });
@@ -96,7 +93,7 @@ export class WebCodecsH264Engine implements StreamEngine {
       error: (e) => {
         console.error('[WebCodecs Debug] Decoder error callback triggered:', e);
         this.callbacks.onError?.(e);
-        this.callbacks.onFallbackRequested?.('Decoder error: ' + (e?.message || 'unknown'));
+        // Fallback disabled to keep WebCodecs active for debugging
       }
     });
   }
@@ -143,19 +140,19 @@ export class WebCodecsH264Engine implements StreamEngine {
       return;
     }
 
-    // Backpressure: if decode queue is too large, drop everything until the next keyframe
-    if (this.decoder.decodeQueueSize > 30) {
-      this.keyframeReceived = false;
-    }
-
     // Drop delta frames if keyframe hasn't arrived
     if (!this.keyframeReceived) {
       if (isKey) {
         this.keyframeReceived = true;
       } else {
-        this.droppedFramesCount++;
         return;
       }
+    }
+
+    // Backpressure: drop stale delta frames if decode queue starts to pile up
+    if (this.decoder.decodeQueueSize > 8 && !isKey) {
+      this.droppedFramesCount++;
+      return;
     }
 
     try {
