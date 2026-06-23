@@ -46,10 +46,13 @@ Removed legacy layers:
 - [NEW] `client/src/lib/deviceStreamCache.ts`: Caches working encoders, resolutions, and configurations for device streams to ensure instant, stable subsequent connections.
 - [NEW] `client/src/stream/StreamEngine.ts`: Interface and types defining start/stop, feedBytes, stats reporting, and callback hooks.
 - [NEW] `client/src/stream/render/VideoFrameRenderer.ts`: Abstract base interface for presenting video frames.
-- [NEW] `client/src/stream/render/Canvas2DVideoFrameRenderer.ts`: Hardware-accelerated frame rendering using 2D Canvas context for high stability.
+- [NEW] `client/src/stream/render/Canvas2DVideoFrameRenderer.ts`: Base frame rendering using 2D Canvas context.
+- [NEW] `client/src/stream/render/BitmapRendererVideoFrameRenderer.ts`: Optimized image transfer renderer using the high-performance 'bitmaprenderer' context with async clone management.
+- [NEW] `client/src/stream/render/WebGLVideoFrameRenderer.ts`: Optimized GPU texture transfer renderer using WebGL shaders.
+- [NEW] `client/src/stream/render/VideoFrameRendererFactory.ts`: Factory choosing the best available rendering context (bitmaprenderer -> WebGL -> Canvas2D).
 - [NEW] `client/src/stream/h264/AccessUnitAssembler.ts`: Re-assembles H.264 slice NAL units into proper Annex-B Access Units required by WebCodecs, with all debug console logging disabled.
 - [NEW] `client/src/stream/legacy/LegacyTinyH264Engine.ts`: Integrates the legacy tinyh264 WASM software decoder and CPU YUV-to-RGBA conversion worker.
-- [NEW] `client/src/stream/webcodecs/WebCodecsH264Engine.ts`: Integrates the browser hardware `VideoDecoder` engine with active frame dropping for backpressure control, with all debug console logging disabled.
+- [NEW] `client/src/stream/webcodecs/WebCodecsH264Engine.ts`: Integrates the browser hardware `VideoDecoder` engine with active frame dropping for backpressure control and optimized rendering context selection, with all debug console logging disabled.
 - [NEW] [backendSettings.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/lib/backendSettings.ts): Client-side safety thresholds validator (devices >= 35, WeChat accounts >= 104, contains "Emma Zhao") and explicit REST API poster for device account vault data to `settings` endpoint.
 - `client/src/store/useTileOrder.ts`: Persistent device numbering and ordering.
 - [MODIFY] `client/src/styles.css`: Added styling classes for `.stream-debug-overlay` and layout metrics.

@@ -336,7 +336,7 @@ export function useTileStream(args: Args) {
             logicalUdid
         );
 
-        async function makeStreamEngine() {
+        async function makeStreamEngine(streamMaxFps?: number) {
             firstFrame = false;
             if (!isSilent()) {
                 setLoading(true);
@@ -404,7 +404,7 @@ export function useTileStream(args: Args) {
             };
 
             if (useWebCodecs) {
-              engine = new WebCodecsH264Engine(canvas!, callbacks);
+              engine = new WebCodecsH264Engine(canvas!, callbacks, streamMaxFps);
             } else {
               engine = new LegacyTinyH264Engine(canvas!, callbacks);
             }
@@ -491,9 +491,6 @@ export function useTileStream(args: Args) {
                 return;
             }
 
-            updateStreamSession(streamSessionKey, owner, 'connecting');
-            await makeStreamEngine();
-
             // Populate fallback stages list if empty
             if (fallbackStagesRef.current.length === 0) {
               const meta = androidDeviceMap[udid];
@@ -530,6 +527,9 @@ export function useTileStream(args: Args) {
               maxFps: currentStage.maxFps || streamCfgRef.current.maxFps,
               bounds: currentStage.bounds ? { ...streamCfgRef.current.bounds, ...currentStage.bounds } : streamCfgRef.current.bounds
             };
+
+            updateStreamSession(streamSessionKey, owner, 'connecting');
+            await makeStreamEngine(trialConfig.maxFps);
 
             let url: string;
             try {

@@ -1,6 +1,7 @@
 import { StreamCallbacks, StreamEngine, StreamStats } from '../StreamEngine';
 import { AccessUnitAssembler } from '../h264/AccessUnitAssembler';
-import { Canvas2DVideoFrameRenderer } from '../render/Canvas2DVideoFrameRenderer';
+import { VideoFrameRenderer } from '../render/VideoFrameRenderer';
+import { createBestVideoFrameRenderer } from '../render/VideoFrameRendererFactory';
 
 function getCodecString(sps: Uint8Array): string {
   // Constructed H.264 profile string: avc1.[profile_idc][profile_compatibility][level_idc]
@@ -22,7 +23,7 @@ export class WebCodecsH264Engine implements StreamEngine {
   private canvas: HTMLCanvasElement;
   private callbacks: StreamCallbacks;
   private decoder: VideoDecoder | null = null;
-  private renderer: Canvas2DVideoFrameRenderer | null = null;
+  private renderer: VideoFrameRenderer | null = null;
   private assembler: AccessUnitAssembler | null = null;
 
   private isReadyState = false;
@@ -41,10 +42,12 @@ export class WebCodecsH264Engine implements StreamEngine {
   private renderedFps = 0;
   private width = 0;
   private height = 0;
+  private maxFps: number;
 
-  constructor(canvas: HTMLCanvasElement, callbacks: StreamCallbacks) {
+  constructor(canvas: HTMLCanvasElement, callbacks: StreamCallbacks, maxFps?: number) {
     this.canvas = canvas;
     this.callbacks = callbacks;
+    this.maxFps = maxFps !== undefined ? maxFps : 15;
   }
 
   start() {
@@ -55,7 +58,7 @@ export class WebCodecsH264Engine implements StreamEngine {
     this.lastPps = null;
     this.activeCodec = '';
 
-    this.renderer = new Canvas2DVideoFrameRenderer(this.canvas);
+    this.renderer = createBestVideoFrameRenderer(this.canvas, this.maxFps);
     this.assembler = new AccessUnitAssembler((frameBytes, isKey) => {
       this.handleAssembledFrame(frameBytes, isKey);
     });
