@@ -5,12 +5,53 @@ import (
 	"net/http"
 	"server-go/adb"
 	"strings"
+	"sync"
 	"time"
 )
 
 type DeviceDescriptor struct {
-	Udid  string `json:"udid"`
-	State string `json:"state"`
+	Udid         string `json:"udid"`
+	State        string `json:"state"`
+	Model        string `json:"ro.product.model,omitempty"`
+	Manufacturer string `json:"ro.product.manufacturer,omitempty"`
+	Release      string `json:"ro.build.version.release,omitempty"`
+	Sdk          string `json:"ro.build.version.sdk,omitempty"`
+	Board        string `json:"ro.product.board,omitempty"`
+	Platform     string `json:"ro.board.platform,omitempty"`
+}
+
+var (
+	devicePropCache sync.Map // map[string]map[string]string
+)
+
+func getDeviceProperties(udid string) map[string]string {
+	if val, ok := devicePropCache.Load(udid); ok {
+		return val.(map[string]string)
+	}
+
+	props := make(map[string]string)
+	devicePropCache.Store(udid, props)
+
+	go func() {
+		fetched := make(map[string]string)
+		keys := []string{
+			"ro.product.model",
+			"ro.product.manufacturer",
+			"ro.build.version.release",
+			"ro.build.version.sdk",
+			"ro.product.board",
+			"ro.board.platform",
+		}
+		for _, key := range keys {
+			out, err := adb.Shell(udid, "getprop "+key)
+			if err == nil {
+				fetched[key] = strings.TrimSpace(out)
+			}
+		}
+		devicePropCache.Store(udid, fetched)
+	}()
+
+	return props
 }
 
 type DeviceListEvent struct {
@@ -112,9 +153,16 @@ func HandleDeviceList(w http.ResponseWriter, r *http.Request, tracker *adb.Track
 		devices := tracker.GetDevices()
 		var descList []DeviceDescriptor
 		for id, dev := range devices {
+			props := getDeviceProperties(id)
 			descList = append(descList, DeviceDescriptor{
-				Udid:  id,
-				State: string(dev.Status),
+				Udid:         id,
+				State:        string(dev.Status),
+				Model:        props["ro.product.model"],
+				Manufacturer: props["ro.product.manufacturer"],
+				Release:      props["ro.build.version.release"],
+				Sdk:          props["ro.build.version.sdk"],
+				Board:        props["ro.product.board"],
+				Platform:     props["ro.board.platform"],
 			})
 		}
 

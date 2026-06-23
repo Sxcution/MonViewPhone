@@ -1367,6 +1367,9 @@ export function App() {
       }
       const failed = results.filter(result => !result.success)
       if (!failed.length) {
+        if (connectType === 'wifi') {
+          return null
+        }
         return {
           type: 'success' as const,
           text: t('Connected {count} device(s)', { count: results.length })
@@ -1467,7 +1470,7 @@ export function App() {
     reloadMap.current.delete(udid)
   }, [])
   const PHONE_SHELL_RATIO = 20 / 9;
-  const DEFAULT_DIMS: TileDims = { width: 350, height: Math.round(350 * PHONE_SHELL_RATIO) }
+  const DEFAULT_DIMS: TileDims = { width: 205, height: Math.round(205 * PHONE_SHELL_RATIO) }
 
   // Persisted tile size
   const [tileDims, setTileDims] = useState<TileDims>(() => {
@@ -2215,6 +2218,8 @@ export function App() {
         if (davActiveTab === 'wechat') {
           filterMatched = accounts.some(acc => {
             const wc = acc as WeChatAccount;
+            const is3Months = wc.createdAt ? (Date.now() - wc.createdAt >= 90 * 24 * 60 * 60 * 1000) : (wc as any).isOneYearOld === true;
+            if (!is3Months) return false;
             const scanCount = wc.scanCount || 0;
             if (scanCount >= 3) return false;
             if (wc.lastScanDate) {
@@ -2309,7 +2314,7 @@ export function App() {
   }, [mergedOrder, isDeviceMatchingAccountFilter]);
 
   const tileHighlightsMap = useMemo(() => {
-    const map = new Map<string, 'blue' | 'yellow' | 'red' | 'orange' | false>();
+    const map = new Map<string, 'blue' | 'yellow' | 'red' | 'orange' | 'white' | 'green' | false>();
     if (!accountManagerOpen) return map;
 
     mergedOrder.forEach(udid => {
@@ -2328,7 +2333,7 @@ export function App() {
           return;
         }
         if (state === 'upcoming') {
-          map.set(udid, 'yellow');
+          map.set(udid, 'blue');
           return;
         }
       }
@@ -2341,6 +2346,67 @@ export function App() {
         map.set(udid, 'orange');
         return;
       }
+
+      // Lọc UnVerify -> yellow
+      if (davActiveFilter === 'unverified' && accounts.some((acc: any) => acc.status === 'Unverified' || acc.verifyStatus === 'Unverified')) {
+        map.set(udid, 'yellow');
+        return;
+      }
+
+      // Lọc Thiếu Info -> trắng
+      if (davActiveFilter === 'incomplete_info' && accounts.some((acc: any) => !acc.name || !acc.nickname || !acc.phone || !acc.email)) {
+        map.set(udid, 'white');
+        return;
+      }
+
+      // Lọc TK 1 năm -> xanh lá
+      if (davActiveFilter === 'one_year') {
+        const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+        const hasOneYear = accounts.some((acc: any) => {
+          if (acc.createdAt) {
+            return (Date.now() - acc.createdAt) >= oneYearMs;
+          }
+          return acc.isOneYearOld === true;
+        });
+        if (hasOneYear) {
+          map.set(udid, 'green');
+          return;
+        }
+      }
+
+      // Lọc Thông báo -> cam
+      if (davActiveFilter === 'has_notice' && accounts.some((acc: any) => acc.notice && acc.notice.title)) {
+        map.set(udid, 'orange');
+        return;
+      }
+
+      // Lọc Scan QR -> xanh lá
+      if (davActiveFilter === 'wechat_scan_qr') {
+        const hasScanEligible = accounts.some((acc: any) => {
+          const is3Months = acc.createdAt ? (Date.now() - acc.createdAt >= 90 * 24 * 60 * 60 * 1000) : (acc.isOneYearOld === true);
+          if (!is3Months) return false;
+          const scanCount = acc.scanCount || 0;
+          const lastScanDate = acc.lastScanDate;
+          return scanCount < 3 && (!lastScanDate || Date.now() >= lastScanDate + 30 * 24 * 60 * 60 * 1000);
+        });
+        if (hasScanEligible) {
+          map.set(udid, 'green');
+          return;
+        }
+      }
+
+      // Lọc TK Mới -> trắng
+      if (davActiveFilter === 'new_month') {
+        const hasNewMonth = accounts.some((acc: any) => {
+          if (!acc.createdAt) return false;
+          return Date.now() - acc.createdAt < 30 * 24 * 60 * 60 * 1000;
+        });
+        if (hasNewMonth) {
+          map.set(udid, 'white');
+          return;
+        }
+      }
+
       map.set(udid, false);
     });
     return map;
@@ -3778,7 +3844,7 @@ export function App() {
                       orderMap={orderMap}
                       accountData={tileAccountDataMap.get(udid) || getDeviceAccountDataFromVault(vault, udid)}
                       isFilteredOut={isFilteredOut}
-                      nearbyAutoOpenEnabled={davActiveTab === 'wechat' && davActiveFilter === 'nearby_people'}
+                      activeFilter={davActiveFilter}
                       highlightFilterMatched={tileHighlightsMap.get(udid) ?? false}
                       onOpenDeviceViewer={openDeviceViewerFromAccountOverlay}
                     />
@@ -3902,7 +3968,9 @@ export function App() {
                             }
                             setViewerStreamConfig(defaultViewerCfg)
                             setDraftViewerConfig(defaultViewerCfg)
+                            updateWidth(205)
                             updateViewerWidthPx(900)
+                            setShowTileInfo(false)
                             const fn = reloadMap.current.get(viewerUdid)
                             try {
                               fn?.({ silent: true })
@@ -3910,8 +3978,9 @@ export function App() {
                           } else {
                             setStreamConfig(STREAM_CONFIG)
                             setDraftConfig(STREAM_CONFIG)
-                            updateWidth(350)
+                            updateWidth(205)
                             updateViewerWidthPx(900)
+                            setShowTileInfo(false)
                             setBitrateWarnAccepted(false)
                             setBitrateConfirmVisible(false)
                             setBitratePending(null)
@@ -6663,13 +6732,23 @@ export function App() {
               </div>
             )}
 
-            {contextMenuTarget.sourceGrid === 'group' ? (
+            {contextMenuTarget.groupIdx === undefined ? (
               <button
                 className="ctxMenuItem ctxMenuItemDanger"
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  removeUiDeviceEntries([contextMenuTarget.udid]);
+
+                  const { udid } = contextMenuTarget!;
+                  setConfirmState({
+                    title: 'Xoá thiết bị?',
+                    message: 'Bạn có chắc chắn muốn xoá thiết bị này hoàn toàn khỏi hệ thống không?',
+                    danger: true,
+                    onConfirm: () => {
+                      removeUiDeviceEntries([udid]);
+                    }
+                  });
+
                   setContextMenuTarget(null);
                   setContextMenuOpen(false);
                   setSubMenuOpen(false);

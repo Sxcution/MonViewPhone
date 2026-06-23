@@ -68,8 +68,12 @@ func shellSafe(udid string, cmd string) string {
 	return strings.TrimSpace(out)
 }
 
+func isCleanUpProcess(proc serverProcess) bool {
+	return strings.Contains(proc.cmdline, "com.genymobile.scrcpy.CleanUp")
+}
+
 func listServerProcesses(udid string) []serverProcess {
-	cmd := fmt.Sprintf(`for p in $(pidof %s 2>/dev/null); do C=$(cat /proc/$p/cmdline 2>/dev/null | tr "\0" " "); case "$C" in *%s*) echo "$p $C";; esac; done`, ProcessName, ServerPackage)
+	cmd := fmt.Sprintf(`for p in $(pidof %s 2>/dev/null); do C=$(cat /proc/$p/cmdline 2>/dev/null | tr "\0" " "); case "$C" in *com.genymobile.scrcpy*) echo "$p $C";; esac; done`, ProcessName)
 	out := shellSafe(udid, cmd)
 	if out == "" {
 		return nil
@@ -111,11 +115,11 @@ func killStaleServers(udid string, processes []serverProcess) {
 		if proc.pid == "" {
 			continue
 		}
-		if !isExpectedServer(proc) {
+		if !isExpectedServer(proc) && !isCleanUpProcess(proc) {
 			log.Printf("[%s] Skip foreign scrcpy server PID %s (%s)", udid, proc.pid, proc.cmdline)
 			continue
 		}
-		log.Printf("[%s] Killing stale MonViewPhone scrcpy server PID %s (%s)", udid, proc.pid, proc.cmdline)
+		log.Printf("[%s] Killing stale MonViewPhone scrcpy process PID %s (%s)", udid, proc.pid, proc.cmdline)
 		_ = shellSafe(udid, "kill "+proc.pid+" 2>/dev/null || true")
 	}
 }
@@ -125,8 +129,8 @@ func killMonViewPhoneScrcpyServers(udid string) error {
 		if proc.pid == "" {
 			continue
 		}
-		if isExpectedServer(proc) {
-			log.Printf("[%s] Killing MonViewPhone scrcpy server PID %s (%s)", udid, proc.pid, proc.cmdline)
+		if isExpectedServer(proc) || isCleanUpProcess(proc) {
+			log.Printf("[%s] Killing MonViewPhone scrcpy process PID %s (%s)", udid, proc.pid, proc.cmdline)
 			_ = shellSafe(udid, "kill -9 "+proc.pid+" 2>/dev/null || true")
 		} else {
 			log.Printf("[%s] Skip foreign scrcpy server PID %s (%s)", udid, proc.pid, proc.cmdline)

@@ -549,7 +549,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   initialData,
   activeTab,
   setActiveTab,
-  nearbyAutoOpenEnabled,
+  activeFilter,
   onOpenDeviceViewer,
   showAccountOverlay = false,
   alwaysShowHeader = false
@@ -562,7 +562,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   initialData: DeviceAccountData;
   activeTab: PlatformType;
   setActiveTab: (tab: PlatformType) => void;
-  nearbyAutoOpenEnabled?: boolean;
+  activeFilter?: string;
   onOpenDeviceViewer?: (udid: string) => void;
   showAccountOverlay?: boolean;
   alwaysShowHeader?: boolean;
@@ -575,44 +575,6 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
   const [data, setData] = useState(initialData);
   const [platforms, setPlatforms] = useState(() => getSavedPlatforms());
-  const [bellTooltip, setBellTooltip] = useState<{ x: number; y: number } | null>(null);
-  const [hiddenIdentityFields, setHiddenIdentityFields] = useState<Record<string, boolean>>({});
-  const [pendingDeleteAccount, setPendingDeleteAccount] = useState<{ id: string; name: string } | null>(null);
-  const [historyModalAccountId, setHistoryModalAccountId] = useState<string | null>(null);
-  const [pendingResetHistoryAccount, setPendingResetHistoryAccount] = useState<Account | null>(null);
-  const [deviceProfiles, setDeviceProfiles] = useState<{ id: number; name: string }[]>([]);
-  const [showSetSubmenu, setShowSetSubmenu] = useState(false);
-  /* showClassificationSubmenu : State hiển thị submenu phân loại của tài khoản trong dropdown */
-  const [showClassificationSubmenu, setShowClassificationSubmenu] = useState(false);
-  const [showStatusSubmenu, setShowStatusSubmenu] = useState(false);
-  const [showNearbySubmenu, setShowNearbySubmenu] = useState(false);
-
-  useEffect(() => {
-    const handleUpdate = () => {
-      setPlatforms(getSavedPlatforms());
-    };
-    // Listen to global open/close dropdown events (holding/pressing hotkey)
-    // Lắng nghe sự kiện mở/đóng toàn bộ danh sách dropdown (khi đè/nhấn hotkey)
-    const handleOpenAll = () => {
-      setAccountTitleDropdownOpen(true);
-    };
-    const handleCloseAll = () => {
-      setAccountTitleDropdownOpen(false);
-    };
-
-    window.addEventListener('device-account-platforms-updated', handleUpdate);
-    window.addEventListener('monviewphone:open-all-dropdowns', handleOpenAll);
-    window.addEventListener('monviewphone:close-all-dropdowns', handleCloseAll);
-
-    return () => {
-      window.removeEventListener('device-account-platforms-updated', handleUpdate);
-      window.removeEventListener('monviewphone:open-all-dropdowns', handleOpenAll);
-      window.removeEventListener('monviewphone:close-all-dropdowns', handleCloseAll);
-      if (dropdownCloseTimeoutRef.current) {
-        clearTimeout(dropdownCloseTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // States for hiding fields on tile/panel
   const [hidePhone, setHidePhone] = useState(() => localStorage.getItem('monviewphone:dav-hide-phone') === 'true');
@@ -709,6 +671,48 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const [dropdownCoords, setDropdownCoords] = useState<{ top: number; left: number; width: number } | null>(null);
   const headerNameDisplayRef = useRef<HTMLDivElement>(null);
   const [dropdownAnchor, setDropdownAnchor] = useState<HTMLElement | null>(null);
+
+  const [bellTooltip, setBellTooltip] = useState<{ x: number; y: number } | null>(null);
+  const [hiddenIdentityFields, setHiddenIdentityFields] = useState<Record<string, boolean>>({});
+  const [pendingDeleteAccount, setPendingDeleteAccount] = useState<{ id: string; name: string } | null>(null);
+  const [historyModalAccountId, setHistoryModalAccountId] = useState<string | null>(null);
+  const [pendingResetHistoryAccount, setPendingResetHistoryAccount] = useState<Account | null>(null);
+  const [deviceProfiles, setDeviceProfiles] = useState<{ id: number; name: string }[]>([]);
+  const [showSetSubmenu, setShowSetSubmenu] = useState(false);
+  /* showClassificationSubmenu : State hiển thị submenu phân loại của tài khoản trong dropdown */
+  const [showClassificationSubmenu, setShowClassificationSubmenu] = useState(false);
+  const [showStatusSubmenu, setShowStatusSubmenu] = useState(false);
+  const [showNearbySubmenu, setShowNearbySubmenu] = useState(false);
+  const [showQrSubmenu, setShowQrSubmenu] = useState(false);
+  const [showAccountSubmenu, setShowAccountSubmenu] = useState(false);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setPlatforms(getSavedPlatforms());
+    };
+    // Listen to global open/close dropdown events (holding/pressing hotkey)
+    // Lắng nghe sự kiện mở/đóng toàn bộ danh sách dropdown (khi đè/nhấn hotkey)
+    const handleOpenAll = () => {
+      setDropdownAnchor(accountTitleDropdownRef.current);
+      setAccountTitleDropdownOpen(true);
+    };
+    const handleCloseAll = () => {
+      setAccountTitleDropdownOpen(false);
+    };
+
+    window.addEventListener('device-account-platforms-updated', handleUpdate);
+    window.addEventListener('monviewphone:open-all-dropdowns', handleOpenAll);
+    window.addEventListener('monviewphone:close-all-dropdowns', handleCloseAll);
+
+    return () => {
+      window.removeEventListener('device-account-platforms-updated', handleUpdate);
+      window.removeEventListener('monviewphone:open-all-dropdowns', handleOpenAll);
+      window.removeEventListener('monviewphone:close-all-dropdowns', handleCloseAll);
+      if (dropdownCloseTimeoutRef.current) {
+        clearTimeout(dropdownCloseTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (accountTitleDropdownOpen && dropdownAnchor) {
@@ -845,26 +849,110 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
     return getNearbyAccountGroupState(groupAccounts.map(x => x.account));
   }, [activeTab, groupAccounts]);
 
-  // Auto-open dropdown khi filter Nearby People bật
+  const panelHasNoticeAccount = useMemo(() => {
+    if (activeTab !== 'wechat') return false;
+    return groupAccounts.some(x => x.account.notice && x.account.notice.title);
+  }, [activeTab, groupAccounts]);
+
+  const panelHasScanQrAccount = useMemo(() => {
+    if (activeTab !== 'wechat') return false;
+    return groupAccounts.some(x => {
+      const scanCount = x.account.scanCount || 0;
+      const lastScanDate = x.account.lastScanDate;
+      const is3Months = x.account.createdAt ? (Date.now() - x.account.createdAt >= 90 * 24 * 60 * 60 * 1000) : (x.account as any).isOneYearOld === true;
+      if (!is3Months) return false;
+      return scanCount < 3 && (!lastScanDate || Date.now() >= lastScanDate + 30 * 24 * 60 * 60 * 1000);
+    });
+  }, [activeTab, groupAccounts]);
+
+  const panelHasNewMonthAccount = useMemo(() => {
+    if (activeTab !== 'wechat') return false;
+    return groupAccounts.some(x => {
+      if (!x.account.createdAt) return false;
+      return Date.now() - x.account.createdAt < 30 * 24 * 60 * 60 * 1000;
+    });
+  }, [activeTab, groupAccounts]);
+
+  const panelHasUnverifiedAccount = useMemo(() => {
+    if (activeTab !== 'wechat') return false;
+    return groupAccounts.some(x => x.account.status === 'Unverified' || (x.account as any).verifyStatus === 'Unverified');
+  }, [activeTab, groupAccounts]);
+
+  const panelHasIncompleteInfoAccount = useMemo(() => {
+    if (activeTab !== 'wechat') return false;
+    return groupAccounts.some(x => !x.account.name || !x.account.nickname || !x.account.phone || !x.account.email);
+  }, [activeTab, groupAccounts]);
+
+  const panelHasOneYearAccount = useMemo(() => {
+    if (activeTab !== 'wechat') return false;
+    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+    return groupAccounts.some(x => {
+      if (x.account.createdAt) {
+        return (Date.now() - x.account.createdAt) >= oneYearMs;
+      }
+      return (x.account as any).isOneYearOld === true;
+    });
+  }, [activeTab, groupAccounts]);
+
+  const panelHasDieAccount = useMemo(() => {
+    if (activeTab !== 'wechat') return false;
+    return groupAccounts.some(x => x.account.status === 'Die');
+  }, [activeTab, groupAccounts]);
+
+  const panelHasRiskAccount = useMemo(() => {
+    if (activeTab !== 'wechat') return false;
+    return groupAccounts.some(x => x.account.status === 'Risk');
+  }, [activeTab, groupAccounts]);
+
+  // Auto-open dropdown khi filter bật
   useEffect(() => {
-    const shouldOpen =
-      nearbyAutoOpenEnabled &&
-      activeTab === 'wechat' &&
-      panelHasNearbyRelevantAccount;
+    let shouldOpen = false;
+    if (activeTab === 'wechat' && activeFilter) {
+      if (activeFilter === 'nearby_people' && panelHasNearbyRelevantAccount) {
+        shouldOpen = true;
+      } else if (activeFilter === 'has_notice' && panelHasNoticeAccount) {
+        shouldOpen = true;
+      } else if (activeFilter === 'wechat_scan_qr' && panelHasScanQrAccount) {
+        shouldOpen = true;
+      } else if (activeFilter === 'new_month' && panelHasNewMonthAccount) {
+        shouldOpen = true;
+      } else if (activeFilter === 'unverified' && panelHasUnverifiedAccount) {
+        shouldOpen = true;
+      } else if (activeFilter === 'incomplete_info' && panelHasIncompleteInfoAccount) {
+        shouldOpen = true;
+      } else if (activeFilter === 'one_year' && panelHasOneYearAccount) {
+        shouldOpen = true;
+      } else if (activeFilter === 'die' && panelHasDieAccount) {
+        shouldOpen = true;
+      } else if (activeFilter === 'risk' && panelHasRiskAccount) {
+        shouldOpen = true;
+      }
+    }
 
     if (shouldOpen) {
       setDropdownAnchor(accountTitleDropdownRef.current);
       setAccountTitleDropdownOpen(true);
       setPlatformDropdownOpen(false);
       autoOpenedNearbyDropdownRef.current = true;
-      return;
+    } else {
+      if (autoOpenedNearbyDropdownRef.current) {
+        setAccountTitleDropdownOpen(false);
+        autoOpenedNearbyDropdownRef.current = false;
+      }
     }
-
-    if (!nearbyAutoOpenEnabled && autoOpenedNearbyDropdownRef.current) {
-      setAccountTitleDropdownOpen(false);
-      autoOpenedNearbyDropdownRef.current = false;
-    }
-  }, [nearbyAutoOpenEnabled, activeTab, panelHasNearbyRelevantAccount]);
+  }, [
+    activeFilter, 
+    activeTab, 
+    panelHasNearbyRelevantAccount, 
+    panelHasNoticeAccount, 
+    panelHasScanQrAccount, 
+    panelHasNewMonthAccount,
+    panelHasUnverifiedAccount,
+    panelHasIncompleteInfoAccount,
+    panelHasOneYearAccount,
+    panelHasDieAccount,
+    panelHasRiskAccount
+  ]);
   const [accountActionMenu, setAccountActionMenu] = useState<{ x: number; y: number; sourceUdid: string; account: Account } | null>(null);
   const [showAddToGroupSubmenu, setShowAddToGroupSubmenu] = useState(false);
 
@@ -914,6 +1002,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       setShowClassificationSubmenu(false);
       setShowStatusSubmenu(false);
       setShowNearbySubmenu(false);
+      setShowQrSubmenu(false);
+      setShowAccountSubmenu(false);
     }
   }, [accountActionMenu, wsServer]);
 
@@ -943,13 +1033,18 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
       if (shouldKeepOpen) return;
 
+      if (activeFilter && activeFilter !== 'default') {
+        // Nếu bộ lọc đang kích hoạt, giữ dropdown luôn mở khi click ra ngoài
+        return;
+      }
+
       setAccountTitleDropdownOpen(false);
       setPlatformDropdownOpen(false);
       setDropdownAnchor(null);
     };
     window.addEventListener('mousedown', hide, true);
     return () => window.removeEventListener('mousedown', hide, true);
-  }, [accountTitleDropdownOpen, platformDropdownOpen]);
+  }, [accountTitleDropdownOpen, platformDropdownOpen, activeFilter]);
 
   // Close accountActionMenu on outside click
   useEffect(() => {
@@ -965,6 +1060,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       setShowAddToGroupSubmenu(false);
       setShowStatusSubmenu(false);
       setShowNearbySubmenu(false);
+      setShowQrSubmenu(false);
+      setShowAccountSubmenu(false);
     };
     window.addEventListener('mousedown', hide, true);
     return () => window.removeEventListener('mousedown', hide, true);
@@ -1840,7 +1937,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   maxWidth: '320px',
                   right: 'auto',
                   marginTop: 0,
-                  zIndex: 28000,
+                  zIndex: 10000010,
                   maxHeight: '300px',
                   overflowY: 'auto',
                   background: 'var(--md-card)',
@@ -1865,6 +1962,18 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                     ));
                     const todayStr = getLocalDateString(Date.now());
                     const isLoggedInToday = loginDates.includes(todayStr);
+
+                    const isScanQrEligible = activeTab === 'wechat' && (() => {
+                      const is3Months = account.createdAt ? (Date.now() - account.createdAt >= 90 * 24 * 60 * 60 * 1000) : (account as any).isOneYearOld === true;
+                      if (!is3Months) return false;
+                      const scanCount = account.scanCount || 0;
+                      if (scanCount >= 3) return false;
+                      if (account.lastScanDate) {
+                        const nextScan = account.lastScanDate + 30 * 24 * 60 * 60 * 1000;
+                        if (nextScan > Date.now()) return false;
+                      }
+                      return true;
+                    })();
 
                     const buildItemData = (accObj: Account) => ({
                       accUdid,
@@ -1940,6 +2049,26 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                           {renderAccountNoticeIcon(account)}
                           {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
                         </span>
+                        {isScanQrEligible && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: 'transparent',
+                              color: '#ffffff',
+                              padding: '0',
+                              marginLeft: 'auto',
+                              flexShrink: 0,
+                              marginRight: account.wechatLaunchProfile ? '4px' : '0'
+                            }}
+                            data-inspector-id="deviceAccount.scanQrBadge"
+                            data-inspector-label={`Scan QR eligible badge for User ${account.name}`}
+                            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+                          >
+                            <QrCode size={12} />
+                          </span>
+                        )}
                         {account.wechatLaunchProfile && (
                           <span
                             style={{
@@ -1948,7 +2077,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                               color: '#22c55e',
                               padding: '1px 4px',
                               borderRadius: '4px',
-                              marginLeft: 'auto',
+                              marginLeft: isScanQrEligible ? '0' : 'auto',
                               fontWeight: 'bold',
                               flexShrink: 0
                             }}
@@ -2022,7 +2151,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   border: '1px solid #333',
                   borderRadius: '6px',
                   padding: '4px',
-                  zIndex: 21000,
+                  zIndex: 10000015,
                   boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
                   display: 'flex',
                   flexDirection: 'column',
@@ -3032,6 +3161,22 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   </button>
                   <button
                     className="dav-ctx-item"
+                    disabled={(selectedAccount.scanCount || 0) >= 3}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const currentCount = selectedAccount.scanCount || 0;
+                      if (currentCount >= 3) return;
+                      handleUpdateAccount(selectedAccount.id, {
+                        lastScanDate: Date.now()
+                      });
+                      setCtxMenu(null);
+                    }}
+                  >
+                    Quét thất bại
+                  </button>
+                  <button
+                    className="dav-ctx-item"
                     onPointerDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -3083,7 +3228,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       {pendingDeleteAccount && ReactDOM.createPortal(
         <div 
           className="confirmOverlay" 
-          style={{ zIndex: 29000, background: 'transparent' }} 
+          style={{ zIndex: 10000050, background: 'transparent' }} 
           onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}
           data-inspector-id="deviceAccount.deleteConfirmOverlay"
           data-inspector-label="Delete account confirmation modal overlay"
@@ -3091,7 +3236,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
         >
           <div 
             className="confirmPanel" 
-            style={{ minWidth: 380, maxWidth: 480, zIndex: 29001 }} 
+            style={{ minWidth: 380, maxWidth: 480, zIndex: 10000051 }} 
             onPointerDown={e => e.stopPropagation()}
             data-inspector-id="deviceAccount.deleteConfirmModal"
             data-inspector-label="Delete account confirmation modal card"
@@ -3219,7 +3364,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       {pendingResetHistoryAccount && ReactDOM.createPortal(
         <div 
           className="confirmOverlay" 
-          style={{ zIndex: 29000, background: 'transparent' }} 
+          style={{ zIndex: 10000050, background: 'transparent' }} 
           onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}
           data-inspector-id="deviceAccount.resetHistoryConfirmOverlay"
           data-inspector-label="Reset history confirmation modal overlay"
@@ -3227,7 +3372,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
         >
           <div 
             className="confirmPanel" 
-            style={{ minWidth: 380, maxWidth: 480, zIndex: 29001 }} 
+            style={{ minWidth: 380, maxWidth: 480, zIndex: 10000051 }} 
             onPointerDown={e => e.stopPropagation()}
             data-inspector-id="deviceAccount.resetHistoryConfirmModal"
             data-inspector-label="Reset history confirmation modal card"
@@ -3304,35 +3449,13 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             Copy ID ( User name)
           </button>
 
-          <button
-            type="button"
-            className="dav-ctx-item"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setNoticeEditModal({ sourceUdid: accountActionMenu.sourceUdid, account: accountActionMenu.account });
-              setEditNoticeTitle(accountActionMenu.account.notice?.title || '');
-              setEditNoticeDays(accountActionMenu.account.notice?.days?.toString() || '');
-              setEditNoticeTime((accountActionMenu.account.notice as any)?.dailyReminderTime || '');
-              setNoticeError('');
-              setAccountActionMenu(null);
-              setAccountTitleDropdownOpen(false);
-              setAccountHoverTooltip(null);
-            }}
-            data-inspector-id="deviceAccount.contextMenuNotice"
-            data-inspector-label="Edit account notice settings menu item"
-            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-          >
-            Thông báo
-          </button>
-
-          {/* Submenu Trạng Thái */}
+          {/* Submenu Tài Khoản */}
           <div
             className="dav-ctx-submenu-container"
-            onMouseEnter={() => setShowStatusSubmenu(true)}
-            onMouseLeave={() => setShowStatusSubmenu(false)}
-            data-inspector-id="deviceAccount.contextMenuStatusSubmenu"
-            data-inspector-label="Account status submenu"
+            onMouseEnter={() => setShowAccountSubmenu(true)}
+            onMouseLeave={() => setShowAccountSubmenu(false)}
+            data-inspector-id="deviceAccount.contextMenuAccountSubmenu"
+            data-inspector-label="Account management submenu"
             data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
           >
             <button
@@ -3341,75 +3464,301 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                setShowStatusSubmenu(v => !v);
+                setShowAccountSubmenu(v => !v);
               }}
             >
-              <Activity size={16} /> Trạng Thái
+              <Users size={16} /> Tài Khoản
             </button>
-            <div className={`dav-ctx-submenu ${showStatusSubmenu ? 'is-open' : ''}`}>
+            <div className={`dav-ctx-submenu ${showAccountSubmenu ? 'is-open' : ''}`}>
+              {/* Submenu Đã set */}
+              {activeTab === 'wechat' && (
+                <div
+                  className="dav-ctx-submenu-container"
+                  onMouseEnter={() => setShowSetSubmenu(true)}
+                  onMouseLeave={() => setShowSetSubmenu(false)}
+                  data-inspector-id="deviceAccount.contextMenuLaunchProfileSubmenu"
+                  data-inspector-label="Launch profile mappings submenu"
+                  data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+                >
+                  <button
+                    type="button"
+                    className="dav-ctx-item dav-ctx-has-sub"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowSetSubmenu(v => !v);
+                    }}
+                  >
+                    Đã set
+                  </button>
+                  <div className={`dav-ctx-submenu ${showSetSubmenu ? 'is-open' : ''}`}>
+                    {deviceProfiles.length === 0 ? (
+                      <div className="dav-ctx-item" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+                        Đang tải...
+                      </div>
+                    ) : (
+                      deviceProfiles.map(profile => {
+                        const appType = getAppTypeFromProfile(profile.id, profile.name);
+                        const label = `User ${profile.id} - ${profile.name} / ${getAppTypeLabel(appType)}`;
+                        const isAssigned = accountActionMenu.account.wechatLaunchProfile?.userId === profile.id;
+                        return (
+                          <button
+                            key={profile.id}
+                            type="button"
+                            className={`dav-ctx-item ${isAssigned ? 'active' : ''}`}
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+
+                              const launch: WechatLaunchProfile = {
+                                userId: profile.id,
+                                name: profile.name,
+                                appType: appType,
+                                packageName: 'com.tencent.mm',
+                                activityName: 'com.tencent.mm.ui.LauncherUI',
+                                assignedAt: Date.now()
+                              };
+
+                              handleUpdateAccount(accountActionMenu.account.id, {
+                                appType: appType,
+                                wechatLaunchProfile: launch
+                              });
+
+                              setAccountActionMenu(null);
+                              setAccountTitleDropdownOpen(false);
+                            }}
+                            data-inspector-id="deviceAccount.contextMenuLaunchProfileItem"
+                            data-inspector-label={`Map launch profile to User ${profile.id}`}
+                            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+                          >
+                            {label}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Submenu Phân Loại */}
+              <div
+                className="dav-ctx-submenu-container"
+                onMouseEnter={() => setShowClassificationSubmenu(true)}
+                onMouseLeave={() => setShowClassificationSubmenu(false)}
+                data-inspector-id="deviceAccount.contextMenuClassificationSubmenu"
+                data-inspector-label="Account classification submenu"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+              >
+                <button
+                  type="button"
+                  className="dav-ctx-item dav-ctx-has-sub"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowClassificationSubmenu(v => !v);
+                  }}
+                >
+                  Phân loại
+                </button>
+                <div className={`dav-ctx-submenu ${showClassificationSubmenu ? 'is-open' : ''}`}>
+                  {(['main', 'clone', 'secure', 'shelter'] as const).map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      className={`dav-ctx-item ${accountActionMenu.account.appType === type ? 'active' : ''}`}
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleUpdateAccount(accountActionMenu.account.id, { appType: type });
+                        setAccountActionMenu(null);
+                        setAccountTitleDropdownOpen(false);
+                      }}
+                      data-inspector-id="deviceAccount.contextMenuClassificationItem"
+                      data-inspector-label={`Set account classification to ${type}`}
+                      data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+                    >
+                      {getAppTypeLabel(type)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Submenu Trạng Thái */}
+              <div
+                className="dav-ctx-submenu-container"
+                onMouseEnter={() => setShowStatusSubmenu(true)}
+                onMouseLeave={() => setShowStatusSubmenu(false)}
+                data-inspector-id="deviceAccount.contextMenuStatusSubmenu"
+                data-inspector-label="Account status submenu"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+              >
+                <button
+                  type="button"
+                  className="dav-ctx-item dav-ctx-has-sub"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowStatusSubmenu(v => !v);
+                  }}
+                >
+                  <Activity size={16} /> Trạng Thái
+                </button>
+                <div className={`dav-ctx-submenu ${showStatusSubmenu ? 'is-open' : ''}`}>
+                  <button
+                    type="button"
+                    className={`dav-ctx-item ${accountActionMenu.account.status === 'Live' ? 'active' : ''}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleUpdateAccount(accountActionMenu.account.id, { status: 'Live' });
+                      setAccountActionMenu(null);
+                      setAccountTitleDropdownOpen(false);
+                    }}
+                  >
+                    <div className="dav-status-dot live" /> Set Live {accountActionMenu.account.status === 'Live' ? '(Hiện tại)' : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className={`dav-ctx-item ${accountActionMenu.account.status === 'Die' ? 'active' : ''}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleUpdateAccount(accountActionMenu.account.id, { status: 'Die' });
+                      setAccountActionMenu(null);
+                      setAccountTitleDropdownOpen(false);
+                    }}
+                  >
+                    <div className="dav-status-dot die" /> Set Die {accountActionMenu.account.status === 'Die' ? '(Hiện tại)' : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className={`dav-ctx-item ${accountActionMenu.account.status === 'Risk' ? 'active' : ''}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleUpdateAccount(accountActionMenu.account.id, { status: 'Risk' });
+                      setAccountActionMenu(null);
+                      setAccountTitleDropdownOpen(false);
+                    }}
+                  >
+                    <div className="dav-status-dot risk" /> Set Risk {accountActionMenu.account.status === 'Risk' ? '(Hiện tại)' : ''}
+                  </button>
+                  <button
+                    type="button"
+                    className={`dav-ctx-item ${accountActionMenu.account.status === 'Unverified' ? 'active verified' : ''}`}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const targetStatus = accountActionMenu.account.status === 'Unverified' ? 'Verify' : 'Unverified';
+                      handleUpdateAccount(accountActionMenu.account.id, { status: targetStatus });
+                      setAccountActionMenu(null);
+                      setAccountTitleDropdownOpen(false);
+                    }}
+                  >
+                    {accountActionMenu.account.status === 'Unverified' ? (
+                      <>
+                        <div className="dav-status-dot live" /> Verify Success
+                      </>
+                    ) : (
+                      <>
+                        <div className="dav-status-dot verify" /> Set UnVerify
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Submenu Thêm Vào Nhóm */}
+              <div
+                className="dav-ctx-submenu-container"
+                onMouseEnter={() => setShowAddToGroupSubmenu(true)}
+                onMouseLeave={() => setShowAddToGroupSubmenu(false)}
+                data-inspector-id="deviceAccount.contextMenuAddToGroupSubmenu"
+                data-inspector-label="Add device to group submenu"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+              >
+                <button
+                  type="button"
+                  className="dav-ctx-item dav-ctx-has-sub"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowAddToGroupSubmenu(v => !v);
+                  }}
+                >
+                  Thêm vào nhóm
+                </button>
+                <div className={`dav-ctx-submenu ${showAddToGroupSubmenu ? 'is-open' : ''}`}>
+                  {savedGroups.length === 0 ? (
+                    <div className="dav-ctx-item" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+                      Không có nhóm nào
+                    </div>
+                  ) : (
+                    savedGroups.map((group, idx) => {
+                      const alreadyIn = group.udids.includes(accountActionMenu.sourceUdid);
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          className={`dav-ctx-item ${alreadyIn ? 'active' : ''}`}
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!alreadyIn) {
+                              handleAddDeviceToGroup(idx, accountActionMenu.sourceUdid);
+                            }
+                            setAccountActionMenu(null);
+                            setAccountTitleDropdownOpen(false);
+                          }}
+                        >
+                          {group.name} {alreadyIn ? '(Đã có)' : ''}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Di chuyển tài khoản */}
               <button
                 type="button"
-                className={`dav-ctx-item ${accountActionMenu.account.status === 'Live' ? 'active' : ''}`}
+                className="dav-ctx-item"
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  handleUpdateAccount(accountActionMenu.account.id, { status: 'Live' });
+                  setMoveModal({ sourceUdid: accountActionMenu.sourceUdid, account: accountActionMenu.account });
+                  setMoveError('');
                   setAccountActionMenu(null);
                   setAccountTitleDropdownOpen(false);
                 }}
+                data-inspector-id="deviceAccount.contextMenuMove"
+                data-inspector-label="Move account to another device menu item"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
-                <div className="dav-status-dot live" /> Set Live {accountActionMenu.account.status === 'Live' ? '(Hiện tại)' : ''}
+                Di chuyển tài khoản
               </button>
+
+              {/* Lịch sử tài khoản */}
               <button
                 type="button"
-                className={`dav-ctx-item ${accountActionMenu.account.status === 'Die' ? 'active' : ''}`}
+                className="dav-ctx-item"
                 onPointerDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  handleUpdateAccount(accountActionMenu.account.id, { status: 'Die' });
+                  setHistoryModalAccountId(accountActionMenu.account.id);
                   setAccountActionMenu(null);
                   setAccountTitleDropdownOpen(false);
                 }}
+                data-inspector-id="deviceAccount.contextMenuHistory"
+                data-inspector-label="View account history menu item"
+                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
               >
-                <div className="dav-status-dot die" /> Set Die {accountActionMenu.account.status === 'Die' ? '(Hiện tại)' : ''}
-              </button>
-              <button
-                type="button"
-                className={`dav-ctx-item ${accountActionMenu.account.status === 'Risk' ? 'active' : ''}`}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleUpdateAccount(accountActionMenu.account.id, { status: 'Risk' });
-                  setAccountActionMenu(null);
-                  setAccountTitleDropdownOpen(false);
-                }}
-              >
-                <div className="dav-status-dot risk" /> Set Risk {accountActionMenu.account.status === 'Risk' ? '(Hiện tại)' : ''}
-              </button>
-              <button
-                type="button"
-                className={`dav-ctx-item ${accountActionMenu.account.status === 'Unverified' ? 'active verified' : ''}`}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const targetStatus = accountActionMenu.account.status === 'Unverified' ? 'Verify' : 'Unverified';
-                  handleUpdateAccount(accountActionMenu.account.id, { status: targetStatus });
-                  setAccountActionMenu(null);
-                  setAccountTitleDropdownOpen(false);
-                }}
-              >
-                {accountActionMenu.account.status === 'Unverified' ? (
-                  <>
-                    <div className="dav-status-dot live" /> Verify Success
-                  </>
-                ) : (
-                  <>
-                    <div className="dav-status-dot verify" /> Set UnVerify
-                  </>
-                )}
+                <History size={16} /> Lịch sử tài khoản
               </button>
             </div>
           </div>
+
+
 
           {/* Submenu Nearby People (Only WeChat) */}
           {activeTab === 'wechat' && (
@@ -3485,30 +3834,14 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             </div>
           )}
 
-          <button
-            type="button"
-            className="dav-ctx-item"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setHistoryModalAccountId(accountActionMenu.account.id);
-              setAccountActionMenu(null);
-              setAccountTitleDropdownOpen(false);
-            }}
-            data-inspector-id="deviceAccount.contextMenuHistory"
-            data-inspector-label="View account history menu item"
-            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-          >
-            <History size={16} /> Lịch sử tài khoản
-          </button>
-
+          {/* Submenu Quét QR (Only WeChat) */}
           {activeTab === 'wechat' && (
             <div
               className="dav-ctx-submenu-container"
-              onMouseEnter={() => setShowSetSubmenu(true)}
-              onMouseLeave={() => setShowSetSubmenu(false)}
-              data-inspector-id="deviceAccount.contextMenuLaunchProfileSubmenu"
-              data-inspector-label="Launch profile mappings submenu"
+              onMouseEnter={() => setShowQrSubmenu(true)}
+              onMouseLeave={() => setShowQrSubmenu(false)}
+              data-inspector-id="deviceAccount.contextMenuQrSubmenu"
+              data-inspector-label="QR scan submenu"
               data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
             >
               <button
@@ -3517,170 +3850,108 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setShowSetSubmenu(v => !v);
+                  setShowQrSubmenu(v => !v);
                 }}
               >
-                Đã set
+                <QrCode size={16} /> Quét QR
               </button>
-              <div className={`dav-ctx-submenu ${showSetSubmenu ? 'is-open' : ''}`}>
-                {deviceProfiles.length === 0 ? (
-                  <div className="dav-ctx-item" style={{ opacity: 0.5, pointerEvents: 'none' }}>
-                    Đang tải...
-                  </div>
-                ) : (
-                  deviceProfiles.map(profile => {
-                    const appType = getAppTypeFromProfile(profile.id, profile.name);
-                    const label = `User ${profile.id} - ${profile.name} / ${getAppTypeLabel(appType)}`;
-                    const isAssigned = accountActionMenu.account.wechatLaunchProfile?.userId === profile.id;
-                    return (
-                      <button
-                        key={profile.id}
-                        type="button"
-                        className={`dav-ctx-item ${isAssigned ? 'active' : ''}`}
-                        onPointerDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-
-                          const launch: WechatLaunchProfile = {
-                            userId: profile.id,
-                            name: profile.name,
-                            appType: appType,
-                            packageName: 'com.tencent.mm',
-                            activityName: 'com.tencent.mm.ui.LauncherUI',
-                            assignedAt: Date.now()
-                          };
-
-                          handleUpdateAccount(accountActionMenu.account.id, {
-                            appType: appType,
-                            wechatLaunchProfile: launch
-                          });
-
-                          setAccountActionMenu(null);
-                          setAccountTitleDropdownOpen(false);
-                        }}
-                        data-inspector-id="deviceAccount.contextMenuLaunchProfileItem"
-                        data-inspector-label={`Map launch profile to User ${profile.id}`}
-                        data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-                      >
-                        {label}
-                      </button>
-                    );
-                  })
-                )}
+              <div className={`dav-ctx-submenu ${showQrSubmenu ? 'is-open' : ''}`}>
+                <button
+                  type="button"
+                  className="dav-ctx-item"
+                  disabled={(accountActionMenu.account.scanCount || 0) >= 3}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const currentCount = accountActionMenu.account.scanCount || 0;
+                    if (currentCount >= 3) return;
+                    handleUpdateAccount(accountActionMenu.account.id, {
+                      scanCount: Math.min(3, currentCount + 1),
+                      lastScanDate: Date.now()
+                    });
+                    setAccountActionMenu(null);
+                    setAccountTitleDropdownOpen(false);
+                  }}
+                >
+                  Quét thành công
+                </button>
+                <button
+                  type="button"
+                  className="dav-ctx-item"
+                  disabled={(accountActionMenu.account.scanCount || 0) >= 3}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const currentCount = accountActionMenu.account.scanCount || 0;
+                    if (currentCount >= 3) return;
+                    handleUpdateAccount(accountActionMenu.account.id, {
+                      lastScanDate: Date.now()
+                    });
+                    setAccountActionMenu(null);
+                    setAccountTitleDropdownOpen(false);
+                  }}
+                >
+                  Quét thất bại
+                </button>
+                <button
+                  type="button"
+                  className="dav-ctx-item"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleUpdateAccount(accountActionMenu.account.id, {
+                      scanCount: 0,
+                      lastScanDate: null
+                    });
+                    setAccountActionMenu(null);
+                    setAccountTitleDropdownOpen(false);
+                  }}
+                >
+                  Reset lượt quét
+                </button>
               </div>
             </div>
           )}
 
-          {/* Submenu Phân Loại */}
-          <div
-            className="dav-ctx-submenu-container"
-            onMouseEnter={() => setShowClassificationSubmenu(true)}
-            onMouseLeave={() => setShowClassificationSubmenu(false)}
-            data-inspector-id="deviceAccount.contextMenuClassificationSubmenu"
-            data-inspector-label="Account classification submenu"
-            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-          >
-            <button
-              type="button"
-              className="dav-ctx-item dav-ctx-has-sub"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowClassificationSubmenu(v => !v);
-              }}
-            >
-              Phân loại
-            </button>
-            <div className={`dav-ctx-submenu ${showClassificationSubmenu ? 'is-open' : ''}`}>
-              {(['main', 'clone', 'secure', 'shelter'] as const).map(type => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`dav-ctx-item ${accountActionMenu.account.appType === type ? 'active' : ''}`}
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleUpdateAccount(accountActionMenu.account.id, { appType: type });
-                    setAccountActionMenu(null);
-                    setAccountTitleDropdownOpen(false);
-                  }}
-                  data-inspector-id="deviceAccount.contextMenuClassificationItem"
-                  data-inspector-label={`Set account classification to ${type}`}
-                  data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-                >
-                  {getAppTypeLabel(type)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Submenu Thêm Vào Nhóm */}
-          <div
-            className="dav-ctx-submenu-container"
-            onMouseEnter={() => setShowAddToGroupSubmenu(true)}
-            onMouseLeave={() => setShowAddToGroupSubmenu(false)}
-            data-inspector-id="deviceAccount.contextMenuAddToGroupSubmenu"
-            data-inspector-label="Add device to group submenu"
-            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-          >
-            <button
-              type="button"
-              className="dav-ctx-item dav-ctx-has-sub"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowAddToGroupSubmenu(v => !v);
-              }}
-            >
-              Thêm vào nhóm
-            </button>
-            <div className={`dav-ctx-submenu ${showAddToGroupSubmenu ? 'is-open' : ''}`}>
-              {savedGroups.length === 0 ? (
-                <div className="dav-ctx-item" style={{ opacity: 0.5, pointerEvents: 'none' }}>
-                  Không có nhóm nào
-                </div>
-              ) : (
-                savedGroups.map((group, idx) => {
-                  const alreadyIn = group.udids.includes(accountActionMenu.sourceUdid);
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      className={`dav-ctx-item ${alreadyIn ? 'active' : ''}`}
-                      onPointerDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (!alreadyIn) {
-                          handleAddDeviceToGroup(idx, accountActionMenu.sourceUdid);
-                        }
-                        setAccountActionMenu(null);
-                        setAccountTitleDropdownOpen(false);
-                      }}
-                    >
-                      {group.name} {alreadyIn ? '(Đã có)' : ''}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
+          {/* Button Thông báo */}
           <button
             type="button"
             className="dav-ctx-item"
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              setMoveModal({ sourceUdid: accountActionMenu.sourceUdid, account: accountActionMenu.account });
-              setMoveError('');
+              setNoticeEditModal({ sourceUdid: accountActionMenu.sourceUdid, account: accountActionMenu.account });
+              setEditNoticeTitle(accountActionMenu.account.notice?.title || '');
+              setEditNoticeDays(accountActionMenu.account.notice?.days?.toString() || '');
+              setEditNoticeTime((accountActionMenu.account.notice as any)?.dailyReminderTime || '');
+              setNoticeError('');
               setAccountActionMenu(null);
               setAccountTitleDropdownOpen(false);
+              setAccountHoverTooltip(null);
             }}
-            data-inspector-id="deviceAccount.contextMenuMove"
-            data-inspector-label="Move account to another device menu item"
+            data-inspector-id="deviceAccount.contextMenuNotice"
+            data-inspector-label="Edit account notice settings menu item"
             data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+            style={{ display: 'flex', alignItems: 'center', width: '100%' }}
           >
-            Di chuyển tài khoản
+            <Bell size={16} color={accountActionMenu.account.notice?.title ? (!!(accountActionMenu.account.notice.dueDate && accountActionMenu.account.notice.dueDate <= Date.now()) ? 'var(--md-danger)' : 'var(--md-warning)') : 'currentColor'} />
+            <span style={{ marginLeft: '8px' }}>Thông báo</span>
+            {accountActionMenu.account.notice?.title && (
+              <span
+                style={{
+                  fontSize: '8px',
+                  background: !!(accountActionMenu.account.notice.dueDate && accountActionMenu.account.notice.dueDate <= Date.now()) ? 'rgba(239, 68, 68, 0.2)' : 'rgba(234, 179, 8, 0.2)',
+                  color: !!(accountActionMenu.account.notice.dueDate && accountActionMenu.account.notice.dueDate <= Date.now()) ? '#ef4444' : '#eab308',
+                  padding: '1px 4px',
+                  borderRadius: '4px',
+                  marginLeft: 'auto',
+                  fontWeight: 'bold',
+                  flexShrink: 0
+                }}
+              >
+                {accountActionMenu.account.notice.title}
+              </span>
+            )}
           </button>
         </div>,
         document.body
@@ -3777,7 +4048,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           onClick={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
           onPointerDown={e => e.stopPropagation()}
-          style={{ zIndex: 28000 }}
+          style={{ zIndex: 10000050 }}
         >
           <div
             className="confirmPanel confirmPanel--compact"
@@ -4295,6 +4566,8 @@ export function DeviceAccountOverlay({
       if (activeTab === 'wechat') {
         const hasQR = accounts.some(acc => {
           const wc = acc as WeChatAccount;
+          const is3Months = wc.createdAt ? (Date.now() - wc.createdAt >= 90 * 24 * 60 * 60 * 1000) : (wc as any).isOneYearOld === true;
+          if (!is3Months) return false;
           const scanCount = wc.scanCount || 0;
           if (scanCount >= 3) return false;
           if (wc.lastScanDate) {
@@ -4419,6 +4692,29 @@ export function DeviceAccountOverlay({
                 <div className="dav-toggle-knob" style={{ width: 12, height: 12, top: 2, left: hideName ? 18 : 2 }} />
               </button>
             </div>
+
+            {/* Thanh tìm kiếm thu nhỏ */}
+            <input
+              ref={searchInputRef}
+              className="account-search-input"
+              type="text"
+              placeholder="Tìm kiếm..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.stopPropagation()}
+              onKeyUp={e => e.stopPropagation()}
+              style={{
+                width: '160px',
+                height: '24px',
+                padding: '0 8px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                marginLeft: '12px'
+              }}
+              data-inspector-id="deviceAccount.searchInput"
+              data-inspector-label="Device accounts search query input"
+              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+            />
           </div>
  
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -4549,20 +4845,7 @@ export function DeviceAccountOverlay({
           </div>
         </div>
  
-        {/* Thanh tìm kiếm ngay phía dưới */}
-        <input
-          ref={searchInputRef}
-          className="account-search-input"
-          type="text"
-          placeholder="Tìm theo Tên, Nickname, SĐT, Email..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          onKeyDown={e => e.stopPropagation()}
-          onKeyUp={e => e.stopPropagation()}
-          data-inspector-id="deviceAccount.searchInput"
-          data-inspector-label="Device accounts search query input"
-          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-        />
+
 
         {/* Nhóm đã tạo sẵn trong Quản lý tài khoản */}
         <div className="dav-saved-groups-section">
@@ -4700,12 +4983,12 @@ export function DeviceAccountOverlay({
     </div>
 
       {showAddPlatformModal && (
-        <div className="confirmOverlay" style={{ zIndex: 28000 }} onMouseDown={() => {
+        <div className="confirmOverlay" style={{ zIndex: 10000050 }} onMouseDown={() => {
           setShowAddPlatformModal(false);
           setNewPlatformName('');
           setAddPlatformError('');
         }}>
-          <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480, zIndex: 28001 }} onMouseDown={e => e.stopPropagation()}>
+          <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480, zIndex: 10000051 }} onMouseDown={e => e.stopPropagation()}>
             <div className="confirmTitle">Thêm nhóm mới</div>
             <div className="confirmText">
               <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>Tên nhóm mới</label>
@@ -4764,7 +5047,7 @@ export function DeviceAccountOverlay({
           style={{
             left: platformCtxMenu.x,
             top: platformCtxMenu.y,
-            zIndex: 29000
+            zIndex: 10000040
           }}
           onContextMenu={e => e.preventDefault()}
         >
@@ -4782,8 +5065,8 @@ export function DeviceAccountOverlay({
       )}
 
       {pendingDeletePlatform && (
-        <div className="confirmOverlay" style={{ zIndex: 28000 }} onMouseDown={() => setPendingDeletePlatform(null)}>
-          <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480, zIndex: 28001 }} onMouseDown={e => e.stopPropagation()}>
+        <div className="confirmOverlay" style={{ zIndex: 10000050 }} onMouseDown={() => setPendingDeletePlatform(null)}>
+          <div className="confirmPanel" style={{ minWidth: 380, maxWidth: 480, zIndex: 10000051 }} onMouseDown={e => e.stopPropagation()}>
             <div className="confirmTitle">Xác nhận xoá nhóm</div>
             <div className="confirmText">
               Bạn có chắc chắn muốn xoá nhóm <strong>{platforms.find(p => p.id === pendingDeletePlatform)?.label || pendingDeletePlatform}</strong>?
@@ -4801,7 +5084,7 @@ export function DeviceAccountOverlay({
       {showAccountSettingsModal && ReactDOM.createPortal(
         <div
           className="confirmOverlay dav-settings-overlay"
-          style={{ zIndex: 30000 }}
+          style={{ zIndex: 10000020 }}
           onMouseDown={e => e.stopPropagation()}
         >
           <div

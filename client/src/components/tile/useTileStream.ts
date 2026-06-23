@@ -348,7 +348,13 @@ export function useTileStream(args: Args) {
             }
 
             // Engine Decision Block
-            const mode = streamCfgRef.current.engine || 'auto';
+            let mode = streamCfgRef.current.engine || 'auto';
+
+            // Device ce0817187cd6803d027e (Samsung Note 8) override: Force legacy-tinyh264 software decoder
+            if (logicalUdid === 'ce0817187cd6803d027e') {
+                mode = 'legacy-tinyh264';
+            }
+
             const hasWebCodecs = await checkWebCodecsSupport();
 
             const useWebCodecs = mode === 'webcodecs' || (mode === 'auto' && hasWebCodecs);
@@ -510,9 +516,16 @@ export function useTileStream(args: Args) {
             activeStageRef.current = currentStage;
 
             // Resolve target stream parameters based on active stage
+            let targetEncoder = 'encoderName' in currentStage ? currentStage.encoderName : streamCfgRef.current.encoderName;
+
+            // Device ce0817187cd6803d027e (Samsung Note 8) override: Force software encoder
+            if (logicalUdid === 'ce0817187cd6803d027e') {
+                targetEncoder = 'OMX.google.h264.encoder';
+            }
+
             const trialConfig: StreamConfig = {
               ...streamCfgRef.current,
-              encoderName: 'encoderName' in currentStage ? currentStage.encoderName : streamCfgRef.current.encoderName,
+              encoderName: targetEncoder,
               bitrate: currentStage.bitrate || streamCfgRef.current.bitrate,
               maxFps: currentStage.maxFps || streamCfgRef.current.maxFps,
               bounds: currentStage.bounds ? { ...streamCfgRef.current.bounds, ...currentStage.bounds } : streamCfgRef.current.bounds

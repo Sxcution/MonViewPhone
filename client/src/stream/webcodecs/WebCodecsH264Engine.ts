@@ -57,7 +57,6 @@ export class WebCodecsH264Engine implements StreamEngine {
 
     this.renderer = new Canvas2DVideoFrameRenderer(this.canvas);
     this.assembler = new AccessUnitAssembler((frameBytes, isKey) => {
-      console.log(`[WebCodecs Debug] Access unit emitted, length: ${frameBytes.length}, isKey: ${isKey}`);
       this.handleAssembledFrame(frameBytes, isKey);
     });
 
@@ -73,7 +72,6 @@ export class WebCodecsH264Engine implements StreamEngine {
 
     this.decoder = new VideoDecoder({
       output: (frame) => {
-        console.log(`[WebCodecs Debug] Decoder output frame: ${frame.displayWidth}x${frame.displayHeight}`);
         this.renderedFramesCount++;
         this.width = frame.displayWidth;
         this.height = frame.displayHeight;
@@ -85,7 +83,6 @@ export class WebCodecsH264Engine implements StreamEngine {
 
         try {
           this.renderer?.draw(frame);
-          console.log(`[WebCodecs Debug] Render success`);
         } catch (e) {
           console.error('[WebCodecs Debug] Render failed:', e);
         }
@@ -140,7 +137,6 @@ export class WebCodecsH264Engine implements StreamEngine {
 
     // Config verification guard
     if (this.activeCodec === '') {
-      console.log(`[WebCodecs Debug] activeCodec is empty, skipping chunk decode`);
       return;
     }
 
@@ -149,14 +145,12 @@ export class WebCodecsH264Engine implements StreamEngine {
       if (isKey) {
         this.keyframeReceived = true;
       } else {
-        console.log(`[WebCodecs Debug] Keyframe not received yet, skipping delta frame`);
         return;
       }
     }
 
     // Backpressure: drop stale delta frames if decode queue starts to pile up
     if (this.decoder.decodeQueueSize > 8 && !isKey) {
-      console.log(`[WebCodecs Debug] Backpressure dropping frame (queue: ${this.decoder.decodeQueueSize})`);
       this.droppedFramesCount++;
       return;
     }
@@ -167,7 +161,6 @@ export class WebCodecsH264Engine implements StreamEngine {
         timestamp: Date.now() * 1000, // microseconds
         data: frameBytes.buffer
       });
-      console.log(`[WebCodecs Debug] Decode called for chunk type: ${chunk.type}, timestamp: ${chunk.timestamp}`);
       this.decoder.decode(chunk);
       this.decodedFramesCount++;
     } catch (e: any) {
@@ -182,13 +175,11 @@ export class WebCodecsH264Engine implements StreamEngine {
     try {
       const codec = getCodecString(this.lastSps);
       this.activeCodec = codec;
-      console.log(`[WebCodecs Debug] Codec string determined: ${codec}`);
 
       this.decoder.configure({
         codec,
         optimizeForLatency: true
       });
-      console.log(`[WebCodecs Debug] Decoder configured successfully`);
     } catch (e: any) {
       console.error('[WebCodecs Debug] configure failed:', e);
       // Fallback disabled to keep WebCodecs active for debugging
@@ -220,7 +211,6 @@ export class WebCodecsH264Engine implements StreamEngine {
   }
 
   feedBytes(data: Uint8Array) {
-    console.log(`[WebCodecs Debug] Received bytes length: ${data.length}`);
     this.assembler?.feedPacket(data);
   }
 

@@ -40,23 +40,7 @@
 
     .line 123
     :try_start_0
-    invoke-static {}, Lcom/genymobile/scrcpy/Device;->isScreenOn()Z
-
-    move-result v0
-
-    if-nez v0, :cond_0
-
-    .line 124
-    iget-object v0, p0, Lcom/genymobile/scrcpy/DesktopConnection$1;->this$0:Lcom/genymobile/scrcpy/DesktopConnection;
-
-    iget-object v0, v0, Lcom/genymobile/scrcpy/DesktopConnection;->controller:Lcom/genymobile/scrcpy/Controller;
-
-    invoke-virtual {v0}, Lcom/genymobile/scrcpy/Controller;->turnScreenOn()V
-
-    const-wide/16 v0, 0x1f4
-
-    .line 133
-    invoke-static {v0, v1}, Landroid/os/SystemClock;->sleep(J)V
+    goto :cond_0
 
     .line 136
     :cond_0

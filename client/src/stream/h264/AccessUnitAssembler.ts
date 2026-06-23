@@ -68,19 +68,15 @@ export class AccessUnitAssembler {
     let hasPps = false;
 
     for (const n of nalus) {
-      console.log(`[WebCodecs Debug] NAL type: ${n.type}`);
       if (n.type === 7) {
         this.cachedSps = n.data;
         hasSps = true;
-        console.log(`[WebCodecs Debug] SPS detected`);
       } else if (n.type === 8) {
         this.cachedPps = n.data;
         hasPps = true;
-        console.log(`[WebCodecs Debug] PPS detected`);
       } else if (n.type === 5) {
         isKey = true;
         hasVcl = true;
-        console.log(`[WebCodecs Debug] IDR detected`);
       } else if (n.type === 1) {
         hasVcl = true;
       }
@@ -88,7 +84,6 @@ export class AccessUnitAssembler {
 
     if (!hasVcl) {
       // Packet has only headers (SPS/PPS), do not emit it as a frame
-      console.log(`[WebCodecs Debug] Packet contains no VCL NALs, skipping emit`);
       return;
     }
 
@@ -97,17 +92,14 @@ export class AccessUnitAssembler {
       // If it's a keyframe, ensure it contains SPS + PPS + IDR
       if (hasSps && hasPps) {
         // Already contains SPS and PPS, emit as is
-        console.log(`[WebCodecs Debug] Keyframe access unit contains SPS + PPS + IDR`);
         this.onFrame(packet, true);
       } else {
         // Prepend cached SPS/PPS
         if (this.cachedSps && this.cachedPps) {
-          console.log(`[WebCodecs Debug] Prepending cached SPS + PPS to IDR keyframe`);
           const assembled = concatU8(concatU8(this.cachedSps, this.cachedPps), packet);
           this.onFrame(assembled, true);
         } else {
           // No cached SPS/PPS yet, emit as is (might fail decoding but we have no choice)
-          console.log(`[WebCodecs Debug] Keyframe missing SPS/PPS and no cached SPS/PPS available`);
           this.onFrame(packet, true);
         }
       }

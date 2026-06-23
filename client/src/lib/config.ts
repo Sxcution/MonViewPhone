@@ -19,8 +19,8 @@ export type StreamConfig = {
 };
 
 export const STREAM_CONFIG: StreamConfig = {
-  bitrate: 524288, //max 8388608
-  maxFps: 25, // max 60
+  bitrate: 917504, //max 8388608
+  maxFps: 24, // max 60
   iFrameInterval: 5,
   bounds: { width: 500, height: 500 },
   sendFrameMeta: false,

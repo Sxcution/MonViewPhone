@@ -1976,6 +1976,10 @@ video {
   border-color: #facc15 !important;
   box-shadow: none !important;
 }
+.tile.is-filter-matched-green {
+  border-color: #22c55e !important;
+  box-shadow: none !important;
+}
 
 canvas {
   display: block;
@@ -12006,6 +12010,75 @@ select:focus,
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.tile.is-filter-matched-white {
+  border-color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.dav-nearby-filter-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--md-card);
+  border: 1px solid var(--md-border);
+  border-radius: 6px;
+  padding: 4px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  margin-top: 4px;
+  box-shadow: var(--md-shadow-soft);
+}
+
+.dav-nearby-dropdown-item {
+  background: transparent;
+  border: none;
+  color: var(--md-text);
+  padding: 6px 12px;
+  text-align: left;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.dav-nearby-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dav-nearby-dropdown-item.active {
+  background: var(--md-blue);
+  color: #fff;
+}
+
+/* Elevate Account Manager overlay, panels, modals, dropdowns and tooltips */
+.dav-overlay {
+  z-index: 1000000 !important;
+}
+.dav-floating-panel {
+  z-index: 1000001 !important;
+}
+.dav-history-overlay {
+  z-index: 10000020 !important;
+}
+.dav-history-panel {
+  z-index: 10000021 !important;
+}
+.dav-settings-overlay {
+  z-index: 10000020 !important;
+}
+.dav-settings-panel {
+  z-index: 10000021 !important;
+}
+.dav-bell-tooltip-floating {
+  z-index: 10000030 !important;
+}
+.dav-ctx-menu {
+  z-index: 10000040 !important;
 }
 
 

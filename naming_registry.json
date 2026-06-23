@@ -435,6 +435,13 @@
   },
   "inspector_ids": {
     "total_accounts_badge": "deviceAccount.totalAccountsBadge",
+    "scan_qr_badge": "deviceAccount.scanQrBadge",
+    "context_menu_qr_submenu": "deviceAccount.contextMenuQrSubmenu",
+    "context_menu_account_submenu": "deviceAccount.contextMenuAccountSubmenu",
+    "context_menu_status_submenu": "deviceAccount.contextMenuStatusSubmenu",
+    "context_menu_notice": "deviceAccount.contextMenuNotice",
+    "context_menu_history": "deviceAccount.contextMenuHistory",
+    "nearby_filter_dropdown": "deviceAccount.nearbyFilterDropdown",
     "notice_badge": "deviceAccount.noticeBadge",
     "daily_reminder_tooltip": "deviceAccount.dailyReminderTooltip",
     "visual_alert_settings_button": "visualAlert.settingsButton",

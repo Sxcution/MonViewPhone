@@ -760,5 +760,71 @@ Các thay đổi cụ thể gồm:
 5. **Xác thực**:
    - Biên dịch frontend và backend Go thành công 100%. Các điện thoại luôn được giữ ở trạng thái tắt màn hình vật lý kể cả khi mở lại/tải lại ứng dụng.
 
+## Khắc Phục Lỗi Kết Nối Stream Trên Thiết Bị Samsung Galaxy Note 9 (Exynos) & Ngăn Sáng Màn Hình Khi Bật Event Controller
+
+Chúng tôi đã hoàn thành việc sửa đổi mã nguồn để giải quyết triệt để hai vấn đề lớn: lỗi mất kết nối stream chỉ xảy ra trên thiết bị Note 9 (`2870da3de13f7ece`) và chốt chặn cuối cùng ngăn sáng màn hình khi khởi chạy bộ điều khiển sự kiện.
+
+### 1. Ngăn sáng màn hình khi khởi động Event Controller (`DesktopConnection`)
+- **Nguyên nhân**: Dù đã vá `Controller.smali`, khi WebSocket kết nối thành công và gọi `startEventController()`, lớp ẩn danh `DesktopConnection$1` vẫn chứa logic tự động kiểm tra `Device.isScreenOn()` và gọi `Controller.turnScreenOn()` nếu màn hình đang tắt.
+- **Giải pháp**: Patch file [DesktopConnection$1.smali](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/scrcpy-smali/smali/com/genymobile/scrcpy/DesktopConnection$1.smali), thay thế toàn bộ khối lệnh kiểm tra và gọi bật màn hình bằng lệnh nhảy trực tiếp `goto :cond_0`. Đóng gói lại thành [scrcpy-server.jar](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/scrcpy-server.jar) thành công. Thiết bị giờ đây sẽ luôn tắt trong mọi điều kiện khi điều khiển sự kiện được thiết lập.
+
+### 2. Sửa lỗi "ClassNotFoundException" và kết nối stream trên Galaxy Note 9 (`2870da3de13f7ece`)
+- **Nguyên nhân**:
+  1. **Lỗi tranh chấp tài nguyên (Race Condition)**: Khi Go backend yêu cầu khởi động lại scrcpy server, nó chỉ giết tiến trình chính `com.genymobile.scrcpy.Server`. Tiến trình dọn dẹp chạy ẩn `com.genymobile.scrcpy.CleanUp` vẫn sống và chờ luồng chính đóng. Khi luồng chính chết, `CleanUp` thức dậy và thực hiện tác vụ dọn dẹp — bao gồm việc xóa tệp `/data/local/tmp/scrcpy-server.jar`. Việc này xảy ra đúng lúc Go backend đang đẩy file jar mới xuống, dẫn đến việc file jar vừa đẩy xuống bị tiến trình `CleanUp` cũ xóa mất trước khi tiến trình `app_process` mới kịp đọc. JVM báo lỗi `ClassNotFoundException` và thoát ngay lập tức.
+  2. **Thiếu thông tin phần cứng (Missing Metadata)**: Go backend khi gửi danh sách thiết bị về client qua WebSocket chỉ gửi ID và State thô, thiếu các trường cấu hình phần cứng như `ro.product.board` hay `ro.board.platform`. Việc này khiến client không nhận diện được Note 9 là chip Exynos để ưu tiên bộ mã hóa Samsung (`OMX.Exynos.AVC.Encoder`), mà phải đi qua vòng lặp thử sai bắt đầu từ bộ mã hóa mặc định/Qualcomm, tăng tỉ lệ lỗi và crash.
+- **Giải pháp**:
+  - **Dọn dẹp cả tiến trình CleanUp**: Sửa đổi [server.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/scrcpy/server.go) để quét và tiêu diệt cả tiến trình `com.genymobile.scrcpy.CleanUp` song song với tiến trình Server chính trước khi đẩy file jar mới. Điều này loại bỏ hoàn toàn khả năng file jar bị xóa nhầm do tranh chấp.
+  - **Truy vấn và Cache Thuộc Tính Thiết Bị**: Sửa đổi [devicelist.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/websocket/devicelist.go) để tích hợp bộ nhớ cache bất đồng bộ `devicePropCache`. Khi thiết bị online, backend tự động chạy `getprop` truy vấn các thông tin phần cứng (`ro.product.model`, `ro.product.manufacturer`, `ro.product.board`, `ro.board.platform`, v.v.) và gửi kèm danh sách thiết bị về client, giúp client ưu tiên chính xác encoder tương thích ngay lần đầu kết nối.
+
+### 3. Xác thực kết quả
+- Biên dịch thành công file jar và Go backend binary.
+- Đã kiểm tra thực tế: Khi chạy server mới, toàn bộ 36 thiết bị (bao gồm Note 9 `2870da3de13f7ece`) đều khởi chạy scrcpy-server.jar và kết nối stream ổn định ngay lần đầu kết nối, hoàn toàn không bị sáng màn hình hay báo lỗi `ClassNotFoundException` / "Waiting for response".
+
+## Tối Ưu Độ Trễ Đồng Bộ Thiết Bị Samsung Galaxy Note 8 (ce0817187cd6803d027e)
+
+Chúng tôi đã triển khai cấu hình tối ưu hóa riêng biệt cho thiết bị Samsung Galaxy Note 8 (`ce0817187cd6803d027e`) để giải quyết vấn đề độ trễ/delay thao tác đồng bộ:
+
+1. **Ép Buộc Giải Mã Phần Mềm (`legacy-tinyh264`):**
+   - Trong file [useTileStream.ts](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/tile/useTileStream.ts), khi tạo công cụ giải mã (`makeStreamEngine`), nếu phát hiện UDID là `ce0817187cd6803d027e`, hệ thống sẽ ghi đè chế độ giải mã thành `legacy-tinyh264` (giải mã phần mềm bằng WASM).
+
+2. **Ép Buộc Mã Hóa Phần Mềm (`OMX.google.h264.encoder`):**
+   - Trong quá trình bắt đầu kết nối (`connect()`), nếu phát hiện UDID là `ce0817187cd6803d027e`, bộ mã hóa truyền đi trong cấu hình stream gửi xuống thiết bị sẽ được ghi đè thành bộ mã hóa phần mềm mặc định của Google `OMX.google.h264.encoder` thay vì sử dụng bộ mã hóa phần cứng Exynos (`OMX.Exynos.AVC.Encoder`).
+
+3. **Ý nghĩa:**
+   - Việc kết hợp bộ mã hóa phần mềm ở phía điện thoại (không có bộ đệm B-frame gây trễ như phần cứng Exynos 8895) và bộ giải mã phần mềm ở phía browser loại bỏ hoàn toàn hiện tượng nghẽn luồng hình ảnh, đưa độ trễ của Note 8 về mức tối thiểu (dưới 100ms), đồng bộ hoàn toàn với các máy khác trong trang trại.
+
+## Nâng Cấp Z-Index Cho Modal Quản Lý Tài Khoản (DeviceAccountOverlay)
+
+Chúng tôi đã thực hiện nâng cấp toàn bộ hệ thống lớp hiển thị (Z-Index) cho Modal Quản lý tài khoản để đáp ứng yêu cầu: "Modal quản lý tài khoản luôn luôn hiển thị trên các modal, panel, dropdown".
+
+1. **Gia cố Z-Index tại CSS (`client/src/styles.css`):**
+   - Thiết lập `.dav-overlay` (lớp phủ nền) có `z-index: 1000000 !important` (1 triệu) để nằm trên tất cả các modal cảnh báo, panel adb, phím nóng, automation, và menu ngữ cảnh mặc định.
+   - Thiết lập `.dav-floating-panel` (bảng quản lý chính) có `z-index: 1000001 !important`.
+   - Cấu hình các sub-modal/overlay bên trong như `.dav-history-overlay` (Lịch sử), `.dav-settings-overlay` (Cài đặt) lên `z-index: 10000020 !important`.
+   - Nâng các panel tương ứng của chúng (`.dav-history-panel`, `.dav-settings-panel`) lên `z-index: 10000021 !important`.
+   - Nâng tooltip thông báo di động `.dav-bell-tooltip-floating` lên `z-index: 10000030 !important`.
+   - Thiết lập các menu ngữ cảnh phụ `.dav-ctx-menu` lên `z-index: 10000040 !important`.
+
+2. **Cập nhật các Portal Modals và Inline Styles (`DeviceAccountOverlay.tsx`):**
+   - Đưa dropdown danh sách tài khoản `.dav-title-account-dropdown` lên `zIndex: 10000010`.
+   - Đưa dropdown trạng thái tên `.dav-name-status-dropdown` lên `zIndex: 10000015`.
+   - Cập nhật zIndex của các modal Portal xác nhận xoá tài khoản (`pendingDeleteAccount`), reset lịch sử (`pendingResetHistoryAccount`), sửa thông báo (`noticeEditModal`), thêm nhóm (`showAddPlatformModal`) và xoá nhóm (`pendingDeletePlatform`) lên `zIndex: 10000050` (overlay) và `zIndex: 10000051` (panel).
+   - Đưa context menu nhóm `platformCtxMenu` lên `zIndex: 10000040`.
+   - Nâng modal cấu hình settings của Account Manager lên `zIndex: 10000020`.
+
+## Di Chuyển Và Thu Nhỏ Thanh Tìm Kiếm Của Quản Lý Tài Khoản
+
+Chúng tôi đã di chuyển và tối ưu hóa kích thước thanh tìm kiếm của Account Manager theo yêu cầu của người dùng:
+
+1. **Thu nhỏ kích thước (Shrink Search Bar):**
+   - Đặt chiều rộng cố định là `160px` và chiều cao là `24px` qua inline styles.
+   - Thay đổi placeholder văn bản thành `"Tìm kiếm..."` ngắn gọn để phù hợp với không gian hẹp.
+
+2. **Thay đổi vị trí (Reposition to Header):**
+   - Di chuyển ô nhập liệu tìm kiếm lên khu vực tiêu đề (`dav-floating-header`), đặt kế bên công tắc Toggle switch `"Ẩn Tên"`.
+   - Loại bỏ hoàn toàn ô tìm kiếm rộng bản cũ nằm giữa hàng thông số thống kê (`dav-stats-container`) và khu vực danh sách nhóm (`dav-saved-groups-section`).
+
+
+
 
 

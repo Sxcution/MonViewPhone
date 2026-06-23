@@ -1332,7 +1332,7 @@
     :try_start_1
     invoke-virtual {p0}, Lcom/genymobile/scrcpy/ScreenEncoder;->streamScreen()V
     :try_end_1
-    .catch Ljava/io/IOException; {:try_start_1 .. :try_end_1} :catch_0
+    .catch Ljava/lang/Throwable; {:try_start_1 .. :try_end_1} :catch_0
 
     goto :goto_1
 
@@ -1344,6 +1344,13 @@
     .line 331
     invoke-static {v1, v0}, Lcom/genymobile/scrcpy/Ln;->e(Ljava/lang/String;Ljava/lang/Throwable;)V
 
+    iget-object v0, p0, Lcom/genymobile/scrcpy/ScreenEncoder;->connection:Lcom/genymobile/scrcpy/Connection;
+
+    if-eqz v0, :cond_3
+
+    invoke-virtual {v0}, Lcom/genymobile/scrcpy/Connection;->close()V
+
+    :cond_3
     :goto_1
     return-void
 

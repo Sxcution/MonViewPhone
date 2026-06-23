@@ -37,7 +37,7 @@ export type TileProps = {
     orderMap?: Map<string, number>;
     accountData?: DeviceAccountData;
     isFilteredOut?: boolean;
-    nearbyAutoOpenEnabled?: boolean;
-    highlightFilterMatched?: 'blue' | 'orange' | 'red' | 'yellow' | boolean;
+    activeFilter?: string;
+    highlightFilterMatched?: 'blue' | 'orange' | 'red' | 'yellow' | 'white' | 'green' | boolean;
     onOpenDeviceViewer?: (udid: string) => void;
 };

@@ -42,7 +42,7 @@ function TileComponent({
     orderMap,
     accountData,
     isFilteredOut = false,
-    nearbyAutoOpenEnabled = false,
+    activeFilter,
     highlightFilterMatched = false,
     onOpenDeviceViewer,
 }: TileProps) {
@@ -471,7 +471,7 @@ function TileComponent({
                                             initialData={accountData}
                                             activeTab={tileTab}
                                             setActiveTab={setTileTab}
-                                            nearbyAutoOpenEnabled={nearbyAutoOpenEnabled}
+                                            activeFilter={activeFilter}
                                             onOpenDeviceViewer={onOpenDeviceViewer}
                                             showAccountOverlay={showAccountOverlay}
                                             alwaysShowHeader={alwaysShowHeader}
