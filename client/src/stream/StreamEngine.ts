@@ -9,6 +9,7 @@ export interface StreamStats {
   height: number;
   encoderName?: string;
   fallbackReason?: string;
+  bitrateKbps?: number;
 }
 
 export interface StreamCallbacks {

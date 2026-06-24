@@ -1,7 +1,10 @@
 package scrcpy
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -35,7 +38,13 @@ type serverProcess struct {
 var (
 	deviceLocks sync.Map
 	serverOps   = make(chan struct{}, 12) // allow 12 concurrent server operations (was 6)
+
+	restartInFlight sync.Map
+	restartMutex    sync.Mutex
+	lastRestartAt   sync.Map
 )
+
+const ForceRestartCooldown = 12 * time.Second
 
 func lockForDevice(udid string) *sync.Mutex {
 	value, _ := deviceLocks.LoadOrStore(udid, &sync.Mutex{})
@@ -71,6 +80,52 @@ func serverJarPath() string {
 		}
 	}
 	return FileName
+}
+
+func localFileMD5(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func remoteServerJarMD5(udid string) string {
+	out := shellSafe(udid, "md5sum "+TempPath+FileName+" 2>/dev/null | awk '{print $1}'")
+	fields := strings.Fields(strings.TrimSpace(out))
+	if len(fields) == 0 {
+		return ""
+	}
+	return fields[0]
+}
+
+func shouldPushServerJar(udid string, localPath string) bool {
+	localMd5, err := localFileMD5(localPath)
+	if err != nil {
+		log.Printf("[%s] Cannot calculate local scrcpy-server.jar md5, will push: %v", udid, err)
+		return true
+	}
+
+	remoteMd5 := remoteServerJarMD5(udid)
+	if remoteMd5 == "" {
+		log.Printf("[%s] Remote scrcpy-server.jar missing, will push", udid)
+		return true
+	}
+
+	if !strings.EqualFold(localMd5, remoteMd5) {
+		log.Printf("[%s] Remote scrcpy-server.jar md5 mismatch, will push local=%s remote=%s", udid, localMd5, remoteMd5)
+		return true
+	}
+
+	log.Printf("[%s] scrcpy-server.jar md5 matched, skipping push md5=%s", udid, localMd5)
+	return false
 }
 
 func shellSafe(udid string, cmd string) string {
@@ -196,12 +251,26 @@ func EnsureServer(udid string) error {
 	})
 }
 
-var (
-	restartInFlight sync.Map
-	restartMutex    sync.Mutex
-)
+func canForceRestartNow(udid string) bool {
+	if v, ok := lastRestartAt.Load(udid); ok {
+		last := v.(time.Time)
+		if time.Since(last) < ForceRestartCooldown {
+			log.Printf("[%s] ForceRestartServer cooldown active, skip restart (%s remaining)",
+				udid,
+				ForceRestartCooldown-time.Since(last),
+			)
+			return false
+		}
+	}
+	lastRestartAt.Store(udid, time.Now())
+	return true
+}
 
 func ForceRestartServer(udid string) error {
+	if !canForceRestartNow(udid) {
+		return EnsureServer(udid)
+	}
+
 	restartMutex.Lock()
 	if chIntf, ok := restartInFlight.Load(udid); ok {
 		restartMutex.Unlock()
@@ -245,18 +314,15 @@ func StartServer(udid string) error {
 }
 
 func startServerUnlocked(udid string) error {
-	// Push scrcpy-server.jar only if not already present (saves 3-5s per device on restart)
-	remoteMd5 := strings.TrimSpace(shellSafe(udid, "md5sum "+TempPath+FileName+" 2>/dev/null | cut -d' ' -f1"))
-	needPush := remoteMd5 == ""
-	if needPush {
+	localJar := serverJarPath()
+
+	if shouldPushServerJar(udid, localJar) {
 		log.Printf("[%s] Pushing scrcpy-server.jar...", udid)
-		err := adb.Push(udid, serverJarPath(), TempPath+FileName)
+		err := adb.Push(udid, localJar, TempPath+FileName)
 		if err != nil {
 			log.Printf("[%s] Failed to push scrcpy-server.jar: %v", udid, err)
 			return err
 		}
-	} else {
-		log.Printf("[%s] scrcpy-server.jar already on device, skipping push", udid)
 	}
 
 	// Start server via app_process

@@ -74,6 +74,8 @@ export function concatBytes(...parts: Uint8Array[]): Uint8Array {
   return concat(parts);
 }
 
+const MAX_CHANNEL_QUEUE_BYTES = 512 * 1024; // 512KB
+
 type ChannelEntry = { channel: MuxChannel; emitter: EventTarget };
 
 export class MuxChannel extends EventTarget {
@@ -88,6 +90,7 @@ export class MuxChannel extends EventTarget {
   private channels = new Map<number, ChannelEntry>();
   // Queue while connecting. Keep only types that WebSocket#send accepts in browsers.
   private storage: (string | Uint8Array)[] = [];
+  private queuedBytes = 0;
   private nextId = 0;
 
   private onopen: ((this: WebSocket, ev: Event) => any) | null = null;
@@ -186,6 +189,7 @@ export class MuxChannel extends EventTarget {
       if (!this.storage.length) return;
       const items = [...this.storage];
       this.storage.length = 0;
+      this.queuedBytes = 0;
       for (const d of items) {
         this._send(d);
       }
@@ -289,7 +293,19 @@ export class MuxChannel extends EventTarget {
     if (this.ws instanceof WebSocket && this.readyState === this.ws.CONNECTING) {
       // `Uint8Array#buffer` may be a SharedArrayBuffer in some runtimes;
       // also WebSocket#send doesn't accept SharedArrayBuffer. Always copy.
-      this.storage.push(typeof data === 'string' ? data : data.slice());
+      const payload = typeof data === 'string' ? data : data.slice();
+      const len = typeof payload === 'string' ? te.encode(payload).byteLength : payload.byteLength;
+      this.queuedBytes += len;
+
+      while (this.storage.length > 0 && this.queuedBytes > MAX_CHANNEL_QUEUE_BYTES) {
+        const dropped = this.storage.shift();
+        if (dropped) {
+          const droppedLen = typeof dropped === 'string' ? te.encode(dropped).byteLength : dropped.byteLength;
+          this.queuedBytes -= droppedLen;
+        }
+      }
+
+      this.storage.push(payload);
       return;
     }
     throw new Error('Socket is already in CLOSING or CLOSED state');

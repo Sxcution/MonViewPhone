@@ -386,6 +386,7 @@ function TileComponent({
                     status={status}
                     syncRole={syncRole}
                     connectionLabel={connectionLabel}
+                    streamStats={streamStats}
                     onHeaderClick={onHeaderClick}
                     onReloadClick={(e) => {
                         e.stopPropagation();

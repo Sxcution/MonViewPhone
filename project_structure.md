@@ -62,7 +62,7 @@ Removed legacy layers:
 - [MODIFY] [main.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/main.tsx): App entry point. Refactored startup synchronization logic to always hydrate browser localStorage cache from backend database state, ensuring backend Data.db remains the sole source of truth, and implemented two-way sync on startup to upload local configuration keys (macros, device profiles, quick action slot bindings) to settings.json if they are missing on the backend.
 - `server-go/adb/`: ADB helpers and device tracker.
 - [MODIFY] `server-go/scrcpy/`: Scrcpy server launch/config helpers. Added `CleanAllMonViewPhoneServers` in `server.go` to cleanly kill any running scrcpy servers on devices during startup.
-- `server-go/websocket/`: Device-list and stream proxy WebSocket handlers.
+- `server-go/websocket/`: Device-list and stream proxy WebSocket handlers. Includes `proxy_raw.go` for the skeleton `raw-v2` experimental route.
 - `server-go/server-go.exe`: Current compiled Go backend binary.
 - `server-go/Start_PhoneFarm.bat`: Starts the Go backend server by running the launcher script `run.pyw`.
 - `server-go/Start_PhoneFarm_Air.bat`: Optional Go hot-reload launcher for backend development.

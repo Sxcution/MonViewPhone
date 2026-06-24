@@ -350,6 +350,9 @@ func main() {
 			case "proxy-adb":
 				websocket.HandleProxyAdb(w, r)
 				return
+			case "proxy-scrcpy-raw":
+				websocket.HandleProxyScrcpyRaw(w, r)
+				return
 			case "devices-list":
 				websocket.HandleSimpleDevicesList(w, r, tracker)
 				return

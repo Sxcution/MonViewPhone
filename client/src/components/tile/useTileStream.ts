@@ -308,6 +308,9 @@ export function useTileStream(args: Args) {
         let engine: StreamEngine | null = null;
         let lastPacketAt = Date.now();
         let lastBitmapAt = 0;
+        let bytesReceivedThisInterval = 0;
+        let lastBitrateCalcTime = Date.now();
+        let currentBitrateKbps = 0;
 
         let watchdogTimer: number | null = null;
         let initialLoadTimer: number | null = null;
@@ -609,6 +612,7 @@ export function useTileStream(args: Args) {
                 else if (ev.data instanceof Blob) ab = await ev.data.arrayBuffer();
                 if (!ab) return;
                 lastPacketAt = Date.now();
+                bytesReceivedThisInterval += ab.byteLength;
                 engine?.feedBytes(new Uint8Array(ab));
             };
 
@@ -688,12 +692,21 @@ export function useTileStream(args: Args) {
 
             // Expose updated stats periodically (only when values change)
             if (engine) {
+              const now = Date.now();
+              const elapsed = now - lastBitrateCalcTime;
+              if (elapsed > 0) {
+                currentBitrateKbps = Math.round((bytesReceivedThisInterval * 8) / elapsed);
+                bytesReceivedThisInterval = 0;
+                lastBitrateCalcTime = now;
+              }
+
               const stats = engine.getStats();
               const nextStats = {
                 ...stats,
                 reconnectCount: reconnectCountRef.current,
                 encoderName: activeStageRef.current?.encoderName || 'default',
-                fallbackReason: fallbackReasonRef.current || undefined
+                fallbackReason: fallbackReasonRef.current || undefined,
+                bitrateKbps: currentBitrateKbps
               };
               const serialized = JSON.stringify(nextStats);
               if (serialized !== prevStatsRef.current) {

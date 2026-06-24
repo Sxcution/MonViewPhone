@@ -19,13 +19,17 @@ export type StreamConfig = {
 };
 
 export const STREAM_CONFIG: StreamConfig = {
-  bitrate: 917504, //max 8388608
-  maxFps: 24, // max 60
+  bitrate: 393216, // 384 KB/s-ish, nhẹ hơn cho grid
+  maxFps: 12,
   iFrameInterval: 5,
-  bounds: { width: 500, height: 500 },
+  bounds: { width: 360, height: 360 },
   sendFrameMeta: false,
   displayId: 0,
   encoderName: 'OMX.google.h264.encoder',
   engine: 'auto',
   encoderMode: 'auto',
 };
+
+export type StreamMode = 'ws6' | 'raw-v2';
+
+export const STREAM_MODE: StreamMode = 'ws6';
