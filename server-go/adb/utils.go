@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -151,4 +152,39 @@ func RunShellAsync(udid string, shellCmd string) (*exec.Cmd, error) {
 	cmd := exec.Command(GetAdbPath(), "-s", udid, "shell", shellCmd)
 	err := cmd.Start()
 	return cmd, err
+}
+
+// CleanAllForwards parses 'adb forward --list' and removes any forwards to our scrcpy port or abstract socket
+func CleanAllForwards() {
+	out, err := Command("forward", "--list")
+	if err != nil {
+		log.Printf("[Startup] Failed to list adb forwards: %v", err)
+		return
+	}
+	lines := strings.Split(out, "\n")
+	cleanedCount := 0
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) < 3 {
+			continue
+		}
+		serial := parts[0]
+		localPort := parts[1]  // e.g. "tcp:57225"
+		remotePort := parts[2] // e.g. "tcp:8886" or "localabstract:scrcpy"
+
+		if remotePort == "tcp:8886" || remotePort == "localabstract:scrcpy" {
+			log.Printf("[Startup] Cleaning stale forward: device=%s, local=%s, remote=%s", serial, localPort, remotePort)
+			err := RemoveForward(serial, localPort)
+			if err != nil {
+				log.Printf("[Startup] Failed to remove forward %s on device %s: %v", localPort, serial, err)
+			} else {
+				cleanedCount++
+			}
+		}
+	}
+	log.Printf("[Startup] Cleaned up %d stale adb forwards.", cleanedCount)
 }

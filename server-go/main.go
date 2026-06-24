@@ -231,6 +231,9 @@ func main() {
 	// Wait a moment for tracker to poll devices first
 	time.Sleep(500 * time.Millisecond)
 
+	// Clean up stale ADB forwards on startup
+	adb.CleanAllForwards()
+
 	// Clean up existing scrcpy servers
 	scrcpy.CleanAllMonViewPhoneServers(tracker)
 

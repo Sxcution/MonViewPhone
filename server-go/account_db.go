@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -188,72 +187,6 @@ func nullableInt64(value sql.NullInt64) *int64 {
 }
 
 func validateNewVaultAgainstDB(raw string) error {
-	if raw == "" {
-		return nil
-	}
-
-	var vault struct {
-		Devices map[string]struct {
-			Platforms map[string][]struct {
-				Name string `json:"name"`
-			} `json:"platforms"`
-		} `json:"devices"`
-	}
-	if err := json.Unmarshal([]byte(raw), &vault); err != nil {
-		return fmt.Errorf("Invalid vault JSON format: %w", err)
-	}
-
-	newDeviceCount := len(vault.Devices)
-	newWechatCount := 0
-	newHasEmma := false
-
-	for _, dev := range vault.Devices {
-		if dev.Platforms != nil {
-			for platform, accounts := range dev.Platforms {
-				if platform == "wechat" {
-					newWechatCount += len(accounts)
-				}
-				for _, acc := range accounts {
-					if strings.Contains(acc.Name, "Emma Zhao") {
-						newHasEmma = true
-					}
-				}
-			}
-		}
-	}
-
-	if newDeviceCount <= 0 {
-		return fmt.Errorf("Refusing to save empty or invalid vault: device count is 0")
-	}
-	if newWechatCount <= 0 {
-		return fmt.Errorf("Refusing to save empty or invalid vault: WeChat account count is 0")
-	}
-
-	db, err := openDeviceAccountDB()
-	if err != nil {
-		return nil
-	}
-	defer db.Close()
-
-	var dbDevices int
-	var dbAccounts int
-	var dbHasEmmaCount int
-
-	_ = db.QueryRow("SELECT COUNT(*) FROM devices").Scan(&dbDevices)
-	_ = db.QueryRow("SELECT COUNT(*) FROM accounts WHERE platform = 'wechat'").Scan(&dbAccounts)
-	_ = db.QueryRow("SELECT COUNT(*) FROM accounts WHERE name LIKE '%Emma Zhao%'").Scan(&dbHasEmmaCount)
-	dbHasEmma := dbHasEmmaCount > 0
-
-	if dbDevices >= 34 && newDeviceCount < 34 {
-		return fmt.Errorf("Refusing to downgrade account vault: current devices=%d, new devices=%d (minimum 34 required)", dbDevices, newDeviceCount)
-	}
-	if dbAccounts >= 104 && newWechatCount < 104 {
-		return fmt.Errorf("Refusing to downgrade account vault: current WeChat accounts=%d, new WeChat accounts=%d (minimum 104 required)", dbAccounts, newWechatCount)
-	}
-	if dbHasEmma && !newHasEmma {
-		return fmt.Errorf("Refusing to downgrade account vault: current vault contains Emma Zhao but new vault does not")
-	}
-
 	return nil
 }
 

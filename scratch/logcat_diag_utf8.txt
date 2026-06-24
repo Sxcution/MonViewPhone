@@ -1,0 +1,1006 @@
+﻿--------- beginning of main
+06-23 00:44:09.724  5180  5180 D BatteryDefenderNotification: isPlugged: true | isOverheated: false | defenderEnabled: false | isCharged: false
+--------- beginning of system
+06-23 00:44:09.726  5180  8739 D PowerUI : can't show warning due to - plugged: true status unknown: false
+06-23 00:44:09.899  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:09.902  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:09.903  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:10.457  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:10.461  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:10.993  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:10.993  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:10.994  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:11.551  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:11.553  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:11.557  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:12.104  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:12.104  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:12.105  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:12.342  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:12.410  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:12.574 19640 19711 I mars::stn: [longlink_connect_monitor.cc:536, OnHeartbeatAlarmReceived]:longlink_progress on_heartbeat_alarm, time: 41412839, is_noop_timeout:false
+06-23 00:44:12.672  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:12.674  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:12.675  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:12.734 19640 23907 I mars::stn: [longlink_connect_monitor.cc:530, OnHeartbeatAlarmSet]:longlink_progress on_heartbeat_set, time: 41412999, time interval:210000
+06-23 00:44:12.748 19640 23907 I mars::stn: [longlink_connect_monitor.cc:530, OnHeartbeatAlarmSet]:longlink_progress on_heartbeat_set, time: 41413013, time interval:210000
+06-23 00:44:13.207  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:13.208  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:13.208  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:13.760  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:13.761  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:13.764  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:14.302  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:14.303  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:14.303  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:14.853  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:14.854  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:14.856  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:15.385  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:15.394  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:15.456  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:15.518  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:15.950  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:15.951  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:15.955  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:16.151 12793 12885 I Finsky  : [3740] Stats for Executor: LightweightExecutor wgz@72e886d[Running, pool size = 4, active threads = 0, queued tasks = 0, completed tasks = 277]
+06-23 00:44:16.164 12793 12885 I Finsky  : [3740] Stats for Executor: BlockingExecutor wgz@daf7ca2[Running, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 41]
+06-23 00:44:16.229 12793 12885 I Finsky  : [3740] Stats for Executor: bgExecutor wgz@2fd9d33[Running, pool size = 4, active threads = 0, queued tasks = 0, completed tasks = 291]
+06-23 00:44:16.486  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:16.488  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:16.490  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:16.559 12793 12885 I Finsky  : [3740] Stats for Executor: GrpcBackgroundExecutor wgz@453a8f0[Running, pool size = 3, active threads = 0, queued tasks = 0, completed tasks = 3]
+06-23 00:44:16.580  5369  5384 W rkstack.process: Reducing the number of considered missed Gc histogram windows from 288 to 100
+06-23 00:44:17.014  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:17.018  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:17.022  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:17.163  5014  5040 E NotificationVibratorHelper: Error creating vibration waveform with pattern: [0]
+06-23 00:44:17.571  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:17.572  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:17.573  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:18.138  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:18.140  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:18.142  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:18.564  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:18.577  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:18.703  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:18.704  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:18.706  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:19.265  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:19.267  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:19.275  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:19.828  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:19.829  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:19.829  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:20.367  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:20.368  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:20.532  5014  5040 D CompatibilityInfo: mCompatibilityFlags - 4
+06-23 00:44:20.533  5014  5040 D CompatibilityInfo: applicationDensity - 720
+06-23 00:44:20.533  5014  5040 D CompatibilityInfo: applicationScale - 1.0
+06-23 00:44:20.690 12584 12584 E adbd    : failed to connect to socket 'tcp:8886': Connection refused
+06-23 00:44:20.922  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:20.928  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:20.929  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:21.438  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:21.439  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:21.440  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:21.459 28379 28379 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-23 00:44:21.464 28379 28379 I AndroidRuntime: Using default boot image
+06-23 00:44:21.464 28379 28379 I AndroidRuntime: Leaving lock profiling enabled
+06-23 00:44:21.468 28379 28379 W app_process: ART APEX data files are untrusted.
+06-23 00:44:21.468 28379 28379 I app_process: Core platform API reporting enabled, enforcing=false
+06-23 00:44:21.471 28379 28379 E app_process: Error reading named image component header for /system/framework/boot.art, error: Unable to open file "/system/framework/arm64/boot-framework.art" for reading image header
+06-23 00:44:21.491 28389 28389 W dex2oat64: Mismatch between dex2oat instruction set features to use (ISA: Arm64 Feature string: a53,crc,-lse,-fp16,-dotprod,-sve) and those from CPP defines (ISA: Arm64 Feature string: -a53,-crc,-lse,-fp16,-dotprod,-sve) for the command line:
+06-23 00:44:21.491 28389 28389 W dex2oat64: /apex/com.android.art/bin/dex2oat64 --runtime-arg -Xbootclasspath:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --runtime-arg -Xbootclasspath-locations:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --boot-image=/system/framework/boot.art!/apex/com.android.art/etc/boot-image.prof --dex-file=/system/framework/framework.jar --dex-location=/system/framework/framework.jar --dex-file=/system/framework/framework-graphics.jar --dex-location=/system/framework/framework-graphics.jar --dex-file=/system/framework/ext.jar --dex-location=/system/framework/ext.jar --dex-file=/system/framework/telephony-common.jar --dex-location=/system/framework/telephony-common.jar --dex-file=/system/framework/voip-common.jar --dex-location=/system/framework/voip-common.jar --dex-file=/system/framework/ims-common.jar --dex-location=/system/framework/ims-common.jar --dex-file=/apex/com.android.i18n/javalib/core-icu4j.jar --dex-location=/apex/com.android.i18n/javalib/core-icu4j.jar --image-fd=6 --output-vdex-fd=7 --oat-fd=8 --oat-location=/system/framework/arm64/boot.oat --single-image --image-format=uncompressed --compiler-filter=verify --profile-file=/system/etc/boot-image.prof --avoid-storing-invocation --instruction-set=arm64 --instruction-set-features=runtime --runtime-arg -Xms64m --runtime-arg -Xmx64m --compiler-filter=quicken --dirty-image-objects=/system/etc/dirty-image-objects -j8 --cpu-set=0,1,2,3,4,5,6,7 --instruction-set-variant=cortex-a53 --instruction-set-features=default
+06-23 00:44:21.505 28389 28389 I dex2oat64: /apex/com.android.art/bin/dex2oat64 --runtime-arg -Xbootclasspath:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --runtime-arg -Xbootclasspath-locations:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --boot-image=/system/framework/boot.art!/apex/com.android.art/etc/boot-image.prof --dex-file=/system/framework/framework.jar --dex-location=/system/framework/framework.jar --dex-file=/system/framework/framework-graphics.jar --dex-location=/system/framework/framework-graphics.jar --dex-file=/system/framework/ext.jar --dex-location=/system/framework/ext.jar --dex-file=/system/framework/telephony-common.jar --dex-location=/system/framework/telephony-common.jar --dex-file=/system/framework/voip-common.jar --dex-location=/system/framework/voip-common.jar --dex-file=/system/framework/ims-common.jar --dex-location=/system/framework/ims-common.jar --dex-file=/apex/com.android.i18n/javalib/core-icu4j.jar --dex-location=/apex/com.android.i18n/javalib/core-icu4j.jar --image-fd=6 --output-vdex-fd=7 --oat-fd=8 --oat-location=/system/framework/arm64/boot.oat --single-image --image-format=uncompressed --compiler-filter=verify --profile-file=/system/etc/boot-image.prof --avoid-storing-invocation --instruction-set=arm64 --instruction-set-features=runtime --runtime-arg -Xms64m --runtime-arg -Xmx64m --compiler-filter=quicken --dirty-image-objects=/system/etc/dirty-image-objects -j8 --cpu-set=0,1,2,3,4,5,6,7 --instruction-set-variant=cortex-a53 --instruction-set-features=default
+06-23 00:44:21.506 28389 28389 I dex2oat64: setting boot class path to /apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar
+06-23 00:44:21.601  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:21.659  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:21.952  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:21.952  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:21.953  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:22.474  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:22.475  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:22.476  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:22.648  5014  5040 D CompatibilityInfo: mCompatibilityFlags - 4
+06-23 00:44:22.648  5014  5040 D CompatibilityInfo: applicationDensity - 720
+06-23 00:44:22.648  5014  5040 D CompatibilityInfo: applicationScale - 1.0
+06-23 00:44:22.996  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:22.999  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:23.001  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:23.518  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:23.519  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:23.519  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:24.039  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:24.039  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:24.040  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:24.552  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:24.552  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:24.553  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:24.677  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:24.734  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:25.075  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:25.076  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:25.601  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:25.602  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:25.603  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:26.142  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:26.143  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:26.144  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:26.251 28389 28389 E dex2oat64: Dex checksum mismatch while verifying profile dex location /system/framework/framework.jar (checksum=2842850069, profile checksum=4106030695
+06-23 00:44:26.641  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:26.641  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:26.641  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:27.160  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:27.160  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:27.161  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:27.691  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:27.692  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:27.693  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:27.746  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:27.804  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:28.020 28389 28389 I dex2oat64: Explicit concurrent copying GC freed 59987(9964KB) AllocSpace objects, 1(16KB) LOS objects, 31% free, 13MB/19MB, paused 13us,11us total 63.082ms
+06-23 00:44:28.116 28389 28389 I dex2oat64: Explicit concurrent copying GC freed 65866(11MB) AllocSpace objects, 0(0B) LOS objects, 49% free, 1866KB/3733KB, paused 8us,10us total 10.225ms
+06-23 00:44:28.200 28389 28389 I dex2oat64: dex2oat took 6.711s (11.905s cpu) (threads: 8) arena alloc=0B (0B) java alloc=1866KB (1911560B) native alloc=9141KB (9360464B) free=100MB (105604048B)
+06-23 00:44:28.210  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:28.210  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:28.211  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:28.332 28379 28379 D app_process: Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-23 00:44:28.332 28379 28379 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt70l.dat
+06-23 00:44:28.342 28379 28379 W ziparchive: Unable to open '/data/local/tmp/scrcpy-server.dm': No such file or directory
+06-23 00:44:28.405 28379 28379 D AndroidRuntime: Calling main entry com.genymobile.scrcpy.Server
+06-23 00:44:28.415 28379 28379 D TrafficStats: tagSocket(42) with statsTag=0xffffffff, statsUid=-1
+06-23 00:44:28.740  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:28.741  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:28.743  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:29.081 28379 28568 E scrcpy  : FIXME: Returning only default display.
+06-23 00:44:29.082 28379 28568 E scrcpy  : See https://github.com/NetrisTV/ws-scrcpy/issues/217
+06-23 00:44:29.082 28379 28567 E scrcpy  : FIXME: Returning only default display.
+06-23 00:44:29.083 28379 28567 E scrcpy  : See https://github.com/NetrisTV/ws-scrcpy/issues/217
+06-23 00:44:29.085 28379 28569 E scrcpy  : FIXME: Returning only default display.
+06-23 00:44:29.086 28379 28569 E scrcpy  : See https://github.com/NetrisTV/ws-scrcpy/issues/217
+06-23 00:44:29.101 28379 28568 D MtpDeviceJNI: register_android_mtp_MtpDevice
+06-23 00:44:29.169 28379 28567 E scrcpy  : Clipboard addPrimaryClipChangedListener signature: listener+package+attribution+user
+06-23 00:44:29.170 28379 28569 E scrcpy  : Clipboard addPrimaryClipChangedListener signature: listener+package+attribution+user
+06-23 00:44:29.193 28379 28567 E scrcpy  : FIXME: Returning only default display.
+06-23 00:44:29.194 28379 28567 E scrcpy  : See https://github.com/NetrisTV/ws-scrcpy/issues/217
+06-23 00:44:29.195 28379 28569 E scrcpy  : FIXME: Returning only default display.
+06-23 00:44:29.196 28379 28569 E scrcpy  : See https://github.com/NetrisTV/ws-scrcpy/issues/217
+06-23 00:44:29.202 28379 28379 E scrcpy  : FIXME: Returning only default display.
+06-23 00:44:29.202 28379 28379 E scrcpy  : See https://github.com/NetrisTV/ws-scrcpy/issues/217
+--------- beginning of crash
+06-23 00:44:29.204 28379 28591 E AndroidRuntime: FATAL EXCEPTION: Thread-13
+06-23 00:44:29.204 28379 28591 E AndroidRuntime: PID: 28379
+06-23 00:44:29.204 28379 28591 E AndroidRuntime: java.lang.IllegalStateException: The main Looper has already been prepared.
+06-23 00:44:29.204 28379 28591 E AndroidRuntime: 	at android.os.Looper.prepareMainLooper(Looper.java:131)
+06-23 00:44:29.204 28379 28591 E AndroidRuntime: 	at com.genymobile.scrcpy.Workarounds.prepareMainLooper(Workarounds.java:34)
+06-23 00:44:29.204 28379 28591 E AndroidRuntime: 	at com.genymobile.scrcpy.ScreenEncoder.streamScreen(ScreenEncoder.java:84)
+06-23 00:44:29.204 28379 28591 E AndroidRuntime: 	at com.genymobile.scrcpy.ScreenEncoder.run(ScreenEncoder.java:329)
+06-23 00:44:29.204 28379 28591 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:29.204 28379 28591 E scrcpy  : Exception on thread Thread[Thread-13,5,main]
+06-23 00:44:29.204 28379 28591 E scrcpy  : java.lang.IllegalStateException: The main Looper has already been prepared.
+06-23 00:44:29.204 28379 28591 E scrcpy  : 	at android.os.Looper.prepareMainLooper(Looper.java:131)
+06-23 00:44:29.204 28379 28591 E scrcpy  : 	at com.genymobile.scrcpy.Workarounds.prepareMainLooper(Workarounds.java:34)
+06-23 00:44:29.204 28379 28591 E scrcpy  : 	at com.genymobile.scrcpy.ScreenEncoder.streamScreen(ScreenEncoder.java:84)
+06-23 00:44:29.204 28379 28591 E scrcpy  : 	at com.genymobile.scrcpy.ScreenEncoder.run(ScreenEncoder.java:329)
+06-23 00:44:29.204 28379 28591 E scrcpy  : 	at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:29.208 28379 28592 D MediaCodec: flushMediametrics
+06-23 00:44:29.208 28379 28592 W MediaCodec-JNI: try to release MediaCodec from JMediaCodec::~JMediaCodec()...
+06-23 00:44:29.208 28379 28592 W MediaCodec-JNI: done releasing MediaCodec from JMediaCodec::~JMediaCodec().
+06-23 00:44:29.209 28379 28592 E AndroidRuntime: FATAL EXCEPTION: Thread-14
+06-23 00:44:29.209 28379 28592 E AndroidRuntime: PID: 28379
+06-23 00:44:29.209 28379 28592 E AndroidRuntime: com.genymobile.scrcpy.InvalidEncoderException: There is no encoder having name 'OMX.MTK.VIDEO.ENCODER.AVC"
+06-23 00:44:29.209 28379 28592 E AndroidRuntime: 	at com.genymobile.scrcpy.ScreenEncoder.createCodec(ScreenEncoder.java:233)
+06-23 00:44:29.209 28379 28592 E AndroidRuntime: 	at com.genymobile.scrcpy.ScreenEncoder.internalStreamScreen(ScreenEncoder.java:104)
+06-23 00:44:29.209 28379 28592 E AndroidRuntime: 	at com.genymobile.scrcpy.ScreenEncoder.streamScreen(ScreenEncoder.java:87)
+06-23 00:44:29.209 28379 28592 E AndroidRuntime: 	at com.genymobile.scrcpy.ScreenEncoder.run(ScreenEncoder.java:329)
+06-23 00:44:29.209 28379 28592 E AndroidRuntime: 	at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:29.209 28379 28592 E scrcpy  : Exception on thread Thread[Thread-14,5,main]
+06-23 00:44:29.209 28379 28592 E scrcpy  : com.genymobile.scrcpy.InvalidEncoderException: There is no encoder having name 'OMX.MTK.VIDEO.ENCODER.AVC"
+06-23 00:44:29.209 28379 28592 E scrcpy  : 	at com.genymobile.scrcpy.ScreenEncoder.createCodec(ScreenEncoder.java:233)
+06-23 00:44:29.209 28379 28592 E scrcpy  : 	at com.genymobile.scrcpy.ScreenEncoder.internalStreamScreen(ScreenEncoder.java:104)
+06-23 00:44:29.209 28379 28592 E scrcpy  : 	at com.genymobile.scrcpy.ScreenEncoder.streamScreen(ScreenEncoder.java:87)
+06-23 00:44:29.209 28379 28592 E scrcpy  : 	at com.genymobile.scrcpy.ScreenEncoder.run(ScreenEncoder.java:329)
+06-23 00:44:29.209 28379 28592 E scrcpy  : 	at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:29.210 28379 28592 E scrcpy  : Try to use one of the available encoders:
+06-23 00:44:29.210 28379 28592 E scrcpy  :     scrcpy --encoder 'OMX.Exynos.AVC.Encoder'
+06-23 00:44:29.211 28379 28592 E scrcpy  :     scrcpy --encoder 'c2.android.avc.encoder'
+06-23 00:44:29.211 28379 28592 E scrcpy  :     scrcpy --encoder 'OMX.google.h264.encoder'
+06-23 00:44:29.256  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:29.257  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:29.260  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:29.299 28587 28587 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-23 00:44:29.299 28588 28588 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-23 00:44:29.304 28587 28587 I AndroidRuntime: Using default boot image
+06-23 00:44:29.304 28587 28587 I AndroidRuntime: Leaving lock profiling enabled
+06-23 00:44:29.304 28588 28588 I AndroidRuntime: Using default boot image
+06-23 00:44:29.304 28588 28588 I AndroidRuntime: Leaving lock profiling enabled
+06-23 00:44:29.307 28587 28587 W app_process: ART APEX data files are untrusted.
+06-23 00:44:29.307 28588 28588 W app_process: ART APEX data files are untrusted.
+06-23 00:44:29.307 28587 28587 I app_process: Core platform API reporting enabled, enforcing=false
+06-23 00:44:29.307 28588 28588 I app_process: Core platform API reporting enabled, enforcing=false
+06-23 00:44:29.310 28588 28588 E app_process: Error reading named image component header for /system/framework/boot.art, error: Unable to open file "/system/framework/arm64/boot-framework.art" for reading image header
+06-23 00:44:29.310 28587 28587 E app_process: Error reading named image component header for /system/framework/boot.art, error: Unable to open file "/system/framework/arm64/boot-framework.art" for reading image header
+06-23 00:44:29.331 28594 28594 W dex2oat64: Mismatch between dex2oat instruction set features to use (ISA: Arm64 Feature string: a53,crc,-lse,-fp16,-dotprod,-sve) and those from CPP defines (ISA: Arm64 Feature string: -a53,-crc,-lse,-fp16,-dotprod,-sve) for the command line:
+06-23 00:44:29.331 28594 28594 W dex2oat64: /apex/com.android.art/bin/dex2oat64 --runtime-arg -Xbootclasspath:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --runtime-arg -Xbootclasspath-locations:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --boot-image=/system/framework/boot.art!/apex/com.android.art/etc/boot-image.prof --dex-file=/system/framework/framework.jar --dex-location=/system/framework/framework.jar --dex-file=/system/framework/framework-graphics.jar --dex-location=/system/framework/framework-graphics.jar --dex-file=/system/framework/ext.jar --dex-location=/system/framework/ext.jar --dex-file=/system/framework/telephony-common.jar --dex-location=/system/framework/telephony-common.jar --dex-file=/system/framework/voip-common.jar --dex-location=/system/framework/voip-common.jar --dex-file=/system/framework/ims-common.jar --dex-location=/system/framework/ims-common.jar --dex-file=/apex/com.android.i18n/javalib/core-icu4j.jar --dex-location=/apex/com.android.i18n/javalib/core-icu4j.jar --image-fd=6 --output-vdex-fd=7 --oat-fd=8 --oat-location=/system/framework/arm64/boot.oat --single-image --image-format=uncompressed --compiler-filter=verify --profile-file=/system/etc/boot-image.prof --avoid-storing-invocation --instruction-set=arm64 --instruction-set-features=runtime --runtime-arg -Xms64m --runtime-arg -Xmx64m --compiler-filter=quicken --dirty-image-objects=/system/etc/dirty-image-objects -j8 --cpu-set=0,1,2,3,4,5,6,7 --instruction-set-variant=cortex-a53 --instruction-set-features=default
+06-23 00:44:29.332 28595 28595 W dex2oat64: Mismatch between dex2oat instruction set features to use (ISA: Arm64 Feature string: a53,crc,-lse,-fp16,-dotprod,-sve) and those from CPP defines (ISA: Arm64 Feature string: -a53,-crc,-lse,-fp16,-dotprod,-sve) for the command line:
+06-23 00:44:29.332 28595 28595 W dex2oat64: /apex/com.android.art/bin/dex2oat64 --runtime-arg -Xbootclasspath:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --runtime-arg -Xbootclasspath-locations:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --boot-image=/system/framework/boot.art!/apex/com.android.art/etc/boot-image.prof --dex-file=/system/framework/framework.jar --dex-location=/system/framework/framework.jar --dex-file=/system/framework/framework-graphics.jar --dex-location=/system/framework/framework-graphics.jar --dex-file=/system/framework/ext.jar --dex-location=/system/framework/ext.jar --dex-file=/system/framework/telephony-common.jar --dex-location=/system/framework/telephony-common.jar --dex-file=/system/framework/voip-common.jar --dex-location=/system/framework/voip-common.jar --dex-file=/system/framework/ims-common.jar --dex-location=/system/framework/ims-common.jar --dex-file=/apex/com.android.i18n/javalib/core-icu4j.jar --dex-location=/apex/com.android.i18n/javalib/core-icu4j.jar --image-fd=6 --output-vdex-fd=7 --oat-fd=8 --oat-location=/system/framework/arm64/boot.oat --single-image --image-format=uncompressed --compiler-filter=verify --profile-file=/system/etc/boot-image.prof --avoid-storing-invocation --instruction-set=arm64 --instruction-set-features=runtime --runtime-arg -Xms64m --runtime-arg -Xmx64m --compiler-filter=quicken --dirty-image-objects=/system/etc/dirty-image-objects -j8 --cpu-set=0,1,2,3,4,5,6,7 --instruction-set-variant=cortex-a53 --instruction-set-features=default
+06-23 00:44:29.345 28594 28594 I dex2oat64: /apex/com.android.art/bin/dex2oat64 --runtime-arg -Xbootclasspath:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --runtime-arg -Xbootclasspath-locations:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --boot-image=/system/framework/boot.art!/apex/com.android.art/etc/boot-image.prof --dex-file=/system/framework/framework.jar --dex-location=/system/framework/framework.jar --dex-file=/system/framework/framework-graphics.jar --dex-location=/system/framework/framework-graphics.jar --dex-file=/system/framework/ext.jar --dex-location=/system/framework/ext.jar --dex-file=/system/framework/telephony-common.jar --dex-location=/system/framework/telephony-common.jar --dex-file=/system/framework/voip-common.jar --dex-location=/system/framework/voip-common.jar --dex-file=/system/framework/ims-common.jar --dex-location=/system/framework/ims-common.jar --dex-file=/apex/com.android.i18n/javalib/core-icu4j.jar --dex-location=/apex/com.android.i18n/javalib/core-icu4j.jar --image-fd=6 --output-vdex-fd=7 --oat-fd=8 --oat-location=/system/framework/arm64/boot.oat --single-image --image-format=uncompressed --compiler-filter=verify --profile-file=/system/etc/boot-image.prof --avoid-storing-invocation --instruction-set=arm64 --instruction-set-features=runtime --runtime-arg -Xms64m --runtime-arg -Xmx64m --compiler-filter=quicken --dirty-image-objects=/system/etc/dirty-image-objects -j8 --cpu-set=0,1,2,3,4,5,6,7 --instruction-set-variant=cortex-a53 --instruction-set-features=default
+06-23 00:44:29.345 28595 28595 I dex2oat64: /apex/com.android.art/bin/dex2oat64 --runtime-arg -Xbootclasspath:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --runtime-arg -Xbootclasspath-locations:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --boot-image=/system/framework/boot.art!/apex/com.android.art/etc/boot-image.prof --dex-file=/system/framework/framework.jar --dex-location=/system/framework/framework.jar --dex-file=/system/framework/framework-graphics.jar --dex-location=/system/framework/framework-graphics.jar --dex-file=/system/framework/ext.jar --dex-location=/system/framework/ext.jar --dex-file=/system/framework/telephony-common.jar --dex-location=/system/framework/telephony-common.jar --dex-file=/system/framework/voip-common.jar --dex-location=/system/framework/voip-common.jar --dex-file=/system/framework/ims-common.jar --dex-location=/system/framework/ims-common.jar --dex-file=/apex/com.android.i18n/javalib/core-icu4j.jar --dex-location=/apex/com.android.i18n/javalib/core-icu4j.jar --image-fd=6 --output-vdex-fd=7 --oat-fd=8 --oat-location=/system/framework/arm64/boot.oat --single-image --image-format=uncompressed --compiler-filter=verify --profile-file=/system/etc/boot-image.prof --avoid-storing-invocation --instruction-set=arm64 --instruction-set-features=runtime --runtime-arg -Xms64m --runtime-arg -Xmx64m --compiler-filter=quicken --dirty-image-objects=/system/etc/dirty-image-objects -j8 --cpu-set=0,1,2,3,4,5,6,7 --instruction-set-variant=cortex-a53 --instruction-set-features=default
+06-23 00:44:29.347 28595 28595 I dex2oat64: setting boot class path to /apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar
+06-23 00:44:29.347 28594 28594 I dex2oat64: setting boot class path to /apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar
+06-23 00:44:29.790  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:29.791  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:29.981  5180  5180 D PowerNotificationWarningsGoogleImpl: onReceive: android.intent.action.BATTERY_CHANGED
+06-23 00:44:30.018  5180  5180 D BatteryInfoBroadcast: onReceive: android.intent.action.BATTERY_CHANGED isPowerSaveMode: false
+06-23 00:44:30.019  5180  5180 D BatteryDefenderNotification: isPlugged: true | isOverheated: false | defenderEnabled: false | isCharged: false
+06-23 00:44:30.021  5180  9441 D PowerUI : can't show warning due to - plugged: true status unknown: false
+06-23 00:44:30.310  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:30.311  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:30.313  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:30.824  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:30.849  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:30.850  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:30.851  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:30.878  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:31.373  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:31.373  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:31.374  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:31.895  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:31.896  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:31.897  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:32.140  5014  5040 E NotificationVibratorHelper: Error creating vibration waveform with pattern: [0]
+06-23 00:44:32.411  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:32.413  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:32.414  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:32.941  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:32.942  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:32.943  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:33.464  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:33.465  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:33.466  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:33.888  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:33.944  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:33.981  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:33.982  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:33.983  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:34.330 28594 28594 E dex2oat64: Dex checksum mismatch while verifying profile dex location /system/framework/framework.jar (checksum=2842850069, profile checksum=4106030695
+06-23 00:44:34.401 28595 28595 E dex2oat64: Dex checksum mismatch while verifying profile dex location /system/framework/framework.jar (checksum=2842850069, profile checksum=4106030695
+06-23 00:44:34.491  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:34.491  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:34.900 28631 28631 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-23 00:44:34.905 28631 28631 I AndroidRuntime: Using default boot image
+06-23 00:44:34.905 28631 28631 I AndroidRuntime: Leaving lock profiling enabled
+06-23 00:44:34.913 28631 28631 W app_process: ART APEX data files are untrusted.
+06-23 00:44:34.913 28631 28631 I app_process: Core platform API reporting enabled, enforcing=false
+06-23 00:44:34.916 28631 28631 E app_process: Error reading named image component header for /system/framework/boot.art, error: Unable to open file "/system/framework/arm64/boot-framework.art" for reading image header
+06-23 00:44:34.980 28642 28642 W dex2oat64: Mismatch between dex2oat instruction set features to use (ISA: Arm64 Feature string: a53,crc,-lse,-fp16,-dotprod,-sve) and those from CPP defines (ISA: Arm64 Feature string: -a53,-crc,-lse,-fp16,-dotprod,-sve) for the command line:
+06-23 00:44:34.980 28642 28642 W dex2oat64: /apex/com.android.art/bin/dex2oat64 --runtime-arg -Xbootclasspath:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --runtime-arg -Xbootclasspath-locations:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --boot-image=/system/framework/boot.art!/apex/com.android.art/etc/boot-image.prof --dex-file=/system/framework/framework.jar --dex-location=/system/framework/framework.jar --dex-file=/system/framework/framework-graphics.jar --dex-location=/system/framework/framework-graphics.jar --dex-file=/system/framework/ext.jar --dex-location=/system/framework/ext.jar --dex-file=/system/framework/telephony-common.jar --dex-location=/system/framework/telephony-common.jar --dex-file=/system/framework/voip-common.jar --dex-location=/system/framework/voip-common.jar --dex-file=/system/framework/ims-common.jar --dex-location=/system/framework/ims-common.jar --dex-file=/apex/com.android.i18n/javalib/core-icu4j.jar --dex-location=/apex/com.android.i18n/javalib/core-icu4j.jar --image-fd=6 --output-vdex-fd=7 --oat-fd=8 --oat-location=/system/framework/arm64/boot.oat --single-image --image-format=uncompressed --compiler-filter=verify --profile-file=/system/etc/boot-image.prof --avoid-storing-invocation --instruction-set=arm64 --instruction-set-features=runtime --runtime-arg -Xms64m --runtime-arg -Xmx64m --compiler-filter=quicken --dirty-image-objects=/system/etc/dirty-image-objects -j8 --cpu-set=0,1,2,3,4,5,6,7 --instruction-set-variant=cortex-a53 --instruction-set-features=default
+06-23 00:44:34.997  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:34.998  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:34.998  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:35.001 28642 28642 I dex2oat64: /apex/com.android.art/bin/dex2oat64 --runtime-arg -Xbootclasspath:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --runtime-arg -Xbootclasspath-locations:/apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar --boot-image=/system/framework/boot.art!/apex/com.android.art/etc/boot-image.prof --dex-file=/system/framework/framework.jar --dex-location=/system/framework/framework.jar --dex-file=/system/framework/framework-graphics.jar --dex-location=/system/framework/framework-graphics.jar --dex-file=/system/framework/ext.jar --dex-location=/system/framework/ext.jar --dex-file=/system/framework/telephony-common.jar --dex-location=/system/framework/telephony-common.jar --dex-file=/system/framework/voip-common.jar --dex-location=/system/framework/voip-common.jar --dex-file=/system/framework/ims-common.jar --dex-location=/system/framework/ims-common.jar --dex-file=/apex/com.android.i18n/javalib/core-icu4j.jar --dex-location=/apex/com.android.i18n/javalib/core-icu4j.jar --image-fd=6 --output-vdex-fd=7 --oat-fd=8 --oat-location=/system/framework/arm64/boot.oat --single-image --image-format=uncompressed --compiler-filter=verify --profile-file=/system/etc/boot-image.prof --avoid-storing-invocation --instruction-set=arm64 --instruction-set-features=runtime --runtime-arg -Xms64m --runtime-arg -Xmx64m --compiler-filter=quicken --dirty-image-objects=/system/etc/dirty-image-objects -j8 --cpu-set=0,1,2,3,4,5,6,7 --instruction-set-variant=cortex-a53 --instruction-set-features=default
+06-23 00:44:35.003 28642 28642 I dex2oat64: setting boot class path to /apex/com.android.art/javalib/core-oj.jar:/apex/com.android.art/javalib/core-libart.jar:/apex/com.android.art/javalib/okhttp.jar:/apex/com.android.art/javalib/bouncycastle.jar:/apex/com.android.art/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/framework-graphics.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/apex/com.android.i18n/javalib/core-icu4j.jar
+06-23 00:44:35.500  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:35.500  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:35.500  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:36.012  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:36.012  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:36.012  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:36.548  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:36.548  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:36.548  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:36.956  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:37.005 28594 28594 I dex2oat64: Explicit concurrent copying GC freed 59901(9948KB) AllocSpace objects, 1(16KB) LOS objects, 31% free, 13MB/19MB, paused 21us,15us total 92.877ms
+06-23 00:44:37.012  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:37.070  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:37.070  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:37.070  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:37.156 28594 28594 I dex2oat64: Explicit concurrent copying GC freed 65866(11MB) AllocSpace objects, 0(0B) LOS objects, 49% free, 1866KB/3733KB, paused 10us,12us total 14.635ms
+06-23 00:44:37.186 28595 28595 I dex2oat64: Explicit concurrent copying GC freed 59933(9916KB) AllocSpace objects, 1(16KB) LOS objects, 31% free, 13MB/19MB, paused 18us,16us total 87.347ms
+06-23 00:44:37.275 28594 28594 I dex2oat64: dex2oat took 7.946s (12.662s cpu) (threads: 8) arena alloc=0B (0B) java alloc=1866KB (1911560B) native alloc=9128KB (9347680B) free=100MB (105616832B)
+06-23 00:44:37.328 28595 28595 I dex2oat64: Explicit concurrent copying GC freed 65866(11MB) AllocSpace objects, 0(0B) LOS objects, 49% free, 1866KB/3733KB, paused 10us,8us total 14.602ms
+06-23 00:44:37.385 28587 28587 D app_process: Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-23 00:44:37.386 28587 28587 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt70l.dat
+06-23 00:44:37.395 28587 28587 W ziparchive: Unable to open '/data/local/tmp/scrcpy-server.dm': No such file or directory
+06-23 00:44:37.448 28595 28595 I dex2oat64: dex2oat took 8.119s (13.317s cpu) (threads: 8) arena alloc=0B (0B) java alloc=1866KB (1911560B) native alloc=8992KB (9208176B) free=100MB (105604720B)
+06-23 00:44:37.469 28587 28587 D AndroidRuntime: Calling main entry com.genymobile.scrcpy.CleanUp
+06-23 00:44:37.471 28587 28587 I scrcpy  : Cleaning up
+06-23 00:44:37.480 28587 28587 I scrcpy  : Restoring normal power mode
+06-23 00:44:37.483  4684  4684 D SurfaceFlinger: Setting power mode 2 on display 4633128631561747585
+06-23 00:44:37.484 28587 28587 D AndroidRuntime: Shutting down VM
+06-23 00:44:37.555 28588 28588 D app_process: Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-23 00:44:37.555 28588 28588 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt70l.dat
+06-23 00:44:37.563 28588 28588 W System  : ClassLoader referenced unknown path: /data/local/tmp/scrcpy-server.jar
+06-23 00:44:37.566 28588 28588 E appproc : ERROR: could not find class 'com.genymobile.scrcpy.CleanUp'
+06-23 00:44:37.566 28588 28588 F app_process: thread.cc:2468] No pending exception expected: java.lang.ClassNotFoundException: com.genymobile.scrcpy.CleanUp
+06-23 00:44:37.566 28588 28588 F app_process: thread.cc:2468] (Throwable with empty stack trace)
+06-23 00:44:37.566 28588 28588 F app_process: thread.cc:2468] 
+06-23 00:44:37.574  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:37.574  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:37.575  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] Runtime aborting...
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] All threads:
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] DALVIK THREADS (12):
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "main" prio=5 tid=1 Runnable
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=0 ucsCount=0 flags=0 obj=0x12c05518 self=0x75c843abe0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28588 nice=0 cgrp=default sched=0/0 handle=0x77055a74f8
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=R schedstat=( 211059306 2251772 55 ) utm=12 stm=8 core=7 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x7fdff29000-0x7fdff2b000 stackSize=8188KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes= "abort lock" "mutator lock"(shared held)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 0000000000570ec4  /apex/com.android.art/lib64/libart.so (art::DumpNativeStack(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, int, BacktraceMap*, char const*, art::ArtMethod*, void*, bool)+148) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 0000000000675a24  /apex/com.android.art/lib64/libart.so (art::Thread::DumpStack(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, bool, BacktraceMap*, bool) const+340) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 000000000069310c  /apex/com.android.art/lib64/libart.so (art::DumpCheckpoint::Run(art::Thread*)+908) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 000000000068ccac  /apex/com.android.art/lib64/libart.so (art::ThreadList::RunCheckpoint(art::Closure*, art::Closure*)+508) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #04 pc 000000000068bf54  /apex/com.android.art/lib64/libart.so (art::ThreadList::Dump(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, bool)+1796) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #05 pc 0000000000641644  /apex/com.android.art/lib64/libart.so (art::AbortState::Dump(std::__1::basic_ostream<char, std::__1::char_traits<char> >&) const+212) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #06 pc 000000000062bdc0  /apex/com.android.art/lib64/libart.so (art::Runtime::Abort(char const*)+1440) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #07 pc 0000000000017560  /system/lib64/libbase.so (android::base::SetAborter(std::__1::function<void (char const*)>&&)::$_3::__invoke(char const*)+80) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #08 pc 0000000000016a84  /system/lib64/libbase.so (android::base::LogMessage::~LogMessage()+356) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #09 pc 000000000067ac84  /apex/com.android.art/lib64/libart.so (art::Thread::AssertNoPendingException() const+1588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #10 pc 00000000002a5660  /apex/com.android.art/lib64/libart.so (art::ClassLinker::FindClass(art::Thread*, char const*, art::Handle<art::mirror::ClassLoader>)+64) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #11 pc 0000000000470f08  /apex/com.android.art/lib64/libart.so (art::JNI<false>::FindClass(_JNIEnv*, char const*)+1000) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #12 pc 00000000000c4f54  /system/lib64/libandroid_runtime.so (jniRegisterNativeMethods(_JNIEnv*, char const*, JNINativeMethod const*, int)+68) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #13 pc 00000000000c4ea8  /system/lib64/libandroid_runtime.so (android::register_com_android_internal_os_RuntimeInit(_JNIEnv*)+104) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #14 pc 00000000000c9370  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::startReg(_JNIEnv*)+64) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #15 pc 00000000000c906c  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)+508) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #16 pc 0000000000002560  /system/bin/app_process64 (main+1280) (BuildId: d73f2fec3cc1b304c3da2dc971816ba5)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #17 pc 000000000004b730  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+96) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "Jit thread pool worker thread 0" prio=5 tid=2 Native
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c40030 self=0x75c84436f0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28729 nice=9 cgrp=default sched=0/0 handle=0x744a7c0cb0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=S schedstat=( 193923 0 3 ) utm=0 stm=0 core=5 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x744a6c1000-0x744a6c3000 stackSize=1023KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 0000000000694b78  /apex/com.android.art/lib64/libart.so (art::ThreadPool::GetTask(art::Thread*)+120) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 0000000000693f10  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Run()+80) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #04 pc 00000000006939cc  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Callback(void*)+172) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #05 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #06 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "Runtime worker thread 0" prio=5 tid=3 Native (still starting up)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x0 self=0x75c8441b20
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28730 nice=0 cgrp=default sched=0/0 handle=0x76fa5ffcb0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=S schedstat=( 120732 0 6 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x76fa5f0000-0x76fa5f2000 stackSize=63KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 0000000000694b78  /apex/com.android.art/lib64/libart.so (art::ThreadPool::GetTask(art::Thread*)+120) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 0000000000693f10  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Run()+80) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #04 pc 00000000006939cc  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Callback(void*)+172) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #05 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #06 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "Runtime worker thread 3" prio=5 tid=4 Native (still starting up)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x0 self=0x75c84452c0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28733 nice=0 cgrp=default sched=0/0 handle=0x76fa301cb0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=S schedstat=( 111192 21345 4 ) utm=0 stm=0 core=7 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x76fa2f2000-0x76fa2f4000 stackSize=63KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 0000000000694b78  /apex/com.android.art/lib64/libart.so (art::ThreadPool::GetTask(art::Thread*)+120) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 0000000000693f10  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Run()+80) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #04 pc 00000000006939cc  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Callback(void*)+172) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #05 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #06 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "Runtime worker thread 1" prio=5 tid=5 Native (still starting up)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x0 self=0x75c843ff50
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28731 nice=0 cgrp=default sched=0/0 handle=0x76fa3f5cb0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=S schedstat=( 279153 31539 6 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x76fa3e6000-0x76fa3e8000 stackSize=63KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 0000000000694b78  /apex/com.android.art/lib64/libart.so (art::ThreadPool::GetTask(art::Thread*)+120) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 0000000000693f10  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Run()+80) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #04 pc 00000000006939cc  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Callback(void*)+172) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #05 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #06 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "Runtime worker thread 2" prio=5 tid=6 Native (still starting up)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x0 self=0x75c844a630
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28732 nice=0 cgrp=default sched=0/0 handle=0x76fa317cb0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=S schedstat=( 207579 0 13 ) utm=0 stm=0 core=5 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x76fa308000-0x76fa30a000 stackSize=63KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 0000000000694b78  /apex/com.android.art/lib64/libart.so (art::ThreadPool::GetTask(art::Thread*)+120) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 0000000000693f10  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Run()+80) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #04 pc 00000000006939cc  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Callback(void*)+172) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #05 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #06 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "Signal Catcher" prio=5 tid=7 WaitingInMainSignalCatcherLoop
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c80020 self=0x75c8448a60
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28734 nice=0 cgrp=default sched=0/0 handle=0x74477fbcb0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=S schedstat=( 137231 0 2 ) utm=0 stm=0 core=7 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x7447704000-0x7447706000 stackSize=991KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 00000000000af048  /apex/com.android.runtime/lib64/bionic/libc.so (__rt_sigtimedwait+8) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 0000000000064498  /apex/com.android.runtime/lib64/bionic/libc.so (sigwait64+88) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 000000000065211c  /apex/com.android.art/lib64/libart.so (art::SignalCatcher::WaitForSignal(art::Thread*, art::SignalSet&)+364) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 0000000000650e08  /apex/com.android.art/lib64/libart.so (art::SignalCatcher::Run(void*)+264) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #04 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #05 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "perfetto_hprof_listener" prio=5 tid=8 Native (still starting up)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x0 self=0x75c8446e90
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28735 nice=0 cgrp=default sched=0/0 handle=0x743cd61cb0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=S schedstat=( 141461 0 3 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x743cc6a000-0x743cc6c000 stackSize=991KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 00000000000ae364  /apex/com.android.runtime/lib64/bionic/libc.so (read+4) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 000000000001dee4  /apex/com.android.art/lib64/libperfetto_hprof.so (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, ArtPlugin_Initialize::$_34> >(void*)+260) (BuildId: 8e96e2c8dad235e76be2c9370bf6b47c)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "HeapTaskDaemon" prio=5 tid=9 WaitingForTaskProcessor
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c06368 self=0x75c844c200
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28736 nice=0 cgrp=default sched=0/0 handle=0x743bc63cb0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=S schedstat=( 125578 0 5 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x743bb60000-0x743bb62000 stackSize=1039KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 00000000003c2c14  /apex/com.android.art/lib64/libart.so (art::gc::TaskProcessor::GetTask(art::Thread*)+468) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 00000000003c34ec  /apex/com.android.art/lib64/libart.so (art::gc::TaskProcessor::RunAllTasks(art::Thread*)+92) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at dalvik.system.VMRuntime.runHeapTasks(Native method)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Daemons$HeapTaskDaemon.runInternal(Daemons.java:609)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Daemons$Daemon.run(Daemons.java:140)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "ReferenceQueueDaemon" prio=5 tid=10 Waiting
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c063f8 self=0x75c844ddd0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28737 nice=0 cgrp=default sched=0/0 handle=0x743ab59cb0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=S schedstat=( 298077 0 7 ) utm=0 stm=0 core=7 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x743aa56000-0x743aa58000 stackSize=1039KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 000000000056c25c  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, long, int, bool, art::ThreadState)+588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 000000000056da28  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, art::ObjPtr<art::mirror::Object>, long, int, bool, art::ThreadState)+296) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Object.wait(Native method)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   - waiting on <0x0517dd2e> (a java.lang.Class<java.lang.ref.ReferenceQueue>)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Object.wait(Object.java:442)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Object.wait(Object.java:568)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Daemons$ReferenceQueueDaemon.runInternal(Daemons.java:232)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   - locked <0x0517dd2e> (a java.lang.Class<java.lang.ref.ReferenceQueue>)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Daemons$Daemon.run(Daemons.java:140)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "FinalizerDaemon" prio=5 tid=11 Waiting
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c06488 self=0x75c844f9a0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28738 nice=0 cgrp=default sched=0/0 handle=0x743aa4fcb0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=S schedstat=( 147461 0 3 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x743a94c000-0x743a94e000 stackSize=1039KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 000000000056c25c  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, long, int, bool, art::ThreadState)+588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 000000000056da28  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, art::ObjPtr<art::mirror::Object>, long, int, bool, art::ThreadState)+296) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Object.wait(Native method)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   - waiting on <0x002160cf> (a java.lang.Object)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Object.wait(Object.java:442)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:203)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   - locked <0x002160cf> (a java.lang.Object)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:224)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Daemons$FinalizerDaemon.runInternal(Daemons.java:300)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Daemons$Daemon.run(Daemons.java:140)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "FinalizerWatchdogDaemon" prio=5 tid=12 Waiting
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c06548 self=0x75c8451570
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28740 nice=0 cgrp=default sched=0/0 handle=0x7438945cb0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=S schedstat=( 125538 0 3 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x7438842000-0x7438844000 stackSize=1039KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 000000000056c25c  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, long, int, bool, art::ThreadState)+588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 000000000056da28  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, art::ObjPtr<art::mirror::Object>, long, int, bool, art::ThreadState)+296) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Object.wait(Native method)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   - waiting on <0x08cf7a5c> (a java.lang.Daemons$FinalizerWatchdogDaemon)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Object.wait(Object.java:442)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Object.wait(Object.java:568)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Daemons$FinalizerWatchdogDaemon.sleepUntilNeeded(Daemons.java:385)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   - locked <0x08cf7a5c> (a java.lang.Daemons$FinalizerWatchdogDaemon)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Daemons$FinalizerWatchdogDaemon.runInternal(Daemons.java:365)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Daemons$Daemon.run(Daemons.java:140)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] Aborting thread:
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] "main" prio=5 tid=1 Runnable
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | group="" sCount=0 ucsCount=0 flags=0 obj=0x12c05518 self=0x75c843abe0
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | sysTid=28588 nice=0 cgrp=default sched=0/0 handle=0x77055a74f8
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | state=R schedstat=( 228542420 2251772 77 ) utm=14 stm=8 core=7 HZ=100
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | stack=0x7fdff29000-0x7fdff2b000 stackSize=8188KB
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   | held mutexes= "abort lock" "mutator lock"(shared held)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #00 pc 0000000000570ec4  /apex/com.android.art/lib64/libart.so (art::DumpNativeStack(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, int, BacktraceMap*, char const*, art::ArtMethod*, void*, bool)+148) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #01 pc 0000000000675a24  /apex/com.android.art/lib64/libart.so (art::Thread::DumpStack(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, bool, BacktraceMap*, bool) const+340) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #02 pc 0000000000641ac4  /apex/com.android.art/lib64/libart.so (art::AbortState::DumpThread(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, art::Thread*) const+68) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #03 pc 0000000000641730  /apex/com.android.art/lib64/libart.so (art::AbortState::Dump(std::__1::basic_ostream<char, std::__1::char_traits<char> >&) const+448) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #04 pc 000000000062bdc0  /apex/com.android.art/lib64/libart.so (art::Runtime::Abort(char const*)+1440) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #05 pc 0000000000017560  /system/lib64/libbase.so (android::base::SetAborter(std::__1::function<void (char const*)>&&)::$_3::__invoke(char const*)+80) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #06 pc 0000000000016a84  /system/lib64/libbase.so (android::base::LogMessage::~LogMessage()+356) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #07 pc 000000000067ac84  /apex/com.android.art/lib64/libart.so (art::Thread::AssertNoPendingException() const+1588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #08 pc 00000000002a5660  /apex/com.android.art/lib64/libart.so (art::ClassLinker::FindClass(art::Thread*, char const*, art::Handle<art::mirror::ClassLoader>)+64) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #09 pc 0000000000470f08  /apex/com.android.art/lib64/libart.so (art::JNI<false>::FindClass(_JNIEnv*, char const*)+1000) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #10 pc 00000000000c4f54  /system/lib64/libandroid_runtime.so (jniRegisterNativeMethods(_JNIEnv*, char const*, JNINativeMethod const*, int)+68) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #11 pc 00000000000c4ea8  /system/lib64/libandroid_runtime.so (android::register_com_android_internal_os_RuntimeInit(_JNIEnv*)+104) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #12 pc 00000000000c9370  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::startReg(_JNIEnv*)+64) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #13 pc 00000000000c906c  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)+508) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #14 pc 0000000000002560  /system/bin/app_process64 (main+1280) (BuildId: d73f2fec3cc1b304c3da2dc971816ba5)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   native: #15 pc 000000000004b730  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+96) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] Pending exception java.lang.ClassNotFoundException: com.genymobile.scrcpy.CleanUp
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] (Throwable with empty stack trace)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:675] 
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:683] No pending exception expected: java.lang.ClassNotFoundException: com.genymobile.scrcpy.CleanUp
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:683] (Throwable with empty stack trace)
+06-23 00:44:37.605 28588 28588 F app_process: runtime.cc:683] 
+06-23 00:44:37.605 28588 28588 F libc    : Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 28588 (main), pid 28588 (main)
+06-23 00:44:37.626 28743 28743 I crash_dump64: obtaining output fd from tombstoned, type: kDebuggerdTombstoneProto
+06-23 00:44:37.627  4612  4612 I tombstoned: received crash request for pid 28588
+06-23 00:44:37.629 28743 28743 I crash_dump64: performing dump of process 28588 (target tid = 28588)
+06-23 00:44:37.751 28743 28743 F DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+06-23 00:44:37.751 28743 28743 F DEBUG   : Build fingerprint: 'samsung/crownlte/crownlte:13/TQ3A.230901.001.B1/1149:userdebug/release-keys'
+06-23 00:44:37.751 28743 28743 F DEBUG   : Revision: '28'
+06-23 00:44:37.751 28743 28743 F DEBUG   : ABI: 'arm64'
+06-23 00:44:37.751 28743 28743 F DEBUG   : Timestamp: 2026-06-23 00:44:37.639384741+0700
+06-23 00:44:37.751 28743 28743 F DEBUG   : Process uptime: 9s
+06-23 00:44:37.751 28743 28743 F DEBUG   : Cmdline: app_process / com.genymobile.scrcpy.CleanUp AAAAAP////8CAAAA
+06-23 00:44:37.751 28743 28743 F DEBUG   : pid: 28588, tid: 28588, name: main  >>> app_process <<<
+06-23 00:44:37.751 28743 28743 F DEBUG   : uid: 2000
+06-23 00:44:37.751 28743 28743 F DEBUG   : signal 6 (SIGABRT), code -1 (SI_QUEUE), fault addr --------
+06-23 00:44:37.751 28743 28743 F DEBUG   : Abort message: 'No pending exception expected: java.lang.ClassNotFoundException: com.genymobile.scrcpy.CleanUp
+06-23 00:44:37.751 28743 28743 F DEBUG   : (Throwable with empty stack trace)'
+06-23 00:44:37.751 28743 28743 F DEBUG   :     x0  0000000000000000  x1  0000000000006fac  x2  0000000000000006  x3  0000007fe0724e50
+06-23 00:44:37.751 28743 28743 F DEBUG   :     x4  0000007705469000  x5  0000007705469000  x6  0000007705469000  x7  000000000100d4fe
+06-23 00:44:37.751 28743 28743 F DEBUG   :     x8  00000000000000f0  x9  00000076ff6bfa40  x10 0000000000000001  x11 00000076ff7018d0
+06-23 00:44:37.751 28743 28743 F DEBUG   :     x12 0000007fe0723bb0  x13 00000000000000b3  x14 0000007fe0723c60  x15 0000000000000000
+06-23 00:44:37.751 28743 28743 F DEBUG   :     x16 00000076ff770d58  x17 00000076ff74bee0  x18 00000077047f0000  x19 00000000000000ac
+06-23 00:44:37.751 28743 28743 F DEBUG   :     x20 00000000000000b2  x21 0000000000006fac  x22 0000000000006fac  x23 00000000ffffffff
+06-23 00:44:37.751 28743 28743 F DEBUG   :     x24 0000007457813000  x25 0000000000000001  x26 0000007457816000  x27 0000000000000124
+06-23 00:44:37.751 28743 28743 F DEBUG   :     x28 000000000000002f  x29 0000007fe0724ed0
+06-23 00:44:37.751 28743 28743 F DEBUG   :     lr  00000076ff6f1624  sp  0000007fe0724e30  pc  00000076ff6f1654  pst 0000000000000000
+06-23 00:44:37.751 28743 28743 F DEBUG   : backtrace:
+06-23 00:44:37.751 28743 28743 F DEBUG   :       #00 pc 0000000000053654  /apex/com.android.runtime/lib64/bionic/libc.so (abort+180) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #01 pc 000000000062bd7c  /apex/com.android.art/lib64/libart.so (art::Runtime::Abort(char const*)+1372) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #02 pc 0000000000017560  /system/lib64/libbase.so (android::base::SetAborter(std::__1::function<void (char const*)>&&)::$_3::__invoke(char const*)+80) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #03 pc 0000000000016a84  /system/lib64/libbase.so (android::base::LogMessage::~LogMessage()+356) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #04 pc 000000000067ac84  /apex/com.android.art/lib64/libart.so (art::Thread::AssertNoPendingException() const+1588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #05 pc 00000000002a5660  /apex/com.android.art/lib64/libart.so (art::ClassLinker::FindClass(art::Thread*, char const*, art::Handle<art::mirror::ClassLoader>)+64) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #06 pc 0000000000470f08  /apex/com.android.art/lib64/libart.so (art::JNI<false>::FindClass(_JNIEnv*, char const*)+1000) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #07 pc 00000000000c4f54  /system/lib64/libandroid_runtime.so (jniRegisterNativeMethods(_JNIEnv*, char const*, JNINativeMethod const*, int)+68) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #08 pc 00000000000c4ea8  /system/lib64/libandroid_runtime.so (android::register_com_android_internal_os_RuntimeInit(_JNIEnv*)+104) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #09 pc 00000000000c9370  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::startReg(_JNIEnv*)+64) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #10 pc 00000000000c906c  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)+508) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #11 pc 0000000000002560  /system/bin/app_process64 (main+1280) (BuildId: d73f2fec3cc1b304c3da2dc971816ba5)
+06-23 00:44:37.752 28743 28743 F DEBUG   :       #12 pc 000000000004b730  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+96) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:37.765  5014  5245 W NativeCrashListener: Couldn't find ProcessRecord for pid 28588
+06-23 00:44:37.765 28743 28743 E crash_dump64: AM data write failed: Broken pipe
+06-23 00:44:37.767  4612  4612 E tombstoned: Tombstone written to: tombstone_14
+06-23 00:44:37.764 28588 28588 W main    : type=1701 audit(0.0:1154): auid=4294967295 uid=2000 gid=2000 ses=4294967295 subj=u:r:shell:s0 exe="/system/bin/app_process64" sig=6
+06-23 00:44:37.788  5014  5083 E NativeTombstoneManager: Tombstone's UID (2000) not an app, ignoring
+06-23 00:44:37.806  5014  5083 E NativeTombstoneManager: Tombstone's UID (2000) not an app, ignoring
+06-23 00:44:38.099  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:38.101  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:38.101  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:38.638  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:38.638  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:38.639  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:39.162  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:39.163  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:39.669  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:39.671  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:39.671  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:40.028  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:40.082  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:40.129  5180  5180 D PowerNotificationWarningsGoogleImpl: onReceive: android.intent.action.BATTERY_CHANGED
+06-23 00:44:40.135  5180  5180 D BatteryInfoBroadcast: onReceive: android.intent.action.BATTERY_CHANGED isPowerSaveMode: false
+06-23 00:44:40.135  5180  5180 D BatteryDefenderNotification: isPlugged: true | isOverheated: false | defenderEnabled: false | isCharged: false
+06-23 00:44:40.136  5180  9762 D PowerUI : can't show warning due to - plugged: true status unknown: false
+06-23 00:44:40.159  5014  5049 W ProcessCpuTracker: Failed to stat(/proc/28798): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+06-23 00:44:40.159  5014  5049 W ProcessCpuTracker: Skipping unknown process pid 28798
+06-23 00:44:40.159  5014  5049 W ProcessCpuTracker: Failed to stat(/proc/28800): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+06-23 00:44:40.159  5014  5049 W ProcessCpuTracker: Skipping unknown process pid 28800
+06-23 00:44:40.159  5014  5049 W ProcessCpuTracker: Failed to stat(/proc/28801): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+06-23 00:44:40.160  5014  5049 W ProcessCpuTracker: Skipping unknown process pid 28801
+06-23 00:44:40.188  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:40.188  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:40.189  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:40.717  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:40.718  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:40.719  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:40.810 28642 28642 E dex2oat64: Dex checksum mismatch while verifying profile dex location /system/framework/framework.jar (checksum=2842850069, profile checksum=4106030695
+06-23 00:44:41.219  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:41.220  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:41.220  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:41.729  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:41.729  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:41.729  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:42.233  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:42.233  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:42.234  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:42.580 28642 28642 I dex2oat64: Explicit concurrent copying GC freed 59976(9964KB) AllocSpace objects, 1(16KB) LOS objects, 31% free, 13MB/19MB, paused 17us,12us total 64.915ms
+06-23 00:44:42.682 28642 28642 I dex2oat64: Explicit concurrent copying GC freed 65866(11MB) AllocSpace objects, 0(0B) LOS objects, 49% free, 1866KB/3733KB, paused 8us,9us total 10.714ms
+06-23 00:44:42.765  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:42.765  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:42.766  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:42.783 28642 28642 I dex2oat64: dex2oat took 7.806s (12.600s cpu) (threads: 8) arena alloc=0B (0B) java alloc=1866KB (1911560B) native alloc=9141KB (9360560B) free=100MB (105603952B)
+06-23 00:44:42.903 28631 28631 D app_process: Time zone APEX ICU file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-23 00:44:42.903 28631 28631 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt70l.dat
+06-23 00:44:42.912 28631 28631 W System  : ClassLoader referenced unknown path: /data/local/tmp/scrcpy-server.jar
+06-23 00:44:42.916 28631 28631 E appproc : ERROR: could not find class 'com.genymobile.scrcpy.Server'
+06-23 00:44:42.917 28631 28631 F app_process: thread.cc:2468] No pending exception expected: java.lang.ClassNotFoundException: com.genymobile.scrcpy.Server
+06-23 00:44:42.917 28631 28631 F app_process: thread.cc:2468] (Throwable with empty stack trace)
+06-23 00:44:42.917 28631 28631 F app_process: thread.cc:2468] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] Runtime aborting...
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] All threads:
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] DALVIK THREADS (12):
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "main" prio=5 tid=1 Runnable
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=0 ucsCount=0 flags=0 obj=0x12c05518 self=0x7945c27380
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28631 nice=0 cgrp=default sched=0/0 handle=0x7a92d044f8
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=R schedstat=( 229221538 65595112 110 ) utm=12 stm=10 core=6 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x7fe26bb000-0x7fe26bd000 stackSize=8188KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes= "abort lock" "mutator lock"(shared held)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 0000000000570ec4  /apex/com.android.art/lib64/libart.so (art::DumpNativeStack(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, int, BacktraceMap*, char const*, art::ArtMethod*, void*, bool)+148) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 0000000000675a24  /apex/com.android.art/lib64/libart.so (art::Thread::DumpStack(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, bool, BacktraceMap*, bool) const+340) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 000000000069310c  /apex/com.android.art/lib64/libart.so (art::DumpCheckpoint::Run(art::Thread*)+908) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 000000000068ccac  /apex/com.android.art/lib64/libart.so (art::ThreadList::RunCheckpoint(art::Closure*, art::Closure*)+508) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #04 pc 000000000068bf54  /apex/com.android.art/lib64/libart.so (art::ThreadList::Dump(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, bool)+1796) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #05 pc 0000000000641644  /apex/com.android.art/lib64/libart.so (art::AbortState::Dump(std::__1::basic_ostream<char, std::__1::char_traits<char> >&) const+212) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #06 pc 000000000062bdc0  /apex/com.android.art/lib64/libart.so (art::Runtime::Abort(char const*)+1440) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #07 pc 0000000000017560  /system/lib64/libbase.so (android::base::SetAborter(std::__1::function<void (char const*)>&&)::$_3::__invoke(char const*)+80) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #08 pc 0000000000016a84  /system/lib64/libbase.so (android::base::LogMessage::~LogMessage()+356) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #09 pc 000000000067ac84  /apex/com.android.art/lib64/libart.so (art::Thread::AssertNoPendingException() const+1588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #10 pc 00000000002a5660  /apex/com.android.art/lib64/libart.so (art::ClassLinker::FindClass(art::Thread*, char const*, art::Handle<art::mirror::ClassLoader>)+64) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #11 pc 0000000000470f08  /apex/com.android.art/lib64/libart.so (art::JNI<false>::FindClass(_JNIEnv*, char const*)+1000) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #12 pc 00000000000c4f54  /system/lib64/libandroid_runtime.so (jniRegisterNativeMethods(_JNIEnv*, char const*, JNINativeMethod const*, int)+68) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #13 pc 00000000000c4ea8  /system/lib64/libandroid_runtime.so (android::register_com_android_internal_os_RuntimeInit(_JNIEnv*)+104) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #14 pc 00000000000c9370  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::startReg(_JNIEnv*)+64) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #15 pc 00000000000c906c  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)+508) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #16 pc 0000000000002560  /system/bin/app_process64 (main+1280) (BuildId: d73f2fec3cc1b304c3da2dc971816ba5)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #17 pc 000000000004b730  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+96) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "Jit thread pool worker thread 0" prio=5 tid=2 Native
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c40030 self=0x7945c2c6f0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28865 nice=9 cgrp=default sched=0/0 handle=0x77c2dfbcb0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=S schedstat=( 210999 22808 3 ) utm=0 stm=0 core=6 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x77c2cfc000-0x77c2cfe000 stackSize=1023KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 0000000000694b78  /apex/com.android.art/lib64/libart.so (art::ThreadPool::GetTask(art::Thread*)+120) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 0000000000693f10  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Run()+80) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #04 pc 00000000006939cc  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Callback(void*)+172) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #05 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #06 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "Runtime worker thread 0" prio=5 tid=3 Native (still starting up)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x0 self=0x7945c2e2c0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28866 nice=0 cgrp=default sched=0/0 handle=0x7a8a0becb0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=S schedstat=( 150654 20884 4 ) utm=0 stm=0 core=5 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x7a8a0af000-0x7a8a0b1000 stackSize=63KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 0000000000694b78  /apex/com.android.art/lib64/libart.so (art::ThreadPool::GetTask(art::Thread*)+120) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 0000000000693f10  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Run()+80) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #04 pc 00000000006939cc  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Callback(void*)+172) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #05 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #06 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "Runtime worker thread 1" prio=5 tid=4 Native (still starting up)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x0 self=0x7945c28f50
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28867 nice=0 cgrp=default sched=0/0 handle=0x7a882d0cb0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=S schedstat=( 145731 117307 2 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x7a882c1000-0x7a882c3000 stackSize=63KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 0000000000694b78  /apex/com.android.art/lib64/libart.so (art::ThreadPool::GetTask(art::Thread*)+120) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 0000000000693f10  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Run()+80) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #04 pc 00000000006939cc  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Callback(void*)+172) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #05 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #06 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "Runtime worker thread 2" prio=5 tid=5 Native (still starting up)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x0 self=0x7945c2ab20
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28868 nice=0 cgrp=default sched=0/0 handle=0x7a880e8cb0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=S schedstat=( 580691 0 4 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x7a880d9000-0x7a880db000 stackSize=63KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 0000000000694b78  /apex/com.android.art/lib64/libart.so (art::ThreadPool::GetTask(art::Thread*)+120) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 0000000000693f10  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Run()+80) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #04 pc 00000000006939cc  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Callback(void*)+172) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #05 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #06 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "Runtime worker thread 3" prio=5 tid=6 Native (still starting up)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x0 self=0x7945c35200
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28869 nice=0 cgrp=default sched=0/0 handle=0x7a880c6cb0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=S schedstat=( 704384 0 6 ) utm=0 stm=0 core=7 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x7a880b7000-0x7a880b9000 stackSize=63KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 0000000000694b78  /apex/com.android.art/lib64/libart.so (art::ThreadPool::GetTask(art::Thread*)+120) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 0000000000693f10  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Run()+80) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #04 pc 00000000006939cc  /apex/com.android.art/lib64/libart.so (art::ThreadPoolWorker::Callback(void*)+172) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #05 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #06 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "Signal Catcher" prio=5 tid=7 WaitingInMainSignalCatcherLoop
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c80020 self=0x7945c2fe90
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28870 nice=0 cgrp=default sched=0/0 handle=0x77bb3fbcb0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=S schedstat=( 239885 0 1 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x77bb304000-0x77bb306000 stackSize=991KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 00000000000af048  /apex/com.android.runtime/lib64/bionic/libc.so (__rt_sigtimedwait+8) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 0000000000064498  /apex/com.android.runtime/lib64/bionic/libc.so (sigwait64+88) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 000000000065211c  /apex/com.android.art/lib64/libart.so (art::SignalCatcher::WaitForSignal(art::Thread*, art::SignalSet&)+364) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 0000000000650e08  /apex/com.android.art/lib64/libart.so (art::SignalCatcher::Run(void*)+264) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #04 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #05 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "ReferenceQueueDaemon" prio=5 tid=8 Waiting
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c063f8 self=0x7945c31a60
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28873 nice=0 cgrp=default sched=0/0 handle=0x77b8041cb0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=S schedstat=( 727769 0 5 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x77b7f3e000-0x77b7f40000 stackSize=1039KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 000000000056c25c  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, long, int, bool, art::ThreadState)+588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 000000000056da28  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, art::ObjPtr<art::mirror::Object>, long, int, bool, art::ThreadState)+296) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Object.wait(Native method)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   - waiting on <0x0517dd33> (a java.lang.Class<java.lang.ref.ReferenceQueue>)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Object.wait(Object.java:442)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Object.wait(Object.java:568)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Daemons$ReferenceQueueDaemon.runInternal(Daemons.java:232)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   - locked <0x0517dd33> (a java.lang.Class<java.lang.ref.ReferenceQueue>)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Daemons$Daemon.run(Daemons.java:140)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "perfetto_hprof_listener" prio=5 tid=9 Native (still starting up)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x0 self=0x7945c3a570
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28871 nice=0 cgrp=default sched=0/0 handle=0x77b8249cb0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=S schedstat=( 546539 19154 7 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x77b8152000-0x77b8154000 stackSize=991KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 00000000000ae364  /apex/com.android.runtime/lib64/bionic/libc.so (read+4) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 000000000001dee4  /apex/com.android.art/lib64/libperfetto_hprof.so (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, ArtPlugin_Initialize::$_34> >(void*)+260) (BuildId: 8e96e2c8dad235e76be2c9370bf6b47c)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 00000000000c4310  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+208) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 0000000000054e80  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "FinalizerDaemon" prio=5 tid=10 Waiting
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c06488 self=0x7945c389a0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28874 nice=0 cgrp=default sched=0/0 handle=0x77b7f37cb0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=S schedstat=( 537462 0 4 ) utm=0 stm=0 core=6 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x77b7e34000-0x77b7e36000 stackSize=1039KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 000000000056c25c  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, long, int, bool, art::ThreadState)+588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 000000000056da28  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, art::ObjPtr<art::mirror::Object>, long, int, bool, art::ThreadState)+296) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Object.wait(Native method)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   - waiting on <0x0900e8f0> (a java.lang.Object)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Object.wait(Object.java:442)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:203)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   - locked <0x0900e8f0> (a java.lang.Object)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:224)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Daemons$FinalizerDaemon.runInternal(Daemons.java:300)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Daemons$Daemon.run(Daemons.java:140)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "HeapTaskDaemon" prio=5 tid=11 WaitingForTaskProcessor
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c06368 self=0x7945c33630
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28872 nice=0 cgrp=default sched=0/0 handle=0x77b814bcb0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=S schedstat=( 665960 6308 7 ) utm=0 stm=0 core=4 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x77b8048000-0x77b804a000 stackSize=1039KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 00000000003c2c14  /apex/com.android.art/lib64/libart.so (art::gc::TaskProcessor::GetTask(art::Thread*)+468) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 00000000003c34ec  /apex/com.android.art/lib64/libart.so (art::gc::TaskProcessor::RunAllTasks(art::Thread*)+92) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at dalvik.system.VMRuntime.runHeapTasks(Native method)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Daemons$HeapTaskDaemon.runInternal(Daemons.java:609)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Daemons$Daemon.run(Daemons.java:140)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "FinalizerWatchdogDaemon" prio=5 tid=12 Waiting
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=1 ucsCount=0 flags=1 obj=0x12c06548 self=0x7945c36dd0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28875 nice=0 cgrp=default sched=0/0 handle=0x77b3e2dcb0
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=S schedstat=( 284269 0 7 ) utm=0 stm=0 core=5 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x77b3d2a000-0x77b3d2c000 stackSize=1039KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes=
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 000000000004f99c  /apex/com.android.runtime/lib64/bionic/libc.so (syscall+28) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 00000000002833dc  /apex/com.android.art/lib64/libart.so (art::ConditionVariable::WaitHoldingLocks(art::Thread*)+140) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 000000000056c25c  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, long, int, bool, art::ThreadState)+588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 000000000056da28  /apex/com.android.art/lib64/libart.so (art::Monitor::Wait(art::Thread*, art::ObjPtr<art::mirror::Object>, long, int, bool, art::ThreadState)+296) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Object.wait(Native method)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   - waiting on <0x05fc7e69> (a java.lang.Daemons$FinalizerWatchdogDaemon)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Object.wait(Object.java:442)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Object.wait(Object.java:568)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Daemons$FinalizerWatchdogDaemon.sleepUntilNeeded(Daemons.java:385)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   - locked <0x05fc7e69> (a java.lang.Daemons$FinalizerWatchdogDaemon)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Daemons$FinalizerWatchdogDaemon.runInternal(Daemons.java:365)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Daemons$Daemon.run(Daemons.java:140)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   at java.lang.Thread.run(Thread.java:1012)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] Aborting thread:
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] "main" prio=5 tid=1 Runnable
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | group="" sCount=0 ucsCount=0 flags=0 obj=0x12c05518 self=0x7945c27380
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | sysTid=28631 nice=0 cgrp=default sched=0/0 handle=0x7a92d044f8
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | state=R schedstat=( 247931653 65595112 132 ) utm=14 stm=10 core=5 HZ=100
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | stack=0x7fe26bb000-0x7fe26bd000 stackSize=8188KB
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   | held mutexes= "abort lock" "mutator lock"(shared held)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #00 pc 0000000000570ec4  /apex/com.android.art/lib64/libart.so (art::DumpNativeStack(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, int, BacktraceMap*, char const*, art::ArtMethod*, void*, bool)+148) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #01 pc 0000000000675a24  /apex/com.android.art/lib64/libart.so (art::Thread::DumpStack(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, bool, BacktraceMap*, bool) const+340) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #02 pc 0000000000641ac4  /apex/com.android.art/lib64/libart.so (art::AbortState::DumpThread(std::__1::basic_ostream<char, std::__1::char_traits<char> >&, art::Thread*) const+68) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #03 pc 0000000000641730  /apex/com.android.art/lib64/libart.so (art::AbortState::Dump(std::__1::basic_ostream<char, std::__1::char_traits<char> >&) const+448) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #04 pc 000000000062bdc0  /apex/com.android.art/lib64/libart.so (art::Runtime::Abort(char const*)+1440) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #05 pc 0000000000017560  /system/lib64/libbase.so (android::base::SetAborter(std::__1::function<void (char const*)>&&)::$_3::__invoke(char const*)+80) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #06 pc 0000000000016a84  /system/lib64/libbase.so (android::base::LogMessage::~LogMessage()+356) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #07 pc 000000000067ac84  /apex/com.android.art/lib64/libart.so (art::Thread::AssertNoPendingException() const+1588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #08 pc 00000000002a5660  /apex/com.android.art/lib64/libart.so (art::ClassLinker::FindClass(art::Thread*, char const*, art::Handle<art::mirror::ClassLoader>)+64) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #09 pc 0000000000470f08  /apex/com.android.art/lib64/libart.so (art::JNI<false>::FindClass(_JNIEnv*, char const*)+1000) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #10 pc 00000000000c4f54  /system/lib64/libandroid_runtime.so (jniRegisterNativeMethods(_JNIEnv*, char const*, JNINativeMethod const*, int)+68) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #11 pc 00000000000c4ea8  /system/lib64/libandroid_runtime.so (android::register_com_android_internal_os_RuntimeInit(_JNIEnv*)+104) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #12 pc 00000000000c9370  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::startReg(_JNIEnv*)+64) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #13 pc 00000000000c906c  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)+508) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #14 pc 0000000000002560  /system/bin/app_process64 (main+1280) (BuildId: d73f2fec3cc1b304c3da2dc971816ba5)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   native: #15 pc 000000000004b730  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+96) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675]   (no managed stack frames)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] Pending exception java.lang.ClassNotFoundException: com.genymobile.scrcpy.Server
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] (Throwable with empty stack trace)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:675] 
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:683] No pending exception expected: java.lang.ClassNotFoundException: com.genymobile.scrcpy.Server
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:683] (Throwable with empty stack trace)
+06-23 00:44:42.954 28631 28631 F app_process: runtime.cc:683] 
+06-23 00:44:42.954 28631 28631 F libc    : Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 28631 (main), pid 28631 (main)
+06-23 00:44:42.974 28878 28878 I crash_dump64: obtaining output fd from tombstoned, type: kDebuggerdTombstoneProto
+06-23 00:44:42.975  4612  4612 I tombstoned: received crash request for pid 28631
+06-23 00:44:42.977 28878 28878 I crash_dump64: performing dump of process 28631 (target tid = 28631)
+06-23 00:44:43.104  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:43.104 28878 28878 F DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+06-23 00:44:43.104 28878 28878 F DEBUG   : Build fingerprint: 'samsung/crownlte/crownlte:13/TQ3A.230901.001.B1/1149:userdebug/release-keys'
+06-23 00:44:43.104 28878 28878 F DEBUG   : Revision: '28'
+06-23 00:44:43.104 28878 28878 F DEBUG   : ABI: 'arm64'
+06-23 00:44:43.104 28878 28878 F DEBUG   : Timestamp: 2026-06-23 00:44:42.986715391+0700
+06-23 00:44:43.104 28878 28878 F DEBUG   : Process uptime: 10s
+06-23 00:44:43.104 28878 28878 F DEBUG   : Cmdline: app_process / com.genymobile.scrcpy.Server 1.19-ws6 web ERROR 8886 true
+06-23 00:44:43.104 28878 28878 F DEBUG   : pid: 28631, tid: 28631, name: main  >>> app_process <<<
+06-23 00:44:43.104 28878 28878 F DEBUG   : uid: 2000
+06-23 00:44:43.104 28878 28878 F DEBUG   : signal 6 (SIGABRT), code -1 (SI_QUEUE), fault addr --------
+06-23 00:44:43.104 28878 28878 F DEBUG   : Abort message: 'No pending exception expected: java.lang.ClassNotFoundException: com.genymobile.scrcpy.Server
+06-23 00:44:43.104 28878 28878 F DEBUG   : (Throwable with empty stack trace)'
+06-23 00:44:43.104 28878 28878 F DEBUG   :     x0  0000000000000000  x1  0000000000006fd7  x2  0000000000000006  x3  0000007fe2eb6d50
+06-23 00:44:43.104 28878 28878 F DEBUG   :     x4  0000007a92bc6000  x5  0000007a92bc6000  x6  0000007a92bc6000  x7  000000000100df70
+06-23 00:44:43.105 28878 28878 F DEBUG   :     x8  00000000000000f0  x9  0000007a76565a40  x10 0000000000000001  x11 0000007a765a78d0
+06-23 00:44:43.105 28878 28878 F DEBUG   :     x12 0000007fe2eb5ab0  x13 00000000000000b2  x14 0000007fe2eb5b60  x15 0000000000000000
+06-23 00:44:43.105 28878 28878 F DEBUG   :     x16 0000007a76616d58  x17 0000007a765f1ee0  x18 0000007a91d00000  x19 00000000000000ac
+06-23 00:44:43.105 28878 28878 F DEBUG   :     x20 00000000000000b2  x21 0000000000006fd7  x22 0000000000006fd7  x23 00000000ffffffff
+06-23 00:44:43.105 28878 28878 F DEBUG   :     x24 00000077d4213000  x25 0000000000000001  x26 00000077d4216000  x27 0000000000000124
+06-23 00:44:43.105 28878 28878 F DEBUG   :     x28 000000000000002f  x29 0000007fe2eb6dd0
+06-23 00:44:43.105 28878 28878 F DEBUG   :     lr  0000007a76597624  sp  0000007fe2eb6d30  pc  0000007a76597654  pst 0000000000000000
+06-23 00:44:43.105 28878 28878 F DEBUG   : backtrace:
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #00 pc 0000000000053654  /apex/com.android.runtime/lib64/bionic/libc.so (abort+180) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #01 pc 000000000062bd7c  /apex/com.android.art/lib64/libart.so (art::Runtime::Abort(char const*)+1372) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #02 pc 0000000000017560  /system/lib64/libbase.so (android::base::SetAborter(std::__1::function<void (char const*)>&&)::$_3::__invoke(char const*)+80) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #03 pc 0000000000016a84  /system/lib64/libbase.so (android::base::LogMessage::~LogMessage()+356) (BuildId: 167481ebf6d9d15c317feb684fe496e7)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #04 pc 000000000067ac84  /apex/com.android.art/lib64/libart.so (art::Thread::AssertNoPendingException() const+1588) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #05 pc 00000000002a5660  /apex/com.android.art/lib64/libart.so (art::ClassLinker::FindClass(art::Thread*, char const*, art::Handle<art::mirror::ClassLoader>)+64) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #06 pc 0000000000470f08  /apex/com.android.art/lib64/libart.so (art::JNI<false>::FindClass(_JNIEnv*, char const*)+1000) (BuildId: dbc5942375f9e9be2b1aa6e1f2bd9e34)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #07 pc 00000000000c4f54  /system/lib64/libandroid_runtime.so (jniRegisterNativeMethods(_JNIEnv*, char const*, JNINativeMethod const*, int)+68) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #08 pc 00000000000c4ea8  /system/lib64/libandroid_runtime.so (android::register_com_android_internal_os_RuntimeInit(_JNIEnv*)+104) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #09 pc 00000000000c9370  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::startReg(_JNIEnv*)+64) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #10 pc 00000000000c906c  /system/lib64/libandroid_runtime.so (android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)+508) (BuildId: 2159c3a8f1e001d5276373fce4b99a1a)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #11 pc 0000000000002560  /system/bin/app_process64 (main+1280) (BuildId: d73f2fec3cc1b304c3da2dc971816ba5)
+06-23 00:44:43.105 28878 28878 F DEBUG   :       #12 pc 000000000004b730  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+96) (BuildId: 0fddeb6c7b5ad0c05f274e9706e79803)
+06-23 00:44:43.121  5014  5245 W NativeCrashListener: Couldn't find ProcessRecord for pid 28631
+06-23 00:44:43.122 28878 28878 E crash_dump64: AM data write failed: Broken pipe
+06-23 00:44:43.123  4612  4612 E tombstoned: Tombstone written to: tombstone_15
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: failed to open /data/tombstones/tombstone_15.pb
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: java.io.FileNotFoundException: open failed: ENOENT (No such file or directory)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at android.os.ParcelFileDescriptor.openInternal(ParcelFileDescriptor.java:342)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at android.os.ParcelFileDescriptor.open(ParcelFileDescriptor.java:229)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at com.android.server.os.NativeTombstoneManager.handleProtoTombstone(Unknown Source:69)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at com.android.server.os.NativeTombstoneManager.handleTombstone(Unknown Source:47)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at com.android.server.os.NativeTombstoneManager.-$$Nest$mhandleTombstone(Unknown Source:0)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at com.android.server.os.NativeTombstoneManager$TombstoneWatcher.lambda$onEvent$0(Unknown Source:11)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at com.android.server.os.NativeTombstoneManager$TombstoneWatcher.$r8$lambda$brzM_6e7cyhhJeR_ISUCuvFg3_s(Unknown Source:0)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at com.android.server.os.NativeTombstoneManager$TombstoneWatcher$$ExternalSyntheticLambda0.run(Unknown Source:4)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at android.os.Handler.handleCallback(Handler.java:942)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at android.os.Looper.loopOnce(Looper.java:201)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at android.os.Looper.loop(Looper.java:288)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at android.os.HandlerThread.run(HandlerThread.java:67)
+06-23 00:44:43.125  5014  5083 W NativeTombstoneManager: 	at com.android.server.ServiceThread.run(Unknown Source:12)
+06-23 00:44:43.120 28631 28631 W main    : type=1701 audit(0.0:1155): auid=4294967295 uid=2000 gid=2000 ses=4294967295 subj=u:r:shell:s0 exe="/system/bin/app_process64" sig=6
+06-23 00:44:43.144  5014  5083 E NativeTombstoneManager: Tombstone's UID (2000) not an app, ignoring
+06-23 00:44:43.159  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:43.316  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:43.320  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:43.321  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:43.891  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:43.892  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:44.448  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:44.449  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:44.455  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:44.992  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:44.994  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:45.000  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:45.556  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:45.557  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:45.567  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:46.085  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:46.085  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:46.086  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:46.183  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:46.243  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:46.633  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:46.634  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:46.637  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:47.168  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:47.171  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:47.173  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:47.193  5014  5040 E NotificationVibratorHelper: Error creating vibration waveform with pattern: [0]
+06-23 00:44:47.387  5014  5040 D CompatibilityInfo: mCompatibilityFlags - 4
+06-23 00:44:47.387  5014  5040 D CompatibilityInfo: applicationDensity - 720
+06-23 00:44:47.387  5014  5040 D CompatibilityInfo: applicationScale - 1.0
+06-23 00:44:47.716  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:47.717  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:47.718  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:48.249  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:48.254  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:48.256  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:48.804  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:48.805  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:49.294  4674  4674 I WifiHAL : Creating message to get link statistics; iface = 16
+06-23 00:44:49.361  4674  4674 I WifiHAL : In GetLinkStatsCommand::handleResponse
+06-23 00:44:49.377  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:49.379  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:49.381  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:49.914  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:49.916  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:49.918  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:50.325  5180  5180 D PowerNotificationWarningsGoogleImpl: onReceive: android.intent.action.BATTERY_CHANGED
+06-23 00:44:50.371  5180  5180 D BatteryInfoBroadcast: onReceive: android.intent.action.BATTERY_CHANGED isPowerSaveMode: false
+06-23 00:44:50.372  5180  5180 D BatteryDefenderNotification: isPlugged: true | isOverheated: false | defenderEnabled: false | isCharged: false
+06-23 00:44:50.373  5180 10335 D PowerUI : can't show warning due to - plugged: true status unknown: false
+06-23 00:44:50.420  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:50.420  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:50.420  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:50.963  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:50.964  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:50.964  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:51.510  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[geofencer_provider]/3728422f blocked - too fast [CONTEXT service_id=6 ]
+06-23 00:44:51.524  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.personalsafety]/1365999d blocked - too close [CONTEXT service_id=6 ]
+06-23 00:44:51.525  5690  6366 I FusedLocation: location delivery to 10111/com.google.android.gms[.crisisalerts]/6192f858 blocked - too close [CONTEXT service_id=6 ]

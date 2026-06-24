@@ -126,6 +126,35 @@ func userIDFromRemotePath(remotePath string) int {
 	return id
 }
 
+func isUserRunning(usersOut string, userID int) bool {
+	needle := fmt.Sprintf("UserInfo{%d:", userID)
+	for _, line := range strings.Split(usersOut, "\n") {
+		if strings.Contains(line, needle) && strings.Contains(line, "running") {
+			return true
+		}
+	}
+	return false
+}
+
+func ensureUserStarted(udid string, userID int) error {
+	if userID <= 0 {
+		return nil
+	}
+	out, _ := adb.CommandTimeout(10*time.Second, "-s", udid, "shell", "pm", "list", "users")
+	if isUserRunning(out, userID) {
+		return nil
+	}
+	startOut, err := adb.CommandTimeout(60*time.Second, "-s", udid, "shell", "am", "start-user", "-w", strconv.Itoa(userID))
+	if err != nil {
+		return fmt.Errorf("start user %d failed: %w; output: %s", userID, err, strings.TrimSpace(startOut))
+	}
+	out, err = adb.CommandTimeout(10*time.Second, "-s", udid, "shell", "pm", "list", "users")
+	if err != nil || !isUserRunning(out, userID) {
+		return fmt.Errorf("user %d is not running after start: %s", userID, strings.TrimSpace(out))
+	}
+	return nil
+}
+
 func mediaStoreInsertURI(udid string, userID int, uri, mimeType, relPath, uniqueFileName string) (string, error) {
 	cmd := fmt.Sprintf(
 		"inserted_out=$(content insert --user %d --uri %s --bind _display_name:s:%s --bind mime_type:s:%s --bind relative_path:s:%s); "+
@@ -225,6 +254,9 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 	// We MUST use the MediaStore Content Provider API since direct adb push or cp to /storage/emulated/{userID}/
 	// will fail with Permission Denied due to multi-user storage isolation.
 	if userID > 0 && useMediaStore {
+		if err := ensureUserStarted(udid, userID); err != nil {
+			return err
+		}
 		if err := pushMediaStoreViaExecIn(udid, tmpPath, fileName, uri, mimeType, relPath, userID); err == nil {
 			return nil
 		}
@@ -237,6 +269,9 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 	// CASE 2: Work Profile / Secondary User (userID > 0) pushing non-media files.
 	// We use the temporary copy method.
 	if userID > 0 {
+		if err := ensureUserStarted(udid, userID); err != nil {
+			return err
+		}
 		deviceTmp := fmt.Sprintf("/data/local/tmp/%d_%s", time.Now().UnixNano(), safeTmpName)
 		if _, err := adb.Command("-s", udid, "push", tmpPath, deviceTmp); err != nil {
 			return err
@@ -668,7 +703,7 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 				shouldRepairOrderNumbers = true
 			} else if strRaw, isStr := settings["tileOrderNumbers"].(string); isStr {
 				var parsed map[string]interface{}
-				if err := json.Unmarshal([]byte(strRaw), &parsed); err != nil || len(parsed) < 35 {
+				if err := json.Unmarshal([]byte(strRaw), &parsed); err != nil || len(parsed) == 0 {
 					shouldRepairOrderNumbers = true
 				}
 			} else {
@@ -686,7 +721,7 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 				shouldRepairTileOrder = true
 			} else if strRaw, isStr := settings["tileOrder"].(string); isStr {
 				var parsed []interface{}
-				if err := json.Unmarshal([]byte(strRaw), &parsed); err != nil || len(parsed) < 35 {
+				if err := json.Unmarshal([]byte(strRaw), &parsed); err != nil || len(parsed) == 0 {
 					shouldRepairTileOrder = true
 				}
 			} else {
@@ -794,18 +829,10 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 					writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": fmt.Sprintf("Invalid tileOrder JSON: %v", err)})
 					return
 				}
-				if dbDevices >= 35 && len(list) < 35 {
-					writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": fmt.Sprintf("Refusing to save tileOrder: length %d < 35 (minimum 35 required)", len(list))})
-					return
-				}
 			} else if k == "tileOrderNumbers" {
 				var obj map[string]interface{}
 				if err := json.Unmarshal([]byte(valStr), &obj); err != nil {
 					writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": fmt.Sprintf("Invalid tileOrderNumbers JSON: %v", err)})
-					return
-				}
-				if dbDevices >= 35 && len(obj) < 35 {
-					writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": fmt.Sprintf("Refusing to save tileOrderNumbers: keys length %d < 35 (minimum 35 required)", len(obj))})
 					return
 				}
 			}
@@ -822,7 +849,7 @@ func handleSettings(w http.ResponseWriter, r *http.Request) {
 
 		if incomingOrderNumbersRaw, ok := temp["tileOrderNumbers"].(string); ok {
 			var orderMap map[string]int
-			if err := json.Unmarshal([]byte(incomingOrderNumbersRaw), &orderMap); err == nil && len(orderMap) >= 35 {
+			if err := json.Unmarshal([]byte(incomingOrderNumbersRaw), &orderMap); err == nil {
 				_ = updateDeviceOrderInDB(orderMap)
 			}
 		}
@@ -911,13 +938,7 @@ func handleDeviceOrder(w http.ResponseWriter, r *http.Request) {
 
 		db, err := openDeviceAccountDB()
 		if err == nil {
-			var dbDevices int
-			_ = db.QueryRow("SELECT COUNT(*) FROM devices").Scan(&dbDevices)
 			db.Close()
-			if dbDevices >= 35 && len(req.OrderNumbers) < 35 {
-				writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Cannot downgrade orderNumbers below 35"})
-				return
-			}
 		}
 
 		if err := updateDeviceOrderInDB(req.OrderNumbers); err != nil {

@@ -95,6 +95,10 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 				}
 				return
 			}
+			if err := deviceWs.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+				log.Printf("[%s] Failed to set write deadline on device WS: %v", udid, err)
+				return
+			}
 			if err := deviceWs.WriteMessage(msgType, msg); err != nil {
 				if !isExpectedCloseError(err) {
 					log.Printf("[%s] Browser->Device write error: %v", udid, err)
@@ -115,6 +119,10 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 				if !isExpectedCloseError(err) {
 					log.Printf("[%s] Device->Browser read error: %v", udid, err)
 				}
+				return
+			}
+			if err := clientWs.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+				log.Printf("[%s] Failed to set write deadline on client WS: %v", udid, err)
 				return
 			}
 			if err := clientWs.WriteMessage(msgType, msg); err != nil {
