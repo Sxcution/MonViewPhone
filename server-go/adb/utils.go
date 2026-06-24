@@ -154,6 +154,31 @@ func RunShellAsync(udid string, shellCmd string) (*exec.Cmd, error) {
 	return cmd, err
 }
 
+// CleanForwardsForDevice removes all forwards matching the given remote (e.g. "tcp:8886")
+// for a specific device. Call this BEFORE creating a new forward to avoid stale forward
+// conflicts (scrcpy-server is single-client, so duplicate forwards cause "Waiting for response").
+func CleanForwardsForDevice(udid, remote string) {
+	out, err := Command("forward", "--list")
+	if err != nil {
+		return
+	}
+	lines := strings.Split(out, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) < 3 {
+			continue
+		}
+		if parts[0] == udid && parts[2] == remote {
+			log.Printf("[%s] Cleaning stale forward %s -> %s before new connection", udid, parts[1], parts[2])
+			_ = RemoveForward(udid, parts[1])
+		}
+	}
+}
+
 // CleanAllForwards parses 'adb forward --list' and removes any forwards to our scrcpy port or abstract socket
 func CleanAllForwards() {
 	out, err := Command("forward", "--list")

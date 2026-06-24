@@ -34,12 +34,25 @@ type serverProcess struct {
 
 var (
 	deviceLocks sync.Map
-	serverOps   = make(chan struct{}, 6)
+	serverOps   = make(chan struct{}, 12) // allow 12 concurrent server operations (was 6)
 )
 
 func lockForDevice(udid string) *sync.Mutex {
 	value, _ := deviceLocks.LoadOrStore(udid, &sync.Mutex{})
 	return value.(*sync.Mutex)
+}
+
+// CleanDeviceLocks removes mutex entries for devices no longer in the active set.
+// Call this periodically from the cleanup goroutine in main.go.
+func CleanDeviceLocks(activeUdids map[string]bool) {
+	deviceLocks.Range(func(key, value any) bool {
+		udid := key.(string)
+		if !activeUdids[udid] {
+			deviceLocks.Delete(udid)
+			log.Printf("[Cleanup] Evicted stale deviceLock for %s", udid)
+		}
+		return true
+	})
 }
 
 func withServerOpSlot(fn func() error) error {
@@ -73,7 +86,7 @@ func isCleanUpProcess(proc serverProcess) bool {
 }
 
 func listServerProcesses(udid string) []serverProcess {
-	cmd := fmt.Sprintf(`for p in $(pidof %s 2>/dev/null); do C=$(cat /proc/$p/cmdline 2>/dev/null | tr "\0" " "); case "$C" in *com.genymobile.scrcpy*) echo "$p $C";; esac; done`, ProcessName)
+	cmd := fmt.Sprintf(`for p in $(pidof %s %s64 2>/dev/null); do C=$(cat /proc/$p/cmdline 2>/dev/null | tr "\0" " "); case "$C" in *com.genymobile.scrcpy*) echo "$p $C";; esac; done`, ProcessName, ProcessName)
 	out := shellSafe(udid, cmd)
 	if out == "" {
 		return nil
@@ -232,18 +245,24 @@ func StartServer(udid string) error {
 }
 
 func startServerUnlocked(udid string) error {
-	// Push scrcpy-server.jar
-	log.Printf("[%s] Pushing scrcpy-server.jar...", udid)
-	err := adb.Push(udid, serverJarPath(), TempPath+FileName)
-	if err != nil {
-		log.Printf("[%s] Failed to push scrcpy-server.jar: %v", udid, err)
-		return err
+	// Push scrcpy-server.jar only if not already present (saves 3-5s per device on restart)
+	remoteMd5 := strings.TrimSpace(shellSafe(udid, "md5sum "+TempPath+FileName+" 2>/dev/null | cut -d' ' -f1"))
+	needPush := remoteMd5 == ""
+	if needPush {
+		log.Printf("[%s] Pushing scrcpy-server.jar...", udid)
+		err := adb.Push(udid, serverJarPath(), TempPath+FileName)
+		if err != nil {
+			log.Printf("[%s] Failed to push scrcpy-server.jar: %v", udid, err)
+			return err
+		}
+	} else {
+		log.Printf("[%s] scrcpy-server.jar already on device, skipping push", udid)
 	}
 
 	// Start server via app_process
 	runCmd := "CLASSPATH=" + TempPath + FileName + " nohup app_process " + ArgsString + " >" + LogFilePath + " 2>&1 &"
 	log.Printf("[%s] Starting scrcpy server: %s", udid, runCmd)
-	_, err = adb.Shell(udid, runCmd)
+	_, err := adb.Shell(udid, runCmd)
 	if err != nil {
 		log.Printf("[%s] Failed to start scrcpy server: %v", udid, err)
 		return err
@@ -264,11 +283,18 @@ func ForwardPort(udid string) (string, error) {
 func CleanAllMonViewPhoneServers(tracker *adb.Tracker) {
 	devices := tracker.GetDevices()
 	log.Printf("[Startup] Cleaning up existing scrcpy servers on %d devices...", len(devices))
+	var wg sync.WaitGroup
 	for id, dev := range devices {
 		if dev.Status == adb.StatusOnline {
-			log.Printf("[%s] Startup cleanup: force killing existing scrcpy server", id)
-			_ = killMonViewPhoneScrcpyServers(id)
-			_ = shellSafe(id, "rm -f "+PidFilePath+" "+LogFilePath)
+			wg.Add(1)
+			go func(udid string) {
+				defer wg.Done()
+				log.Printf("[%s] Startup cleanup: force killing existing scrcpy server", udid)
+				_ = killMonViewPhoneScrcpyServers(udid)
+				_ = shellSafe(udid, "rm -f "+PidFilePath+" "+LogFilePath)
+			}(id)
 		}
 	}
+	wg.Wait()
+	log.Printf("[Startup] Cleanup completed for %d devices", len(devices))
 }

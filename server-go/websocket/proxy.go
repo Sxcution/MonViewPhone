@@ -194,6 +194,10 @@ func prepareScrcpyServerForAttempt(udid string, attempt int, restartRequested bo
 }
 
 func dialForwardedDeviceWs(udid, remote, wsPath string, attempt, maxAttempts int) (*deviceWsSession, error) {
+	// Clean stale forwards for this device before creating a new one.
+	// scrcpy-server is single-client: duplicate forwards cause "Waiting for response" stuck.
+	adb.CleanForwardsForDevice(udid, remote)
+
 	portStr, err := adb.Forward(udid, "tcp:0", remote)
 	if err != nil {
 		return nil, fmt.Errorf("adb forward failed (attempt %d/%d): %w", attempt, maxAttempts, err)

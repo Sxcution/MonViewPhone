@@ -219,6 +219,7 @@ export function useTileStream(args: Args) {
     const currentStageIdxRef = useRef<number>(0);
     const activeStageRef = useRef<FallbackStage | null>(null);
     const reconnectCountRef = useRef<number>(0);
+    const prevStatsRef = useRef<string>('');
     const activeEngineNameRef = useRef<string>('');
     const fallbackReasonRef = useRef<string>('');
 
@@ -685,15 +686,20 @@ export function useTileStream(args: Args) {
                 return;
             }
 
-            // Expose updated stats periodically
+            // Expose updated stats periodically (only when values change)
             if (engine) {
               const stats = engine.getStats();
-              setStreamStats({
+              const nextStats = {
                 ...stats,
                 reconnectCount: reconnectCountRef.current,
                 encoderName: activeStageRef.current?.encoderName || 'default',
                 fallbackReason: fallbackReasonRef.current || undefined
-              });
+              };
+              const serialized = JSON.stringify(nextStats);
+              if (serialized !== prevStatsRef.current) {
+                prevStatsRef.current = serialized;
+                setStreamStats(nextStats);
+              }
             }
 
             if (packetAge > 300000 && bitmapAge > 300000) {
@@ -701,7 +707,7 @@ export function useTileStream(args: Args) {
                 setLoading(true);
                 connect();
             }
-        }, 1000);
+        }, 3000);
 
         const closeWs = () => {
             cleanupWs();

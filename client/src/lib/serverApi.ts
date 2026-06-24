@@ -173,12 +173,20 @@ type FslSession = {
   session: MuxChannel;
 };
 
-const fslSessionCache = new Map<string, Promise<FslSession>>();
+const FSL_SESSION_TTL = 60_000; // 60 seconds
+const fslSessionCache = new Map<string, { promise: Promise<FslSession>; timestamp: number }>();
 
 async function getFslSession(wsServer: string, udid: string): Promise<FslSession> {
   const key = `${wsServer}__${udid}`;
   const cached = fslSessionCache.get(key);
-  if (cached) return cached;
+  if (cached) {
+    // Evict stale entries older than TTL
+    if (Date.now() - cached.timestamp > FSL_SESSION_TTL) {
+      fslSessionCache.delete(key);
+    } else {
+      return cached.promise;
+    }
+  }
 
   const promise = new Promise<FslSession>((resolve, reject) => {
     const ws = new WebSocket(actionUrl(wsServer, 'multiplex'));
@@ -194,7 +202,7 @@ async function getFslSession(wsServer: string, udid: string): Promise<FslSession
     });
   });
 
-  fslSessionCache.set(key, promise);
+  fslSessionCache.set(key, { promise, timestamp: Date.now() });
   return promise;
 }
 

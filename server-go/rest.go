@@ -47,6 +47,38 @@ func uploadDir() (string, error) {
 	return filepath.Abs(filepath.Join(".", "uploads"))
 }
 
+// CleanOldUploads removes uploaded APK temp files older than 1 hour.
+// Call this at startup and periodically to prevent disk space leaks.
+func CleanOldUploads() {
+	root, err := uploadDir()
+	if err != nil {
+		return
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-1 * time.Hour)
+	removed := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().Before(cutoff) {
+			if err := os.Remove(filepath.Join(root, entry.Name())); err == nil {
+				removed++
+			}
+		}
+	}
+	if removed > 0 {
+		log.Printf("[Cleanup] Removed %d old uploaded files from uploads/", removed)
+	}
+}
+
 func safeUploadPath(filePath string) (string, error) {
 	root, err := uploadDir()
 	if err != nil {
@@ -537,6 +569,8 @@ func handleInstallUploaded(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, err := adbInstallUploaded(strings.TrimSpace(req.UDID), resolved, nil)
+	// Cleanup: remove the uploaded APK file after installation attempt
+	defer os.Remove(resolved)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error(), "output": out})
 		return
@@ -569,6 +603,8 @@ func handleInstallApkUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, err := adbInstallUploaded(strings.TrimSpace(req.UDID), resolved, req.UserID)
+	// Cleanup: remove the uploaded APK file after installation attempt
+	defer os.Remove(resolved)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error(), "output": out})
 		return

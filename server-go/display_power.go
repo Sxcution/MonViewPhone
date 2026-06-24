@@ -62,6 +62,18 @@ var (
 	pushedHelpers      = make(map[string]bool)
 )
 
+// CleanPushedHelpers removes entries for devices no longer in the active set.
+// Call this periodically from the cleanup goroutine in main.go.
+func CleanPushedHelpers(activeUdids map[string]bool) {
+	pushedHelpersMutex.Lock()
+	defer pushedHelpersMutex.Unlock()
+	for udid := range pushedHelpers {
+		if !activeUdids[udid] {
+			delete(pushedHelpers, udid)
+		}
+	}
+}
+
 func setDisplayPower(udid string, mode string, displayIndex int) (string, string, error) {
 	var failures []string
 

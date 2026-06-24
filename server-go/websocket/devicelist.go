@@ -54,6 +54,19 @@ func getDeviceProperties(udid string) map[string]string {
 	return props
 }
 
+// EvictStaleDeviceProps removes cached properties for devices no longer in the active set.
+// Call this periodically from the cleanup goroutine in main.go.
+func EvictStaleDeviceProps(activeUdids map[string]bool) {
+	devicePropCache.Range(func(key, value any) bool {
+		udid := key.(string)
+		if !activeUdids[udid] {
+			devicePropCache.Delete(udid)
+			log.Printf("[Cleanup] Evicted stale devicePropCache entry for %s", udid)
+		}
+		return true
+	})
+}
+
 type DeviceListEvent struct {
 	List []DeviceDescriptor `json:"list"`
 	Id   string             `json:"id"`
@@ -129,7 +142,23 @@ func HandleSimpleDevicesList(w http.ResponseWriter, r *http.Request, tracker *ad
 	}
 	defer ws.Close()
 
+	// Read loop: required by gorilla/websocket to handle ping/pong/close frames
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		for {
+			if _, _, err := ws.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}()
+
 	for {
+		select {
+		case <-readDone:
+			return
+		default:
+		}
 		if err := ws.WriteJSON(simpleDevicePayloads(tracker)); err != nil {
 			if !isExpectedCloseError(err) && !isClientDisconnect(err) {
 				log.Printf("Devices-list WS write error: %v", err)
@@ -148,8 +177,24 @@ func HandleDeviceList(w http.ResponseWriter, r *http.Request, tracker *adb.Track
 	}
 	defer ws.Close()
 
+	// Read loop: required by gorilla/websocket to handle ping/pong/close frames
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		for {
+			if _, _, err := ws.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}()
+
 	// Simple polling loop for now. In a real app we'd use channels to subscribe to tracker changes.
 	for {
+		select {
+		case <-readDone:
+			return
+		default:
+		}
 		devices := tracker.GetDevices()
 		var descList []DeviceDescriptor
 		for id, dev := range devices {

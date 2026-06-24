@@ -152,6 +152,14 @@ export class AnnexBSplitter {
   push(chunk: Uint8Array): void {
     this.buf = concatU8(this.buf, chunk);
 
+    // Safety cap: prevent unbounded buffer growth during stream corruption
+    const MAX_BUFFER_SIZE = 512 * 1024; // 512KB
+    if (this.buf.length > MAX_BUFFER_SIZE) {
+      this.buf = new Uint8Array(0);
+      this.seen = false;
+      return;
+    }
+
     if (!this.seen) {
       const first = this.findStart(this.buf, 0);
       if (!first) {

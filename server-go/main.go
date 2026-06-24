@@ -237,6 +237,39 @@ func main() {
 	// Clean up existing scrcpy servers
 	scrcpy.CleanAllMonViewPhoneServers(tracker)
 
+	// Clean up old uploaded APK files at startup
+	CleanOldUploads()
+
+	// Start periodic cleanup goroutine (every 5 minutes):
+	// evicts stale sync.Map entries and cleans old uploads
+	go func() {
+		for {
+			time.Sleep(5 * time.Minute)
+			devices := tracker.GetDevices()
+			activeUdids := make(map[string]bool, len(devices))
+			for id, dev := range devices {
+				if dev.Status == adb.StatusOnline {
+					activeUdids[id] = true
+				}
+			}
+			log.Printf("[Cleanup] Running periodic cleanup (%d active devices)", len(activeUdids))
+			websocket.EvictStaleDeviceProps(activeUdids)
+			scrcpy.CleanDeviceLocks(activeUdids)
+			CleanPushedHelpers(activeUdids)
+			CleanOldUploads()
+			// NOTE: adb.CleanAllForwards() is NOT called here — it would kill active streams.
+			// It only runs at startup when no streams are connected.
+		}
+	}()
+
+	// Cache findDistDir() once at startup
+	cachedDistDir := findDistDir()
+	if cachedDistDir != "" {
+		log.Printf("Frontend dist dir: %s", cachedDistDir)
+	} else {
+		log.Println("Warning: Frontend dist dir not found. Run 'cd client && npm run build'")
+	}
+
 	// Setup HTTP handler with action query param router
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// CORS headers
@@ -332,7 +365,7 @@ func main() {
 		}
 
 		// Serve static frontend
-		distDir := findDistDir()
+		distDir := cachedDistDir
 		if distDir == "" {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.WriteHeader(http.StatusNotFound)
