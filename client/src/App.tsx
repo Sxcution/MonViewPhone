@@ -502,6 +502,10 @@ export function App() {
     } catch { }
     return STREAM_CONFIG
   })
+  const streamConfigRef = useRef<StreamConfig>(STREAM_CONFIG)
+  useEffect(() => {
+    streamConfigRef.current = streamConfig
+  }, [streamConfig])
   const reloadMap = useRef<Map<string, (opts?: StreamReloadOptions) => void>>(new Map())
 
   const [viewerStreamConfig, setViewerStreamConfig] = useState<StreamConfig>(() => {
@@ -3289,13 +3293,37 @@ export function App() {
     })
   }, [draftViewerConfig])
 
-  const applyActiveDraftConfig = useCallback(() => {
+  const applyStreamConfig = useCallback((scope: 'active' | 'selected' | 'all' = 'active') => {
     if (viewerUdid) {
-      applyViewerDraftConfig()
-    } else {
-      applyGridDraftConfig()
+      setViewerStreamConfig(draftViewerConfig);
+      streamConfigRef.current = draftViewerConfig;
+      reloadMap.current.get(viewerUdid)?.({ silent: true, restart: true });
+      return;
     }
-  }, [viewerUdid, applyViewerDraftConfig, applyGridDraftConfig])
+
+    setStreamConfig(draftConfig);
+    streamConfigRef.current = draftConfig;
+
+    let targets: string[] = [];
+    if (scope === 'active' && activeUdid) {
+      targets = [activeUdid];
+    } else if (scope === 'selected') {
+      targets = Array.from(connectSelection);
+    } else {
+      targets = registeredUdids;
+    }
+
+    targets.forEach(id => {
+      reloadMap.current.get(id)?.({ silent: true, restart: true });
+    });
+  }, [
+    viewerUdid,
+    draftViewerConfig,
+    draftConfig,
+    activeUdid,
+    connectSelection,
+    registeredUdids,
+  ]);
 
   const handleBitrateChange = (val: number) => {
     const needsConfirm = val > BITRATE_WARN_THRESHOLD && !bitrateWarnAccepted
@@ -3334,37 +3362,7 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [viewerUdid]);
 
-  // Auto-apply on slider changes with debounce to avoid spamming reconnects
-  useEffect(() => {
-    if (skipNextAutoApply.current) {
-      skipNextAutoApply.current = false
-      return
-    }
-    if (
-      (bitrateNeedsConfirm && !bitrateWarnAccepted) ||
-      bitrateConfirmVisible
-    ) {
-      return
-    }
-    if (autoApplyTimer.current) window.clearTimeout(autoApplyTimer.current)
-    autoApplyTimer.current = window.setTimeout(() => {
-      applyActiveDraftConfig()
-      autoApplyTimer.current = null
-    }, 600)
-    return () => {
-      if (autoApplyTimer.current) {
-        window.clearTimeout(autoApplyTimer.current)
-        autoApplyTimer.current = null
-      }
-    }
-  }, [
-    draftConfig,
-    draftViewerConfig,
-    applyActiveDraftConfig,
-    bitrateNeedsConfirm,
-    bitrateWarnAccepted,
-    bitrateConfirmVisible
-  ])
+
 
   const onViewerPointerMove = useCallback((e: PointerEvent) => {
     if (!viewerDragRef.current.active) return
@@ -4328,6 +4326,34 @@ export function App() {
                     : draftConfig.bounds.width}
                   px
                 </div>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px 12px' }}>
+                <button
+                  className="rcpBtn"
+                  style={{ flex: 1, minWidth: '80px', height: '30px', fontSize: '11px', padding: '0 4px' }}
+                  onClick={() => applyStreamConfig('active')}
+                >
+                  {viewerUdid ? t('Apply Viewer') : t('Apply active')}
+                </button>
+                {!viewerUdid && (
+                  <>
+                    <button
+                      className="rcpBtn"
+                      style={{ flex: 1, minWidth: '80px', height: '30px', fontSize: '11px', padding: '0 4px' }}
+                      onClick={() => applyStreamConfig('selected')}
+                    >
+                      {t('Apply selected')}
+                    </button>
+                    <button
+                      className="rcpBtn"
+                      style={{ flex: 1, minWidth: '80px', height: '30px', fontSize: '11px', padding: '0 4px' }}
+                      onClick={() => applyStreamConfig('all')}
+                    >
+                      {t('Apply all')}
+                    </button>
+                  </>
+                )}
               </div>
 
             </div>
