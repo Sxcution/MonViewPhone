@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActive } from '@/context/ActiveContext';
-import type { StreamConfig } from '@/lib/config';
+import { type StreamConfig, STREAM_MODE } from '@/lib/config';
 import { useI18n } from '@/context/I18nContext';
 import { useServer } from '@/context/ServerContext';
 
@@ -165,7 +165,20 @@ function TileComponent({
     // without forcing the heavy streaming effect to re-run on every slider tick.
     const streamCfgRef = useRef<StreamConfig>(streamConfig);
     useEffect(() => {
+        const prev = streamCfgRef.current;
         streamCfgRef.current = streamConfig;
+
+        if (STREAM_MODE === 'raw-v2' && prev) {
+            const hasChanged =
+                prev.maxFps !== streamConfig.maxFps ||
+                prev.bitrate !== streamConfig.bitrate ||
+                prev.bounds.width !== streamConfig.bounds.width ||
+                prev.bounds.height !== streamConfig.bounds.height;
+
+            if (hasChanged) {
+                reloadRef.current?.({ silent: true });
+            }
+        }
     }, [streamConfig]);
 
     // Register a stable reload wrapper with the parent (App) so it can "reload all tiles".

@@ -102,9 +102,10 @@ export type MakeWsUrlArgs = {
   deviceParam: string | null;
   udid: string;
   restart?: boolean;
+  config?: StreamConfig;
 };
 
-export function makeWsUrl({ wsServer, deviceParam, udid, restart = false }: MakeWsUrlArgs): string {
+export function makeWsUrl({ wsServer, deviceParam, udid, restart = false, config }: MakeWsUrlArgs): string {
   if (STREAM_MODE !== 'raw-v2' && !deviceParam) throw new Error('Missing required query param: device');
 
   const u = new URL(wsServer);
@@ -113,6 +114,12 @@ export function makeWsUrl({ wsServer, deviceParam, udid, restart = false }: Make
 
   if (STREAM_MODE === 'raw-v2') {
     u.searchParams.set('udid', udid);
+    if (config) {
+      const rawMaxSize = Math.max(config.bounds.width, config.bounds.height);
+      u.searchParams.set('max_fps', String(config.maxFps));
+      u.searchParams.set('bitrate', String(config.bitrate));
+      u.searchParams.set('max_size', String(rawMaxSize));
+    }
   } else {
     u.searchParams.set('remote', COMMON_PARAMS.remote);
     u.searchParams.set('udid', udid);

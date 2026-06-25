@@ -541,7 +541,8 @@ export function useTileStream(args: Args) {
                     wsServer,
                     deviceParam: streamDeviceParam,
                     udid: streamEndpointUdid,
-                    restart: Boolean(opts?.restart)
+                    restart: Boolean(opts?.restart),
+                    config: trialConfig
                 });
             } catch (err) {
                 releaseStreamSession(streamSessionKey, owner);

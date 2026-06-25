@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"server-go/adb"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +37,54 @@ var (
 	rawSessionLocks sync.Map
 	rawActive       sync.Map
 )
+
+type RawStreamParams struct {
+	MaxSize string
+	BitRate string
+	MaxFps  string
+}
+
+func clampInt(v, min, max int) int {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
+}
+
+func parseRawStreamParams(r *http.Request) RawStreamParams {
+	q := r.URL.Query()
+
+	maxSize := RawDefaultMaxSize
+	bitRate := RawDefaultBitRate
+	maxFps := RawDefaultMaxFps
+
+	if v := q.Get("max_size"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			maxSize = strconv.Itoa(clampInt(n, 240, 1440))
+		}
+	}
+
+	if v := q.Get("bitrate"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			bitRate = strconv.Itoa(clampInt(n, 128000, 8000000))
+		}
+	}
+
+	if v := q.Get("max_fps"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			maxFps = strconv.Itoa(clampInt(n, 1, 60))
+		}
+	}
+
+	return RawStreamParams{
+		MaxSize: maxSize,
+		BitRate: bitRate,
+		MaxFps:  maxFps,
+	}
+}
 
 type rawSession struct {
 	cancel func()
@@ -202,7 +251,7 @@ func killRawScrcpyServer(udid string) {
 	_, _ = rawShell(udid, cmd, 5*time.Second)
 }
 
-func startRawScrcpyServer(udid string, scid string) (*exec.Cmd, error) {
+func startRawScrcpyServer(udid string, scid string, params RawStreamParams) (*exec.Cmd, error) {
 	args := []string{
 		"-s", udid,
 		"shell",
@@ -227,10 +276,10 @@ func startRawScrcpyServer(udid string, scid string) (*exec.Cmd, error) {
 		// giữ server sống tới khi TCP bị đóng, không tự xóa jar
 		"cleanup=false",
 
-		// cấu hình nhẹ cho grid 36 máy
-		"max_size=" + RawDefaultMaxSize,
-		"video_bit_rate=" + RawDefaultBitRate,
-		"max_fps=" + RawDefaultMaxFps,
+		// cấu hình truyền vào từ client
+		"max_size=" + params.MaxSize,
+		"video_bit_rate=" + params.BitRate,
+		"max_fps=" + params.MaxFps,
 
 		// ổn định hơn cho màn hình ít thay đổi
 		"power_on=true",
@@ -445,6 +494,15 @@ func HandleProxyScrcpyRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	params := parseRawStreamParams(r)
+
+	log.Printf("[%s] raw-v2 params: max_size=%s bitrate=%s max_fps=%s",
+		udid,
+		params.MaxSize,
+		params.BitRate,
+		params.MaxFps,
+	)
+
 	log.Printf("[%s] raw-v2 trace: adb_forward_ready elapsed=%s local_port=%d socket=%s",
 		udid,
 		time.Since(traceStart),
@@ -452,7 +510,7 @@ func HandleProxyScrcpyRaw(w http.ResponseWriter, r *http.Request) {
 		socketName,
 	)
 
-	serverCmd, err = startRawScrcpyServer(udid, scidVal)
+	serverCmd, err = startRawScrcpyServer(udid, scidVal, params)
 	if err != nil {
 		log.Printf("[%s] raw-v2 start server failed: %v", udid, err)
 		writeProxyClose(clientWs, "raw-v2 start server failed: "+err.Error())

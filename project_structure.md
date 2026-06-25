@@ -34,8 +34,9 @@ Removed legacy layers:
 - [MODIFY] [VisualAlertPanel.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/VisualAlertPanel.tsx): Simplified Visual Alert UI panel for multi-ROI red-dot notification detection. Removed sidebar expand behavior, status notification feeds, and action buttons. Settings inputs (Chu kỳ, Lần check, Báo lại) are moved into the Multi-ROI setup modal (renamed to 'Thiết lập Visual Alert'). A Settings gear icon button is added in the panel header actions.
 - [NEW] [ThemeInspector.tsx](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/ThemeInspector.tsx): Theme color inspector UI. When active, hovers elements to show active theme variables, property matches, and logical target details. Handles normal clicks to copy logical targets, Alt/Shift+Click to copy CSS variables, and Ctrl+Click to open the color editor card.
 - `client/src/components/tile/`: Tile-specific helpers, headers, phone controls, and account overlay filter dimming wrapper.
--   - [MODIFY] `Tile.tsx`: Integrates the per-tile Stream Debug Overlay displaying engine, active encoder, resolution, FPS, drops, queue size, and reconnect stats.
+-   - [MODIFY] `Tile.tsx`: Integrates the per-tile Stream Debug Overlay displaying engine, active encoder, resolution, FPS, drops, queue size, and reconnect stats. Watches `streamConfig` and triggers a silent stream restart in `raw-v2` mode upon any parameter changes.
 -   - [MODIFY] `useTileStream.ts`: Refactored to orchestrate stream lifecycle using the new pluggable `StreamEngine`, implementing the sequential connection retry/fallback loop on connection/decode errors. Includes specific stream optimization overrides for device `ce0817187cd6803d027e` (Samsung Note 8) to force tinyh264 software decoding and Android software encoding, resolving control synchronization latency.
+-   - [MODIFY] `client/src/lib/video.ts`: Contains `makeWsUrl` which generates WebSocket URLs. Changed to append dynamic `max_fps`, `bitrate`, and `max_size` query params for `raw-v2` stream configurations.
 - `client/src/context/ActiveContext.tsx`: Active device, multi-control, and focus state.
 - `client/src/context/I18nContext.tsx`: Translation helper.
 - `client/src/context/ServerContext.tsx`: Backend URL state.
@@ -63,7 +64,7 @@ Removed legacy layers:
 - `server-go/adb/`: ADB helpers and device tracker.
 - [MODIFY] `server-go/scrcpy/`: Scrcpy server launch/config helpers. Added `CleanAllMonViewPhoneServers` in `server.go` to cleanly kill any running scrcpy servers on devices during startup.
 - [NEW] `server-go/bin/`: Contains external binary dependency assets. Includes `scrcpy-server-v3.3.4.jar` for the official v3.3.4 scrcpy server.
-- `server-go/websocket/`: Device-list and stream proxy WebSocket handlers. Includes `proxy_raw.go` implementing the `raw-v2` experimental stream route, and [raw_control_translate.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/websocket/raw_control_translate.go) implementing legacy-to-v3.3.4 control packet translator.
+- `server-go/websocket/`: Device-list and stream proxy WebSocket handlers. Includes `proxy_raw.go` implementing the `raw-v2` experimental stream route (supporting dynamic URL stream parameter parsing, clamp safety limits, and custom scrcpy arguments), and [raw_control_translate.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/websocket/raw_control_translate.go) implementing legacy-to-v3.3.4 control packet translator.
 - `server-go/server-go.exe`: Current compiled Go backend binary.
 - `server-go/Start_PhoneFarm.bat`: Starts the Go backend server by running the launcher script `run.pyw`.
 - `server-go/Start_PhoneFarm_Air.bat`: Optional Go hot-reload launcher for backend development.
