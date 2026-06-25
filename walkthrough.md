@@ -1,3 +1,30 @@
+# Walkthrough - Configuration Reload Optimization & Parameter Fixes (2026-06-25)
+
+We have successfully optimized the configuration application workflow and resolved query parameter parsing for raw-v2 streams.
+
+## Changes Implemented
+
+### 1. Targeted Debounced Auto-Apply
+- **App.tsx**: Implemented a 600ms debounced auto-apply effect when dragging the sidebar sliders. When config changes, it automatically triggers reloads with a smart targeted scope:
+  - **Viewer open**: Reloads only the viewer device.
+  - **Selected devices**: Reloads only the selected devices.
+  - **Active device**: Reloads only the active device.
+  - **Otherwise**: Reloads all registered devices.
+- **Tile.tsx**: Removed the automatic stream reload watcher on the `streamConfig` prop. Changing the global configuration state now only updates the stream reference but does not trigger automatic WebSocket reconnects on non-targeted tiles.
+
+### 2. makeWsUrl query parameter fixes for raw-v2
+- **video.ts**: Updated the `makeWsUrl` generator function to safely calculate and append `max_fps`, `bitrate`, and `max_size` based on the configuration bounds with default fallback options:
+  - `max_size`: Calculated from `Math.max(width || 720, height || 720)` to prevent runtime crashes.
+  - `max_fps`: Defaults to `12` if unspecified.
+  - `bitrate`: Defaults to `393216` if unspecified.
+  - Added support for passing the `restart=1` flag.
+
+## Documentation Updates
+- Updated [naming_registry.json](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/naming_registry.json) with `applyStreamConfig` and `applyActiveDraftConfig` handler references.
+- Updated [project_structure.md](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/project_structure.md) to document the targeted auto-apply mechanism and modified file descriptions.
+
+---
+
 # Walkthrough - raw-v2 Stream Integration (Xiaowei Style)
 
 We have successfully integrated the `raw-v2` streaming engine, resembling the Xiaowei-style raw H.264 stream pipe.

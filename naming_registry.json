@@ -424,7 +424,8 @@
       "open_rename_action": "openRenameAction",
       "emit_automation_click": "emitAutomationClick",
       "emit_automation_swipe": "emitAutomationSwipe",
-      "copy_row": "copyRow"
+      "copy_row": "copyRow",
+      "apply_stream_config": "applyStreamConfig"
     },
     "constants": {
       "stream_mode": "STREAM_MODE",

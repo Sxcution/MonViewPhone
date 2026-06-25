@@ -105,8 +105,16 @@ export type MakeWsUrlArgs = {
   config?: StreamConfig;
 };
 
-export function makeWsUrl({ wsServer, deviceParam, udid, restart = false, config }: MakeWsUrlArgs): string {
-  if (STREAM_MODE !== 'raw-v2' && !deviceParam) throw new Error('Missing required query param: device');
+export function makeWsUrl({
+  wsServer,
+  deviceParam,
+  udid,
+  restart = false,
+  config,
+}: MakeWsUrlArgs): string {
+  if (STREAM_MODE !== 'raw-v2' && !deviceParam) {
+    throw new Error('Missing required query param: device');
+  }
 
   const u = new URL(wsServer);
   const action = STREAM_MODE === 'raw-v2' ? 'proxy-scrcpy-raw' : 'proxy-adb';
@@ -114,18 +122,26 @@ export function makeWsUrl({ wsServer, deviceParam, udid, restart = false, config
 
   if (STREAM_MODE === 'raw-v2') {
     u.searchParams.set('udid', udid);
+
     if (config) {
-      const rawMaxSize = Math.max(config.bounds.width, config.bounds.height);
-      u.searchParams.set('max_fps', String(config.maxFps));
-      u.searchParams.set('bitrate', String(config.bitrate));
-      u.searchParams.set('max_size', String(rawMaxSize));
+      const maxSize = Math.max(config.bounds?.width || 720, config.bounds?.height || 720);
+
+      u.searchParams.set('max_fps', String(config.maxFps || 12));
+      u.searchParams.set('bitrate', String(config.bitrate || 393216));
+      u.searchParams.set('max_size', String(maxSize));
+    }
+
+    if (restart) {
+      u.searchParams.set('restart', '1');
     }
   } else {
     u.searchParams.set('remote', COMMON_PARAMS.remote);
     u.searchParams.set('udid', udid);
+
     if (deviceParam) {
       u.searchParams.set('device', deviceParam);
     }
+
     const upstreamPath = restart ? '/?restart=1' : '/';
     u.searchParams.set('path', upstreamPath);
   }

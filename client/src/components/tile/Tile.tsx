@@ -165,20 +165,7 @@ function TileComponent({
     // without forcing the heavy streaming effect to re-run on every slider tick.
     const streamCfgRef = useRef<StreamConfig>(streamConfig);
     useEffect(() => {
-        const prev = streamCfgRef.current;
         streamCfgRef.current = streamConfig;
-
-        if (STREAM_MODE === 'raw-v2' && prev) {
-            const hasChanged =
-                prev.maxFps !== streamConfig.maxFps ||
-                prev.bitrate !== streamConfig.bitrate ||
-                prev.bounds.width !== streamConfig.bounds.width ||
-                prev.bounds.height !== streamConfig.bounds.height;
-
-            if (hasChanged) {
-                reloadRef.current?.({ silent: true });
-            }
-        }
     }, [streamConfig]);
 
     // Register a stable reload wrapper with the parent (App) so it can "reload all tiles".

@@ -3325,6 +3325,47 @@ export function App() {
     registeredUdids,
   ]);
 
+  const applyActiveDraftConfig = useCallback(() => {
+    if (viewerUdid) {
+      applyStreamConfig('active');
+    } else {
+      const scope = connectSelection.size > 0 ? 'selected' : (activeUdid ? 'active' : 'all');
+      applyStreamConfig(scope);
+    }
+  }, [viewerUdid, connectSelection.size, activeUdid, applyStreamConfig]);
+
+  // Auto-apply on slider changes with debounce to avoid spamming reconnects
+  useEffect(() => {
+    if (skipNextAutoApply.current) {
+      skipNextAutoApply.current = false;
+      return;
+    }
+    if (
+      (bitrateNeedsConfirm && !bitrateWarnAccepted) ||
+      bitrateConfirmVisible
+    ) {
+      return;
+    }
+    if (autoApplyTimer.current) window.clearTimeout(autoApplyTimer.current);
+    autoApplyTimer.current = window.setTimeout(() => {
+      applyActiveDraftConfig();
+      autoApplyTimer.current = null;
+    }, 600);
+    return () => {
+      if (autoApplyTimer.current) {
+        window.clearTimeout(autoApplyTimer.current);
+        autoApplyTimer.current = null;
+      }
+    };
+  }, [
+    draftConfig,
+    draftViewerConfig,
+    applyActiveDraftConfig,
+    bitrateNeedsConfirm,
+    bitrateWarnAccepted,
+    bitrateConfirmVisible
+  ]);
+
   const handleBitrateChange = (val: number) => {
     const needsConfirm = val > BITRATE_WARN_THRESHOLD && !bitrateWarnAccepted
     if (needsConfirm) {
@@ -4326,34 +4367,6 @@ export function App() {
                     : draftConfig.bounds.width}
                   px
                 </div>
-              </div>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px 12px' }}>
-                <button
-                  className="rcpBtn"
-                  style={{ flex: 1, minWidth: '80px', height: '30px', fontSize: '11px', padding: '0 4px' }}
-                  onClick={() => applyStreamConfig('active')}
-                >
-                  {viewerUdid ? t('Apply Viewer') : t('Apply active')}
-                </button>
-                {!viewerUdid && (
-                  <>
-                    <button
-                      className="rcpBtn"
-                      style={{ flex: 1, minWidth: '80px', height: '30px', fontSize: '11px', padding: '0 4px' }}
-                      onClick={() => applyStreamConfig('selected')}
-                    >
-                      {t('Apply selected')}
-                    </button>
-                    <button
-                      className="rcpBtn"
-                      style={{ flex: 1, minWidth: '80px', height: '30px', fontSize: '11px', padding: '0 4px' }}
-                      onClick={() => applyStreamConfig('all')}
-                    >
-                      {t('Apply all')}
-                    </button>
-                  </>
-                )}
               </div>
 
             </div>
