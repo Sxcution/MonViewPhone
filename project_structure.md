@@ -82,5 +82,15 @@ Removed legacy layers:
 - [NEW] [wifi_mapping.json](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/wifi_mapping.json): Auto-generated JSON file persisting WiFi endpoint-to-USB-serial mappings. Created/updated automatically by the backend when WiFi connections are established.
 - [MODIFY] [devicelist.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/websocket/devicelist.go): Updated `physicalUUIDForDevice` to use `ResolveWifiSerial` (tries in-memory map, then ADB getprop). WiFi entries whose serial cannot be resolved are now skipped entirely from the device list emission to prevent frontend from creating rogue tiles. Also added device hardware properties (model, manufacturer, release version, SDK version, board name, and platform platform) caching and emission, allowing the frontend to immediately detect and prioritize appropriate hardware encoders.
 
+## MCP Server
+- [NEW] [Start_MCP_Server.bat](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/Start_MCP_Server.bat): Windows Batch script shortcut to quickly start both the Node.js MCP server and localtunnel.
+- [NEW] [mcp-workspace-server/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/mcp-workspace-server): MCP (Model Context Protocol) Server production-ready using TypeScript + Express, exposing local `/health` and authenticated `/mcp` (SSE stream) + `/messages` endpoints.
+- [NEW] [docs/MCP_IMPLEMENTATION_PLAN.md](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/docs/MCP_IMPLEMENTATION_PLAN.md): Implementation details for building the MCP server.
+- [NEW] [docs/SECURITY.md](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/docs/SECURITY.md): Threat model and sandboxing rules for safe AI workspace access.
+- [NEW] [docs/CHATGPT_SETUP.md](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/docs/CHATGPT_SETUP.md): Guide to connect the MCP server to ChatGPT (via ngrok/localtunnel HTTPS mapping).
+- [NEW] [docs/ANTIGRAVITY_SETUP.md](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/docs/ANTIGRAVITY_SETUP.md): Configuration guide to connect the MCP server to Antigravity via stdio/SSE.
+- [NEW] [docs/DECISIONS.md](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/docs/DECISIONS.md): Architectural decisions and framework selection records.
+
+
 
 

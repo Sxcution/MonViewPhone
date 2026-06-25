@@ -39,9 +39,10 @@ var (
 )
 
 type RawStreamParams struct {
-	MaxSize string
-	BitRate string
-	MaxFps  string
+	MaxSize     string
+	BitRate     string
+	MaxFps      string
+	EncoderName string
 }
 
 func clampInt(v, min, max int) int {
@@ -60,6 +61,7 @@ func parseRawStreamParams(r *http.Request) RawStreamParams {
 	maxSize := RawDefaultMaxSize
 	bitRate := RawDefaultBitRate
 	maxFps := RawDefaultMaxFps
+	encoderName := q.Get("encoder_name")
 
 	if v := q.Get("max_size"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
@@ -80,9 +82,10 @@ func parseRawStreamParams(r *http.Request) RawStreamParams {
 	}
 
 	return RawStreamParams{
-		MaxSize: maxSize,
-		BitRate: bitRate,
-		MaxFps:  maxFps,
+		MaxSize:     maxSize,
+		BitRate:     bitRate,
+		MaxFps:      maxFps,
+		EncoderName: encoderName,
 	}
 }
 
@@ -283,6 +286,10 @@ func startRawScrcpyServer(udid string, scid string, params RawStreamParams) (*ex
 
 		// ổn định hơn cho màn hình ít thay đổi
 		"power_on=true",
+	}
+
+	if params.EncoderName != "" {
+		args = append(args, "video_encoder="+params.EncoderName)
 	}
 
 	cmd := exec.Command(adb.GetAdbPath(), args...)
@@ -597,6 +604,7 @@ func HandleProxyScrcpyRaw(w http.ResponseWriter, r *http.Request) {
 					close(firstFrameCh)
 				})
 
+				_ = clientWs.SetWriteDeadline(time.Now().Add(4 * time.Second))
 				if err := clientWs.WriteMessage(gws.BinaryMessage, chunk); err != nil {
 					errCh <- fmt.Errorf("browser ws write failed: %w", err)
 					return

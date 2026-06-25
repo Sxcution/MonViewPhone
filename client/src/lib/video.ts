@@ -119,6 +119,9 @@ export function makeWsUrl({ wsServer, deviceParam, udid, restart = false, config
       u.searchParams.set('max_fps', String(config.maxFps));
       u.searchParams.set('bitrate', String(config.bitrate));
       u.searchParams.set('max_size', String(rawMaxSize));
+      if (config.encoderName) {
+        u.searchParams.set('encoder_name', config.encoderName);
+      }
     }
   } else {
     u.searchParams.set('remote', COMMON_PARAMS.remote);

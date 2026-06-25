@@ -400,6 +400,9 @@ export function useTileStream(args: Args) {
               },
               onError: (err: any) => {
                 console.error('[StreamEngine error]', udid, err);
+                const reason = `Engine error: ${err?.message || err}`;
+                fallbackReasonRef.current = reason;
+                triggerFallbackConnection(reason);
               },
               onFallbackRequested: (reason: string) => {
                 fallbackReasonRef.current = reason;
@@ -691,10 +694,11 @@ export function useTileStream(args: Args) {
 
             const packetsStillArriving = packetAge < 2500;
             const outputStalled = bitmapAge > 8000;
-            if (packetsStillArriving && outputStalled) {
-                setStatus(tRef.current('⚠️ decode đứng - kết nối lại…'));
+            const connectionStalled = packetAge > 12000 && bitmapAge > 12000;
+            if ((packetsStillArriving && outputStalled) || connectionStalled) {
+                setStatus(tRef.current(connectionStalled ? '⚠️ stream mất tín hiệu - kết nối lại…' : '⚠️ decode đứng - kết nối lại…'));
                 setLoading(true);
-                connect();
+                connect({ restart: true });
                 return;
             }
 

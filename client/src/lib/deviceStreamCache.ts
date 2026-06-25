@@ -49,7 +49,7 @@ export function getHardwareEncodersForDevice(meta?: GoogDeviceDescriptor): strin
 
   const candidates: string[] = [];
 
-  const isQualcomm = platform.includes('qcom') || platform.includes('msm') || platform.includes('sdm') || platform.includes('sm') || board.includes('qcom') || manufacturer.includes('qualcomm');
+  const isQualcomm = platform.includes('qcom') || platform.includes('msm') || platform.includes('sdm') || platform.includes('sm') || platform.includes('bengal') || board.includes('qcom') || board.includes('spes') || manufacturer.includes('qualcomm');
   const isSamsung = manufacturer.includes('samsung') || platform.includes('exynos') || board.includes('universal') || board.includes('exynos');
   const isMTK = platform.includes('mt') || board.includes('mt') || manufacturer.includes('mediatek');
 
