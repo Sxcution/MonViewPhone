@@ -477,6 +477,7 @@ export function App() {
     clickDevice,
     syncAll,
     syncMain,
+    getCanvasForUdid,
   } = useActive()
 
   const [streamConfig, setStreamConfig] = useState<StreamConfig>(() => {
@@ -588,8 +589,16 @@ export function App() {
   }, []);
 
   const handleViewDevice = useCallback((id: string) => {
-    setViewerUdid(prev => prev === id ? null : id)
-  }, [])
+    setViewerUdid(prev => {
+      if (prev === id) return null;
+      selectOnly(id);
+      requestAnimationFrame(() => {
+        const c = getCanvasForUdid?.(id);
+        c?.focus?.({ preventScroll: true });
+      });
+      return id;
+    });
+  }, [selectOnly, getCanvasForUdid]);
 
   const handleDragStart = useCallback((id: string) => {
     setDraggingTile(id)
@@ -835,7 +844,11 @@ export function App() {
     clickDevice(udid);
     selectOnly(udid);
     setViewerUdid(udid);
-  }, [clickDevice, selectOnly]);
+    requestAnimationFrame(() => {
+      const c = getCanvasForUdid?.(udid);
+      c?.focus?.({ preventScroll: true });
+    });
+  }, [clickDevice, selectOnly, getCanvasForUdid]);
   const apkInputRef = useRef<HTMLInputElement | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const [viewerOffset, setViewerOffset] = useState({ x: 0, y: 0 })
@@ -3309,37 +3322,17 @@ export function App() {
     }
   }
 
-  const prevViewerRef = useRef<string | null>(null)
-
-  // Reload single tile silently when opening/closing viewer or when viewer config changes
+  // Delay upgrade quality (Tạm thời KHÔNG reload để tránh đơ khi phóng to/thu nhỏ)
   useEffect(() => {
-    const prev = prevViewerRef.current
+    if (!viewerUdid) return;
 
-    // Case 1: Viewer is currently open
-    if (viewerUdid) {
-      const fn = reloadMap.current.get(viewerUdid)
-      try {
-        fn?.({ silent: true })
-      } catch {}
+    const timer = window.setTimeout(() => {
+      // Tạm thời KHÔNG reload ở đây nếu chưa có make-before-break.
+      // Sau này thay bằng upgradeViewerStreamMakeBeforeBreak(viewerUdid).
+    }, 800);
 
-      // If we switched from another viewer device, reload that previous device silently so it returns to grid config
-      if (prev && prev !== viewerUdid) {
-        const prevFn = reloadMap.current.get(prev)
-        try {
-          prevFn?.({ silent: true })
-        } catch {}
-      }
-      prevViewerRef.current = viewerUdid
-    }
-    // Case 2: Viewer was closed (viewerUdid is null)
-    else if (prev) {
-      const fn = reloadMap.current.get(prev)
-      try {
-        fn?.({ silent: true })
-      } catch {}
-      prevViewerRef.current = null
-    }
-  }, [viewerUdid, viewerStreamConfig])
+    return () => window.clearTimeout(timer);
+  }, [viewerUdid]);
 
   // Auto-apply on slider changes with debounce to avoid spamming reconnects
   useEffect(() => {
@@ -3830,9 +3823,7 @@ export function App() {
                       isDisconnected={!isConnected}
                       visualAlertActive={Boolean(visualTileAlerts[udid])}
                       onClearVisualAlert={clearVisualAlert}
-                      streamConfig={
-                        viewerUdid === udid ? viewerStreamConfig : streamConfig
-                      }
+                      streamConfig={streamConfig}
                       onRegisterReload={registerReload}
                       onUnregisterReload={unregisterReload}
                       onViewDevice={handleViewDevice}
