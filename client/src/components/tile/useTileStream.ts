@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { attachTouchControls } from '@/lib/touchControls';
 import { buildConfigBinary, makeWsUrl } from '@/lib/video';
 import { useI18n } from '@/context/I18nContext';
-import { type StreamConfig, STREAM_MODE } from '@/lib/config';
+import { type StreamConfig, type StreamMode } from '@/lib/config';
 import type { InputTarget } from '@/context/ActiveContext';
 import type { StreamReloadOptions } from './types';
 import { useServer } from '@/context/ServerContext';
@@ -42,6 +42,7 @@ type Args = {
 
     // Keep latest config without re-running the heavy stream effect on every tick
     streamCfgRef: MutableRefObject<StreamConfig>;
+    streamMode: StreamMode;
 
     // Active/sync callbacks from ActiveContext
     selectOnly: (udid: string) => void;
@@ -185,6 +186,7 @@ export function useTileStream(args: Args) {
         closingRef,
         destroyedRef,
         streamCfgRef,
+        streamMode,
         selectOnly,
         getInputTargetsForSource,
         setAltSoloUdid,
@@ -512,11 +514,13 @@ export function useTileStream(args: Args) {
             // Populate fallback stages list if empty
             if (fallbackStagesRef.current.length === 0) {
               const meta = androidDeviceMap[udid];
-              fallbackStagesRef.current = getFallbackStages(streamCfgRef.current, meta);
+              fallbackStagesRef.current = streamMode === 'raw-v2'
+                ? getFallbackStages(streamCfgRef.current, meta)
+                : [{ description: 'Stable ws6' }];
 
               // Pre-fill cached successful config if it exists
               const cached = getCachedDeviceStream(udid);
-              if (cached) {
+              if (streamMode === 'raw-v2' && cached) {
                 fallbackStagesRef.current.unshift({
                   encoderName: cached.workingEncoder,
                   bounds: cached.workingWidth ? { width: cached.workingWidth, height: cached.workingHeight || 1280 } : undefined,
@@ -553,7 +557,8 @@ export function useTileStream(args: Args) {
                     deviceParam: streamDeviceParam,
                     udid: streamEndpointUdid,
                     restart: Boolean(opts?.restart),
-                    config: trialConfig
+                    config: trialConfig,
+                    streamMode
                 });
             } catch (err) {
                 releaseStreamSession(streamSessionKey, owner);
@@ -569,7 +574,7 @@ export function useTileStream(args: Args) {
             updateStreamSession(streamSessionKey, owner, 'connecting', ws);
 
             if (!isSilent()) {
-                setStatus(tRef.current(`Đang kết nối: ${currentStage.description}…`));
+                setStatus(tRef.current(streamMode === 'raw-v2' ? `Đang kết nối: ${currentStage.description}…` : 'Đang kết nối…'));
             }
 
             if (initialLoadTimer != null) {
@@ -604,7 +609,7 @@ export function useTileStream(args: Args) {
 
             ws.onopen = () => {
                 updateStreamSession(streamSessionKey, owner, 'connected', ws);
-                if (STREAM_MODE === 'raw-v2') {
+                if (streamMode === 'raw-v2') {
                     if (!isSilent()) {
                         setStatus(tRef.current("Đang chờ phản hồi"));
                     }
@@ -689,11 +694,9 @@ export function useTileStream(args: Args) {
 
         connect();
 
-        // Watchdog: auto-reconnects only when connection is truly dead.
-        // Do NOT reconnect on browser decode stall.
+        // Watchdog: auto-reconnects when decoding stalls
         watchdogTimer = window.setInterval(() => {
             if (destroyedRef.current || closingRef.current) return;
-
             const ws = wsRef.current;
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             if (!firstFrame) return;
@@ -702,18 +705,16 @@ export function useTileStream(args: Args) {
             const packetAge = now - lastPacketAt;
             const bitmapAge = lastBitmapAt ? now - lastBitmapAt : 1e9;
 
-            const OUTPUT_STALL_WARN_MS = 20_000;
             const packetsStillArriving = packetAge < 2500;
-            const outputStalled = bitmapAge > OUTPUT_STALL_WARN_MS;
-
+            const outputStalled = bitmapAge > 8000;
             if (packetsStillArriving && outputStalled) {
-                // Browser/GPU decode bị nghẽn, nhưng socket vẫn sống.
-                // Không reconnect, vì reconnect sẽ kill scrcpy-server trên phone và gây reconnect hàng loạt.
-                setStatus(tRef.current('⚠️ Chrome decode quá tải - giữ kết nối'));
-                setLoading(false);
+                setStatus(tRef.current('⚠️ decode đứng - kết nối lại…'));
+                setLoading(true);
+                connect();
                 return;
             }
 
+            // Expose updated stats periodically (only when values change)
             if (engine) {
               const now = Date.now();
               const elapsed = now - lastBitrateCalcTime;
@@ -738,9 +739,8 @@ export function useTileStream(args: Args) {
               }
             }
 
-            // Chỉ reconnect nếu socket thật sự im rất lâu.
-            if (packetAge > 60_000 && bitmapAge > 60_000) {
-                setStatus(tRef.current('⚠️ mất dữ liệu stream - kết nối lại…'));
+            if (packetAge > 300000 && bitmapAge > 300000) {
+                setStatus(tRef.current('⚠️ idle lâu - kết nối lại…'));
                 setLoading(true);
                 connect();
             }
@@ -783,6 +783,7 @@ export function useTileStream(args: Args) {
         streamEndpointUdid,
         streamSessionKey,
         wsServer,
+        streamMode,
         selectOnly
     ]);
 

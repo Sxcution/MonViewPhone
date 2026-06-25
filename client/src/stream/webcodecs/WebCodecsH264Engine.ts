@@ -159,7 +159,7 @@ export class WebCodecsH264Engine implements StreamEngine {
       const chunk = new EncodedVideoChunk({
         type: isKey ? 'key' : 'delta',
         timestamp: Date.now() * 1000, // microseconds
-        data: frameBytes.buffer
+        data: frameBytes
       });
       this.decoder.decode(chunk);
       this.decodedFramesCount++;

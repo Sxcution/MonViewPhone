@@ -19,10 +19,10 @@ export type StreamConfig = {
 };
 
 export const STREAM_CONFIG: StreamConfig = {
-  bitrate: 393216, // 384 KB/s-ish, nhẹ hơn cho grid
-  maxFps: 12,
+  bitrate: 524288,
+  maxFps: 24,
   iFrameInterval: 5,
-  bounds: { width: 360, height: 360 },
+  bounds: { width: 500, height: 500 },
   sendFrameMeta: false,
   displayId: 0,
   encoderName: 'OMX.google.h264.encoder',
@@ -32,4 +32,4 @@ export const STREAM_CONFIG: StreamConfig = {
 
 export type StreamMode = 'ws6' | 'raw-v2';
 
-export const STREAM_MODE: StreamMode = 'raw-v2';
+export const STREAM_MODE: StreamMode = 'ws6';

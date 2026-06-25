@@ -1,5 +1,5 @@
 import { concatU8 } from './bytes';
-import { COMMON_PARAMS, type StreamConfig, STREAM_MODE } from './config';
+import { COMMON_PARAMS, type StreamConfig, STREAM_MODE, type StreamMode } from './config';
 
 export function buildConfigBinary(cfg: StreamConfig): Uint8Array {
   const enc = new TextEncoder();
@@ -103,16 +103,17 @@ export type MakeWsUrlArgs = {
   udid: string;
   restart?: boolean;
   config?: StreamConfig;
+  streamMode?: StreamMode;
 };
 
-export function makeWsUrl({ wsServer, deviceParam, udid, restart = false, config }: MakeWsUrlArgs): string {
-  if (STREAM_MODE !== 'raw-v2' && !deviceParam) throw new Error('Missing required query param: device');
+export function makeWsUrl({ wsServer, deviceParam, udid, restart = false, config, streamMode = STREAM_MODE }: MakeWsUrlArgs): string {
+  if (streamMode !== 'raw-v2' && !deviceParam) throw new Error('Missing required query param: device');
 
   const u = new URL(wsServer);
-  const action = STREAM_MODE === 'raw-v2' ? 'proxy-scrcpy-raw' : 'proxy-adb';
+  const action = streamMode === 'raw-v2' ? 'proxy-scrcpy-raw' : 'proxy-adb';
   u.searchParams.set('action', action);
 
-  if (STREAM_MODE === 'raw-v2') {
+  if (streamMode === 'raw-v2') {
     u.searchParams.set('udid', udid);
     if (config) {
       const rawMaxSize = Math.max(config.bounds.width, config.bounds.height);

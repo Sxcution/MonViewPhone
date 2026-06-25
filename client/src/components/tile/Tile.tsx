@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActive } from '@/context/ActiveContext';
-import { type StreamConfig, STREAM_MODE } from '@/lib/config';
+import { type StreamConfig, STREAM_MODE, type StreamMode } from '@/lib/config';
 import { useI18n } from '@/context/I18nContext';
 import { useServer } from '@/context/ServerContext';
 
@@ -24,6 +24,7 @@ function TileComponent({
     connectionMode = 'unknown',
     wsServer,
     streamConfig,
+    streamMode = STREAM_MODE,
     order,
     isViewing = false,
     selected = false,
@@ -168,7 +169,7 @@ function TileComponent({
         const prev = streamCfgRef.current;
         streamCfgRef.current = streamConfig;
 
-        if (STREAM_MODE === 'raw-v2' && prev) {
+        if (streamMode === 'raw-v2' && prev) {
             const hasChanged =
                 prev.maxFps !== streamConfig.maxFps ||
                 prev.bitrate !== streamConfig.bitrate ||
@@ -179,7 +180,7 @@ function TileComponent({
                 reloadRef.current?.({ silent: true });
             }
         }
-    }, [streamConfig]);
+    }, [streamConfig, streamMode]);
 
     // Register a stable reload wrapper with the parent (App) so it can "reload all tiles".
     useEffect(() => {
@@ -220,6 +221,7 @@ function TileComponent({
         closingRef,
         destroyedRef,
         streamCfgRef,
+        streamMode,
         selectOnly,
         getInputTargetsForSource,
         setAltSoloUdid,

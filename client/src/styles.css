@@ -4896,6 +4896,17 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   z-index: 20 !important;
 }
 
+.btn-stream-mode {
+  left: 56px !important;
+  z-index: 20 !important;
+}
+
+.btn-stream-mode.on {
+  border-color: rgba(61, 220, 132, 0.75);
+  background: rgba(20, 80, 45, 0.88);
+  color: #84f5ad;
+}
+
 .btn-notes {
   right: 56px !important;
   left: auto !important;

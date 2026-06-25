@@ -8,22 +8,20 @@ interface NaluInfo {
 function parseNalus(packet: Uint8Array): NaluInfo[] {
   const nalus: NaluInfo[] = [];
   let pos = 0;
-  
+
   while (pos < packet.length) {
-    // Find start code
     let startLen = 0;
     if (pos + 2 < packet.length && packet[pos] === 0x00 && packet[pos + 1] === 0x00 && packet[pos + 2] === 0x01) {
       startLen = 3;
     } else if (pos + 3 < packet.length && packet[pos] === 0x00 && packet[pos + 1] === 0x00 && packet[pos + 2] === 0x00 && packet[pos + 3] === 0x01) {
       startLen = 4;
     }
-    
+
     if (startLen === 0) {
       pos++;
       continue;
     }
-    
-    // Find next start code
+
     let nextStart = -1;
     for (let i = pos + startLen; i + 2 < packet.length; i++) {
       if (packet[i] === 0x00 && packet[i + 1] === 0x00) {
@@ -37,15 +35,15 @@ function parseNalus(packet: Uint8Array): NaluInfo[] {
         }
       }
     }
-    
+
     const end = nextStart === -1 ? packet.length : nextStart;
     const naluData = packet.subarray(pos, end);
     const type = naluData[startLen] & 0x1f;
-    
+
     nalus.push({ type, data: naluData });
     pos = end;
   }
-  
+
   return nalus;
 }
 
@@ -82,29 +80,18 @@ export class AccessUnitAssembler {
       }
     }
 
-    if (!hasVcl) {
-      // Packet has only headers (SPS/PPS), do not emit it as a frame
-      return;
-    }
+    if (!hasVcl) return;
 
-    // It has VCL, so we assemble the complete Access Unit
     if (isKey) {
-      // If it's a keyframe, ensure it contains SPS + PPS + IDR
       if (hasSps && hasPps) {
-        // Already contains SPS and PPS, emit as is
         this.onFrame(packet, true);
+      } else if (this.cachedSps && this.cachedPps) {
+        const assembled = concatU8(concatU8(this.cachedSps, this.cachedPps), packet);
+        this.onFrame(assembled, true);
       } else {
-        // Prepend cached SPS/PPS
-        if (this.cachedSps && this.cachedPps) {
-          const assembled = concatU8(concatU8(this.cachedSps, this.cachedPps), packet);
-          this.onFrame(assembled, true);
-        } else {
-          // No cached SPS/PPS yet, emit as is (might fail decoding but we have no choice)
-          this.onFrame(packet, true);
-        }
+        this.onFrame(packet, true);
       }
     } else {
-      // P-frame, emit as is
       this.onFrame(packet, false);
     }
   }

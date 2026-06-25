@@ -1,4 +1,4 @@
-import type { StreamConfig } from '@/lib/config';
+import type { StreamConfig, StreamMode } from '@/lib/config';
 import type { DeviceAccountData } from '@/lib/deviceAccountVault';
 
 export type StreamReloadOptions = {
@@ -19,6 +19,7 @@ export type TileProps = {
     connectionMode?: ConnectionState;
     wsServer: string;
     streamConfig: StreamConfig;
+    streamMode?: StreamMode;
     order?: number;
     isViewing?: boolean;
     selected?: boolean;
