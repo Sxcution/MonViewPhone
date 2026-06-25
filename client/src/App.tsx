@@ -502,10 +502,6 @@ export function App() {
     } catch { }
     return STREAM_CONFIG
   })
-  const streamConfigRef = useRef<StreamConfig>(STREAM_CONFIG)
-  useEffect(() => {
-    streamConfigRef.current = streamConfig
-  }, [streamConfig])
   const reloadMap = useRef<Map<string, (opts?: StreamReloadOptions) => void>>(new Map())
 
   const [viewerStreamConfig, setViewerStreamConfig] = useState<StreamConfig>(() => {
@@ -3293,78 +3289,13 @@ export function App() {
     })
   }, [draftViewerConfig])
 
-  const applyStreamConfig = useCallback((scope: 'active' | 'selected' | 'all' = 'active') => {
-    if (viewerUdid) {
-      setViewerStreamConfig(draftViewerConfig);
-      streamConfigRef.current = draftViewerConfig;
-      reloadMap.current.get(viewerUdid)?.({ silent: true, restart: true });
-      return;
-    }
-
-    setStreamConfig(draftConfig);
-    streamConfigRef.current = draftConfig;
-
-    let targets: string[] = [];
-    if (scope === 'active' && activeUdid) {
-      targets = [activeUdid];
-    } else if (scope === 'selected') {
-      targets = Array.from(connectSelection);
-    } else {
-      targets = registeredUdids;
-    }
-
-    targets.forEach(id => {
-      reloadMap.current.get(id)?.({ silent: true, restart: true });
-    });
-  }, [
-    viewerUdid,
-    draftViewerConfig,
-    draftConfig,
-    activeUdid,
-    connectSelection,
-    registeredUdids,
-  ]);
-
   const applyActiveDraftConfig = useCallback(() => {
     if (viewerUdid) {
-      applyStreamConfig('active');
+      applyViewerDraftConfig()
     } else {
-      const scope = connectSelection.size > 0 ? 'selected' : (activeUdid ? 'active' : 'all');
-      applyStreamConfig(scope);
+      applyGridDraftConfig()
     }
-  }, [viewerUdid, connectSelection.size, activeUdid, applyStreamConfig]);
-
-  // Auto-apply on slider changes with debounce to avoid spamming reconnects
-  useEffect(() => {
-    if (skipNextAutoApply.current) {
-      skipNextAutoApply.current = false;
-      return;
-    }
-    if (
-      (bitrateNeedsConfirm && !bitrateWarnAccepted) ||
-      bitrateConfirmVisible
-    ) {
-      return;
-    }
-    if (autoApplyTimer.current) window.clearTimeout(autoApplyTimer.current);
-    autoApplyTimer.current = window.setTimeout(() => {
-      applyActiveDraftConfig();
-      autoApplyTimer.current = null;
-    }, 600);
-    return () => {
-      if (autoApplyTimer.current) {
-        window.clearTimeout(autoApplyTimer.current);
-        autoApplyTimer.current = null;
-      }
-    };
-  }, [
-    draftConfig,
-    draftViewerConfig,
-    applyActiveDraftConfig,
-    bitrateNeedsConfirm,
-    bitrateWarnAccepted,
-    bitrateConfirmVisible
-  ]);
+  }, [viewerUdid, applyViewerDraftConfig, applyGridDraftConfig])
 
   const handleBitrateChange = (val: number) => {
     const needsConfirm = val > BITRATE_WARN_THRESHOLD && !bitrateWarnAccepted
@@ -3403,7 +3334,37 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [viewerUdid]);
 
-
+  // Auto-apply on slider changes with debounce to avoid spamming reconnects
+  useEffect(() => {
+    if (skipNextAutoApply.current) {
+      skipNextAutoApply.current = false
+      return
+    }
+    if (
+      (bitrateNeedsConfirm && !bitrateWarnAccepted) ||
+      bitrateConfirmVisible
+    ) {
+      return
+    }
+    if (autoApplyTimer.current) window.clearTimeout(autoApplyTimer.current)
+    autoApplyTimer.current = window.setTimeout(() => {
+      applyActiveDraftConfig()
+      autoApplyTimer.current = null
+    }, 600)
+    return () => {
+      if (autoApplyTimer.current) {
+        window.clearTimeout(autoApplyTimer.current)
+        autoApplyTimer.current = null
+      }
+    }
+  }, [
+    draftConfig,
+    draftViewerConfig,
+    applyActiveDraftConfig,
+    bitrateNeedsConfirm,
+    bitrateWarnAccepted,
+    bitrateConfirmVisible
+  ])
 
   const onViewerPointerMove = useCallback((e: PointerEvent) => {
     if (!viewerDragRef.current.active) return
