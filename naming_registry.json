@@ -397,9 +397,7 @@
       "input_modal_state": "InputModalState",
       "macro_ctx_menu_state": "MacroCtxMenuState",
       "automation_click_detail": "AutomationClickDetail",
-      "automation_swipe_detail": "AutomationSwipeDetail",
-      "raw_stream_params": "RawStreamParams",
-      "make_ws_url_args": "MakeWsUrlArgs"
+      "automation_swipe_detail": "AutomationSwipeDetail"
     },
     "events": {
       "automation_click_event": "monviewphone:automation-click",
@@ -425,14 +423,6 @@
       "emit_automation_click": "emitAutomationClick",
       "emit_automation_swipe": "emitAutomationSwipe",
       "copy_row": "copyRow"
-    },
-    "constants": {
-      "stream_mode": "STREAM_MODE",
-      "max_channel_queue_bytes": "MAX_CHANNEL_QUEUE_BYTES",
-      "force_restart_cooldown": "ForceRestartCooldown",
-      "raw_default_max_size": "RawDefaultMaxSize",
-      "raw_default_bit_rate": "RawDefaultBitRate",
-      "raw_default_max_fps": "RawDefaultMaxFps"
     }
   },
   "key_codes": {

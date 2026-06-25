@@ -1,12 +1,4 @@
-import React, {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState
-} from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActive } from '@/context/ActiveContext';
 import { useServer } from '@/context/ServerContext';
 import { attachTouchControls } from '@/lib/touchControls';
@@ -124,14 +116,7 @@ const DeviceViewerComponent = ({
   const detachRef = useRef<(() => void) | null>(null);
   const rafRef = useRef<number | null>(null);
 
-  const [status, setStatusState] = useState<'connecting' | 'ready'>('connecting');
-  const statusRef = useRef<'connecting' | 'ready'>('connecting');
-  const setStatus = useCallback((s: 'connecting' | 'ready') => {
-    if (statusRef.current !== s) {
-      statusRef.current = s;
-      setStatusState(s);
-    }
-  }, []);
+  const [status, setStatus] = useState<'connecting' | 'ready'>('connecting');
   const [tab, setTab] = useState<ViewerTab>('view');
   const [serialCopied, setSerialCopied] = useState(false);
   const [newOrderViewer, setNewOrderViewer] = useState('');
@@ -246,8 +231,8 @@ const DeviceViewerComponent = ({
     }
   };
 
-  // ===== Touch controls: only bind when we are in "view" tab. (Fix 2)
-  useLayoutEffect(() => {
+  // ===== Touch controls: only bind when we are in "view" tab.
+  useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
 
@@ -257,7 +242,6 @@ const DeviceViewerComponent = ({
     if (tab !== 'view') return;
 
     const onActivate = () => selectOnly(udid);
-
     detachRef.current = attachTouchControls(
       c,
       () => getInputTargetsForSource(udid),
@@ -266,43 +250,18 @@ const DeviceViewerComponent = ({
       { ctrlWheelPinch: true }
     );
 
-    c.tabIndex = 0;
-    c.focus?.({ preventScroll: true });
-
     return () => {
       detachRef.current?.();
       detachRef.current = null;
     };
   }, [udid, tab, getInputTargetsForSource, selectOnly]);
 
-  // ===== Copy canvas dimensions and last frame from source tile canvas (Fix 3)
-  useLayoutEffect(() => {
-    if (tab !== 'view') return;
-
-    const dst = canvasRef.current;
-    const src = getCanvasForUdid(udid);
-
-    if (!dst || !src || src.width <= 0 || src.height <= 0) return;
-
-    if (dst.width !== src.width || dst.height !== src.height) {
-      dst.width = src.width;
-      dst.height = src.height;
-    }
-
-    const ctx = dst.getContext('2d', { alpha: false });
-    if (ctx) {
-      try {
-        ctx.drawImage(src, 0, 0, dst.width, dst.height);
-        setStatus('ready');
-      } catch {}
-    }
-
-    dst.focus?.({ preventScroll: true });
-  }, [udid, tab, getCanvasForUdid]);
-
   useEffect(() => {
     if (tab !== 'view') return;
     selectOnly(udid);
+    requestAnimationFrame(() => {
+      canvasRef.current?.focus?.();
+    });
   }, [udid, tab, selectOnly]);
 
   // ===== Mirror tile canvas into viewer canvas (RAF), only in view tab.
@@ -327,12 +286,12 @@ const DeviceViewerComponent = ({
         }
         try {
           ctx.drawImage(src, 0, 0, dst.width, dst.height);
-          if (statusRef.current !== 'ready') setStatus('ready');
+          if (status !== 'ready') setStatus('ready');
         } catch {
           // ignore
         }
       } else {
-        if (statusRef.current !== 'connecting') setStatus('connecting');
+        if (status !== 'connecting') setStatus('connecting');
       }
       rafRef.current = requestAnimationFrame(tick);
     };

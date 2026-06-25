@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '@/context/I18nContext';
 import { Eye, RefreshCw } from 'lucide-react';
-import { StreamStats } from '@/stream/StreamEngine';
 
 type Props = {
   udid: string;
@@ -12,7 +11,6 @@ type Props = {
   onHeaderClick: (e: React.MouseEvent) => void;
   onReloadClick: (e: React.MouseEvent) => void;
   connectionLabel?: string;
-  streamStats?: StreamStats | null;
   onViewClick?: () => void;
   onMove?: (udid: string, toIndex: number) => void;
   onChangeOrderNumber?: (udid: string, nextNumber: number) => void;
@@ -27,7 +25,6 @@ export function TileHeader({
   onHeaderClick,
   onReloadClick,
   connectionLabel,
-  streamStats,
   onViewClick,
   onChangeOrderNumber,
 }: Props) {
@@ -95,17 +92,6 @@ export function TileHeader({
           {syncRole ? (
             <div className={`tileSyncChip ${syncRole}`}>{syncRole === 'main' ? t('Chinh') : t('Phu')}</div>
           ) : null}
-          {streamStats && (
-            <div className="tileStatsText" style={{ marginLeft: '6px', fontSize: '10px', color: 'var(--md-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <span>{streamStats.decodedFps} FPS</span>
-              {streamStats.bitrateKbps !== undefined && (
-                <>
-                  <span>|</span>
-                  <span>{streamStats.bitrateKbps} kb/s</span>
-                </>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

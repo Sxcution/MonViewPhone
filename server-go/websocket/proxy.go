@@ -50,9 +50,6 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[%s] Proxy WS connected (remote=%s, path=%s)", udid, remote, wsPath)
 
-	traceStart := time.Now()
-	log.Printf("[%s] Stream trace: browser_ws_connected remote=%s path=%s", udid, remote, wsPath)
-
 	session, err := connectDeviceWsWithRecovery(udid, remote, wsPath, pathRequestsRestart(wsPath))
 	if err != nil {
 		if remote == "tcp:8886" {
@@ -65,8 +62,6 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[%s] Stream trace: device_ws_connected elapsed=%s local_port=%s", udid, time.Since(traceStart), session.port)
-
 	deviceWs := session.ws
 	defer deviceWs.Close()
 	defer func() {
@@ -77,9 +72,6 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	log.Printf("[%s] Device WS connected, starting bidirectional pipe", udid)
-
-	var firstBrowserConfigOnce sync.Once
-	var firstDeviceFrameOnce sync.Once
 
 	done := make(chan struct{}, 2)
 	var closeOnce sync.Once
@@ -103,14 +95,6 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 				}
 				return
 			}
-			firstBrowserConfigOnce.Do(func() {
-				log.Printf("[%s] Stream trace: first_browser_payload elapsed=%s bytes=%d type=%d",
-					udid,
-					time.Since(traceStart),
-					len(msg),
-					msgType,
-				)
-			})
 			if err := deviceWs.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 				log.Printf("[%s] Failed to set write deadline on device WS: %v", udid, err)
 				return
@@ -137,14 +121,6 @@ func HandleProxyAdb(w http.ResponseWriter, r *http.Request) {
 				}
 				return
 			}
-			firstDeviceFrameOnce.Do(func() {
-				log.Printf("[%s] Stream trace: first_device_payload elapsed=%s bytes=%d type=%d",
-					udid,
-					time.Since(traceStart),
-					len(msg),
-					msgType,
-				)
-			})
 			if err := clientWs.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 				log.Printf("[%s] Failed to set write deadline on client WS: %v", udid, err)
 				return

@@ -19,8 +19,8 @@ export type StreamConfig = {
 };
 
 export const STREAM_CONFIG: StreamConfig = {
-  bitrate: 524288,
-  maxFps: 24,
+  bitrate: 917504, //max 8388608
+  maxFps: 24, // max 60
   iFrameInterval: 5,
   bounds: { width: 500, height: 500 },
   sendFrameMeta: false,
@@ -29,7 +29,3 @@ export const STREAM_CONFIG: StreamConfig = {
   engine: 'auto',
   encoderMode: 'auto',
 };
-
-export type StreamMode = 'ws6' | 'raw-v2';
-
-export const STREAM_MODE: StreamMode = 'ws6';

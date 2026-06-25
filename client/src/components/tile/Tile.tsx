@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useActive } from '@/context/ActiveContext';
-import { type StreamConfig, STREAM_MODE, type StreamMode } from '@/lib/config';
+import type { StreamConfig } from '@/lib/config';
 import { useI18n } from '@/context/I18nContext';
 import { useServer } from '@/context/ServerContext';
 
@@ -24,7 +24,6 @@ function TileComponent({
     connectionMode = 'unknown',
     wsServer,
     streamConfig,
-    streamMode = STREAM_MODE,
     order,
     isViewing = false,
     selected = false,
@@ -166,21 +165,8 @@ function TileComponent({
     // without forcing the heavy streaming effect to re-run on every slider tick.
     const streamCfgRef = useRef<StreamConfig>(streamConfig);
     useEffect(() => {
-        const prev = streamCfgRef.current;
         streamCfgRef.current = streamConfig;
-
-        if (streamMode === 'raw-v2' && prev) {
-            const hasChanged =
-                prev.maxFps !== streamConfig.maxFps ||
-                prev.bitrate !== streamConfig.bitrate ||
-                prev.bounds.width !== streamConfig.bounds.width ||
-                prev.bounds.height !== streamConfig.bounds.height;
-
-            if (hasChanged) {
-                reloadRef.current?.({ silent: true });
-            }
-        }
-    }, [streamConfig, streamMode]);
+    }, [streamConfig]);
 
     // Register a stable reload wrapper with the parent (App) so it can "reload all tiles".
     useEffect(() => {
@@ -221,7 +207,6 @@ function TileComponent({
         closingRef,
         destroyedRef,
         streamCfgRef,
-        streamMode,
         selectOnly,
         getInputTargetsForSource,
         setAltSoloUdid,
@@ -401,7 +386,6 @@ function TileComponent({
                     status={status}
                     syncRole={syncRole}
                     connectionLabel={connectionLabel}
-                    streamStats={streamStats}
                     onHeaderClick={onHeaderClick}
                     onReloadClick={(e) => {
                         e.stopPropagation();

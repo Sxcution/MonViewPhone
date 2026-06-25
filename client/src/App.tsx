@@ -7,7 +7,7 @@ import { hasNearbyRelevantAccount, getNearestNearbyHours, getNearbyAccountGroupS
 import { readPageParams } from '@/lib/params'
 import { useServer } from '@/context/ServerContext'
 import { Tile } from '@/components/Tile'
-import { STREAM_CONFIG, type StreamConfig, type StreamMode } from '@/lib/config'
+import { STREAM_CONFIG, type StreamConfig } from '@/lib/config'
 import { useI18n } from '@/context/I18nContext'
 import { useDirectKeyboard } from '@/hooks/useDirectKeyboard'
 import { DeviceViewer } from '@/components/DeviceViewer'
@@ -132,7 +132,6 @@ const CONNECT_CHECK_DEVICE_MESSAGE =
 const QUICK_ACTION_ORDER_KEY = 'quickActionOrder'
 const SAVED_GROUPS_KEY = 'savedGroups'
 const STREAM_CONFIG_KEY = 'streamConfig'
-const STREAM_MODE_KEY = 'monviewphone:stream-mode'
 const VIEWER_STREAM_CONFIG_KEY = 'viewerStreamConfig'
 const SAVED_GROUPS_BACKUP_KEY = 'savedGroupsBackupV1'
 const SAVED_GROUPS_DELETED_ALL_KEY = 'savedGroupsDeletedAllV1'
@@ -478,7 +477,6 @@ export function App() {
     clickDevice,
     syncAll,
     syncMain,
-    getCanvasForUdid,
   } = useActive()
 
   const [streamConfig, setStreamConfig] = useState<StreamConfig>(() => {
@@ -590,16 +588,8 @@ export function App() {
   }, []);
 
   const handleViewDevice = useCallback((id: string) => {
-    setViewerUdid(prev => {
-      if (prev === id) return null;
-      selectOnly(id);
-      requestAnimationFrame(() => {
-        const c = getCanvasForUdid?.(id);
-        c?.focus?.({ preventScroll: true });
-      });
-      return id;
-    });
-  }, [selectOnly, getCanvasForUdid]);
+    setViewerUdid(prev => prev === id ? null : id)
+  }, [])
 
   const handleDragStart = useCallback((id: string) => {
     setDraggingTile(id)
@@ -845,11 +835,7 @@ export function App() {
     clickDevice(udid);
     selectOnly(udid);
     setViewerUdid(udid);
-    requestAnimationFrame(() => {
-      const c = getCanvasForUdid?.(udid);
-      c?.focus?.({ preventScroll: true });
-    });
-  }, [clickDevice, selectOnly, getCanvasForUdid]);
+  }, [clickDevice, selectOnly]);
   const apkInputRef = useRef<HTMLInputElement | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const [viewerOffset, setViewerOffset] = useState({ x: 0, y: 0 })
@@ -902,18 +888,6 @@ export function App() {
       return false
     }
   })
-  const [streamMode, setStreamMode] = useState<StreamMode>(() => {
-    try {
-      return localStorage.getItem(STREAM_MODE_KEY) === 'raw-v2' ? 'raw-v2' : 'ws6'
-    } catch {
-      return 'ws6'
-    }
-  })
-  useEffect(() => {
-    try {
-      localStorage.setItem(STREAM_MODE_KEY, streamMode)
-    } catch { }
-  }, [streamMode])
   useEffect(() => {
     try {
       localStorage.setItem('isSidebarPinned', String(isSidebarPinned))
@@ -3335,17 +3309,37 @@ export function App() {
     }
   }
 
-  // Delay upgrade quality (Tạm thời KHÔNG reload để tránh đơ khi phóng to/thu nhỏ)
+  const prevViewerRef = useRef<string | null>(null)
+
+  // Reload single tile silently when opening/closing viewer or when viewer config changes
   useEffect(() => {
-    if (!viewerUdid) return;
+    const prev = prevViewerRef.current
 
-    const timer = window.setTimeout(() => {
-      // Tạm thời KHÔNG reload ở đây nếu chưa có make-before-break.
-      // Sau này thay bằng upgradeViewerStreamMakeBeforeBreak(viewerUdid).
-    }, 800);
+    // Case 1: Viewer is currently open
+    if (viewerUdid) {
+      const fn = reloadMap.current.get(viewerUdid)
+      try {
+        fn?.({ silent: true })
+      } catch {}
 
-    return () => window.clearTimeout(timer);
-  }, [viewerUdid]);
+      // If we switched from another viewer device, reload that previous device silently so it returns to grid config
+      if (prev && prev !== viewerUdid) {
+        const prevFn = reloadMap.current.get(prev)
+        try {
+          prevFn?.({ silent: true })
+        } catch {}
+      }
+      prevViewerRef.current = viewerUdid
+    }
+    // Case 2: Viewer was closed (viewerUdid is null)
+    else if (prev) {
+      const fn = reloadMap.current.get(prev)
+      try {
+        fn?.({ silent: true })
+      } catch {}
+      prevViewerRef.current = null
+    }
+  }, [viewerUdid, viewerStreamConfig])
 
   // Auto-apply on slider changes with debounce to avoid spamming reconnects
   useEffect(() => {
@@ -3830,14 +3824,15 @@ export function App() {
                       streamUdid={streamUdid}
                       connectionMode={connectionMode}
                       wsServer={wsServer}
-                      streamMode={streamMode}
                       isViewing={viewerUdid === udid}
                       selected={connectSelection.has(udid)}
                       showTileInfo={showTileInfo}
                       isDisconnected={!isConnected}
                       visualAlertActive={Boolean(visualTileAlerts[udid])}
                       onClearVisualAlert={clearVisualAlert}
-                      streamConfig={streamConfig}
+                      streamConfig={
+                        viewerUdid === udid ? viewerStreamConfig : streamConfig
+                      }
                       onRegisterReload={registerReload}
                       onUnregisterReload={unregisterReload}
                       onViewDevice={handleViewDevice}
@@ -3902,28 +3897,6 @@ export function App() {
               <PinOff size={16} strokeWidth={2} />
             ) : (
               <Pin size={16} strokeWidth={2} />
-            )}
-          </button>
-          <button
-            className={`btn-pin btn-stream-mode${streamMode === 'raw-v2' ? ' on' : ''}`}
-            aria-label={streamMode === 'raw-v2' ? 'Stream mới raw-v2 đang bật' : 'Stream cũ ws6 đang bật'}
-            title={streamMode === 'raw-v2' ? 'Stream mới raw-v2 (thử nghiệm)' : 'Stream cũ ws6 (ổn định)'}
-            onClick={() => {
-              const next: StreamMode = streamMode === 'raw-v2' ? 'ws6' : 'raw-v2'
-              setStreamMode(next)
-              try {
-                localStorage.setItem(STREAM_MODE_KEY, next)
-              } catch { }
-              setTimeout(() => reloadAllTiles(), 100)
-            }}
-            data-inspector-id="rightSidebar.streamModeToggle"
-            data-inspector-label="Right sidebar stream mode toggle button"
-            data-inspector-component="client/src/App.tsx"
-          >
-            {streamMode === 'raw-v2' ? (
-              <Monitor size={16} strokeWidth={2} />
-            ) : (
-              <MonitorOff size={16} strokeWidth={2} />
             )}
           </button>
           <button

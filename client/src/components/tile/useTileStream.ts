@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { attachTouchControls } from '@/lib/touchControls';
 import { buildConfigBinary, makeWsUrl } from '@/lib/video';
 import { useI18n } from '@/context/I18nContext';
-import { type StreamConfig, type StreamMode } from '@/lib/config';
+import type { StreamConfig } from '@/lib/config';
 import type { InputTarget } from '@/context/ActiveContext';
 import type { StreamReloadOptions } from './types';
 import { useServer } from '@/context/ServerContext';
@@ -42,7 +42,6 @@ type Args = {
 
     // Keep latest config without re-running the heavy stream effect on every tick
     streamCfgRef: MutableRefObject<StreamConfig>;
-    streamMode: StreamMode;
 
     // Active/sync callbacks from ActiveContext
     selectOnly: (udid: string) => void;
@@ -186,7 +185,6 @@ export function useTileStream(args: Args) {
         closingRef,
         destroyedRef,
         streamCfgRef,
-        streamMode,
         selectOnly,
         getInputTargetsForSource,
         setAltSoloUdid,
@@ -310,9 +308,6 @@ export function useTileStream(args: Args) {
         let engine: StreamEngine | null = null;
         let lastPacketAt = Date.now();
         let lastBitmapAt = 0;
-        let bytesReceivedThisInterval = 0;
-        let lastBitrateCalcTime = Date.now();
-        let currentBitrateKbps = 0;
 
         let watchdogTimer: number | null = null;
         let initialLoadTimer: number | null = null;
@@ -402,9 +397,6 @@ export function useTileStream(args: Args) {
               },
               onError: (err: any) => {
                 console.error('[StreamEngine error]', udid, err);
-                const reason = `Engine error: ${err?.message || err}`;
-                fallbackReasonRef.current = reason;
-                triggerFallbackConnection(reason);
               },
               onFallbackRequested: (reason: string) => {
                 fallbackReasonRef.current = reason;
@@ -423,20 +415,12 @@ export function useTileStream(args: Args) {
 
         function triggerFallbackConnection(reason: string) {
           if (destroyedRef.current || closingRef.current) return;
-
-          // Đã từng có frame rồi thì lỗi này thường là decode/browser overload,
-          // không phải encoder Android. Không thử encoder lung tung nữa.
-          if (firstFrame) {
-            console.warn(`[Stream V2] Ignore fallback after first frame on ${udid}: ${reason}`);
-            fallbackReasonRef.current = `Decode overloaded: ${reason}`;
-            setStatus(tRef.current('⚠️ decode quá tải'));
-            return;
-          }
-
           console.warn(`[Stream V2 Fallback] Fallback requested on device ${udid} due to: ${reason}`);
 
+          // Advance stage index
           currentStageIdxRef.current++;
           if (currentStageIdxRef.current >= fallbackStagesRef.current.length) {
+            // We have exhausted all trial stages. Keep trying WebCodecs
             currentStageIdxRef.current = 0;
             fallbackReasonRef.current = 'All encoders failed. Retrying WebCodecs...';
           }
@@ -514,13 +498,11 @@ export function useTileStream(args: Args) {
             // Populate fallback stages list if empty
             if (fallbackStagesRef.current.length === 0) {
               const meta = androidDeviceMap[udid];
-              fallbackStagesRef.current = streamMode === 'raw-v2'
-                ? getFallbackStages(streamCfgRef.current, meta)
-                : [{ description: 'Stable ws6' }];
+              fallbackStagesRef.current = getFallbackStages(streamCfgRef.current, meta);
 
               // Pre-fill cached successful config if it exists
               const cached = getCachedDeviceStream(udid);
-              if (streamMode === 'raw-v2' && cached) {
+              if (cached) {
                 fallbackStagesRef.current.unshift({
                   encoderName: cached.workingEncoder,
                   bounds: cached.workingWidth ? { width: cached.workingWidth, height: cached.workingHeight || 1280 } : undefined,
@@ -556,9 +538,7 @@ export function useTileStream(args: Args) {
                     wsServer,
                     deviceParam: streamDeviceParam,
                     udid: streamEndpointUdid,
-                    restart: Boolean(opts?.restart),
-                    config: trialConfig,
-                    streamMode
+                    restart: Boolean(opts?.restart)
                 });
             } catch (err) {
                 releaseStreamSession(streamSessionKey, owner);
@@ -574,7 +554,7 @@ export function useTileStream(args: Args) {
             updateStreamSession(streamSessionKey, owner, 'connecting', ws);
 
             if (!isSilent()) {
-                setStatus(tRef.current(streamMode === 'raw-v2' ? `Đang kết nối: ${currentStage.description}…` : 'Đang kết nối…'));
+                setStatus(tRef.current(`Đang kết nối: ${currentStage.description}…`));
             }
 
             if (initialLoadTimer != null) {
@@ -609,13 +589,6 @@ export function useTileStream(args: Args) {
 
             ws.onopen = () => {
                 updateStreamSession(streamSessionKey, owner, 'connected', ws);
-                if (streamMode === 'raw-v2') {
-                    if (!isSilent()) {
-                        setStatus(tRef.current("Đang chờ phản hồi"));
-                    }
-                    return;
-                }
-
                 if (!isSilent()) {
                     setStatus(tRef.current('Gửi cấu hình stream...'));
                 }
@@ -636,7 +609,6 @@ export function useTileStream(args: Args) {
                 else if (ev.data instanceof Blob) ab = await ev.data.arrayBuffer();
                 if (!ab) return;
                 lastPacketAt = Date.now();
-                bytesReceivedThisInterval += ab.byteLength;
                 engine?.feedBytes(new Uint8Array(ab));
             };
 
@@ -716,21 +688,12 @@ export function useTileStream(args: Args) {
 
             // Expose updated stats periodically (only when values change)
             if (engine) {
-              const now = Date.now();
-              const elapsed = now - lastBitrateCalcTime;
-              if (elapsed > 0) {
-                currentBitrateKbps = Math.round((bytesReceivedThisInterval * 8) / elapsed);
-                bytesReceivedThisInterval = 0;
-                lastBitrateCalcTime = now;
-              }
-
               const stats = engine.getStats();
               const nextStats = {
                 ...stats,
                 reconnectCount: reconnectCountRef.current,
                 encoderName: activeStageRef.current?.encoderName || 'default',
-                fallbackReason: fallbackReasonRef.current || undefined,
-                bitrateKbps: currentBitrateKbps
+                fallbackReason: fallbackReasonRef.current || undefined
               };
               const serialized = JSON.stringify(nextStats);
               if (serialized !== prevStatsRef.current) {
@@ -783,7 +746,6 @@ export function useTileStream(args: Args) {
         streamEndpointUdid,
         streamSessionKey,
         wsServer,
-        streamMode,
         selectOnly
     ]);
 
