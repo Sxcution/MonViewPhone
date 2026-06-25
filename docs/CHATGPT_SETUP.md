@@ -31,9 +31,15 @@ Hiện tại, việc cấu hình MCP server trên ChatGPT có thể thực hiệ
 1.  Truy cập ChatGPT, chọn **Explore GPTs** -> **Create a GPT**.
 2.  Chuyển sang tab **Configure**, đặt tên cho GPT (ví dụ: `MonViewPhone Workspace Assistant`).
 3.  Cuộn xuống và nhấn **Create new action**.
-4.  Ở mục **Authentication**, chọn **Bearer** và nhập mã token tương ứng với biến `MCP_AUTH_TOKEN` bạn đã cấu hình trong file `.env`.
-5.  Trong phần **Schema**, nhập tài liệu OpenAPI định nghĩa endpoint `/health`, `/mcp` và `/messages` (hoặc cấu hình SSE connection trực tiếp).
-    > *Lưu ý*: Với giao thức MCP SSE chuẩn, client sẽ thực hiện kết nối GET tới `/mcp` với header `Authorization: Bearer <token>`, từ đó nhận stream SSE và gửi command POST tới `/messages`.
+4.  Ở mục **Authentication**, chọn nút bánh răng cài đặt:
+    *   **Authentication Type**: Chọn **API Key**
+    *   **Auth Type**: Chọn **Bearer**
+    *   **API Key**: Dán đúng raw token đang được cấu hình trên server local (ví dụ: `test-token-123-abc` từ biến môi trường `MCP_AUTH_TOKEN`).
+    *   *Chú ý*: Không nhập chữ "Bearer" vào ô nhập này, chỉ nhập raw token. ChatGPT sẽ tự động thêm tiền tố Bearer khi gửi request.
+5.  Trong phần **Schema**, nhập tài liệu OpenAPI REST định nghĩa các endpoints.
+
+🔐 **Lưu ý khắc phục lỗi Authentication (Unauthorized: Invalid token):**
+Nếu các endpoint `/workspace/*` trả về lỗi "Unauthorized: Invalid token" thì nguyên nhân chính là do mã API Key cấu hình trong ChatGPT Action Authentication không khớp 100% với token trên server local. Hãy kiểm tra kỹ tệp `.env` của local server.
 
 ### Tùy chọn B: Sử dụng các Client MCP hỗ trợ giao diện ChatGPT
 Nếu bạn đang dùng ứng dụng chat / Developer Mode hỗ trợ trực tiếp MCP Server:
