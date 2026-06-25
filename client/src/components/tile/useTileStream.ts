@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { attachTouchControls } from '@/lib/touchControls';
 import { buildConfigBinary, makeWsUrl } from '@/lib/video';
 import { useI18n } from '@/context/I18nContext';
-import type { StreamConfig } from '@/lib/config';
+import { type StreamConfig, STREAM_MODE } from '@/lib/config';
 import type { InputTarget } from '@/context/ActiveContext';
 import type { StreamReloadOptions } from './types';
 import { useServer } from '@/context/ServerContext';
@@ -592,6 +592,13 @@ export function useTileStream(args: Args) {
 
             ws.onopen = () => {
                 updateStreamSession(streamSessionKey, owner, 'connected', ws);
+                if (STREAM_MODE === 'raw-v2') {
+                    if (!isSilent()) {
+                        setStatus(tRef.current("Đang chờ phản hồi"));
+                    }
+                    return;
+                }
+
                 if (!isSilent()) {
                     setStatus(tRef.current('Gửi cấu hình stream...'));
                 }

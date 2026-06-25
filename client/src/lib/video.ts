@@ -1,5 +1,5 @@
 import { concatU8 } from './bytes';
-import { COMMON_PARAMS, type StreamConfig } from './config';
+import { COMMON_PARAMS, type StreamConfig, STREAM_MODE } from './config';
 
 export function buildConfigBinary(cfg: StreamConfig): Uint8Array {
   const enc = new TextEncoder();
@@ -105,17 +105,23 @@ export type MakeWsUrlArgs = {
 };
 
 export function makeWsUrl({ wsServer, deviceParam, udid, restart = false }: MakeWsUrlArgs): string {
-  if (!deviceParam) throw new Error('Missing required query param: device');
+  if (STREAM_MODE !== 'raw-v2' && !deviceParam) throw new Error('Missing required query param: device');
 
   const u = new URL(wsServer);
-  u.searchParams.set('action', COMMON_PARAMS.action);
-  u.searchParams.set('remote', COMMON_PARAMS.remote);
+  const action = STREAM_MODE === 'raw-v2' ? 'proxy-scrcpy-raw' : 'proxy-adb';
+  u.searchParams.set('action', action);
 
-  u.searchParams.set('udid', udid);
-  u.searchParams.set('device', deviceParam);
-
-  const upstreamPath = restart ? '/?restart=1' : '/';
-  u.searchParams.set('path', upstreamPath);
+  if (STREAM_MODE === 'raw-v2') {
+    u.searchParams.set('udid', udid);
+  } else {
+    u.searchParams.set('remote', COMMON_PARAMS.remote);
+    u.searchParams.set('udid', udid);
+    if (deviceParam) {
+      u.searchParams.set('device', deviceParam);
+    }
+    const upstreamPath = restart ? '/?restart=1' : '/';
+    u.searchParams.set('path', upstreamPath);
+  }
 
   return u.toString();
 }

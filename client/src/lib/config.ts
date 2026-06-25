@@ -32,4 +32,4 @@ export const STREAM_CONFIG: StreamConfig = {
 
 export type StreamMode = 'ws6' | 'raw-v2';
 
-export const STREAM_MODE: StreamMode = 'ws6';
+export const STREAM_MODE: StreamMode = 'raw-v2';

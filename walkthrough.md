@@ -1,34 +1,27 @@
-# Walkthrough - Stream Optimizations & Debugging Traces
+# Walkthrough - raw-v2 Stream Integration (Xiaowei Style)
 
-We have successfully resolved the phone farm streaming bottlenecks, implemented connection tracing logs, added safety guards against restart storms and buffer overflows, and added FPS & bitrate statistics to the tile title header.
+We have successfully integrated the `raw-v2` streaming engine, resembling the Xiaowei-style raw H.264 stream pipe.
 
 ## Changes Implemented
 
-### 1. Backend (server-go)
-- **JAR Version Check**: Added helper functions `localFileMD5`, `remoteServerJarMD5`, and `shouldPushServerJar` to compare local and remote scrcpy-server JAR MD5 values before deciding to push.
-- **Force Restart Cooldown**: Added a `ForceRestartCooldown = 12 * time.Second` constant. Implemented the `canForceRestartNow` check at the beginning of `ForceRestartServer` to fallback to `EnsureServer` if the cooldown is active, preventing restart storms.
-- **Connection Trace Logging**: Added precise timestamps and tracing statements for WebSocket connections to locate connection delays:
-  - `Stream trace: browser_ws_connected`
-  - `Stream trace: device_ws_connected`
-  - `Stream trace: first_browser_payload`
-  - `Stream trace: first_device_payload`
-- **Raw-v2 Skeleton**: Created a new skeleton endpoint `HandleProxyScrcpyRaw` under `server-go/websocket/proxy_raw.go` and mapped it to the `proxy-scrcpy-raw` action in `main.go`.
+### 1. scrcpy-server v3.3.4 Preparation
+- Created the folder `server-go/bin`.
+- Downloaded and placed the official `scrcpy-server-v3.3.4.jar` release binary in `server-go/bin/scrcpy-server-v3.3.4.jar`.
 
-### 2. Frontend (client)
-- **Lower Default Stream Configuration**: Reduced default `STREAM_CONFIG` properties in `client/src/lib/config.ts` to be lightweight for 36-device grids:
-  - `bitrate`: 393,216 bps
-  - `maxFps`: 12 FPS
-  - `bounds`: { width: 360, height: 360 }
-- **Stream Mode Toggle**: Declared `StreamMode` type and `STREAM_MODE = 'ws6'` constant in `client/src/lib/config.ts`.
-- **Multiplexer Queue Limit**: Limited the `storage` array in `MuxChannel` to `MAX_CHANNEL_QUEUE_BYTES = 512 * 1024` (512KB) inside `client/src/lib/multiplexer.ts` to prevent unbounded memory growth during connection lag.
-- **Stream Stats inside Tile Title Header**:
-  - Exposed `bitrateKbps` calculated inside `useTileStream.ts`'s message throughput accumulator.
-  - Passed `streamStats` into `TileHeader` and displayed `<FPS> FPS | <bitrate> kb/s` dynamically on the title header of each device, using standard theme tokens.
+### 2. Backend (server-go)
+- **Implement HandleProxyScrcpyRaw**: Replaced `server-go/websocket/proxy_raw.go` with a complete implementation that:
+  - Pushes `scrcpy-server-v3.3.4.jar` to the device as `/data/local/tmp/monview-scrcpy-server-v3.3.4.jar` (checked via MD5 verification).
+  - Removes any existing instances of our raw-v2 server via `pkill`.
+  - Sets up ADB forward matching a safe socket name derived from the device UDID.
+  - Starts the scrcpy server on the device in standalone mode with options: `video=true`, `audio=false`, `control=false`, `raw_stream=true` (outputs raw H.264 and removes genymobile metadata headers).
+  - Connects to the local forward TCP port and pipes the raw H.264 bytes directly into the client's WebSocket connection.
+- **Route action**: Added routing for action `proxy-scrcpy-raw` inside `server-go/main.go`.
 
-### 3. Documentation & Registries
-- Updated `project_structure.md` with the new `proxy_raw.go` skeleton file.
-- Updated `naming_registry.json` with the new stream constants.
+### 3. Frontend (client)
+- **STREAM_MODE default configuration**: Switched `STREAM_MODE` in `client/src/lib/config.ts` from `'ws6'` to `'raw-v2'`.
+- **WS URL creation updates**: Modified `makeWsUrl` in `client/src/lib/video.ts` to output `action=proxy-scrcpy-raw` and skip redundant query parameters when `STREAM_MODE === 'raw-v2'`.
+- **Skip config binary push**: Modified `ws.onopen` in `client/src/components/tile/useTileStream.ts` to bypass sending the config binary when running in `raw-v2` mode (since configs are already set in the backend's server execution command).
 
 ## Verification & Validation
 - Ran `go build -o ../server-go.exe .` inside `server-go` which compiled successfully.
-- Ran `npm run build` inside `client` which completed with zero type errors.
+- Ran `npm run build` inside `client` which completed with zero errors.
