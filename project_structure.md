@@ -63,7 +63,7 @@ Removed legacy layers:
 - `server-go/adb/`: ADB helpers and device tracker.
 - [MODIFY] `server-go/scrcpy/`: Scrcpy server launch/config helpers. Added `CleanAllMonViewPhoneServers` in `server.go` to cleanly kill any running scrcpy servers on devices during startup.
 - [NEW] `server-go/bin/`: Contains external binary dependency assets. Includes `scrcpy-server-v3.3.4.jar` for the official v3.3.4 scrcpy server.
-- `server-go/websocket/`: Device-list and stream proxy WebSocket handlers. Includes `proxy_raw.go` implementing the `raw-v2` experimental stream route.
+- `server-go/websocket/`: Device-list and stream proxy WebSocket handlers. Includes `proxy_raw.go` implementing the `raw-v2` experimental stream route, and [raw_control_translate.go](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/server-go/websocket/raw_control_translate.go) implementing legacy-to-v3.3.4 control packet translator.
 - `server-go/server-go.exe`: Current compiled Go backend binary.
 - `server-go/Start_PhoneFarm.bat`: Starts the Go backend server by running the launcher script `run.pyw`.
 - `server-go/Start_PhoneFarm_Air.bat`: Optional Go hot-reload launcher for backend development.

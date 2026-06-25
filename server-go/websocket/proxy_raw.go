@@ -216,10 +216,10 @@ func startRawScrcpyServer(udid string, scid string) (*exec.Cmd, error) {
 		"log_level=info",
 		"tunnel_forward=true",
 
-		// stream only; control/audio để sau
+		// video and control enabled
 		"video=true",
 		"audio=false",
-		"control=false",
+		"control=true",
 
 		// quan trọng: output raw H.264, bỏ meta/header
 		"raw_stream=true",
@@ -335,6 +335,23 @@ func dialRawStream(localPort int) (net.Conn, error) {
 	return nil, fmt.Errorf("dial raw stream timeout: %w", lastErr)
 }
 
+func dialScrcpyControlSocket(localPort int, timeout time.Duration) (net.Conn, error) {
+	deadline := time.Now().Add(timeout)
+	addr := fmt.Sprintf("127.0.0.1:%d", localPort)
+
+	var lastErr error
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", addr, 1500*time.Millisecond)
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+		time.Sleep(150 * time.Millisecond)
+	}
+
+	return nil, fmt.Errorf("dial control socket timeout: %w", lastErr)
+}
+
 func closePreviousRawSession(udid string) {
 	if v, ok := rawActive.Load(udid); ok {
 		if s, ok := v.(*rawSession); ok && s.cancel != nil {
@@ -383,6 +400,7 @@ func HandleProxyScrcpyRaw(w http.ResponseWriter, r *http.Request) {
 	socketName := "scrcpy_" + scidVal
 	localPort := 0
 	var rawConn net.Conn
+	var controlConn net.Conn
 	var serverCmd *exec.Cmd
 
 	cleanup := func() {
@@ -390,6 +408,10 @@ func HandleProxyScrcpyRaw(w http.ResponseWriter, r *http.Request) {
 
 		if rawConn != nil {
 			_ = rawConn.Close()
+		}
+
+		if controlConn != nil {
+			_ = controlConn.Close()
 		}
 
 		if serverCmd != nil && serverCmd.Process != nil {
@@ -447,18 +469,52 @@ func HandleProxyScrcpyRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[%s] raw-v2 trace: raw_tcp_connected elapsed=%s", udid, time.Since(traceStart))
+	controlConn, err = dialScrcpyControlSocket(localPort, 12*time.Second)
+	if err != nil {
+		log.Printf("[%s] raw-v2 control dial failed: %v", udid, err)
+		writeProxyClose(clientWs, "raw-v2 control dial failed: "+err.Error())
+		return
+	}
+
+	log.Printf("[%s] raw-v2 trace: control_tcp_connected elapsed=%s", udid, time.Since(traceStart))
 
 	errCh := make(chan error, 2)
 	firstFrameOnce := sync.Once{}
 	firstFrameCh := make(chan struct{})
 
-	// Browser -> raw stream: hiện chưa dùng control, chỉ đọc để detect browser đóng.
+	// Browser -> raw stream control
 	go func() {
 		for {
-			_, _, err := clientWs.ReadMessage()
+			msgType, msg, err := clientWs.ReadMessage()
 			if err != nil {
 				errCh <- fmt.Errorf("browser ws closed: %w", err)
+				return
+			}
+
+			if msgType != gws.BinaryMessage || len(msg) == 0 {
+				continue
+			}
+
+			converted, ok := translateLegacyControlToScrcpy334(msg)
+			if !ok {
+				log.Printf("[%s] raw-v2 control: drop unsupported packet len=%d type=%d", udid, len(msg), msg[0])
+				continue
+			}
+
+			_ = controlConn.SetWriteDeadline(time.Now().Add(3 * time.Second))
+			if _, err := controlConn.Write(converted); err != nil {
+				errCh <- fmt.Errorf("control write failed: %w", err)
+				return
+			}
+		}
+	}()
+
+	// Drain controlConn reads (clipboard, notifications) to prevent blocking
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			_, err := controlConn.Read(buf)
+			if err != nil {
 				return
 			}
 		}
