@@ -421,12 +421,20 @@ export function useTileStream(args: Args) {
 
         function triggerFallbackConnection(reason: string) {
           if (destroyedRef.current || closingRef.current) return;
+
+          // Đã từng có frame rồi thì lỗi này thường là decode/browser overload,
+          // không phải encoder Android. Không thử encoder lung tung nữa.
+          if (firstFrame) {
+            console.warn(`[Stream V2] Ignore fallback after first frame on ${udid}: ${reason}`);
+            fallbackReasonRef.current = `Decode overloaded: ${reason}`;
+            setStatus(tRef.current('⚠️ decode quá tải'));
+            return;
+          }
+
           console.warn(`[Stream V2 Fallback] Fallback requested on device ${udid} due to: ${reason}`);
 
-          // Advance stage index
           currentStageIdxRef.current++;
           if (currentStageIdxRef.current >= fallbackStagesRef.current.length) {
-            // We have exhausted all trial stages. Keep trying WebCodecs
             currentStageIdxRef.current = 0;
             fallbackReasonRef.current = 'All encoders failed. Retrying WebCodecs...';
           }
@@ -681,9 +689,11 @@ export function useTileStream(args: Args) {
 
         connect();
 
-        // Watchdog: auto-reconnects when decoding stalls
+        // Watchdog: auto-reconnects only when connection is truly dead.
+        // Do NOT reconnect on browser decode stall.
         watchdogTimer = window.setInterval(() => {
             if (destroyedRef.current || closingRef.current) return;
+
             const ws = wsRef.current;
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             if (!firstFrame) return;
@@ -692,17 +702,18 @@ export function useTileStream(args: Args) {
             const packetAge = now - lastPacketAt;
             const bitmapAge = lastBitmapAt ? now - lastBitmapAt : 1e9;
 
+            const OUTPUT_STALL_WARN_MS = 20_000;
             const packetsStillArriving = packetAge < 2500;
-            const outputStalled = bitmapAge > 8000;
-            const connectionStalled = packetAge > 12000 && bitmapAge > 12000;
-            if ((packetsStillArriving && outputStalled) || connectionStalled) {
-                setStatus(tRef.current(connectionStalled ? '⚠️ stream mất tín hiệu - kết nối lại…' : '⚠️ decode đứng - kết nối lại…'));
-                setLoading(true);
-                connect({ restart: true });
+            const outputStalled = bitmapAge > OUTPUT_STALL_WARN_MS;
+
+            if (packetsStillArriving && outputStalled) {
+                // Browser/GPU decode bị nghẽn, nhưng socket vẫn sống.
+                // Không reconnect, vì reconnect sẽ kill scrcpy-server trên phone và gây reconnect hàng loạt.
+                setStatus(tRef.current('⚠️ Chrome decode quá tải - giữ kết nối'));
+                setLoading(false);
                 return;
             }
 
-            // Expose updated stats periodically (only when values change)
             if (engine) {
               const now = Date.now();
               const elapsed = now - lastBitrateCalcTime;
@@ -727,8 +738,9 @@ export function useTileStream(args: Args) {
               }
             }
 
-            if (packetAge > 300000 && bitmapAge > 300000) {
-                setStatus(tRef.current('⚠️ idle lâu - kết nối lại…'));
+            // Chỉ reconnect nếu socket thật sự im rất lâu.
+            if (packetAge > 60_000 && bitmapAge > 60_000) {
+                setStatus(tRef.current('⚠️ mất dữ liệu stream - kết nối lại…'));
                 setLoading(true);
                 connect();
             }
