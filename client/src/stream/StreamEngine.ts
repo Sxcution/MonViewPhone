@@ -1,5 +1,6 @@
 export interface StreamStats {
   engineName: string;
+  decoderName?: string;
   decodedFps: number;
   renderedFps: number;
   droppedFrames: number;

@@ -14,7 +14,7 @@ import (
 
 const (
 	defaultCommandTimeout = 15 * time.Second
-	pushTimeout           = 60 * time.Second
+	pushTimeout           = 180 * time.Second
 	forwardTimeout        = 8 * time.Second
 	removeForwardTimeout  = 5 * time.Second
 	shellTimeout          = 15 * time.Second
@@ -48,6 +48,11 @@ func timeoutForArgs(args []string) time.Duration {
 			}
 			return forwardTimeout
 		case "shell":
+			for _, subArg := range args {
+				if strings.Contains(subArg, "install") {
+					return 180 * time.Second
+				}
+			}
 			return shellTimeout
 		}
 	}

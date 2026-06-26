@@ -517,6 +517,10 @@
     "app_icon_png": "assets/IconMonViewPhone.png",
     "app_icon_ico": "assets/IconMonViewPhone.ico",
     "favicon_ico": "client/public/favicon.ico",
-    "favicon_png": "client/public/favicon.png"
+    "favicon_png": "client/public/favicon.png",
+    "build_v2_all_bat": "build_v2_all.bat",
+    "launcher_log": "logs/launcher.log",
+    "stream_node_log": "logs/stream-node.log",
+    "server_go_log": "logs/server-go.log"
   }
 }

@@ -1,23 +1,11 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { attachTouchControls } from '@/lib/touchControls';
-import { buildConfigBinary, makeWsUrl } from '@/lib/video';
 import { useI18n } from '@/context/I18nContext';
 import type { StreamConfig } from '@/lib/config';
 import type { InputTarget } from '@/context/ActiveContext';
 import type { StreamReloadOptions } from './types';
-import { useServer } from '@/context/ServerContext';
-
-// Stream Engine V2 Imports
-import { StreamEngine, StreamStats } from '@/stream/StreamEngine';
-import { LegacyTinyH264Engine } from '@/stream/legacy/LegacyTinyH264Engine';
-import { WebCodecsH264Engine } from '@/stream/webcodecs/WebCodecsH264Engine';
-import {
-  getCachedDeviceStream,
-  cacheSuccessfulStream,
-  clearDeviceStreamCache,
-  getFallbackStages,
-  FallbackStage
-} from '@/lib/deviceStreamCache';
+import { StreamStats } from '@/stream/StreamEngine';
+import { TangoStreamEngine, makeTangoStreamUrl } from '@/stream/tango';
 
 type Args = {
     udid: string;
@@ -28,42 +16,37 @@ type Args = {
     enabled?: boolean;
     suppressLoadingOverlay?: boolean;
 
-    // DOM refs
     canvasRef: MutableRefObject<HTMLCanvasElement | null>;
     bodyRef: MutableRefObject<HTMLDivElement | null>;
     frameRef: MutableRefObject<HTMLDivElement | null>;
 
-    // WS + teardown refs
     wsRef: MutableRefObject<WebSocket | null>;
     reconnectTimerRef: MutableRefObject<number | null>;
     detachControlsRef: MutableRefObject<(() => void) | null>;
     closingRef: MutableRefObject<boolean>;
     destroyedRef: MutableRefObject<boolean>;
 
-    // Keep latest config without re-running the heavy stream effect on every tick
     streamCfgRef: MutableRefObject<StreamConfig>;
 
-    // Active/sync callbacks from ActiveContext
     selectOnly: (udid: string) => void;
     getInputTargetsForSource: (udid: string) => InputTarget[];
     setAltSoloUdid?: (udid: string | null) => void;
     getIsAltHeld?: () => boolean;
 
-    // UI state setters
     setStatus: (s: string) => void;
     setLoading: (b: boolean) => void;
 
-    // Exposed reload ref (used by header/menu + parent App for reload-all)
     reloadRef: MutableRefObject<((opts?: StreamReloadOptions) => void) | null>;
-
-    // Notify caller about current video dimensions (per-tile aspect ratio)
     onVideoDims?: (w: number, h: number) => void;
 };
 
-const STREAM_CONNECT_BATCH_SIZE = 6;
-const STREAM_CONNECT_BATCH_DELAY_MS = 1000;
-const INITIAL_FRAME_TIMEOUT_MS = 15_000; // Lower timeout to trigger fallback stages faster
-const RECONNECT_DELAY_MS = 1200;
+const STREAM_CONNECT_BATCH_SIZE = 3;
+const STREAM_CONNECT_BATCH_DELAY_MS = 1200;
+const INITIAL_FRAME_TIMEOUT_MS = 120_000;
+const NO_PACKET_BEFORE_FIRST_FRAME_TIMEOUT_MS = 180_000;
+const NO_PACKET_AFTER_FIRST_FRAME_TIMEOUT_MS = 90_000;
+const RENDER_STALL_RESTART_DECODER_MS = 18_000;
+const RECONNECT_DELAY_MS = 4000;
 
 type StreamSessionState = 'queued' | 'connecting' | 'connected';
 
@@ -83,36 +66,6 @@ type QueuedConnect = {
 const activeStreamSessions = new Map<string, StreamSession>();
 const connectQueue: QueuedConnect[] = [];
 let connectQueueTimer: number | null = null;
-
-// Static feature detection state for WebCodecs
-let webCodecsSupported = false;
-let webCodecsChecked = false;
-
-async function checkWebCodecsSupport(): Promise<boolean> {
-  if (webCodecsChecked) return webCodecsSupported;
-  if (!window.isSecureContext) {
-    webCodecsChecked = true;
-    webCodecsSupported = false;
-    return false;
-  }
-  if (typeof VideoDecoder === 'undefined' || typeof EncodedVideoChunk === 'undefined') {
-    webCodecsChecked = true;
-    webCodecsSupported = false;
-    return false;
-  }
-  try {
-    const config: VideoDecoderConfig = {
-      codec: 'avc1.42e01f',
-      optimizeForLatency: true
-    };
-    const res = await VideoDecoder.isConfigSupported(config);
-    webCodecsSupported = !!res.supported;
-  } catch {
-    webCodecsSupported = false;
-  }
-  webCodecsChecked = true;
-  return webCodecsSupported;
-}
 
 function flushConnectQueue() {
     connectQueueTimer = null;
@@ -147,9 +100,7 @@ function scheduleBatchedConnect(udid: string, owner: symbol, run: () => void): (
 
 function claimStreamSession(udid: string, owner: symbol, state: StreamSessionState): boolean {
     const existing = activeStreamSessions.get(udid);
-    if (existing && existing.owner !== owner) {
-        return false;
-    }
+    if (existing && existing.owner !== owner) return false;
     activeStreamSessions.set(udid, { owner, state });
     return true;
 }
@@ -167,13 +118,18 @@ function releaseStreamSession(udid: string, owner: symbol, ws?: WebSocket) {
     activeStreamSessions.delete(udid);
 }
 
+function maxSizeFromConfig(cfg: StreamConfig): number {
+    const w = cfg.bounds?.width || 500;
+    const h = cfg.bounds?.height || 500;
+    return Math.max(1, Math.max(w, h));
+}
+
 export function useTileStream(args: Args) {
     const {
         udid,
         deviceParam,
         streamUdid,
         controlUdid,
-        wsServer,
         enabled = true,
         suppressLoadingOverlay = false,
         canvasRef,
@@ -197,52 +153,28 @@ export function useTileStream(args: Args) {
 
     const logicalUdid = controlUdid || udid;
     const streamEndpointUdid = streamUdid || deviceParam || udid;
-    const streamDeviceParam = streamUdid || deviceParam;
     const streamSessionKey = streamEndpointUdid;
     const { t } = useI18n();
     const tRef = useRef(t);
     const ownerRef = useRef<symbol | null>(null);
-    if (ownerRef.current == null) {
-        ownerRef.current = Symbol(logicalUdid);
-    }
-    useEffect(() => {
-        tRef.current = t;
-    }, [t]);
+    if (ownerRef.current == null) ownerRef.current = Symbol(logicalUdid);
+    useEffect(() => { tRef.current = t; }, [t]);
 
-    const { androidDeviceMap } = useServer();
-
-    // Stream Stats state exposed to Tile Component
     const [streamStats, setStreamStats] = useState<StreamStats | null>(null);
-
-    // Fallback Machine State
-    const fallbackStagesRef = useRef<FallbackStage[]>([]);
-    const currentStageIdxRef = useRef<number>(0);
-    const activeStageRef = useRef<FallbackStage | null>(null);
     const reconnectCountRef = useRef<number>(0);
     const prevStatsRef = useRef<string>('');
-    const activeEngineNameRef = useRef<string>('');
-    const fallbackReasonRef = useRef<string>('');
 
-    // Keep latest targets getter in a ref so touch controls always see newest sync state.
     const getInputTargetsRef = useRef(getInputTargetsForSource);
-    useEffect(() => {
-        getInputTargetsRef.current = getInputTargetsForSource;
-    }, [getInputTargetsForSource]);
+    useEffect(() => { getInputTargetsRef.current = getInputTargetsForSource; }, [getInputTargetsForSource]);
 
     const getIsAltHeldRef = useRef(getIsAltHeld);
-    useEffect(() => {
-        getIsAltHeldRef.current = getIsAltHeld;
-    }, [getIsAltHeld]);
+    useEffect(() => { getIsAltHeldRef.current = getIsAltHeld; }, [getIsAltHeld]);
 
     const setAltSoloUdidRef = useRef(setAltSoloUdid);
-    useEffect(() => {
-        setAltSoloUdidRef.current = setAltSoloUdid;
-    }, [setAltSoloUdid]);
+    useEffect(() => { setAltSoloUdidRef.current = setAltSoloUdid; }, [setAltSoloUdid]);
 
     const suppressLoadingOverlayRef = useRef(suppressLoadingOverlay);
-    useEffect(() => {
-        suppressLoadingOverlayRef.current = suppressLoadingOverlay;
-    }, [suppressLoadingOverlay]);
+    useEffect(() => { suppressLoadingOverlayRef.current = suppressLoadingOverlay; }, [suppressLoadingOverlay]);
 
     const silentReconnectRef = useRef(false);
     const isSilent = () => suppressLoadingOverlayRef.current || silentReconnectRef.current;
@@ -265,28 +197,15 @@ export function useTileStream(args: Args) {
         const body = frameRef.current || bodyRef.current;
         if (!canvas || !body) return;
 
-        const ctx2d = canvas.getContext("2d", { alpha: false }) as CanvasRenderingContext2D | null;
-
         function fitCanvasToBody() {
             if (!body || !canvas) return;
-
-            const rect = body.getBoundingClientRect();
-            const bw = rect.width;
-            const bh = rect.height;
-
-            if (!bw || !bh || !canvas.width || !canvas.height) return;
-
-            const scale = Math.min(bw / canvas.width, bh / canvas.height);
-            const dw = Math.ceil(canvas.width * scale);
-            const dh = Math.ceil(canvas.height * scale);
+            if (!canvas.width || !canvas.height) return;
         }
 
         const ro = new ResizeObserver(fitCanvasToBody);
         ro.observe(body);
 
-        const scheduleFit = () => {
-            requestAnimationFrame(() => fitCanvasToBody());
-        };
+        const scheduleFit = () => requestAnimationFrame(() => fitCanvasToBody());
         window.addEventListener('resize', scheduleFit, { passive: true } as any);
         window.addEventListener('orientationchange', scheduleFit, { passive: true } as any);
         window.visualViewport?.addEventListener('resize', scheduleFit, { passive: true } as any);
@@ -305,10 +224,10 @@ export function useTileStream(args: Args) {
         }
 
         let firstFrame = false;
-        let engine: StreamEngine | null = null;
+        let engine: TangoStreamEngine | null = null;
         let lastPacketAt = Date.now();
         let lastBitmapAt = 0;
-
+        let lastDecoderRestartAt = 0;
         let watchdogTimer: number | null = null;
         let initialLoadTimer: number | null = null;
         let queuedConnectCancel: (() => void) | null = null;
@@ -317,116 +236,48 @@ export function useTileStream(args: Args) {
         const onActivate = () => selectOnly(logicalUdid);
 
         const handlePointerEnter = () => {
-            if (getIsAltHeldRef.current?.()) {
-                setAltSoloUdidRef.current?.(logicalUdid);
-            }
+            if (getIsAltHeldRef.current?.()) setAltSoloUdidRef.current?.(logicalUdid);
         };
         const handlePointerLeave = () => {
-            if (!getIsAltHeldRef.current?.()) {
-                setAltSoloUdidRef.current?.(null);
-            }
+            if (!getIsAltHeldRef.current?.()) setAltSoloUdidRef.current?.(null);
         };
 
         body.addEventListener('pointerenter', handlePointerEnter);
         body.addEventListener('pointerleave', handlePointerLeave);
 
-        detachControlsRef.current = attachTouchControls(
-            canvas,
-            () => getInputTargetsRef.current(logicalUdid),
-            onActivate,
-            logicalUdid
-        );
+        detachControlsRef.current = attachTouchControls(canvas, () => getInputTargetsRef.current(logicalUdid), onActivate, logicalUdid);
 
         async function makeStreamEngine() {
             firstFrame = false;
-            if (!isSilent()) {
-                setLoading(true);
-            }
-
+            if (!isSilent()) setLoading(true);
             if (engine) {
                 try { engine.stop(); } catch {}
                 engine = null;
             }
 
-            // Engine Decision Block
-            let mode = streamCfgRef.current.engine || 'auto';
-
-            // Device ce0817187cd6803d027e (Samsung Note 8) override: Force legacy-tinyh264 software decoder
-            if (logicalUdid === 'ce0817187cd6803d027e') {
-                mode = 'legacy-tinyh264';
-            }
-
-            const hasWebCodecs = await checkWebCodecsSupport();
-
-            const useWebCodecs = mode === 'webcodecs' || (mode === 'auto' && hasWebCodecs);
-            activeEngineNameRef.current = useWebCodecs ? 'webcodecs' : 'legacy-tinyh264';
-
             const callbacks = {
-              onFirstFrame: (meta: { width: number; height: number }) => {
-                if (destroyedRef.current) return;
-                firstFrame = true;
-                reconnectCountRef.current = 0;
-                fallbackReasonRef.current = '';
-
-                // Cache successful stream params for this device!
-                if (activeStageRef.current) {
-                  cacheSuccessfulStream(udid, {
-                    workingEncoder: activeStageRef.current.encoderName,
-                    workingWidth: activeStageRef.current.bounds?.width,
-                    workingHeight: activeStageRef.current.bounds?.height,
-                    workingFps: activeStageRef.current.maxFps,
-                    workingBitrate: activeStageRef.current.bitrate
-                  });
-                }
-
-                if (initialLoadTimer != null) {
-                    clearTimeout(initialLoadTimer);
-                    initialLoadTimer = null;
-                }
-                setLoading(false);
-                setStatus('');
-                silentReconnectRef.current = false;
-                lastBitmapAt = Date.now();
-
-                ensureCanvasSize(meta.width, meta.height);
-                fitCanvasToBody();
-                onVideoDims?.(meta.width, meta.height);
-              },
-              onFrame: () => {
-                lastBitmapAt = Date.now();
-              },
-              onError: (err: any) => {
-                console.error('[StreamEngine error]', udid, err);
-              },
-              onFallbackRequested: (reason: string) => {
-                fallbackReasonRef.current = reason;
-                triggerFallbackConnection(reason);
-              }
+                onFirstFrame: (meta: { width: number; height: number }) => {
+                    if (destroyedRef.current) return;
+                    firstFrame = true;
+                    reconnectCountRef.current = 0;
+                    if (initialLoadTimer != null) {
+                        clearTimeout(initialLoadTimer);
+                        initialLoadTimer = null;
+                    }
+                    setLoading(false);
+                    setStatus('');
+                    silentReconnectRef.current = false;
+                    lastBitmapAt = Date.now();
+                    ensureCanvasSize(meta.width, meta.height);
+                    fitCanvasToBody();
+                    onVideoDims?.(meta.width, meta.height);
+                },
+                onFrame: () => { lastBitmapAt = Date.now(); },
+                onError: (err: any) => { console.error('[TangoStreamEngine error]', udid, err); },
             };
 
-            if (useWebCodecs) {
-              engine = new WebCodecsH264Engine(canvas!, callbacks);
-            } else {
-              engine = new LegacyTinyH264Engine(canvas!, callbacks);
-            }
-
+            engine = new TangoStreamEngine(canvas!, callbacks);
             engine.start();
-        }
-
-        function triggerFallbackConnection(reason: string) {
-          if (destroyedRef.current || closingRef.current) return;
-          console.warn(`[Stream V2 Fallback] Fallback requested on device ${udid} due to: ${reason}`);
-
-          // Advance stage index
-          currentStageIdxRef.current++;
-          if (currentStageIdxRef.current >= fallbackStagesRef.current.length) {
-            // We have exhausted all trial stages. Keep trying WebCodecs
-            currentStageIdxRef.current = 0;
-            fallbackReasonRef.current = 'All encoders failed. Retrying WebCodecs...';
-          }
-
-          reconnectCountRef.current++;
-          connect({ restart: true });
         }
 
         function cleanupWs() {
@@ -442,30 +293,25 @@ export function useTileStream(args: Args) {
                 prev.onmessage = null;
                 prev.onerror = null;
                 prev.onclose = null;
-                try {
-                    prev.close();
-                } catch {}
+                try { prev.close(); } catch {}
             }
             wsRef.current = null;
             releaseStreamSession(streamSessionKey, owner);
-
             if (engine) {
-              try { engine.stop(); } catch {}
-              engine = null;
+                try { engine.stop(); } catch {}
+                engine = null;
             }
-
             if (reconnectTimerRef.current != null) {
                 clearTimeout(reconnectTimerRef.current);
                 reconnectTimerRef.current = null;
             }
-
             if (initialLoadTimer != null) {
                 clearTimeout(initialLoadTimer);
                 initialLoadTimer = null;
             }
         }
 
-        async function connect(opts?: { restart?: boolean; immediate?: boolean }) {
+        async function connect(opts?: { immediate?: boolean }) {
             if (!opts?.immediate) {
                 cleanupWs();
                 if (!claimStreamSession(streamSessionKey, owner, 'queued')) {
@@ -477,17 +323,16 @@ export function useTileStream(args: Args) {
                 }
                 if (!isSilent()) {
                     setLoading(true);
-                    setStatus(tRef.current('Đang đợi lượt kết nối...'));
+                    setStatus(tRef.current('Đang xếp hàng khởi động Tango...'));
                 }
                 const generation = ++connectGeneration;
-                const restart = Boolean(opts?.restart);
                 queuedConnectCancel = scheduleBatchedConnect(streamSessionKey, owner, () => {
                     queuedConnectCancel = null;
                     if (destroyedRef.current || generation !== connectGeneration) {
                         releaseStreamSession(streamSessionKey, owner);
                         return;
                     }
-                    connect({ restart, immediate: true });
+                    connect({ immediate: true });
                 });
                 return;
             }
@@ -495,115 +340,50 @@ export function useTileStream(args: Args) {
             updateStreamSession(streamSessionKey, owner, 'connecting');
             await makeStreamEngine();
 
-            // Populate fallback stages list if empty
-            if (fallbackStagesRef.current.length === 0) {
-              const meta = androidDeviceMap[udid];
-              fallbackStagesRef.current = getFallbackStages(streamCfgRef.current, meta);
-
-              // Pre-fill cached successful config if it exists
-              const cached = getCachedDeviceStream(udid);
-              if (cached) {
-                fallbackStagesRef.current.unshift({
-                  encoderName: cached.workingEncoder,
-                  bounds: cached.workingWidth ? { width: cached.workingWidth, height: cached.workingHeight || 1280 } : undefined,
-                  maxFps: cached.workingFps,
-                  bitrate: cached.workingBitrate,
-                  description: `Cached parameters (${cached.workingEncoder || 'default'})`
-                });
-              }
-            }
-
-            const currentStage = fallbackStagesRef.current[currentStageIdxRef.current] || { description: 'Default' };
-            activeStageRef.current = currentStage;
-
-            // Resolve target stream parameters based on active stage
-            let targetEncoder = 'encoderName' in currentStage ? currentStage.encoderName : streamCfgRef.current.encoderName;
-
-            // Device ce0817187cd6803d027e (Samsung Note 8) override: Force software encoder
-            if (logicalUdid === 'ce0817187cd6803d027e') {
-                targetEncoder = 'OMX.google.h264.encoder';
-            }
-
-            const trialConfig: StreamConfig = {
-              ...streamCfgRef.current,
-              encoderName: targetEncoder,
-              bitrate: currentStage.bitrate || streamCfgRef.current.bitrate,
-              maxFps: currentStage.maxFps || streamCfgRef.current.maxFps,
-              bounds: currentStage.bounds ? { ...streamCfgRef.current.bounds, ...currentStage.bounds } : streamCfgRef.current.bounds
-            };
-
-            let url: string;
-            try {
-                url = makeWsUrl({
-                    wsServer,
-                    deviceParam: streamDeviceParam,
-                    udid: streamEndpointUdid,
-                    restart: Boolean(opts?.restart)
-                });
-            } catch (err) {
-                releaseStreamSession(streamSessionKey, owner);
-                setStatus(tRef.current('❌ thiếu tham số thiết bị'));
-                setLoading(false);
-                return;
-            }
+            const cfg = streamCfgRef.current;
+            const url = makeTangoStreamUrl({
+                udid: streamEndpointUdid,
+                bitrate: cfg.bitrate,
+                maxFps: cfg.maxFps,
+                maxSize: maxSizeFromConfig(cfg),
+                displayId: cfg.displayId ?? 0,
+                encoderName: cfg.encoderMode === 'custom' ? cfg.encoderName : undefined,
+            });
 
             const ws = new WebSocket(url);
             ws.binaryType = 'arraybuffer';
             closingRef.current = false;
             wsRef.current = ws;
             updateStreamSession(streamSessionKey, owner, 'connecting', ws);
+            lastPacketAt = Date.now();
 
-            if (!isSilent()) {
-                setStatus(tRef.current(`Đang kết nối: ${currentStage.description}…`));
-            }
+            if (!isSilent()) setStatus(tRef.current('Đang kết nối Tango/scrcpy 3.3.4…'));
 
-            if (initialLoadTimer != null) {
-                clearTimeout(initialLoadTimer);
-                initialLoadTimer = null;
-            }
-            
-            // Watchdog for initial frame timeouts triggers fallback stages
+            if (initialLoadTimer != null) clearTimeout(initialLoadTimer);
             initialLoadTimer = window.setTimeout(() => {
-                if (destroyedRef.current || closingRef.current) return;
-                if (firstFrame) return;
-
-                const nextIndex = currentStageIdxRef.current + 1;
-                const totalStages = fallbackStagesRef.current.length;
-
-                if (nextIndex >= totalStages) {
-                  // Reached end of pipeline, force legacy fallback
-                  // DISABLED: Do not fallback to tinyh264 now
-                  currentStageIdxRef.current = 0;
-                  fallbackReasonRef.current = 'Initial frame timed out. Retrying WebCodecs...';
-                  setStatus(tRef.current('Đang chờ phản hồi WebCodecs…'));
-                } else {
-                  currentStageIdxRef.current = nextIndex;
-                  const reason = `Frame timeout on stage ${currentStage.description}`;
-                  fallbackReasonRef.current = reason;
-                  setStatus(tRef.current(`Lỗi kết nối: thử ${fallbackStagesRef.current[nextIndex].description}…`));
-                }
-
+                if (destroyedRef.current || closingRef.current || firstFrame) return;
                 reconnectCountRef.current++;
-                connect({ restart: true });
+                setStatus(tRef.current('Khởi động Tango quá lâu - kết nối lại…'));
+                connect();
             }, INITIAL_FRAME_TIMEOUT_MS);
 
             ws.onopen = () => {
                 updateStreamSession(streamSessionKey, owner, 'connected', ws);
-                if (!isSilent()) {
-                    setStatus(tRef.current('Gửi cấu hình stream...'));
-                }
-                try {
-                    ws.send(buildConfigBinary(trialConfig));
-                    if (!isSilent()) {
-                        setStatus(tRef.current("Đang chờ phản hồi"));
-                    }
-                } catch (e) {
-                    console.error('send binary config failed', e);
-                    setStatus(tRef.current('❌ Thất bại'));
-                }
+                lastPacketAt = Date.now();
+                if (!isSilent()) setStatus(tRef.current('Đang chờ frame Tango…'));
             };
 
             ws.onmessage = async (ev) => {
+                if (typeof ev.data === 'string') {
+                    lastPacketAt = Date.now();
+                    try {
+                        const msg = JSON.parse(ev.data);
+                        if (msg?.type === 'error') setStatus(`❌ ${msg.message || 'Tango stream lỗi'}`);
+                        else if (msg?.type === 'status' && msg.message && !firstFrame) setStatus(String(msg.message));
+                    } catch {}
+                    return;
+                }
+
                 let ab: ArrayBuffer | null = null;
                 if (ev.data instanceof ArrayBuffer) ab = ev.data;
                 else if (ev.data instanceof Blob) ab = await ev.data.arrayBuffer();
@@ -612,108 +392,83 @@ export function useTileStream(args: Args) {
                 engine?.feedBytes(new Uint8Array(ab));
             };
 
-            ws.onerror = () => setStatus(tRef.current('❌ lỗi WS'));
+            ws.onerror = () => setStatus(tRef.current('Không kết nối được stream-node 11080'));
 
-            ws.onclose = (e) => {
+            ws.onclose = () => {
                 releaseStreamSession(streamSessionKey, owner, ws);
                 if (closingRef.current || destroyedRef.current) return;
-                
                 if (initialLoadTimer != null) {
                     clearTimeout(initialLoadTimer);
                     initialLoadTimer = null;
                 }
-                
                 silentReconnectRef.current = false;
-                
-                // On close before first frame, trigger next fallback stage immediately
-                if (!firstFrame) {
-                  const nextIndex = currentStageIdxRef.current + 1;
-                  if (nextIndex >= fallbackStagesRef.current.length) {
-                    // DISABLED: Do not fallback to tinyh264 now
-                    currentStageIdxRef.current = 0;
-                    fallbackReasonRef.current = 'WS Closed. Retrying WebCodecs...';
-                  } else {
-                    currentStageIdxRef.current = nextIndex;
-                    fallbackReasonRef.current = `WS closed (Code ${e.code})`;
-                  }
-                }
-
                 reconnectCountRef.current++;
                 reconnectTimerRef.current = window.setTimeout(() => {
                     if (destroyedRef.current) return;
-                    connect({ restart: !firstFrame });
+                    setStatus(tRef.current('Stream service chưa sẵn sàng - kết nối lại…'));
+                    connect();
                 }, RECONNECT_DELAY_MS);
             };
         }
 
-        // Allow user to manually reload this tile.
         reloadRef.current = (opts?: StreamReloadOptions) => {
             if (destroyedRef.current) return;
             silentReconnectRef.current = Boolean(opts?.silent);
             if (!silentReconnectRef.current) {
                 setLoading(true);
-                setStatus(tRef.current('Đang reload…'));
+                setStatus(tRef.current('Đang reload Tango…'));
             }
-            
-            // Clear fallback state and cache on user manual action
-            clearDeviceStreamCache(udid);
-            currentStageIdxRef.current = 0;
-            fallbackStagesRef.current = [];
-            fallbackReasonRef.current = '';
-
-            connect({ restart: Boolean(opts?.restart) });
+            connect();
         };
 
         connect();
 
-        // Watchdog: auto-reconnects when decoding stalls
         watchdogTimer = window.setInterval(() => {
             if (destroyedRef.current || closingRef.current) return;
             const ws = wsRef.current;
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
-            if (!firstFrame) return;
 
             const now = Date.now();
             const packetAge = now - lastPacketAt;
             const bitmapAge = lastBitmapAt ? now - lastBitmapAt : 1e9;
 
-            const packetsStillArriving = packetAge < 2500;
-            const outputStalled = bitmapAge > 8000;
-            if (packetsStillArriving && outputStalled) {
-                setStatus(tRef.current('⚠️ decode đứng - kết nối lại…'));
+            // Important: if packets are still arriving, do NOT close WebSocket.
+            // Closing WS tears down scrcpy and creates the random reconnect storm.
+            // Only restart the local decoder/canvas pipeline and keep control alive.
+            if (firstFrame && packetAge < 5000 && bitmapAge > RENDER_STALL_RESTART_DECODER_MS) {
+                if (now - lastDecoderRestartAt > RENDER_STALL_RESTART_DECODER_MS) {
+                    lastDecoderRestartAt = now;
+                    setStatus(tRef.current('⚠️ render Tango đang hồi…'));
+                    try { engine?.restartDecoderOnly(); } catch (e) { console.warn('[Tango] decoder-only restart failed', e); }
+                }
+            }
+
+            const noPacketLimit = firstFrame ? NO_PACKET_AFTER_FIRST_FRAME_TIMEOUT_MS : NO_PACKET_BEFORE_FIRST_FRAME_TIMEOUT_MS;
+            if (packetAge > noPacketLimit) {
+                setStatus(tRef.current('⚠️ Tango stream im lặng - kết nối lại…'));
                 setLoading(true);
                 connect();
                 return;
             }
 
-            // Expose updated stats periodically (only when values change)
             if (engine) {
-              const stats = engine.getStats();
-              const nextStats = {
-                ...stats,
-                reconnectCount: reconnectCountRef.current,
-                encoderName: activeStageRef.current?.encoderName || 'default',
-                fallbackReason: fallbackReasonRef.current || undefined
-              };
-              const serialized = JSON.stringify(nextStats);
-              if (serialized !== prevStatsRef.current) {
-                prevStatsRef.current = serialized;
-                setStreamStats(nextStats);
-              }
-            }
-
-            if (packetAge > 300000 && bitmapAge > 300000) {
-                setStatus(tRef.current('⚠️ idle lâu - kết nối lại…'));
-                setLoading(true);
-                connect();
+                const cfg = streamCfgRef.current;
+                const stats = {
+                    ...engine.getStats(),
+                    reconnectCount: reconnectCountRef.current,
+                    encoderName: cfg.encoderMode === 'custom' ? (cfg.encoderName || 'custom') : 'auto'
+                };
+                const serialized = JSON.stringify(stats);
+                if (serialized !== prevStatsRef.current) {
+                    prevStatsRef.current = serialized;
+                    setStreamStats(stats);
+                }
             }
         }, 3000);
 
         const closeWs = () => {
             cleanupWs();
-            try {
-                detachControlsRef.current?.();
-            } catch {}
+            try { detachControlsRef.current?.(); } catch {}
         };
 
         window.addEventListener('beforeunload', closeWs);
@@ -738,18 +493,7 @@ export function useTileStream(args: Args) {
             }
             closeWs();
         };
-    }, [
-        enabled,
-        udid,
-        logicalUdid,
-        streamDeviceParam,
-        streamEndpointUdid,
-        streamSessionKey,
-        wsServer,
-        selectOnly
-    ]);
+    }, [enabled, udid, logicalUdid, streamEndpointUdid, streamSessionKey, selectOnly]);
 
-    return {
-      streamStats
-    };
+    return { streamStats };
 }

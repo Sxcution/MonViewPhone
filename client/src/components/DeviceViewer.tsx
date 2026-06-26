@@ -117,6 +117,7 @@ const DeviceViewerComponent = ({
   const rafRef = useRef<number | null>(null);
 
   const [status, setStatus] = useState<'connecting' | 'ready'>('connecting');
+  const statusRef = useRef<'connecting' | 'ready'>('connecting');
   const [tab, setTab] = useState<ViewerTab>('view');
   const [serialCopied, setSerialCopied] = useState(false);
   const [newOrderViewer, setNewOrderViewer] = useState('');
@@ -140,6 +141,12 @@ const DeviceViewerComponent = ({
       return undefined;
     }
   });
+
+  const setViewerStatus = useCallback((next: 'connecting' | 'ready') => {
+    if (statusRef.current === next) return;
+    statusRef.current = next;
+    setStatus(next);
+  }, []);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -286,12 +293,12 @@ const DeviceViewerComponent = ({
         }
         try {
           ctx.drawImage(src, 0, 0, dst.width, dst.height);
-          if (status !== 'ready') setStatus('ready');
+          setViewerStatus('ready');
         } catch {
           // ignore
         }
       } else {
-        if (status !== 'connecting') setStatus('connecting');
+        setViewerStatus('connecting');
       }
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -302,7 +309,7 @@ const DeviceViewerComponent = ({
       rafRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [udid, tab, getCanvasForUdid]);
+  }, [udid, tab, getCanvasForUdid, setViewerStatus]);
 
   // ===== Files tab state =====
   const [cwd, setCwd] = useState<string>(() => {

@@ -851,7 +851,6 @@ export function App() {
   }, [displayFilterOpen]);
 
   const [viewerUdid, setViewerUdid] = useState<string | null>(null)
-  const activeViewerStreamUdidRef = useRef<string | null>(null)
 
   const openDeviceViewerFromAccountOverlay = useCallback((udid: string) => {
     clickDevice(udid);
@@ -1495,40 +1494,6 @@ export function App() {
   const unregisterReload = useCallback((udid: string) => {
     reloadMap.current.delete(udid)
   }, [])
-
-  // Solumate-style viewer profile:
-  // - Open viewer: reload only that tile so scrcpy starts with viewerStreamConfig.
-  // - Close/switch viewer: reload previous tile so it returns to global streamConfig.
-  useEffect(() => {
-    const previousViewerUdid = activeViewerStreamUdidRef.current
-    const timers: number[] = []
-    const scheduleReload = (udid: string) => {
-      const timer = window.setTimeout(() => {
-        try {
-          reloadMap.current.get(udid)?.({ restart: true, silent: true })
-        } catch {
-          // ignore reload errors; tile reconnect watchdog still handles failures
-        }
-      }, 80)
-      timers.push(timer)
-    }
-
-    if (viewerUdid) {
-      if (previousViewerUdid && previousViewerUdid !== viewerUdid) {
-        scheduleReload(previousViewerUdid)
-      }
-      activeViewerStreamUdidRef.current = viewerUdid
-      scheduleReload(viewerUdid)
-    } else if (previousViewerUdid) {
-      activeViewerStreamUdidRef.current = null
-      scheduleReload(previousViewerUdid)
-    }
-
-    return () => {
-      timers.forEach(timer => window.clearTimeout(timer))
-    }
-  }, [viewerUdid, viewerStreamConfig])
-
   const PHONE_SHELL_RATIO = 20 / 9;
   const DEFAULT_DIMS: TileDims = { width: 205, height: Math.round(205 * PHONE_SHELL_RATIO) }
 

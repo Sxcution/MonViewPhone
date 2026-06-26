@@ -1,0 +1,25 @@
+{
+  "name": "monviewphone-stream-node",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@yume-chan/adb": "^2.2.0",
+    "@yume-chan/adb-server-node-tcp": "^2.2.0",
+    "@yume-chan/adb-scrcpy": "^2.2.0",
+    "@yume-chan/scrcpy": "^2.2.0",
+    "@yume-chan/stream-extra": "^2.2.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

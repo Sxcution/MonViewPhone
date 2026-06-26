@@ -3,7 +3,6 @@ import { AccessUnitAssembler } from '../h264/AccessUnitAssembler';
 import { Canvas2DVideoFrameRenderer } from '../render/Canvas2DVideoFrameRenderer';
 
 function getCodecString(sps: Uint8Array): string {
-  // Constructed H.264 profile string: avc1.[profile_idc][profile_compatibility][level_idc]
   const profile = sps[1].toString(16).padStart(2, '0');
   const compat = sps[2].toString(16).padStart(2, '0');
   const level = sps[3].toString(16).padStart(2, '0');
@@ -28,6 +27,7 @@ export class WebCodecsH264Engine implements StreamEngine {
   private isReadyState = false;
   private firstFrame = false;
   private keyframeReceived = false;
+  private dropUntilKeyframe = false;
 
   private lastSps: Uint8Array | null = null;
   private lastPps: Uint8Array | null = null;
@@ -50,6 +50,7 @@ export class WebCodecsH264Engine implements StreamEngine {
   start() {
     this.firstFrame = false;
     this.keyframeReceived = false;
+    this.dropUntilKeyframe = false;
     this.isReadyState = false;
     this.lastSps = null;
     this.lastPps = null;
@@ -61,7 +62,6 @@ export class WebCodecsH264Engine implements StreamEngine {
     });
 
     this.initDecoder();
-
     this.isReadyState = true;
   }
 
@@ -93,15 +93,25 @@ export class WebCodecsH264Engine implements StreamEngine {
       error: (e) => {
         console.error('[WebCodecs Debug] Decoder error callback triggered:', e);
         this.callbacks.onError?.(e);
-        // Fallback disabled to keep WebCodecs active for debugging
+        this.dropUntilKeyframe = true;
+        this.keyframeReceived = false;
+        this.recreateDecoder();
       }
     });
+  }
+
+  private recreateDecoder() {
+    try { this.decoder?.close(); } catch {}
+    this.decoder = null;
+    this.initDecoder();
+    if (this.lastSps) {
+      this.reconfigureDecoder();
+    }
   }
 
   private handleAssembledFrame(frameBytes: Uint8Array, isKey: boolean) {
     if (!this.decoder) return;
 
-    // Scan for SPS/PPS parameters inside Annex-B to update config
     let offset = 0;
     while (offset < frameBytes.length) {
       let startLen = 0;
@@ -120,12 +130,12 @@ export class WebCodecsH264Engine implements StreamEngine {
       const naluData = frameBytes.subarray(offset + startLen, naluEnd);
       const type = naluData[0] & 0x1f;
 
-      if (type === 7) { // SPS
+      if (type === 7) {
         if (!this.lastSps || !arrayEquals(this.lastSps, naluData)) {
           this.lastSps = new Uint8Array(naluData);
           this.reconfigureDecoder();
         }
-      } else if (type === 8) { // PPS
+      } else if (type === 8) {
         if (!this.lastPps || !arrayEquals(this.lastPps, naluData)) {
           this.lastPps = new Uint8Array(naluData);
           this.reconfigureDecoder();
@@ -135,37 +145,43 @@ export class WebCodecsH264Engine implements StreamEngine {
       offset = naluEnd;
     }
 
-    // Config verification guard
-    if (this.activeCodec === '') {
-      return;
-    }
+    if (this.activeCodec === '') return;
 
-    // Drop delta frames if keyframe hasn't arrived
-    if (!this.keyframeReceived) {
-      if (isKey) {
-        this.keyframeReceived = true;
-      } else {
+    if (this.dropUntilKeyframe) {
+      if (!isKey) {
+        this.droppedFramesCount++;
         return;
       }
+      this.dropUntilKeyframe = false;
+      this.keyframeReceived = true;
     }
 
-    // Backpressure: drop stale delta frames if decode queue starts to pile up
+    if (!this.keyframeReceived) {
+      if (isKey) this.keyframeReceived = true;
+      else return;
+    }
+
     if (this.decoder.decodeQueueSize > 8 && !isKey) {
       this.droppedFramesCount++;
       return;
     }
 
     try {
+      const frameCopy = frameBytes.byteOffset === 0 && frameBytes.byteLength === frameBytes.buffer.byteLength
+        ? frameBytes
+        : new Uint8Array(frameBytes);
       const chunk = new EncodedVideoChunk({
         type: isKey ? 'key' : 'delta',
-        timestamp: Date.now() * 1000, // microseconds
-        data: frameBytes.buffer
+        timestamp: Date.now() * 1000,
+        data: frameCopy,
       });
       this.decoder.decode(chunk);
       this.decodedFramesCount++;
     } catch (e: any) {
       console.error('[WebCodecs Debug] decode chunk failed:', e);
-      // Fallback disabled to keep WebCodecs active for debugging
+      this.dropUntilKeyframe = true;
+      this.keyframeReceived = false;
+      this.droppedFramesCount++;
     }
   }
 
@@ -175,14 +191,12 @@ export class WebCodecsH264Engine implements StreamEngine {
     try {
       const codec = getCodecString(this.lastSps);
       this.activeCodec = codec;
-
-      this.decoder.configure({
-        codec,
-        optimizeForLatency: true
-      });
+      if (this.decoder.state !== 'closed') {
+        this.decoder.configure({ codec, optimizeForLatency: true });
+      }
     } catch (e: any) {
       console.error('[WebCodecs Debug] configure failed:', e);
-      // Fallback disabled to keep WebCodecs active for debugging
+      this.dropUntilKeyframe = true;
     }
   }
 
@@ -231,6 +245,7 @@ export class WebCodecsH264Engine implements StreamEngine {
 
     return {
       engineName: 'webcodecs',
+      decoderName: 'webcodecs',
       decodedFps: this.decodedFps,
       renderedFps: this.renderedFps,
       droppedFrames: this.droppedFramesCount,

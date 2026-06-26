@@ -6,7 +6,9 @@
 - `APK Build/`: Android helper APK source.
 - [NEW] [assets/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/assets): Project assets directory. Contains `IconMonViewPhone.png` (original image) and `IconMonViewPhone.ico` (multi-size Windows icon file).
 - `rule.md`: Local development rules and UI interaction notes.
-- [NEW] [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw): Windows tray launcher and process manager. Starts the Go backend server before opening Chrome in App mode pointing to `http://localhost:11000/`. Does not run Vite or NPM. Loads the custom tray icon from `assets/IconMonViewPhone.png`.
+- [NEW] [run.pyw](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/run.pyw): One-click Windows tray launcher and process manager. Validates required files, automatically builds stream-node if missing, manages port conflict resolution, redirects stdout/stderr to `logs/`, starts backend and stream-node, and opens Chrome App.
+- [NEW] [build_v2_all.bat](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/build_v2_all.bat): Developer batch script to compile and build all components (client frontend, Go backend, and stream-node) in one click.
+- [NEW] [logs/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/logs): Directory containing logs: `launcher.log` (launcher process), `server-go.log` (Go backend stdout/stderr), and `stream-node.log` (stream-node server stdout/stderr).
 - [NEW] [Backup/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/Backup): Local directory for backup data (ignored by Git). Contains `Backup/adb/` for copying and restoring ADB host keys (`adbkey` and `adbkey.pub`) when starting the application.
 - [NEW] [packages/apps/CloneAppProxy/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/packages/apps/CloneAppProxy): Android 13 AOSP privileged proxy app. Launches WeChat clone inside the clone profile from user 0 launcher icon.
 

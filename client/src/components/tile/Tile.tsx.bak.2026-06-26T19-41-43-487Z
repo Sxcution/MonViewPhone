@@ -163,9 +163,6 @@ function TileComponent({
     // Keep latest streamConfig in a ref so ws.onopen/reload always send newest config
     // without forcing the heavy streaming effect to re-run on every slider tick.
     const streamCfgRef = useRef<StreamConfig>(streamConfig);
-    // Keep this synchronous so a parent-triggered reload immediately uses the
-    // just-rendered viewer/global config instead of waiting for child effects.
-    streamCfgRef.current = streamConfig;
     useEffect(() => {
         streamCfgRef.current = streamConfig;
     }, [streamConfig]);
