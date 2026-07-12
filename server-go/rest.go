@@ -78,6 +78,142 @@ func uploadDir() (string, error) {
 	return filepath.Abs(filepath.Join(".", "uploads"))
 }
 
+func findAndroidBuildTool(name string) (string, error) {
+	roots := []string{}
+	if androidHome := strings.TrimSpace(os.Getenv("ANDROID_HOME")); androidHome != "" {
+		roots = append(roots, androidHome)
+	}
+	if androidSDK := strings.TrimSpace(os.Getenv("ANDROID_SDK_ROOT")); androidSDK != "" {
+		roots = append(roots, androidSDK)
+	}
+	if localAppData := strings.TrimSpace(os.Getenv("LOCALAPPDATA")); localAppData != "" {
+		roots = append(roots, filepath.Join(localAppData, "Android", "Sdk"))
+	}
+	roots = append(roots, filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local", "Android", "Sdk"))
+
+	for _, root := range roots {
+		buildTools := filepath.Join(root, "build-tools")
+		entries, err := os.ReadDir(buildTools)
+		if err != nil {
+			continue
+		}
+		versions := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			if entry.IsDir() {
+				versions = append(versions, entry.Name())
+			}
+		}
+		sort.Sort(sort.Reverse(sort.StringSlice(versions)))
+		for _, version := range versions {
+			candidate := filepath.Join(buildTools, version, name)
+			if _, err := os.Stat(candidate); err == nil {
+				return candidate, nil
+			}
+		}
+	}
+
+	if candidate, err := exec.LookPath(name); err == nil {
+		return candidate, nil
+	}
+	return "", fmt.Errorf("missing Android build tool %s", name)
+}
+
+func runExternalTool(tool string, args ...string) error {
+	var cmd *exec.Cmd
+	if strings.HasSuffix(strings.ToLower(tool), ".bat") {
+		cmd = exec.Command("cmd", append([]string{"/c", tool}, args...)...)
+	} else {
+		cmd = exec.Command(tool, args...)
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s failed: %v: %s", filepath.Base(tool), err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func repairApkForAndroidRInstall(apkPath string) (string, func(), error) {
+	root, err := uploadDir()
+	if err != nil {
+		return "", nil, err
+	}
+	tmpDir, err := os.MkdirTemp(root, "apkfix-")
+	if err != nil {
+		return "", nil, err
+	}
+	cleanup := func() { _ = os.RemoveAll(tmpDir) }
+
+	decoded := filepath.Join(tmpDir, "decoded")
+	rebuilt := filepath.Join(tmpDir, "rebuilt-target29-unsigned.apk")
+	aligned := filepath.Join(tmpDir, "aligned.apk")
+	signed := filepath.Join(tmpDir, "signed.apk")
+
+	apktool, err := filepath.Abs("apktool.jar")
+	if err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	if _, err := os.Stat(apktool); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("missing apktool.jar at %s", apktool)
+	}
+
+	if err := runExternalTool("java", "-jar", apktool, "d", "-f", "-s", "-o", decoded, apkPath); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	if err := forceApktoolTargetSDK(decoded, 29); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	if err := runExternalTool("java", "-jar", apktool, "b", decoded, "-o", rebuilt); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+
+	zipalign, err := findAndroidBuildTool("zipalign.exe")
+	if err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	if err := runExternalTool(zipalign, "-p", "-f", "4", rebuilt, aligned); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+
+	apksigner, err := findAndroidBuildTool("apksigner.bat")
+	if err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	debugKeystore := filepath.Join(os.Getenv("USERPROFILE"), ".android", "debug.keystore")
+	if _, err := os.Stat(debugKeystore); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("missing debug keystore %s", debugKeystore)
+	}
+	if err := runExternalTool(apksigner, "sign", "--ks", debugKeystore, "--ks-key-alias", "androiddebugkey", "--ks-pass", "pass:android", "--key-pass", "pass:android", "--v4-signing-enabled", "false", "--out", signed, aligned); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+
+	return signed, cleanup, nil
+}
+
+func forceApktoolTargetSDK(decodedDir string, target int) error {
+	ymlPath := filepath.Join(decodedDir, "apktool.yml")
+	data, err := os.ReadFile(ymlPath)
+	if err != nil {
+		return err
+	}
+	re := regexp.MustCompile(`(?m)^(\s*targetSdkVersion:\s*)\d+`)
+	text := string(data)
+	if !re.MatchString(text) {
+		return fmt.Errorf("targetSdkVersion not found in %s", ymlPath)
+	}
+	text = re.ReplaceAllString(text, "${1}"+strconv.Itoa(target))
+	return os.WriteFile(ymlPath, []byte(text), 0644)
+}
+
 // CleanOldUploads removes uploaded APK temp files older than 1 hour.
 // Call this at startup and periodically to prevent disk space leaks.
 func CleanOldUploads() {
@@ -478,24 +614,44 @@ func pushQRToCloneUsers(udid, tmpPath, sourceRemotePath string) ([]qrClonePushRe
 }
 
 func adbInstallUploaded(udid, apkPath string, userID *int) (string, error) {
-	remote := "/data/local/tmp/" + sanitizeFileName(filepath.Base(apkPath))
-	if _, err := adb.Command("-s", udid, "push", apkPath, remote); err != nil {
-		return "", err
-	}
-	defer adb.Command("-s", udid, "shell", "rm", remote)
-
-	args := []string{"-s", udid, "shell", "pm", "install", "-r"}
+	targetUserID := 0
 	if userID != nil {
-		args = append(args, "--user", strconv.Itoa(*userID))
+		targetUserID = *userID
 	}
-	args = append(args, remote)
 
-	out, err := adb.Command(args...)
+	out, err := adbInstallLocalApkForUser(udid, apkPath, targetUserID)
+	if err != nil {
+		diagnostic := out + "\n" + err.Error()
+		if !strings.Contains(diagnostic, "resources.arsc") {
+			return out, err
+		}
+
+		fixedApk, cleanup, fixErr := repairApkForAndroidRInstall(apkPath)
+		if fixErr != nil {
+			return out, fmt.Errorf("%w; APK repair failed: %v", err, fixErr)
+		}
+		defer cleanup()
+
+		retryOut, retryErr := adbInstallLocalApkForUser(udid, fixedApk, targetUserID)
+		if retryErr != nil {
+			return retryOut, fmt.Errorf("%w; repaired APK install failed: %v", err, retryErr)
+		}
+		return strings.TrimSpace(retryOut) + "\nInstalled after APK resource alignment/sign repair.", nil
+	}
+	if !strings.Contains(strings.ToLower(out), "success") {
+		return out, fmt.Errorf("adb install failed: %s", strings.TrimSpace(out))
+	}
+	return out, nil
+}
+
+func adbInstallLocalApkForUser(udid, apkPath string, userID int) (string, error) {
+	// ponytail: always pass an explicit user; bare install can target all users on some Android builds.
+	out, err := adb.CommandTimeout(180*time.Second, "-s", udid, "install", "--user", strconv.Itoa(userID), "-r", apkPath)
 	if err != nil {
 		return out, err
 	}
 	if !strings.Contains(strings.ToLower(out), "success") {
-		return out, fmt.Errorf("pm install failed: %s", strings.TrimSpace(out))
+		return out, fmt.Errorf("adb install failed: %s", strings.TrimSpace(out))
 	}
 	return out, nil
 }

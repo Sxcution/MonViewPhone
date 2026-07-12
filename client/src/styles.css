@@ -4626,6 +4626,10 @@ textarea.vsp-modal-input {
   position: relative;
 }
 
+.vsp-profile-section {
+  position: relative;
+}
+
 .vsp-adb-submenu {
   position: absolute;
   left: -6px;
@@ -4653,6 +4657,7 @@ textarea.vsp-modal-input {
 .vsp-adb-submenu-item {
   display: flex !important;
   align-items: center !important;
+  gap: 8px !important;
   width: 100% !important;
   text-align: left !important;
   padding: 6px 12px !important;
@@ -4684,6 +4689,10 @@ textarea.vsp-modal-input {
 
 .vsp-adb-submenu-item.vsp-cmd-warn:hover {
   background: rgba(255, 100, 100, 0.12) !important;
+}
+
+.vsp-profile-submenu {
+  min-width: 170px;
 }
 
 .vsp-connection-section {
@@ -4725,7 +4734,8 @@ textarea.vsp-modal-input {
 }
 
 .vsp-connection-submenu-item:disabled,
-.vsp-connection-submenu-item.disabled {
+.vsp-connection-submenu-item.disabled,
+.vsp-adb-submenu-item.disabled {
   opacity: .52 !important;
   cursor: not-allowed;
 }

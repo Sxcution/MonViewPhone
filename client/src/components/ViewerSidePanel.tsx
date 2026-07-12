@@ -14,7 +14,7 @@ import {
   normalizeAdbSegment,
 } from '@/lib/serverApi';
 import type { ConnectionMode, ConnectionState } from '@/components/tile/types';
-import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Save, Trash2, Palette, Plus, Copy, ChevronRight } from 'lucide-react';
+import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Save, Trash2, Palette, Plus, Copy, ChevronRight, Users } from 'lucide-react';
 import { ViewerAppsMenu } from './ViewerAppsMenu';
 
 type ViewerSidePanelProps = {
@@ -65,6 +65,23 @@ const LS_PRESET_COLORS = 'vsp_preset_colors';
 
 function loadJson<T>(key: string, def: T): T { try { return JSON.parse(localStorage.getItem(key) || '') ?? def; } catch { return def; } }
 function saveJson(key: string, v: any) { localStorage.setItem(key, JSON.stringify(v)); }
+function shellQuote(value: string): string { return `'${value.replace(/'/g, `'\\''`)}'`; }
+function parseCreatedUserId(output: string): number | null {
+  const match = output.match(/(?:created user id|id)\s+(\d+)/i);
+  return match ? Number(match[1]) : null;
+}
+
+function inspectManagedProfileCapacity(output: string): { maxPerParent: number | null; existingIds: number[] } {
+  const maxMatch = output.match(/android\.os\.usertype\.profile\.MANAGED:[\s\S]*?mMaxAllowedPerParent:\s*(-?\d+)/);
+  const maxPerParent = maxMatch ? Number(maxMatch[1]) : null;
+  const existingIds: number[] = [];
+  for (const block of output.split(/\r?\n(?=\s*UserInfo\{)/)) {
+    if (!/parentId=0/.test(block) || !/Type:\s*android\.os\.usertype\.profile\.MANAGED/.test(block)) continue;
+    const idMatch = block.match(/UserInfo\{(\d+):/);
+    if (idMatch) existingIds.push(Number(idMatch[1]));
+  }
+  return { maxPerParent, existingIds };
+}
 
 export function ViewerSidePanel({
   udid,
@@ -89,6 +106,9 @@ export function ViewerSidePanel({
   // Shared profile
   const [profiles, setProfiles] = useState<{ id: number; name: string }[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<number>(0);
+  const [profileActionStatus, setProfileActionStatus] = useState<string | null>(null);
+  const [deleteProfileModalOpen, setDeleteProfileModalOpen] = useState(false);
+  const [deleteProfileInput, setDeleteProfileInput] = useState('');
 
   // Toast notifications
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
@@ -375,18 +395,32 @@ export function ViewerSidePanel({
 
   // ADB submenu on hover
   const [showAdbSubmenu, setShowAdbSubmenu] = useState(false);
+  const [showProfileSubmenu, setShowProfileSubmenu] = useState(false);
   const [showConnectionSubmenu, setShowConnectionSubmenu] = useState(false);
   const [showGameSubmenu, setShowGameSubmenu] = useState(false);
   const adbHoverTimer = useRef<number | null>(null);
+  const profileHoverTimer = useRef<number | null>(null);
   const connectionHoverTimer = useRef<number | null>(null);
   const gameHoverTimer = useRef<number | null>(null);
 
 
 
   // Load profiles
-  useEffect(() => {
-    listUserProfiles(wsServer, udid).then(setProfiles).catch(() => {});
+  const refreshProfiles = useCallback(async () => {
+    try {
+      const nextProfiles = await listUserProfiles(wsServer, udid);
+      setProfiles(nextProfiles);
+      setSelectedProfile(prev => nextProfiles.some(p => p.id === prev) ? prev : 0);
+      return nextProfiles;
+    } catch (err) {
+      console.warn('[VSP] Failed to refresh profiles:', err);
+      return [];
+    }
   }, [wsServer, udid]);
+
+  useEffect(() => {
+    void refreshProfiles();
+  }, [refreshProfiles]);
 
   // Handle click outside to close context menu, using capture phase to catch clicks blocked by canvas
   useEffect(() => {
@@ -413,6 +447,8 @@ export function ViewerSidePanel({
 
   const adbSectionRef = useRef<HTMLDivElement>(null);
   const adbSubmenuMenuRef = useRef<HTMLDivElement>(null);
+  const profileSectionRef = useRef<HTMLDivElement>(null);
+  const profileSubmenuMenuRef = useRef<HTMLDivElement>(null);
   const connectionSectionRef = useRef<HTMLDivElement>(null);
   const connectionSubmenuMenuRef = useRef<HTMLDivElement>(null);
   const gameSectionRef = useRef<HTMLDivElement>(null);
@@ -445,6 +481,25 @@ export function ViewerSidePanel({
       menuEl.style.pointerEvents = 'auto';
     }
   }, [showAdbSubmenu]);
+
+  React.useLayoutEffect(() => {
+    if (showProfileSubmenu && profileSectionRef.current && profileSubmenuMenuRef.current) {
+      const rect = profileSectionRef.current.getBoundingClientRect();
+      const menuEl = profileSubmenuMenuRef.current;
+      const menuWidth = 190;
+      let x = rect.right + 4;
+      if (x + menuWidth > window.innerWidth) {
+        x = rect.left - menuWidth - 4;
+      }
+
+      menuEl.style.left = `${x}px`;
+      menuEl.style.bottom = 'auto';
+      menuEl.style.top = `${rect.top}px`;
+      menuEl.style.maxHeight = `${window.innerHeight - rect.top - 12}px`;
+      menuEl.style.opacity = '1';
+      menuEl.style.pointerEvents = 'auto';
+    }
+  }, [showProfileSubmenu]);
 
   React.useLayoutEffect(() => {
     if (showConnectionSubmenu && connectionSectionRef.current && connectionSubmenuMenuRef.current) {
@@ -500,6 +555,151 @@ export function ViewerSidePanel({
   const handleAdbLeave = () => {
     adbHoverTimer.current = window.setTimeout(() => setShowAdbSubmenu(false), 100);
   };
+
+  const handleProfileEnter = () => {
+    if (profileHoverTimer.current) clearTimeout(profileHoverTimer.current);
+    setShowProfileSubmenu(true);
+  };
+
+  const handleProfileLeave = () => {
+    profileHoverTimer.current = window.setTimeout(() => setShowProfileSubmenu(false), 100);
+  };
+
+  const nextMonSpaceProfileName = useCallback(() => {
+    const used = new Set<number>();
+    for (const profile of profiles) {
+      const match = profile.name.match(/^MonSpace\s+(\d+)$/i);
+      if (match) used.add(Number(match[1]));
+    }
+    let index = 1;
+    while (used.has(index)) index += 1;
+    return `MonSpace ${index}`;
+  }, [profiles]);
+
+  const handleCreateProfilePointerDown = useCallback(async (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowProfileSubmenu(false);
+
+    const targets = connectSelection && connectSelection.size > 0
+      ? Array.from(connectSelection)
+      : [udid];
+    const profileName = nextMonSpaceProfileName();
+
+    setProfileActionStatus(`Creating ${profileName}...`);
+    let okCount = 0;
+
+    try {
+      for (const targetUdid of targets) {
+        const userDump = await runAdbCommandApi(wsServer, targetUdid, 'dumpsys user', 'shell');
+        if (userDump.success) {
+          const capacity = inspectManagedProfileCapacity(userDump.output);
+          if (
+            capacity.maxPerParent !== null &&
+            capacity.maxPerParent >= 0 &&
+            capacity.existingIds.length >= capacity.maxPerParent
+          ) {
+            throw new Error(
+              `${targetUdid}: ROM hiện chỉ cho ${capacity.maxPerParent} managed profile/user 0; ` +
+              `đang có user ${capacity.existingIds.join(', ')}. Xoá profile cũ hoặc cài/reboot MonSpace UserType overlay trước khi tạo thêm.`,
+            );
+          }
+        }
+
+        const createResult = await runAdbCommandApi(
+          wsServer,
+          targetUdid,
+          `pm create-user --profileOf 0 --managed ${shellQuote(profileName)}`,
+          'shell',
+        );
+        if (!createResult.success) throw new Error(createResult.output || 'pm create-user failed');
+        const createdUserId = parseCreatedUserId(createResult.output);
+        if (!createdUserId) throw new Error(`Cannot parse created user id: ${createResult.output}`);
+
+        const setupCommands = [
+          `cmd package install-existing --user ${createdUserId} com.mon.monspacev2`,
+          `dpm set-profile-owner --user ${createdUserId} com.mon.monspacev2/.MonDeviceAdminReceiver`,
+          `am start-user -w ${createdUserId}`,
+          `settings --user ${createdUserId} put secure user_setup_complete 1`,
+          `am start --user ${createdUserId} -n com.mon.monspacev2/.MonspaceV2Activity --ez finish_only true`,
+        ];
+
+        for (const setupCommand of setupCommands) {
+          const result = await runAdbCommandApi(wsServer, targetUdid, setupCommand, 'shell');
+          if (!result.success) {
+            throw new Error(`${setupCommand}: ${result.output || 'failed'}`);
+          }
+        }
+
+        okCount += 1;
+      }
+
+      if (okCount > 0) {
+        showToast(`Đã tạo ${profileName} trên ${okCount}/${targets.length} thiết bị`, 'ok');
+      }
+      await refreshProfiles();
+    } catch (err: any) {
+      showToast(err?.message || 'Tạo profile thất bại', 'err');
+    } finally {
+      setProfileActionStatus(null);
+    }
+  }, [connectSelection, nextMonSpaceProfileName, refreshProfiles, showToast, udid, wsServer]);
+
+  const handleDeleteProfilePointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowProfileSubmenu(false);
+
+    if (selectedProfile <= 0) {
+      showToast('Chọn profile cần xoá trước.', 'err');
+      return;
+    }
+    setDeleteProfileInput('');
+    setDeleteProfileModalOpen(true);
+  }, [selectedProfile, showToast]);
+
+  const handleDeleteProfileConfirm = useCallback(async () => {
+    if (deleteProfileInput.trim().toLowerCase() !== 'delete') return;
+    const profileId = selectedProfile;
+    if (profileId <= 0) {
+      showToast('Không thể xoá User 0 - Owner.', 'err');
+      return;
+    }
+
+    const targets = connectSelection && connectSelection.size > 0
+      ? Array.from(connectSelection)
+      : [udid];
+    const errors: string[] = [];
+    let okCount = 0;
+
+    setDeleteProfileModalOpen(false);
+    setProfileActionStatus(`Deleting User ${profileId}...`);
+
+    try {
+      for (const targetUdid of targets) {
+        const result = await runAdbCommandApi(wsServer, targetUdid, `pm remove-user ${profileId}`, 'shell');
+        const output = (result.output || '').trim();
+        if (result.success && !/(error|failure|failed)/i.test(output)) {
+          okCount += 1;
+        } else {
+          errors.push(`${targetUdid}: ${output || 'failed'}`);
+        }
+      }
+
+      if (okCount > 0) {
+        showToast(`Đã xoá User ${profileId} trên ${okCount}/${targets.length} thiết bị`, 'ok');
+        setSelectedProfile(0);
+        await refreshProfiles();
+      }
+      if (errors.length > 0) {
+        showToast(`Xoá profile lỗi ${errors.length}/${targets.length}: ${errors[0]}`, 'err');
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Xoá profile thất bại', 'err');
+    } finally {
+      setProfileActionStatus(null);
+    }
+  }, [connectSelection, deleteProfileInput, refreshProfiles, selectedProfile, showToast, udid, wsServer]);
 
   const handleConnectionEnter = () => {
     if (connectionHoverTimer.current) clearTimeout(connectionHoverTimer.current);
@@ -563,6 +763,7 @@ export function ViewerSidePanel({
   useEffect(() => {
     return () => {
       if (adbHoverTimer.current) window.clearTimeout(adbHoverTimer.current);
+      if (profileHoverTimer.current) window.clearTimeout(profileHoverTimer.current);
       if (connectionHoverTimer.current) window.clearTimeout(connectionHoverTimer.current);
       if (gameHoverTimer.current) window.clearTimeout(gameHoverTimer.current);
     };
@@ -1211,6 +1412,66 @@ export function ViewerSidePanel({
             showToast={showToast}
           />
 
+          {/* DS Profile */}
+          <div
+            className="vsp-profile-section"
+            ref={profileSectionRef}
+            onMouseEnter={handleProfileEnter}
+            onMouseLeave={handleProfileLeave}
+            data-inspector-id="viewerSidePanel.profileActions"
+            data-inspector-label="Profile management sidebar row"
+            data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+          >
+            <div className="vsp-section-title vsp-clickable vsp-connection-title">
+              <span className="vsp-connection-title-left">
+                <Users size={15} />
+                <span>DS Profile</span>
+              </span>
+              <ChevronRight size={14} />
+            </div>
+            {showProfileSubmenu && ReactDOM.createPortal(
+              <div
+                ref={profileSubmenuMenuRef}
+                className="vsp-adb-submenu vsp-profile-submenu"
+                style={{ position: 'fixed', left: 0, top: 0, opacity: 0, pointerEvents: 'none', margin: 0 }}
+                onMouseEnter={() => {
+                  if (profileHoverTimer.current) clearTimeout(profileHoverTimer.current);
+                  setShowProfileSubmenu(true);
+                }}
+                onMouseLeave={handleProfileLeave}
+                data-inspector-id="viewerSidePanel.profileActionsSubmenu"
+                data-inspector-label="Profile management hover submenu"
+                data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+              >
+                <button
+                  type="button"
+                  className="vsp-adb-submenu-item"
+                  onPointerDown={handleCreateProfilePointerDown}
+                  data-inspector-id="viewerSidePanel.createProfileButton"
+                  data-inspector-label="Open Android managed profile setup"
+                  data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+                >
+                  <Plus size={14} />
+                  <span>Tạo Profile</span>
+                </button>
+                <button
+                  type="button"
+                  className={`vsp-adb-submenu-item vsp-cmd-warn${selectedProfile <= 0 ? ' disabled' : ''}`}
+                  aria-disabled={selectedProfile <= 0}
+                  onPointerDown={handleDeleteProfilePointerDown}
+                  data-inspector-id="viewerSidePanel.deleteProfileButton"
+                  data-inspector-label="Delete selected Android profile"
+                  data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+                >
+                  <Trash2 size={14} />
+                  <span>Xoá Profile</span>
+                </button>
+              </div>,
+              document.body
+            )}
+            {profileActionStatus && <div className="vsp-status" style={{ marginTop: '4px' }}>{profileActionStatus}</div>}
+          </div>
+
           {/* 5. Chạy lệnh ADB - with hover submenu */}
           <div 
             className="vsp-adb-section" 
@@ -1394,6 +1655,59 @@ export function ViewerSidePanel({
           </div>
         </div>
       </div>
+
+      {deleteProfileModalOpen && ReactDOM.createPortal(
+        <div
+          className="confirmOverlay"
+          style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onMouseDown={() => setDeleteProfileModalOpen(false)}
+          data-inspector-id="viewerSidePanel.deleteProfileModal"
+          data-inspector-label="Confirm selected profile deletion modal"
+          data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+        >
+          <div
+            className="confirmPanel"
+            style={{ width: 380, maxWidth: 'calc(100vw - 28px)', padding: 18, color: '#fff' }}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Xoá Profile</div>
+            <div style={{ color: '#cfcfcf', fontSize: 13, lineHeight: 1.45 }}>
+              Profile đã chọn sẽ bị xoá khỏi thiết bị: User {selectedProfile}
+              {profiles.find(p => p.id === selectedProfile)?.name ? ` - ${profiles.find(p => p.id === selectedProfile)?.name}` : ''}.
+              Nhập <b>Delete</b> để xác nhận.
+            </div>
+            <input
+              className="vsp-input"
+              style={{ width: '100%', marginTop: 12 }}
+              value={deleteProfileInput}
+              onChange={e => setDeleteProfileInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && deleteProfileInput.trim().toLowerCase() === 'delete') {
+                  void handleDeleteProfileConfirm();
+                }
+              }}
+              placeholder="Delete"
+              autoFocus
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <button type="button" className="modalBtn" onClick={() => setDeleteProfileModalOpen(false)}>Huỷ</button>
+              <button
+                type="button"
+                className="modalBtn modalBtnDanger"
+                disabled={deleteProfileInput.trim().toLowerCase() !== 'delete'}
+                style={{
+                  opacity: deleteProfileInput.trim().toLowerCase() === 'delete' ? 1 : 0.5,
+                  cursor: deleteProfileInput.trim().toLowerCase() === 'delete' ? 'pointer' : 'not-allowed',
+                }}
+                onClick={() => void handleDeleteProfileConfirm()}
+              >
+                Xoá
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ADB Command Modal */}
       {showAdbModal && (

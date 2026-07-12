@@ -67,6 +67,18 @@ func formatCommandError(path string, args []string, timeout time.Duration, stder
 	return fmt.Errorf("adb command failed: path=%q args=%v timeout=%s err=%v stderr=%q", path, args, timeout, err, stderr)
 }
 
+func commandOutput(stdout, stderr bytes.Buffer) string {
+	out := strings.TrimSpace(stdout.String())
+	errText := strings.TrimSpace(stderr.String())
+	if out == "" {
+		return errText
+	}
+	if errText == "" {
+		return out
+	}
+	return out + "\n" + errText
+}
+
 // Command executes an adb command
 func Command(args ...string) (string, error) {
 	return CommandTimeout(timeoutForArgs(args), args...)
@@ -87,10 +99,10 @@ func CommandTimeout(timeout time.Duration, args ...string) (string, error) {
 
 	err := cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		return "", formatCommandError(path, args, timeout, stderr.String(), context.DeadlineExceeded)
+		return commandOutput(stdout, stderr), formatCommandError(path, args, timeout, stderr.String(), context.DeadlineExceeded)
 	}
 	if err != nil {
-		return "", formatCommandError(path, args, timeout, stderr.String(), err)
+		return commandOutput(stdout, stderr), formatCommandError(path, args, timeout, stderr.String(), err)
 	}
 	return stdout.String(), nil
 }
@@ -117,10 +129,10 @@ func CommandWithStdinFileTimeout(timeout time.Duration, stdinPath string, args .
 
 	err = cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		return "", formatCommandError(path, args, timeout, stderr.String(), context.DeadlineExceeded)
+		return commandOutput(stdout, stderr), formatCommandError(path, args, timeout, stderr.String(), context.DeadlineExceeded)
 	}
 	if err != nil {
-		return "", formatCommandError(path, args, timeout, stderr.String(), err)
+		return commandOutput(stdout, stderr), formatCommandError(path, args, timeout, stderr.String(), err)
 	}
 	return stdout.String(), nil
 }

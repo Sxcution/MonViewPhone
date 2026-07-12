@@ -279,7 +279,7 @@ def start_vite_dev_server():
     log_launcher(f"Starting Vite dev frontend: node {vite_bin}")
     try:
         vite_process = subprocess.Popen(
-            ["node", vite_bin, "--host", "127.0.0.1", "--port", str(DEV_FRONTEND_PORT)],
+            ["node", vite_bin, "--host", "127.0.0.1", "--port", str(DEV_FRONTEND_PORT), "--logLevel", "warn"],
             cwd=client_dir,
             stdout=vite_log_file,
             stderr=subprocess.STDOUT,
