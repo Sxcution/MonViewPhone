@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"server-go/adb"
@@ -31,6 +33,35 @@ var userInfoPattern = regexp.MustCompile(`UserInfo\{(\d+):([^:}]*)`)
 var storageUserPattern = regexp.MustCompile(`^/storage/emulated/(\d+)/`)
 var mediaIDPattern = regexp.MustCompile(`_id=(\d+)`)
 var contentURIPattern = regexp.MustCompile(`content://[a-zA-Z0-9./_:-]+`)
+var clipboardB64Pattern = regexp.MustCompile(`(?:^|\s)text_b64=([A-Za-z0-9+/=]*)`)
+var clipboardTimestampPattern = regexp.MustCompile(`(?:^|\s)timestamp=(\d+)`)
+
+var phoneClipboardSync = struct {
+	sync.Mutex
+	run        sync.Mutex
+	last       map[string]string
+	activeUDID string
+	started    bool
+}{last: make(map[string]string)}
+
+type phoneClipboardSnapshot struct {
+	UserID    int
+	Text      string
+	Encoded   string
+	Timestamp int64
+}
+
+type phoneClipboardReadResult struct {
+	snapshot phoneClipboardSnapshot
+	err      error
+}
+
+type phoneClipboardSyncResult struct {
+	Changed bool
+	Empty   bool
+	Bytes   int
+	UserID  int
+}
 
 func writeJSON(w http.ResponseWriter, status int, payload jsonResponse) {
 	w.Header().Set("Content-Type", "application/json")
@@ -338,6 +369,114 @@ func pushFileToProfileAwarePath(udid, tmpPath, remotePath string) error {
 	return nil
 }
 
+func listUserProfilesForDevice(udid string) ([]userProfile, string, error) {
+	out, err := adb.Shell(strings.TrimSpace(udid), "pm list users")
+	if err != nil {
+		return nil, out, err
+	}
+
+	profiles := make([]userProfile, 0)
+	for _, match := range userInfoPattern.FindAllStringSubmatch(out, -1) {
+		id, err := strconv.Atoi(match[1])
+		if err != nil {
+			continue
+		}
+		name := strings.TrimSpace(match[2])
+		if name == "" {
+			name = fmt.Sprintf("User %d", id)
+		}
+		profiles = append(profiles, userProfile{ID: id, Name: name})
+	}
+	if len(profiles) == 0 {
+		profiles = append(profiles, userProfile{ID: 0, Name: "Owner"})
+	}
+	sort.Slice(profiles, func(i, j int) bool {
+		return profiles[i].ID < profiles[j].ID
+	})
+	return profiles, out, nil
+}
+
+func isQRImageRemotePath(remotePath string) bool {
+	base := path.Base(strings.TrimSpace(remotePath))
+	ext := path.Ext(base)
+	nameWithoutExt := strings.TrimSuffix(base, ext)
+	if !strings.EqualFold(nameWithoutExt, "QR") {
+		return false
+	}
+	extLower := strings.ToLower(strings.TrimPrefix(ext, "."))
+	switch extLower {
+	case "png", "jpg", "jpeg", "gif", "webp", "bmp", "mp4", "mkv", "avi", "mov":
+		return true
+	}
+	return false
+}
+
+func relativeDirFromRemotePath(remotePath, fallback string) string {
+	cleaned := path.Clean(strings.ReplaceAll(strings.TrimSpace(remotePath), "\\", "/"))
+	rel := ""
+	if strings.HasPrefix(cleaned, "/storage/emulated/") {
+		parts := strings.SplitN(strings.TrimPrefix(cleaned, "/storage/emulated/"), "/", 2)
+		if len(parts) == 2 {
+			rel = parts[1]
+		}
+	} else if strings.HasPrefix(cleaned, "/sdcard/") {
+		rel = strings.TrimPrefix(cleaned, "/sdcard/")
+	} else if strings.HasPrefix(cleaned, "sdcard/") {
+		rel = strings.TrimPrefix(cleaned, "sdcard/")
+	}
+
+	relDir := path.Dir(rel)
+	relDir = strings.Trim(relDir, "/")
+	if relDir == "" || relDir == "." {
+		return strings.Trim(fallback, "/")
+	}
+	return relDir
+}
+
+type qrClonePushResult struct {
+	UserID     int    `json:"userId"`
+	Name       string `json:"name"`
+	RemotePath string `json:"remotePath"`
+	Success    bool   `json:"success"`
+	Error      string `json:"error,omitempty"`
+}
+
+func pushQRToCloneUsers(udid, tmpPath, sourceRemotePath string) ([]qrClonePushResult, error) {
+	sourceUserID := userIDFromRemotePath(sourceRemotePath)
+	profiles, _, err := listUserProfilesForDevice(udid)
+	if err != nil {
+		return nil, err
+	}
+
+	fileName := path.Base(sourceRemotePath)
+	relDir := relativeDirFromRemotePath(sourceRemotePath, "DCIM/Camera")
+	results := make([]qrClonePushResult, 0)
+	failures := make([]string, 0)
+	for _, profile := range profiles {
+		if profile.ID <= 0 || profile.ID == sourceUserID {
+			continue
+		}
+		targetPath := fmt.Sprintf("/storage/emulated/%d/%s/%s", profile.ID, relDir, fileName)
+		result := qrClonePushResult{
+			UserID:     profile.ID,
+			Name:       profile.Name,
+			RemotePath: targetPath,
+		}
+		if err := pushFileToProfileAwarePath(udid, tmpPath, targetPath); err != nil {
+			result.Error = err.Error()
+			failures = append(failures, fmt.Sprintf("user %d: %s", profile.ID, err.Error()))
+		} else {
+			result.Success = true
+		}
+		results = append(results, result)
+	}
+
+	if len(failures) > 0 {
+		return results, fmt.Errorf("%s clone push failed: %s", fileName, strings.Join(failures, "; "))
+	}
+	return results, nil
+}
+
 func adbInstallUploaded(udid, apkPath string, userID *int) (string, error) {
 	remote := "/data/local/tmp/" + sanitizeFileName(filepath.Base(apkPath))
 	if _, err := adb.Command("-s", udid, "push", apkPath, remote); err != nil {
@@ -375,27 +514,12 @@ func handleUserProfiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := adb.Shell(strings.TrimSpace(req.UDID), "pm list users")
+	profiles, out, err := listUserProfilesForDevice(req.UDID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
 		return
 	}
 
-	profiles := make([]userProfile, 0)
-	for _, match := range userInfoPattern.FindAllStringSubmatch(out, -1) {
-		id, err := strconv.Atoi(match[1])
-		if err != nil {
-			continue
-		}
-		name := strings.TrimSpace(match[2])
-		if name == "" {
-			name = fmt.Sprintf("User %d", id)
-		}
-		profiles = append(profiles, userProfile{ID: id, Name: name})
-	}
-	if len(profiles) == 0 {
-		profiles = append(profiles, userProfile{ID: 0, Name: "Owner"})
-	}
 	writeJSON(w, http.StatusOK, jsonResponse{"success": true, "profiles": profiles, "raw": out})
 }
 
@@ -488,6 +612,187 @@ func handleAdbCommand(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, jsonResponse{"success": true, "output": out})
 }
 
+func handleSyncPhoneClipboardToPC(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		UDID string `json:"udid"`
+	}
+	if err := readJSON(r, &req); err != nil || strings.TrimSpace(req.UDID) == "" {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": `Invalid "udid"`})
+		return
+	}
+	udid := strings.TrimSpace(req.UDID)
+	setActivePhoneClipboardSyncUDID(udid)
+
+	result, err := syncPhoneClipboardToPCOnce(udid)
+	if err != nil {
+		writeJSON(w, http.StatusOK, jsonResponse{"success": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, jsonResponse{
+		"success": true,
+		"changed": result.Changed,
+		"empty":   result.Empty,
+		"bytes":   result.Bytes,
+		"userId":  result.UserID,
+	})
+}
+
+func setActivePhoneClipboardSyncUDID(udid string) {
+	phoneClipboardSync.Lock()
+	phoneClipboardSync.activeUDID = udid
+	shouldStart := !phoneClipboardSync.started
+	phoneClipboardSync.started = true
+	phoneClipboardSync.Unlock()
+
+	if shouldStart {
+		go runPhoneClipboardAutoSync()
+	}
+}
+
+func runPhoneClipboardAutoSync() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		phoneClipboardSync.Lock()
+		udid := phoneClipboardSync.activeUDID
+		phoneClipboardSync.Unlock()
+		if udid == "" {
+			continue
+		}
+		_, _ = syncPhoneClipboardToPCOnce(udid)
+	}
+}
+
+func syncPhoneClipboardToPCOnce(udid string) (phoneClipboardSyncResult, error) {
+	phoneClipboardSync.run.Lock()
+	defer phoneClipboardSync.run.Unlock()
+
+	snapshot, err := readLatestPhoneClipboard(udid)
+	if err != nil {
+		return phoneClipboardSyncResult{}, err
+	}
+	text := snapshot.Text
+	if text == "" {
+		return phoneClipboardSyncResult{Empty: true}, nil
+	}
+	syncKey := fmt.Sprintf("%d:%d:%s", snapshot.UserID, snapshot.Timestamp, snapshot.Encoded)
+
+	phoneClipboardSync.Lock()
+	if phoneClipboardSync.last[udid] == syncKey {
+		phoneClipboardSync.Unlock()
+		return phoneClipboardSyncResult{UserID: snapshot.UserID, Bytes: len([]byte(text))}, nil
+	}
+	phoneClipboardSync.Unlock()
+
+	if err := setWindowsClipboard(text); err != nil {
+		return phoneClipboardSyncResult{}, err
+	}
+	phoneClipboardSync.Lock()
+	phoneClipboardSync.last[udid] = syncKey
+	phoneClipboardSync.Unlock()
+	return phoneClipboardSyncResult{Changed: true, Bytes: len([]byte(text)), UserID: snapshot.UserID}, nil
+}
+
+func readLatestPhoneClipboard(udid string) (phoneClipboardSnapshot, error) {
+	profiles, _, err := listUserProfilesForDevice(udid)
+	if err != nil {
+		profiles = []userProfile{{ID: 0, Name: "Owner"}}
+	}
+
+	results := make(chan phoneClipboardReadResult, len(profiles))
+	for _, profile := range profiles {
+		userID := profile.ID
+		go func() {
+			snapshot, err := readPhoneClipboardForUser(udid, userID)
+			results <- phoneClipboardReadResult{snapshot: snapshot, err: err}
+		}()
+	}
+
+	var best phoneClipboardSnapshot
+	var lastErr error
+	for range profiles {
+		result := <-results
+		if result.err != nil {
+			lastErr = result.err
+			continue
+		}
+		snapshot := result.snapshot
+		if snapshot.Text == "" {
+			continue
+		}
+		if best.Text == "" || snapshot.Timestamp >= best.Timestamp {
+			best = snapshot
+		}
+	}
+	if best.Text != "" {
+		return best, nil
+	}
+	if lastErr != nil {
+		return phoneClipboardSnapshot{}, lastErr
+	}
+	return phoneClipboardSnapshot{}, nil
+}
+
+func readPhoneClipboardForUser(udid string, userID int) (phoneClipboardSnapshot, error) {
+	out, err := adb.CommandTimeout(
+		5*time.Second,
+		"-s", udid,
+		"shell", "content", "query", "--user", strconv.Itoa(userID), "--uri", "content://com.mon.monkeybroad.clipboard/text",
+	)
+	if err != nil {
+		return phoneClipboardSnapshot{}, err
+	}
+	matches := clipboardB64Pattern.FindStringSubmatch(out)
+	if len(matches) < 2 {
+		return phoneClipboardSnapshot{}, fmt.Errorf("Chưa cài MonKeybroad bản hỗ trợ copy từ điện thoại")
+	}
+	data, err := base64.StdEncoding.DecodeString(matches[1])
+	if err != nil {
+		return phoneClipboardSnapshot{}, fmt.Errorf("Clipboard điện thoại trả dữ liệu không hợp lệ")
+	}
+	timestamp := int64(0)
+	if tsMatch := clipboardTimestampPattern.FindStringSubmatch(out); len(tsMatch) >= 2 {
+		if parsed, err := strconv.ParseInt(tsMatch[1], 10, 64); err == nil {
+			timestamp = parsed
+		}
+	}
+	return phoneClipboardSnapshot{UserID: userID, Text: string(data), Encoded: matches[1], Timestamp: timestamp}, nil
+}
+
+func setWindowsClipboard(text string) error {
+	tmp, err := os.CreateTemp("", "monviewphone-clipboard-*.txt")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if _, err := tmp.WriteString(text); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+
+	cmd := exec.Command(
+		"powershell.exe",
+		"-NoProfile",
+		"-NonInteractive",
+		"-Command",
+		"Set-Clipboard -Value (Get-Content -LiteralPath $env:MONVIEWPHONE_CLIPBOARD_FILE -Raw -Encoding UTF8)",
+	)
+	cmd.Env = append(os.Environ(), "MONVIEWPHONE_CLIPBOARD_FILE="+tmpPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("Không ghi được clipboard PC: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
 func handleInstallApkBinary(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
@@ -568,13 +873,15 @@ func handleInstallUploaded(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, jsonResponse{"success": false, "error": "file not found"})
 		return
 	}
-	out, err := adbInstallUploaded(strings.TrimSpace(req.UDID), resolved, nil)
-	// Cleanup: remove the uploaded APK file after installation attempt
-	defer os.Remove(resolved)
+	udid := strings.TrimSpace(req.UDID)
+	log.Printf("[APK_INSTALL] start udid=%s file=%s", udid, filepath.Base(resolved))
+	out, err := adbInstallUploaded(udid, resolved, nil)
 	if err != nil {
+		log.Printf("[APK_INSTALL] failed udid=%s file=%s error=%v output=%s", udid, filepath.Base(resolved), err, strings.TrimSpace(out))
 		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error(), "output": out})
 		return
 	}
+	log.Printf("[APK_INSTALL] success udid=%s file=%s output=%s", udid, filepath.Base(resolved), strings.TrimSpace(out))
 	writeJSON(w, http.StatusOK, jsonResponse{"success": true, "output": out})
 }
 
@@ -602,13 +909,19 @@ func handleInstallApkUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, jsonResponse{"success": false, "error": "file not found"})
 		return
 	}
-	out, err := adbInstallUploaded(strings.TrimSpace(req.UDID), resolved, req.UserID)
-	// Cleanup: remove the uploaded APK file after installation attempt
-	defer os.Remove(resolved)
+	udid := strings.TrimSpace(req.UDID)
+	userLabel := "owner"
+	if req.UserID != nil {
+		userLabel = strconv.Itoa(*req.UserID)
+	}
+	log.Printf("[APK_INSTALL_USER] start udid=%s user=%s file=%s", udid, userLabel, filepath.Base(resolved))
+	out, err := adbInstallUploaded(udid, resolved, req.UserID)
 	if err != nil {
+		log.Printf("[APK_INSTALL_USER] failed udid=%s user=%s file=%s error=%v output=%s", udid, userLabel, filepath.Base(resolved), err, strings.TrimSpace(out))
 		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error(), "output": out})
 		return
 	}
+	log.Printf("[APK_INSTALL_USER] success udid=%s user=%s file=%s output=%s", udid, userLabel, filepath.Base(resolved), strings.TrimSpace(out))
 	writeJSON(w, http.StatusOK, jsonResponse{"success": true, "output": out})
 }
 
@@ -659,7 +972,22 @@ func handlePushFile(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, jsonResponse{"success": true})
+
+	resp := jsonResponse{"success": true}
+	if isQRImageRemotePath(remotePath) {
+		qrResults, err := pushQRToCloneUsers(udid, tmpPath, remotePath)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, jsonResponse{
+				"success":        false,
+				"error":          err.Error(),
+				"qrCloneResults": qrResults,
+			})
+			return
+		}
+		resp["qrCloneCount"] = len(qrResults)
+		resp["qrCloneResults"] = qrResults
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func handlePullFile(w http.ResponseWriter, r *http.Request) {
@@ -1194,5 +1522,20 @@ func handlePushLocalFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, jsonResponse{"success": true})
+	resp := jsonResponse{"success": true}
+	if isQRImageRemotePath(req.RemotePath) {
+		qrResults, err := pushQRToCloneUsers(req.UDID, req.LocalPath, req.RemotePath)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, jsonResponse{
+				"success":        false,
+				"error":          err.Error(),
+				"qrCloneResults": qrResults,
+			})
+			return
+		}
+		resp["qrCloneCount"] = len(qrResults)
+		resp["qrCloneResults"] = qrResults
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }

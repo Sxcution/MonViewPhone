@@ -1,9 +1,10 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useActive } from '@/context/ActiveContext';
 import { useServer } from '@/context/ServerContext';
 import { attachTouchControls } from '@/lib/touchControls';
 import type { FileStats } from '@/lib/serverApi';
-import { encodeKeycodeMessage, KeyEventAction } from '@/lib/control';
+import { encodeKeycodeMessage, encodeTouchMessage, KeyEventAction, MotionAction } from '@/lib/control';
 import { AndroidKeycode } from '@/lib/keyEvent';
 import type { ConnectionMode, ConnectionState } from '@/components/tile/types';
 import { ShellPage } from '@/pages/ShellPage';
@@ -38,6 +39,64 @@ type Props = {
 };
 
 type ViewerTab = 'view' | 'files' | 'apps' | 'shell';
+
+type GameWasdConfig = {
+  x01: number;
+  y01: number;
+  size01: number;
+};
+
+type CustomKeyConfig = {
+  code: string;
+  key: string;
+  x01: number;
+  y01: number;
+};
+
+type ActiveBindingKey = {
+  index: number;
+  x01: number;
+  y01: number;
+  isNew: boolean;
+} | null;
+
+const GAME_WASD_STORAGE_KEY = 'monviewphone:game:liquan:wasd';
+const GAME_WASD_POINTER_ID = 77;
+const GAME_WASD_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD']);
+const DEFAULT_GAME_WASD_CONFIG: GameWasdConfig = { x01: 0.165, y01: 0.61, size01: 0.22 };
+
+function clampGameValue(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
+
+function loadGameWasdConfig(): GameWasdConfig {
+  try {
+    const raw = localStorage.getItem(GAME_WASD_STORAGE_KEY);
+    if (!raw) return DEFAULT_GAME_WASD_CONFIG;
+    const parsed = JSON.parse(raw) as Partial<GameWasdConfig>;
+    return {
+      x01: clampGameValue(Number(parsed.x01 ?? DEFAULT_GAME_WASD_CONFIG.x01), 0, 0.9),
+      y01: clampGameValue(Number(parsed.y01 ?? DEFAULT_GAME_WASD_CONFIG.y01), 0, 0.9),
+      size01: clampGameValue(Number(parsed.size01 ?? DEFAULT_GAME_WASD_CONFIG.size01), 0.12, 0.4),
+    };
+  } catch {
+    return DEFAULT_GAME_WASD_CONFIG;
+  }
+}
+
+function saveGameWasdConfig(config: GameWasdConfig) {
+  try {
+    localStorage.setItem(GAME_WASD_STORAGE_KEY, JSON.stringify(config));
+  } catch {
+    // ignore
+  }
+}
+
+function isGameKeyboardEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
+}
 
 function normPath(p: string): string {
   let out = (p || '/').trim().replace(/\\/g, '/');
@@ -110,10 +169,51 @@ const DeviceViewerComponent = ({
   onChangeConnection
 }: Props) => {
   const { androidDeviceMap, listDir, pullFile, pushFile } = useServer();
-  const { getCanvasForUdid, getInputTargetsForSource, selectOnly } = useActive();
+  const { getCanvasForUdid, getInputTargetsForSource, getTargetsByUdids, selectOnly } = useActive();
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const detachRef = useRef<(() => void) | null>(null);
+  const pressedWasdKeysRef = useRef<Set<string>>(new Set());
+  const joystickDownRef = useRef(false);
+  const lastWasdTouchRef = useRef<{ x01: number; y01: number } | null>(null);
+  const [gameModeEnabled, setGameModeEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(`monviewphone:game-mode:${udid}`) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [wasdEditVisible, setWasdEditVisible] = useState(false);
+  const wasdTimerRef = useRef<number | null>(null);
+  const [wasdPreviewActive, setWasdPreviewActive] = useState(false);
+  const [wasdConfig, setWasdConfig] = useState<GameWasdConfig>(() => loadGameWasdConfig());
+
+  const [customKeys, setCustomKeys] = useState<CustomKeyConfig[]>(() => {
+    try {
+      const raw = localStorage.getItem(`monviewphone:game:keys:${udid}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isAddingKeyMode, setIsAddingKeyMode] = useState(false);
+  const [activeBindingKey, setActiveBindingKey] = useState<ActiveBindingKey>(null);
+  const pressedCustomKeysRef = useRef<Map<string, number>>(new Map());
+
+  const saveCustomKeys = (keys: CustomKeyConfig[]) => {
+    setCustomKeys(keys);
+    try {
+      localStorage.setItem(`monviewphone:game:keys:${udid}`, JSON.stringify(keys));
+    } catch {}
+  };
+
+  useEffect(() => {
+    return () => {
+      if (wasdTimerRef.current) {
+        clearTimeout(wasdTimerRef.current);
+      }
+    };
+  }, []);
   const rafRef = useRef<number | null>(null);
 
   const [status, setStatus] = useState<'connecting' | 'ready'>('connecting');
@@ -157,6 +257,18 @@ const DeviceViewerComponent = ({
     };
     window.addEventListener('device-account-updated', handleUpdate);
     return () => window.removeEventListener('device-account-updated', handleUpdate);
+  }, [udid]);
+
+  useEffect(() => {
+    joystickDownRef.current = false;
+    lastWasdTouchRef.current = null;
+    pressedWasdKeysRef.current.clear();
+    try {
+      const saved = localStorage.getItem(`monviewphone:game-mode:${udid}`) === 'true';
+      setGameModeEnabled(saved);
+    } catch {
+      setGameModeEnabled(false);
+    }
   }, [udid]);
 
   useEffect(() => {
@@ -237,6 +349,361 @@ const DeviceViewerComponent = ({
       // ignore
     }
   };
+
+  const getWasdTouchGeometry = useCallback(() => {
+    const canvas = canvasRef.current;
+    const wrap = canvas?.parentElement;
+    if (!canvas || !wrap) return null;
+
+    const canvasRect = canvas.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+
+    // Overlay CSS: width = size01 * wrapWidth, aspect-ratio: 1 → height = width
+    // So the rendered overlay size in pixels is always square:
+    const overlaySizePx = wasdConfig.size01 * wrapRect.width;
+
+    // Overlay left = x01 * wrapWidth, top = y01 * wrapHeight (CSS percentage)
+    const overlayLeftPx = wasdConfig.x01 * wrapRect.width;
+    const overlayTopPx = wasdConfig.y01 * wrapRect.height;
+
+    // Center in client coordinates
+    const centerClientX = wrapRect.left + overlayLeftPx + overlaySizePx / 2;
+    const centerClientY = wrapRect.top + overlayTopPx + overlaySizePx / 2;
+
+    // Convert to 0-1 normalized coords relative to the displayed canvas
+    const centerX01 = clampGameValue((centerClientX - canvasRect.left) / canvasRect.width, 0.02, 0.98);
+    const centerY01 = clampGameValue((centerClientY - canvasRect.top) / canvasRect.height, 0.02, 0.98);
+
+    // Radius is 28% of the overlay size, converted to canvas-relative 0-1
+    const radiusX01 = (overlaySizePx * 0.28) / canvasRect.width;
+    const radiusY01 = (overlaySizePx * 0.28) / canvasRect.height;
+
+    return { centerX01, centerY01, radiusX01, radiusY01 };
+  }, [wasdConfig]);
+
+  const sendGameTouch = useCallback((action: MotionAction, x01: number, y01: number, pressure: number, buttons: number, pointerId: number = GAME_WASD_POINTER_ID) => {
+    const targets = getTargetsByUdids([udid]);
+    for (const target of targets) {
+      if (!target.ws || target.ws.readyState !== WebSocket.OPEN || !target.canvas) continue;
+      const w = target.canvas.width || 1;
+      const h = target.canvas.height || 1;
+      const x = clampGameValue(Math.round(x01 * w), 0, w);
+      const y = clampGameValue(Math.round(y01 * h), 0, h);
+      try {
+        target.ws.send(encodeTouchMessage(action, pointerId, x, y, w, h, pressure, buttons));
+      } catch {
+        // ignore
+      }
+    }
+  }, [getTargetsByUdids, udid]);
+
+  const updateWasdJoystickTouch = useCallback(() => {
+    const keys = pressedWasdKeysRef.current;
+    let dx = 0;
+    let dy = 0;
+    if (keys.has('KeyA')) dx -= 1;
+    if (keys.has('KeyD')) dx += 1;
+    if (keys.has('KeyW')) dy -= 1;
+    if (keys.has('KeyS')) dy += 1;
+
+    const geo = getWasdTouchGeometry();
+    if (!geo) return;
+
+    if (dx === 0 && dy === 0) {
+      if (joystickDownRef.current) {
+        const last = lastWasdTouchRef.current ?? { x01: geo.centerX01, y01: geo.centerY01 };
+        sendGameTouch(MotionAction.UP, last.x01, last.y01, 0, 0);
+        joystickDownRef.current = false;
+        lastWasdTouchRef.current = null;
+      }
+      return;
+    }
+
+    const len = Math.hypot(dx, dy) || 1;
+    const targetX01 = clampGameValue(geo.centerX01 + (dx / len) * geo.radiusX01, 0.02, 0.98);
+    const targetY01 = clampGameValue(geo.centerY01 + (dy / len) * geo.radiusY01, 0.02, 0.98);
+
+    if (!joystickDownRef.current) {
+      sendGameTouch(MotionAction.DOWN, geo.centerX01, geo.centerY01, 1, 1);
+      joystickDownRef.current = true;
+      requestAnimationFrame(() => {
+        sendGameTouch(MotionAction.MOVE, targetX01, targetY01, 1, 1);
+      });
+    } else {
+      sendGameTouch(MotionAction.MOVE, targetX01, targetY01, 1, 1);
+    }
+
+    lastWasdTouchRef.current = { x01: targetX01, y01: targetY01 };
+  }, [getWasdTouchGeometry, sendGameTouch]);
+
+  const handleShowWasdKeySetting = useCallback(() => {
+    setGameModeEnabled(true);
+    try {
+      localStorage.setItem(`monviewphone:game-mode:${udid}`, 'true');
+    } catch {}
+    setWasdEditVisible(true);
+    setTab('view');
+    selectOnly(udid);
+  }, [selectOnly, udid]);
+
+  const handleToggleGameMode = useCallback(() => {
+    setGameModeEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem(`monviewphone:game-mode:${udid}`, String(next));
+      } catch {}
+      if (!next) {
+        pressedWasdKeysRef.current.clear();
+        updateWasdJoystickTouch();
+      } else {
+        setTab('view');
+        selectOnly(udid);
+      }
+      return next;
+    });
+  }, [selectOnly, udid, updateWasdJoystickTouch]);
+
+  const handleWasdOverlayPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (wasdTimerRef.current) {
+      clearTimeout(wasdTimerRef.current);
+      wasdTimerRef.current = null;
+    }
+    setWasdPreviewActive(false);
+
+    const wrap = canvasRef.current?.parentElement;
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    const mode = (e.target instanceof HTMLElement && e.target.closest('.gameWasdResizeHandle')) ? 'resize' : 'move';
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const start = wasdConfig;
+
+    const onMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      const dx01 = rect.width ? (moveEvent.clientX - startX) / rect.width : 0;
+      const dy01 = rect.height ? (moveEvent.clientY - startY) / rect.height : 0;
+      setWasdConfig(prev => {
+        const nextSize = mode === 'resize'
+          ? clampGameValue(start.size01 + Math.max(dx01, dy01), 0.12, 0.4)
+          : start.size01;
+        const next = mode === 'resize'
+          ? {
+              x01: clampGameValue(start.x01, 0, 1 - nextSize),
+              y01: clampGameValue(start.y01, 0, 1 - nextSize),
+              size01: nextSize,
+            }
+          : {
+              x01: clampGameValue(start.x01 + dx01, 0, 1 - prev.size01),
+              y01: clampGameValue(start.y01 + dy01, 0, 1 - prev.size01),
+              size01: prev.size01,
+            };
+        saveGameWasdConfig(next);
+        return next;
+      });
+    };
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp, { once: true });
+  }, [wasdConfig, setWasdEditVisible]);
+
+  const handleShowCustomKeySetting = useCallback(() => {
+    setGameModeEnabled(true);
+    try {
+      localStorage.setItem(`monviewphone:game-mode:${udid}`, 'true');
+    } catch {}
+    setIsAddingKeyMode(true);
+    setTab('view');
+    selectOnly(udid);
+  }, [selectOnly, udid]);
+
+  const handleCanvasClickForAddKey = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x01 = clampGameValue((e.clientX - rect.left) / rect.width, 0.02, 0.98);
+    const y01 = clampGameValue((e.clientY - rect.top) / rect.height, 0.02, 0.98);
+    
+    setActiveBindingKey({
+      index: -1,
+      x01,
+      y01,
+      isNew: true
+    });
+    setIsAddingKeyMode(false);
+  };
+
+  const handleDeleteCustomKey = (index: number) => {
+    const updated = customKeys.filter((_, idx) => idx !== index);
+    saveCustomKeys(updated);
+  };
+
+  useEffect(() => {
+    const disableDirectKeyboard = tab === 'shell' || (tab === 'view' && gameModeEnabled);
+    (window as any).__disableDirectKeyboard = disableDirectKeyboard;
+    return () => {
+      (window as any).__disableDirectKeyboard = false;
+    };
+  }, [tab, gameModeEnabled]);
+
+  useEffect(() => {
+    if (tab !== 'view' || !gameModeEnabled) {
+      pressedWasdKeysRef.current.clear();
+      updateWasdJoystickTouch();
+      
+      // Release custom keys
+      pressedCustomKeysRef.current.forEach((pointerId, code) => {
+        const customKey = customKeys.find(ck => ck.code === code);
+        if (customKey) {
+          sendGameTouch(MotionAction.UP, customKey.x01, customKey.y01, 0, 0, pointerId);
+        }
+      });
+      pressedCustomKeysRef.current.clear();
+      return;
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isGameKeyboardEditableTarget(e.target)) return;
+      
+      // WASD Joystick Keys
+      if (GAME_WASD_KEYS.has(e.code)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation?.();
+        selectOnly(udid);
+        if (!pressedWasdKeysRef.current.has(e.code)) {
+          pressedWasdKeysRef.current.add(e.code);
+          updateWasdJoystickTouch();
+        }
+        return;
+      }
+
+      // Custom Key Mappings
+      const customKeyIndex = customKeys.findIndex(ck => ck.code === e.code);
+      if (customKeyIndex !== -1) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation?.();
+        selectOnly(udid);
+        
+        if (!pressedCustomKeysRef.current.has(e.code)) {
+          const pointerId = 80 + customKeyIndex;
+          pressedCustomKeysRef.current.set(e.code, pointerId);
+          const ck = customKeys[customKeyIndex];
+          sendGameTouch(MotionAction.DOWN, ck.x01, ck.y01, 1, 1, pointerId);
+        }
+      }
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (GAME_WASD_KEYS.has(e.code)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation?.();
+        if (pressedWasdKeysRef.current.delete(e.code)) {
+          updateWasdJoystickTouch();
+        }
+        return;
+      }
+
+      const pointerId = pressedCustomKeysRef.current.get(e.code);
+      if (pointerId !== undefined) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation?.();
+        pressedCustomKeysRef.current.delete(e.code);
+        const customKey = customKeys.find(ck => ck.code === e.code);
+        if (customKey) {
+          sendGameTouch(MotionAction.UP, customKey.x01, customKey.y01, 0, 0, pointerId);
+        }
+      }
+    };
+
+    const onBlur = () => {
+      pressedWasdKeysRef.current.clear();
+      updateWasdJoystickTouch();
+      
+      pressedCustomKeysRef.current.forEach((pointerId, code) => {
+        const customKey = customKeys.find(ck => ck.code === code);
+        if (customKey) {
+          sendGameTouch(MotionAction.UP, customKey.x01, customKey.y01, 0, 0, pointerId);
+        }
+      });
+      pressedCustomKeysRef.current.clear();
+    };
+
+    window.addEventListener('keydown', onKeyDown, { capture: true, passive: false });
+    window.addEventListener('keyup', onKeyUp, { capture: true, passive: false });
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, { capture: true } as any);
+      window.removeEventListener('keyup', onKeyUp, { capture: true } as any);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [gameModeEnabled, tab, selectOnly, udid, updateWasdJoystickTouch, customKeys, sendGameTouch]);
+
+  useEffect(() => {
+    if (!activeBindingKey) return;
+    
+    const handleKeyCapture = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation?.();
+      
+      if (e.code === 'Escape') {
+        setActiveBindingKey(null);
+        return;
+      }
+      
+      const displayKey = e.key === ' ' ? 'Space' : e.key;
+      
+      if (activeBindingKey.isNew) {
+        // Add new key mapping
+        const newKey: CustomKeyConfig = {
+          code: e.code,
+          key: displayKey,
+          x01: activeBindingKey.x01,
+          y01: activeBindingKey.y01
+        };
+        const filtered = customKeys.filter(ck => ck.code !== newKey.code);
+        const updated = [...filtered, newKey];
+        saveCustomKeys(updated);
+      } else {
+        // Edit existing key mapping
+        const updated = [...customKeys];
+        const targetCode = e.code;
+        
+        updated[activeBindingKey.index] = {
+          ...updated[activeBindingKey.index],
+          code: targetCode,
+          key: displayKey
+        };
+        
+        // Filter out duplicate mappings on other keys
+        const finalKeys = updated.filter((ck, idx) => idx === activeBindingKey.index || ck.code !== targetCode);
+        saveCustomKeys(finalKeys);
+      }
+      
+      setActiveBindingKey(null);
+      setWasdEditVisible(true); // stay in edit mode
+    };
+    
+    window.addEventListener('keydown', handleKeyCapture, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleKeyCapture, { capture: true });
+    };
+  }, [activeBindingKey, customKeys]);
 
   // ===== Touch controls: only bind when we are in "view" tab.
   useEffect(() => {
@@ -476,13 +943,6 @@ const DeviceViewerComponent = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, udid]);
 
-  useEffect(() => {
-    (window as any).__disableDirectKeyboard = tab === 'shell';
-    return () => {
-      (window as any).__disableDirectKeyboard = false;
-    };
-  }, [tab]);
-
   const filteredApps = useMemo(() => {
     const q = appsFilter.trim().toLowerCase();
     if (!q) return apps;
@@ -493,6 +953,7 @@ const DeviceViewerComponent = ({
     <>
     <div
       id="viewerPanel"
+      className={`deviceViewerPanel ${viewerAspect >= 1 ? 'is-landscape' : 'is-portrait'}`}
       style={{ width: '100%', ['--viewer-aspect' as any]: viewerAspect }}
       onMouseDown={(e) => {
         if (e.button === 1) {
@@ -540,6 +1001,24 @@ const DeviceViewerComponent = ({
         {tab === 'view' ? (
           <div className="viewerMain">
             <div className="viewerCanvasWrap" style={{ transform: 'none', position: 'relative' }} onContextMenu={suppressStreamContextMenu}>
+              {wasdEditVisible && (
+                <button
+                  type="button"
+                  className="gameSaveConfigBtn"
+                  onClick={() => {
+                    setWasdEditVisible(false);
+                  }}
+                  onPointerDown={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  data-inspector-id="gameKeyboard.saveConfigBtn"
+                  data-inspector-label="Save game keyboard configuration button"
+                  data-inspector-component="client/src/components/DeviceViewer.tsx"
+                >
+                  Lưu
+                </button>
+              )}
               <div 
                 className="viewerDragHandleTop"
                 data-inspector-id="deviceViewer.dragHandleTop"
@@ -556,6 +1035,143 @@ const DeviceViewerComponent = ({
                 data-inspector-label="Device screen mirroring canvas"
                 data-inspector-component="client/src/components/DeviceViewer.tsx"
               />
+              {wasdEditVisible && (
+                <div
+                  className={`gameWasdOverlay${wasdPreviewActive ? ' is-preview' : ''}`}
+                  style={{
+                    left: `${wasdConfig.x01 * 100}%`,
+                    top: `${wasdConfig.y01 * 100}%`,
+                    width: `${wasdConfig.size01 * 100}%`,
+                    height: `${wasdConfig.size01 * 100}%`,
+                  }}
+                  onPointerDown={handleWasdOverlayPointerDown}
+                  data-inspector-id="gameKeyboard.wasdOverlay"
+                  data-inspector-label="Game keyboard WASD joystick edit overlay"
+                  data-inspector-component="client/src/components/DeviceViewer.tsx"
+                >
+                  <div className="gameWasdPad" aria-label="WASD joystick preview">
+                    <span className="gameWasdKey gameWasdKeyW">W</span>
+                    <span className="gameWasdKey gameWasdKeyA">A</span>
+                    <span className="gameWasdKey gameWasdKeyS">S</span>
+                    <span className="gameWasdKey gameWasdKeyD">D</span>
+                    <span className="gameWasdCenter" />
+                  </div>
+                  <button
+                    type="button"
+                    className="gameWasdCloseBtn"
+                    onClick={() => {
+                      if (wasdTimerRef.current) {
+                        clearTimeout(wasdTimerRef.current);
+                        wasdTimerRef.current = null;
+                      }
+                      setWasdEditVisible(false);
+                      setWasdPreviewActive(false);
+                    }}
+                    onPointerDown={e => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    data-inspector-id="gameKeyboard.wasdCloseBtn"
+                    data-inspector-label="Close WASD joystick overlay button"
+                    data-inspector-component="client/src/components/DeviceViewer.tsx"
+                  >
+                    ×
+                  </button>
+                  <span
+                    className="gameWasdResizeHandle"
+                    data-inspector-id="gameKeyboard.wasdResizeHandle"
+                    data-inspector-label="Resize WASD joystick overlay handle"
+                    data-inspector-component="client/src/components/DeviceViewer.tsx"
+                  />
+                </div>
+              )}
+
+              {wasdEditVisible && customKeys.map((ck, idx) => {
+                const isBindingThis = activeBindingKey && !activeBindingKey.isNew && activeBindingKey.index === idx;
+                return (
+                  <div
+                    key={idx}
+                    className={`gameCustomKeyCircle is-editable${isBindingThis ? ' is-binding' : ''}`}
+                    style={{
+                      left: `${ck.x01 * 100}%`,
+                      top: `${ck.y01 * 100}%`,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setActiveBindingKey({
+                        index: idx,
+                        x01: ck.x01,
+                        y01: ck.y01,
+                        isNew: false
+                      });
+                    }}
+                  >
+                    <span className="gameCustomKeyLabel">
+                      {isBindingThis ? '?' : (ck.key === ' ' ? 'Space' : ck.key.toUpperCase())}
+                    </span>
+                    <button
+                      type="button"
+                      className="gameCustomKeyDeleteBtn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteCustomKey(idx);
+                      }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Pulsing indicator circle for new pending key */}
+              {activeBindingKey && activeBindingKey.isNew && (
+                <div
+                  className="gameCustomKeyCircle is-binding"
+                  style={{
+                    left: `${activeBindingKey.x01 * 100}%`,
+                    top: `${activeBindingKey.y01 * 100}%`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  <span className="gameCustomKeyLabel">?</span>
+                </div>
+              )}
+
+              {isAddingKeyMode && (
+                <div
+                  className="gameAddKeyOverlay"
+                  onClick={handleCanvasClickForAddKey}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'rgba(0, 0, 0, 0.25)',
+                    cursor: 'crosshair',
+                    zIndex: 10030,
+                    display: 'flex',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <span style={{
+                    position: 'absolute',
+                    top: '15px',
+                    background: 'rgba(0, 0, 0, 0.85)',
+                    color: 'var(--md-info)',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    pointerEvents: 'none',
+                    border: '1.5px solid var(--md-info)'
+                  }}>
+                    Click lên màn hình để gán phím
+                  </span>
+                </div>
+              )}
               {alwaysShowHeader && accountData && (
                 <div 
                   className={`tile-account-overlay is-header-only ${headerHideOrder ? 'header-hide-order' : ''} ${headerMinimalBg ? 'header-minimal-bg' : ''}`}
@@ -744,6 +1360,10 @@ const DeviceViewerComponent = ({
       connectionMode={connectionMode}
       availableConnections={availableConnections}
       onChangeConnection={onChangeConnection}
+      gameModeEnabled={gameModeEnabled}
+      onToggleGameMode={handleToggleGameMode}
+      onShowWasdKeySetting={handleShowWasdKeySetting}
+      onShowCustomKeySetting={handleShowCustomKeySetting}
     />
     </>
   );

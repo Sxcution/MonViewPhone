@@ -26,7 +26,11 @@ export type TileProps = {
     showTileInfo?: boolean;
     isDisconnected?: boolean;
     visualAlertActive?: boolean;
+    visualAlertLabel?: string;
+    visualAlertSource?: 'visual' | 'wechat';
+    visualAlertTargetUserId?: number;
     onClearVisualAlert?: (udid: string) => void;
+    onVisualAlertClick?: (udid: string) => void;
     onRegisterReload?: (udid: string, reload: (opts?: StreamReloadOptions) => void) => void;
     onUnregisterReload?: (udid: string) => void;
     onViewDevice?: (udid: string) => void;
@@ -41,4 +45,6 @@ export type TileProps = {
     activeFilter?: string;
     highlightFilterMatched?: 'blue' | 'orange' | 'red' | 'yellow' | 'white' | 'green' | boolean;
     onOpenDeviceViewer?: (udid: string) => void;
+    search?: string;
+    onSyncNovaWechat?: (udids: string[], dataByUdid?: Record<string, DeviceAccountData>, force?: boolean) => Promise<void>;
 };

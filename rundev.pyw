@@ -11,19 +11,26 @@ import webbrowser
 from PIL import Image, ImageDraw, ImageFont
 from pystray import Icon as TrayIcon, Menu as TrayMenu, MenuItem as TrayMenuItem
 
-APP_NAME = "MonViewPhone V2"
+APP_NAME = "MonViewPhone V2 Dev"
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_URL = "http://localhost:11000/"
 BACKEND_PORT = 11000
+BASE_URL = f"http://localhost:{BACKEND_PORT}/"
+DEV_FRONTEND = True
+DEV_FRONTEND_PORT = 5173
+DEV_FRONTEND_URL = f"http://127.0.0.1:{DEV_FRONTEND_PORT}/"
+DEV_WS_QUERY = f"ws=ws%3A%2F%2F127.0.0.1%3A{BACKEND_PORT}%2F"
+APP_URL = f"{DEV_FRONTEND_URL}?{DEV_WS_QUERY}" if DEV_FRONTEND else BASE_URL
 STREAM_NODE_PORT = 11080
 STREAM_NODE_BUILD_ID = "tango-v2-race-safe-close-1"
-APP_MUTEX_NAME = r"Local\MonViewPhoneV2_SingleInstance"
+APP_MUTEX_NAME = r"Local\MonViewPhoneV2_Dev_SingleInstance"
 
 instance_mutex = None
 go_process = None
 stream_node_process = None
+vite_process = None
 go_log_file = None
 stream_node_log_file = None
+vite_log_file = None
 
 
 def logs_dir():
@@ -130,14 +137,27 @@ def check_go_ready():
     if not is_port_open(BACKEND_PORT):
         return False
     try:
-        handler = urllib.request.ProxyHandler({})
-        opener = urllib.request.build_opener(handler)
-        req = urllib.request.Request(BASE_URL)
-        with opener.open(req, timeout=1.0) as response:
-            text = response.read(4096).decode("utf-8", errors="ignore").lower()
-            return response.status == 200 and ("html" in text or "monview" in text or "phone" in text)
+        data = http_get_json(f"http://127.0.0.1:{BACKEND_PORT}/healthz", timeout=1.0)
+        return data.get("ok") is True and data.get("backend") == "server-go"
     except Exception as e:
         log_launcher(f"check_go_ready failed: {e}")
+        return False
+
+
+def check_vite_ready():
+    if not DEV_FRONTEND:
+        return True
+    if not is_port_open(DEV_FRONTEND_PORT):
+        return False
+    try:
+        handler = urllib.request.ProxyHandler({})
+        opener = urllib.request.build_opener(handler)
+        req = urllib.request.Request(DEV_FRONTEND_URL)
+        with opener.open(req, timeout=1.0) as response:
+            text = response.read(8192).decode("utf-8", errors="ignore")
+            return response.status == 200 and "MonViewPhone" in text and "/src/main.tsx" in text
+    except Exception as e:
+        log_launcher(f"check_vite_ready failed: {e}")
         return False
 
 
@@ -235,6 +255,44 @@ def start_stream_node():
     stream_node_process = subprocess.Popen(["node", dist_index], cwd=stream_dir, stdout=stream_node_log_file, stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW)
 
 
+def start_vite_dev_server():
+    global vite_process, vite_log_file
+    if not DEV_FRONTEND:
+        return
+    if check_vite_ready():
+        log_launcher(f"Reusing Vite dev frontend on {DEV_FRONTEND_PORT}")
+        return
+    pid = pid_on_port(DEV_FRONTEND_PORT)
+    if pid:
+        show_error(
+            "Port 5173 is busy",
+            f"Port 5173 is used by {process_name(pid) or 'another app'} (PID {pid}). Close it, then open run.lnk again.",
+        )
+        sys.exit(1)
+
+    client_dir = os.path.join(ROOT_DIR, "client")
+    vite_bin = os.path.join(client_dir, "node_modules", "vite", "bin", "vite.js")
+    log_path = os.path.join(logs_dir(), "vite-current.log")
+    vite_log_file = open(log_path, "w", encoding="utf-8")
+    vite_log_file.write(f"--- START Vite dev {time.strftime('%Y-%m-%d %H:%M:%S')} port={DEV_FRONTEND_PORT} ---\n")
+    vite_log_file.flush()
+    log_launcher(f"Starting Vite dev frontend: node {vite_bin}")
+    try:
+        vite_process = subprocess.Popen(
+            ["node", vite_bin, "--host", "127.0.0.1", "--port", str(DEV_FRONTEND_PORT)],
+            cwd=client_dir,
+            stdout=vite_log_file,
+            stderr=subprocess.STDOUT,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    except FileNotFoundError:
+        show_error("Node.js not found", "Node.js is not available in PATH. Install Node.js or open from a terminal with node in PATH.")
+        sys.exit(1)
+    except Exception as e:
+        show_error("Vite start failed", str(e))
+        sys.exit(1)
+
+
 def terminate_process(process):
     if not process:
         return
@@ -247,71 +305,41 @@ def terminate_process(process):
 
 
 def cleanup():
-    global go_process, stream_node_process, go_log_file, stream_node_log_file
+    global go_process, stream_node_process, vite_process, go_log_file, stream_node_log_file, vite_log_file
     log_launcher("Cleaning up launcher-owned processes")
+    terminate_process(vite_process)
     terminate_process(stream_node_process)
     terminate_process(go_process)
+    vite_process = None
     stream_node_process = None
     go_process = None
-    for f in (go_log_file, stream_node_log_file):
+    for f in (go_log_file, stream_node_log_file, vite_log_file):
         try:
             if f: f.close()
         except Exception:
             pass
     go_log_file = None
     stream_node_log_file = None
+    vite_log_file = None
 
 
 def open_app(icon=None, item=None):
     chrome_paths = [r"C:\Program Files\Google\Chrome\Application\chrome.exe", r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe", "chrome"]
     for path in chrome_paths:
         try:
-            subprocess.Popen([
-                path, 
-                f"--app={BASE_URL}",
-                "--disable-background-timer-throttling",
-                "--disable-backgrounding-occluded-windows",
-                "--disable-renderer-backgrounding"
-            ], creationflags=subprocess.CREATE_NO_WINDOW)
+            subprocess.Popen([path, f"--app={APP_URL}"], creationflags=subprocess.CREATE_NO_WINDOW)
             return
         except Exception:
             continue
-    webbrowser.open(BASE_URL)
-
-
-def kill_chrome_app():
-    log_launcher("Closing current Chrome App window...")
-    cmd = (
-        f"powershell -NoProfile -ExecutionPolicy Bypass -Command "
-        f"\"Get-CimInstance Win32_Process -Filter \\\"Name = 'chrome.exe'\\\" | "
-        f"Where-Object {{ $_.CommandLine -like '*--app=http://localhost:{BACKEND_PORT}*' }} | "
-        f"ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }}\""
-    )
-    try:
-        subprocess.run(
-            cmd,
-            shell=True,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-    except Exception as e:
-        log_launcher(f"kill_chrome_app failed: {e}")
+    webbrowser.open(APP_URL)
 
 
 def exit_application(icon, item):
-    icon.stop()
-    kill_chrome_app()
-    cleanup()
-    sys.exit(0)
+    icon.stop(); cleanup(); sys.exit(0)
 
 
 def restart_application(icon, item):
-    icon.stop()
-    kill_chrome_app()
-    cleanup()
-    subprocess.Popen([sys.executable] + sys.argv, cwd=ROOT_DIR, creationflags=subprocess.CREATE_NO_WINDOW)
-    sys.exit(0)
+    icon.stop(); cleanup(); subprocess.Popen([sys.executable] + sys.argv, cwd=ROOT_DIR, creationflags=subprocess.CREATE_NO_WINDOW); sys.exit(0)
 
 
 def create_tray_icon():
@@ -330,7 +358,18 @@ def create_tray_icon():
 
 
 def validate_files():
-    if not os.path.exists(os.path.join(ROOT_DIR, "client", "dist", "index.html")):
+    if DEV_FRONTEND:
+        client_dir = os.path.join(ROOT_DIR, "client")
+        required = [
+            os.path.join(client_dir, "index.html"),
+            os.path.join(client_dir, "package.json"),
+            os.path.join(client_dir, "node_modules", "vite", "bin", "vite.js"),
+        ]
+        missing = [p for p in required if not os.path.exists(p)]
+        if missing:
+            show_error("Dev frontend is not ready", "Missing:\n" + "\n".join(missing) + "\n\nRun: cd client && npm install")
+            sys.exit(1)
+    elif not os.path.exists(os.path.join(ROOT_DIR, "client", "dist", "index.html")):
         show_error("Chưa build frontend", "Thiếu client/dist/index.html. Chạy build_v2_all.bat trước."); sys.exit(1)
     jar1 = os.path.join(ROOT_DIR, "stream-node", "vendor", "scrcpy-server-v3.3.4.jar")
     jar2 = os.path.join(ROOT_DIR, "server-go", "bin", "scrcpy-server-v3.3.4.jar")
@@ -348,9 +387,10 @@ def wait_ready(label, predicate, seconds, log_file):
 def main():
     if not acquire_single_instance_lock(): return
     os.chdir(ROOT_DIR)
-    validate_files(); start_backend(); start_stream_node()
+    validate_files(); start_backend(); start_stream_node(); start_vite_dev_server()
     wait_ready("Go backend 11000", check_go_ready, 20, os.path.join(logs_dir(), "server-go-current.log"))
     wait_ready("stream-node 11080", check_stream_node_ready, 20, os.path.join(logs_dir(), "stream-node-current.log"))
+    wait_ready("Vite frontend 5173", check_vite_ready, 30, os.path.join(logs_dir(), "vite-current.log"))
     open_app()
     try:
         log_launcher("Starting system tray icon..."); create_tray_icon().run()

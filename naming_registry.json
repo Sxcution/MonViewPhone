@@ -134,6 +134,7 @@
       "dav_identity_toggle": "dav-identity-toggle",
       "dav_input_wrapper": "dav-input-wrapper",
       "dav_transparent_input": "dav-transparent-input",
+      "dav_input_prefix": "dav-input-prefix",
       "dav_stats_row": "dav-stats-row",
       "dav_notice_centered_row": "dav-notice-centered-row",
       "dav_title_dropdown_wrap": "dav-title-dropdown-wrap",
@@ -236,7 +237,10 @@
       "notes_reminder_header": "notesReminderHeader",
       "notes_reminder_title": "notesReminderTitle",
       "notes_reminder_content": "notesReminderContent",
-      "notes_reminder_actions": "notesReminderActions"
+      "notes_reminder_actions": "notesReminderActions",
+      "device_viewer_panel": "deviceViewerPanel",
+      "is_landscape": "is-landscape",
+      "is_portrait": "is-portrait"
     },
     "css_variables": {
       "bg_base": "--bg-base",
@@ -345,7 +349,9 @@
       "active_daily_reminders": "activeDailyReminders",
       "notes_modal_open": "notesModalOpen",
       "active_reminder_note": "activeReminderNote",
-      "reminder_open_note_id": "reminderOpenNoteId"
+      "reminder_open_note_id": "reminderOpenNoteId",
+      "note_modal_state": "noteModal",
+      "note_value_state": "noteValue"
     },
     "handlers": {
       "change_order_viewer": "handleChangeOrderViewer",
@@ -441,6 +447,11 @@
     "context_menu_status_submenu": "deviceAccount.contextMenuStatusSubmenu",
     "context_menu_notice": "deviceAccount.contextMenuNotice",
     "context_menu_history": "deviceAccount.contextMenuHistory",
+    "context_menu_note": "deviceAccount.contextMenuNote",
+    "note_modal": "deviceAccount.noteModal",
+    "note_modal_close_btn": "deviceAccount.noteModalCloseButton",
+    "note_modal_cancel_btn": "deviceAccount.noteModalCancelButton",
+    "note_modal_save_btn": "deviceAccount.noteModalSaveButton",
     "nearby_filter_dropdown": "deviceAccount.nearbyFilterDropdown",
     "notice_badge": "deviceAccount.noticeBadge",
     "daily_reminder_tooltip": "deviceAccount.dailyReminderTooltip",
@@ -511,7 +522,14 @@
     "app_settings_video_encoding_section": "appSettings.videoEncodingSection",
     "app_settings_stream_engine_select": "appSettings.streamEngineSelect",
     "app_settings_encoder_mode_select": "appSettings.encoderModeSelect",
-    "app_settings_custom_encoder_name_input": "appSettings.customEncoderNameInput"
+    "app_settings_custom_encoder_name_input": "appSettings.customEncoderNameInput",
+    "game_custom_key_circle": "gameCustomKeyCircle",
+    "game_custom_key_label": "gameCustomKeyLabel",
+    "game_custom_key_delete_btn": "gameCustomKeyDeleteBtn",
+    "game_keyboard_add_wasd_key_button": "gameKeyboard.addWasdKeyButton",
+    "game_keyboard_add_custom_key_button": "gameKeyboard.addCustomKeyButton",
+    "game_add_key_overlay": "gameAddKeyOverlay",
+    "game_save_config_btn": "gameSaveConfigBtn"
   },
   "project_assets": {
     "app_icon_png": "assets/IconMonViewPhone.png",

@@ -25,6 +25,10 @@ type ViewerSidePanelProps = {
   connectionMode?: ConnectionState;
   availableConnections?: Partial<Record<ConnectionMode, boolean>>;
   onChangeConnection?: (mode: ConnectionMode) => void;
+  gameModeEnabled?: boolean;
+  onToggleGameMode?: () => void;
+  onShowWasdKeySetting?: () => void;
+  onShowCustomKeySetting?: () => void;
 };
 type AdbLogEntry = { id: number; time: string; command: string; output: string; success: boolean };
 type ToastMsg = { id: number; text: string; type: 'ok' | 'err' };
@@ -39,8 +43,6 @@ function httpBase(wsServer: string): string {
 
 /* Preset ADB commands - warn=true for dangerous */
 const DEFAULT_PRESETS: { label: string; cmd: string; warn?: boolean; color?: string }[] = [
-  { label: 'Tắt màn hình', cmd: 'input keyevent 26' },
-  { label: 'Mở khóa màn hình', cmd: 'input keyevent 82' },
   { label: 'Bật WiFi', cmd: 'svc wifi enable' },
   { label: 'Tắt WiFi', cmd: 'svc wifi disable' },
   { label: 'Tăng âm lượng', cmd: 'input keyevent 24' },
@@ -72,6 +74,10 @@ export function ViewerSidePanel({
   connectionMode = 'unknown',
   availableConnections,
   onChangeConnection,
+  gameModeEnabled = false,
+  onToggleGameMode,
+  onShowWasdKeySetting,
+  onShowCustomKeySetting,
 }: ViewerSidePanelProps) {
   const { wsServer } = useServer();
   const { t } = useI18n();
@@ -167,7 +173,7 @@ export function ViewerSidePanel({
       }
 
       const files = res.files;
-      const targets = connectSelection && connectSelection.has(udid)
+      const targets = connectSelection && connectSelection.size > 0
         ? Array.from(connectSelection)
         : [udid];
 
@@ -369,8 +375,10 @@ export function ViewerSidePanel({
   // ADB submenu on hover
   const [showAdbSubmenu, setShowAdbSubmenu] = useState(false);
   const [showConnectionSubmenu, setShowConnectionSubmenu] = useState(false);
+  const [showGameSubmenu, setShowGameSubmenu] = useState(false);
   const adbHoverTimer = useRef<number | null>(null);
   const connectionHoverTimer = useRef<number | null>(null);
+  const gameHoverTimer = useRef<number | null>(null);
 
 
 
@@ -403,24 +411,88 @@ export function ViewerSidePanel({
   };
 
   const adbSectionRef = useRef<HTMLDivElement>(null);
-  const [adbSubmenuPos, setAdbSubmenuPos] = useState({ x: 0, y: 0 });
+  const adbSubmenuMenuRef = useRef<HTMLDivElement>(null);
   const connectionSectionRef = useRef<HTMLDivElement>(null);
-  const [connectionSubmenuPos, setConnectionSubmenuPos] = useState({ x: 0, y: 0 });
+  const connectionSubmenuMenuRef = useRef<HTMLDivElement>(null);
+  const gameSectionRef = useRef<HTMLDivElement>(null);
+  const gameSubmenuMenuRef = useRef<HTMLDivElement>(null);
 
-  const positionSideSubmenu = (section: HTMLDivElement | null, setPosition: (pos: { x: number; y: number }) => void) => {
-    if (!section) return;
-    const rect = section.getBoundingClientRect();
-    const menuWidth = 220;
-    let x = rect.right + 4;
-    if (x + menuWidth > window.innerWidth) {
-      x = rect.left - menuWidth - 4;
+  React.useLayoutEffect(() => {
+    if (showAdbSubmenu && adbSectionRef.current && adbSubmenuMenuRef.current) {
+      const rect = adbSectionRef.current.getBoundingClientRect();
+      const menuEl = adbSubmenuMenuRef.current;
+      const menuWidth = 220;
+      let x = rect.right + 4;
+      if (x + menuWidth > window.innerWidth) {
+        x = rect.left - menuWidth - 4;
+      }
+      
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      menuEl.style.left = `${x}px`;
+      if (spaceBelow < 250 && spaceAbove > spaceBelow) {
+        menuEl.style.top = 'auto';
+        menuEl.style.bottom = `${window.innerHeight - rect.bottom}px`;
+        menuEl.style.maxHeight = `${rect.bottom - 12}px`;
+      } else {
+        menuEl.style.bottom = 'auto';
+        menuEl.style.top = `${rect.top}px`;
+        menuEl.style.maxHeight = `${window.innerHeight - rect.top - 12}px`;
+      }
+      menuEl.style.opacity = '1';
+      menuEl.style.pointerEvents = 'auto';
     }
-    setPosition({ x, y: rect.bottom });
-  };
+  }, [showAdbSubmenu]);
+
+  React.useLayoutEffect(() => {
+    if (showConnectionSubmenu && connectionSectionRef.current && connectionSubmenuMenuRef.current) {
+      const rect = connectionSectionRef.current.getBoundingClientRect();
+      const menuEl = connectionSubmenuMenuRef.current;
+      const menuWidth = 220;
+      let x = rect.right + 4;
+      if (x + menuWidth > window.innerWidth) {
+        x = rect.left - menuWidth - 4;
+      }
+      
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      
+      menuEl.style.left = `${x}px`;
+      if (spaceBelow < 250 && spaceAbove > spaceBelow) {
+        menuEl.style.top = 'auto';
+        menuEl.style.bottom = `${window.innerHeight - rect.bottom}px`;
+        menuEl.style.maxHeight = `${rect.bottom - 12}px`;
+      } else {
+        menuEl.style.bottom = 'auto';
+        menuEl.style.top = `${rect.top}px`;
+        menuEl.style.maxHeight = `${window.innerHeight - rect.top - 12}px`;
+      }
+      menuEl.style.opacity = '1';
+      menuEl.style.pointerEvents = 'auto';
+    }
+  }, [showConnectionSubmenu]);
+
+  React.useLayoutEffect(() => {
+    if (showGameSubmenu && gameSectionRef.current && gameSubmenuMenuRef.current) {
+      const rect = gameSectionRef.current.getBoundingClientRect();
+      const menuEl = gameSubmenuMenuRef.current;
+      const menuWidth = 180;
+      let x = rect.right + 4;
+      if (x + menuWidth > window.innerWidth) {
+        x = rect.left - menuWidth - 4;
+      }
+      menuEl.style.left = `${x}px`;
+      menuEl.style.bottom = 'auto';
+      menuEl.style.top = `${rect.top}px`;
+      menuEl.style.maxHeight = `${window.innerHeight - rect.top - 12}px`;
+      menuEl.style.opacity = '1';
+      menuEl.style.pointerEvents = 'auto';
+    }
+  }, [showGameSubmenu]);
 
   const handleAdbEnter = () => {
     if (adbHoverTimer.current) clearTimeout(adbHoverTimer.current);
-    positionSideSubmenu(adbSectionRef.current, setAdbSubmenuPos);
     setShowAdbSubmenu(true);
   };
 
@@ -430,13 +502,36 @@ export function ViewerSidePanel({
 
   const handleConnectionEnter = () => {
     if (connectionHoverTimer.current) clearTimeout(connectionHoverTimer.current);
-    positionSideSubmenu(connectionSectionRef.current, setConnectionSubmenuPos);
     setShowConnectionSubmenu(true);
   };
 
   const handleConnectionLeave = () => {
     connectionHoverTimer.current = window.setTimeout(() => setShowConnectionSubmenu(false), 100);
   };
+
+  const handleGameEnter = () => {
+    if (gameHoverTimer.current) clearTimeout(gameHoverTimer.current);
+    setShowGameSubmenu(true);
+  };
+
+  const handleGameLeave = () => {
+    gameHoverTimer.current = window.setTimeout(() => setShowGameSubmenu(false), 100);
+  };
+
+  const handleGameKeyPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowGameSubmenu(false);
+    onShowWasdKeySetting?.();
+  };
+
+  const handleCustomKeyPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowGameSubmenu(false);
+    onShowCustomKeySetting?.();
+  };
+
   const handleConnectionModePointerDown = (e: React.PointerEvent<HTMLButtonElement>, mode: ConnectionMode, disabled: boolean) => {
     e.preventDefault();
     e.stopPropagation();
@@ -468,6 +563,7 @@ export function ViewerSidePanel({
     return () => {
       if (adbHoverTimer.current) window.clearTimeout(adbHoverTimer.current);
       if (connectionHoverTimer.current) window.clearTimeout(connectionHoverTimer.current);
+      if (gameHoverTimer.current) window.clearTimeout(gameHoverTimer.current);
     };
   }, []);
 
@@ -493,7 +589,7 @@ export function ViewerSidePanel({
     e.target.value = '';
     console.log('[VSP] APK files selected:', files.length);
 
-    const targets = connectSelection && connectSelection.has(udid)
+    const targets = connectSelection && connectSelection.size > 0
       ? Array.from(connectSelection)
       : [udid];
 
@@ -561,7 +657,7 @@ export function ViewerSidePanel({
     e.target.value = '';
     console.log('[VSP] Import files selected:', files.length, 'profile:', selectedProfile);
 
-    const targets = connectSelection && connectSelection.has(udid)
+    const targets = connectSelection && connectSelection.size > 0
       ? Array.from(connectSelection)
       : [udid];
 
@@ -637,7 +733,7 @@ export function ViewerSidePanel({
     const segments = splitCommandBatchSmart(rawInput);
     const parsedCommands = segments.map(normalizeAdbSegment);
 
-    const targets = connectSelection && connectSelection.has(udid)
+    const targets = connectSelection && connectSelection.size > 0
       ? Array.from(connectSelection)
       : [udid];
 
@@ -709,8 +805,10 @@ export function ViewerSidePanel({
       await Promise.all(workers);
     };
 
+    const allDevicesLogs: Record<string, StepLog[]> = {};
     await runWithConcurrency(targets, 8, async (targetUdid) => {
       const stepLogs = await executeBatchOnDevice(targetUdid);
+      allDevicesLogs[targetUdid] = stepLogs;
       if (targetUdid === udid) {
         mainDeviceLogs = stepLogs;
       }
@@ -791,8 +889,32 @@ export function ViewerSidePanel({
 
     const id = ++logIdRef.current;
     const time = new Date().toLocaleTimeString('vi-VN');
-    const isOverallSuccess = mainDeviceLogs.length === parsedCommands.length && mainDeviceLogs.every(s => s.success);
-    const formattedOutput = formatBatchLog(mainDeviceLogs);
+    
+    let isOverallSuccess = true;
+    for (const targetUdid of targets) {
+      const deviceLogs = allDevicesLogs[targetUdid] || [];
+      const ok = deviceLogs.length === parsedCommands.length && deviceLogs.every(s => s.success);
+      if (!ok) {
+        isOverallSuccess = false;
+        break;
+      }
+    }
+
+    let formattedOutput = '';
+    if (targets.length > 1) {
+      const parts = targets.map(targetUdid => {
+        const deviceLogs = allDevicesLogs[targetUdid] || [];
+        const deviceOut = formatBatchLog(deviceLogs);
+        if (deviceOut.trim().toLowerCase() === targetUdid.toLowerCase()) {
+          return `[Device: ${targetUdid}]`;
+        }
+        return `[Device: ${targetUdid}]\n${deviceOut}`;
+      });
+      const allSingleLine = parts.every(p => !p.includes('\n'));
+      formattedOutput = parts.join(allSingleLine ? '\n' : '\n\n');
+    } else {
+      formattedOutput = formatBatchLog(mainDeviceLogs);
+    }
 
     setAdbLogs(prev => [
       {
@@ -843,13 +965,14 @@ export function ViewerSidePanel({
 
   const handlePresetClick = (cmd: string, label: string, color?: string, fromSubmenu?: boolean) => {
     if (fromSubmenu) {
-      setShowAdbSubmenu(false);
       if (cmd.includes('<')) {
+        setShowAdbSubmenu(false);
         setShowAdbModal(true);
         setAdbCommand(cmd);
         return;
       }
       if (color === '#ef4444' || color === '#ff9c9c' || color === 'red') {
+        setShowAdbSubmenu(false);
         setConfirmCmd({ cmd, label });
       } else {
         executeAdbCommand(cmd);
@@ -921,15 +1044,24 @@ export function ViewerSidePanel({
         data-inspector-component="client/src/components/ViewerSidePanel.tsx"
       >
         <div className="vsp-header" style={{ justifyContent: 'space-between' }}>
-          <div className="device-serial-title" style={{
+          <div 
+            className="device-serial-title" 
+            style={{
               color: '#fff', 
               fontWeight: 'bold',
               fontSize: '14px',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
-          }}>
-              📱 {udid}
+              gap: '6px',
+              cursor: 'pointer'
+            }}
+            title={t('Click để copy số seri')}
+            onClick={() => {
+              navigator.clipboard.writeText(udid);
+              showToast('Đã copy: ' + udid, 'ok');
+            }}
+          >
+            {udid}
           </div>
           <button 
             className="vsp-header-close" 
@@ -943,49 +1075,60 @@ export function ViewerSidePanel({
           </button>
         </div>
         {/* Toast notifications */}
-        {toasts.length > 0 && (
+        {toasts.length > 0 && ReactDOM.createPortal(
           <div className="vsp-toast-container">
             {toasts.map(toast => (
               <div key={toast.id} className={`vsp-toast vsp-toast-${toast.type}`}>{toast.text}</div>
             ))}
-          </div>
+          </div>,
+          document.body
         )}
         <div className="vsp-body">
           {/* 1. Số Máy - inline */}
-          <div className="vsp-section">
-            <div className="vsp-section-title-inline">
-              <Hash size={15} />
-              <span>{t('Số Máy')}</span>
-              <input className="vsp-input vsp-input-inline" type="text" inputMode="numeric" pattern="[0-9]*"
-                placeholder={currentOrder !== undefined ? String(currentOrder + 1) : '?'}
-                value={newOrder} onChange={e => setNewOrder(e.target.value.replace(/[^0-9]/g, ''))}
-                onPointerDown={e => e.stopPropagation()}
-                onKeyDown={e => e.key === 'Enter' && handleChangeOrder()} />
-              <button className="vsp-btn vsp-btn-primary" onClick={handleChangeOrder}>{t('Đổi')}</button>
-            </div>
+          <div className="vsp-section-title-inline" style={{ padding: '0 4px' }}>
+            <span>{t('Số Máy')}</span>
+            <input className="vsp-input vsp-input-inline" type="text" inputMode="numeric" pattern="[0-9]*"
+              placeholder={currentOrder !== undefined ? String(currentOrder + 1) : '?'}
+              value={newOrder} onChange={e => setNewOrder(e.target.value.replace(/[^0-9]/g, ''))}
+              onPointerDown={e => e.stopPropagation()}
+              onKeyDown={e => e.key === 'Enter' && handleChangeOrder()} />
+            <button
+              className="vsp-btn vsp-btn-primary"
+              onClick={handleChangeOrder}
+              data-inspector-id="viewerSidePanel.changeOrderButton"
+              data-inspector-label="Change viewer device order button"
+              data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+            >{t('Đổi')}</button>
+            <button
+              type="button"
+              className={`vsp-btn vsp-game-btn${gameModeEnabled ? ' active' : ''}`}
+              aria-pressed={gameModeEnabled}
+              onClick={onToggleGameMode}
+              data-inspector-id="gameKeyboard.toggleButton"
+              data-inspector-label="Toggle Game WASD joystick mode for current viewer"
+              data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+            >Game</button>
           </div>
 
           {/* 2. Profile selector (shared) */}
           {profiles.length > 0 && (
-            <div className="vsp-section">
-              <div className="vsp-profile-inline">
-                <span className="vsp-label">{t('Profile:')}</span>
-                <select 
-                  className="vsp-select" 
-                  value={selectedProfile} 
-                  onChange={e => setSelectedProfile(Number(e.target.value))}
-                  data-inspector-id="viewerSidePanel.profileSelect"
-                  data-inspector-label="WeChat profile selector"
-                  data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-                >
-                  {profiles.map(p => <option key={p.id} value={p.id}>User {p.id} - {p.name}</option>)}
-                </select>
-              </div>
+            <div className="vsp-profile-inline" style={{ padding: '0 4px' }}>
+              <span className="vsp-label">{t('Profile:')}</span>
+              <select 
+                className="vsp-select" 
+                value={selectedProfile} 
+                onChange={e => setSelectedProfile(Number(e.target.value))}
+                data-inspector-id="viewerSidePanel.profileSelect"
+                data-inspector-label="WeChat profile selector"
+                data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+              >
+                {profiles.map(p => <option key={p.id} value={p.id}>User {p.id} - {p.name}</option>)}
+              </select>
             </div>
           )}
 
           {/* 3. Cài APK */}
-          <div className="vsp-section">
+          <div>
             <div 
               className="vsp-section-title vsp-clickable" 
               onClick={() => {
@@ -1001,11 +1144,11 @@ export function ViewerSidePanel({
             <input ref={apkInputRef} type="file" accept=".apk,.xapk,.zip" multiple
               style={{ position: 'absolute', width: 0, height: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }}
               onChange={handleApkSelect} />
-            {apkStatus && <div className="vsp-status">{apkStatus}</div>}
+            {apkStatus && <div className="vsp-status" style={{ marginTop: '4px' }}>{apkStatus}</div>}
           </div>
 
           {/* 4. Nhập tệp */}
-          <div className="vsp-section">
+          <div>
             <div 
               className="vsp-section-title vsp-clickable" 
               onClick={handleImportClick}
@@ -1020,7 +1163,7 @@ export function ViewerSidePanel({
             <input ref={fileInputRef} type="file" multiple
               style={{ position: 'absolute', width: 0, height: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }}
               onChange={handleFileImport} />
-            {importStatus && <div className="vsp-status">{importStatus}</div>}
+            {importStatus && <div className="vsp-status" style={{ marginTop: '4px' }}>{importStatus}</div>}
 
             {showPathInput && (
               <div className="vsp-import-path-container" onClick={e => e.stopPropagation()}>
@@ -1058,9 +1201,9 @@ export function ViewerSidePanel({
             )}
           </div>
 
-          {/* 6. Chạy lệnh ADB - with hover submenu */}
+          {/* 5. Chạy lệnh ADB - with hover submenu */}
           <div 
-            className="vsp-section vsp-adb-section" 
+            className="vsp-adb-section" 
             ref={adbSectionRef}
             onMouseEnter={handleAdbEnter}
             onMouseLeave={handleAdbLeave}
@@ -1073,8 +1216,9 @@ export function ViewerSidePanel({
             </div>
             {showAdbSubmenu && ReactDOM.createPortal(
               <div 
+                ref={adbSubmenuMenuRef}
                 className="vsp-adb-submenu"
-                style={{ position: 'fixed', left: adbSubmenuPos.x, bottom: window.innerHeight - adbSubmenuPos.y, margin: 0 }}
+                style={{ position: 'fixed', left: 0, top: 0, opacity: 0, pointerEvents: 'none', margin: 0 }}
                 onMouseEnter={() => {
                   if (adbHoverTimer.current) clearTimeout(adbHoverTimer.current);
                   setShowAdbSubmenu(true);
@@ -1099,8 +1243,9 @@ export function ViewerSidePanel({
             )}
           </div>
 
+          {/* 6. Kết Nối */}
           <div
-            className="vsp-section vsp-connection-section"
+            className="vsp-connection-section"
             ref={connectionSectionRef}
             onMouseEnter={handleConnectionEnter}
             onMouseLeave={handleConnectionLeave}
@@ -1131,8 +1276,9 @@ export function ViewerSidePanel({
             </div>
             {showConnectionSubmenu && ReactDOM.createPortal(
               <div
+                ref={connectionSubmenuMenuRef}
                 className="vsp-adb-submenu vsp-connection-submenu"
-                style={{ position: 'fixed', left: connectionSubmenuPos.x, bottom: window.innerHeight - connectionSubmenuPos.y, margin: 0 }}
+                style={{ position: 'fixed', left: 0, top: 0, opacity: 0, pointerEvents: 'none', margin: 0 }}
                 onMouseEnter={() => {
                   if (connectionHoverTimer.current) clearTimeout(connectionHoverTimer.current);
                   setShowConnectionSubmenu(true);
@@ -1176,7 +1322,62 @@ export function ViewerSidePanel({
                       <span>{label}</span>
                       <span className="vsp-connection-submenu-status">{reason}</span>
                     </button>
-                  );                })}
+                  );
+                })}
+              </div>,
+              document.body
+            )}
+          </div>
+
+          <div
+            className="vsp-game-setting-section"
+            ref={gameSectionRef}
+            onMouseEnter={handleGameEnter}
+            onMouseLeave={handleGameLeave}
+            data-inspector-id="gameKeyboard.settingRow"
+            data-inspector-label="Game Setting sidebar row"
+            data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+          >
+            <div className="vsp-section-title vsp-clickable vsp-connection-title">
+              <span className="vsp-connection-title-left">
+                <ChevronRight size={15} />
+                <span>Game Setting</span>
+              </span>
+            </div>
+            {showGameSubmenu && ReactDOM.createPortal(
+              <div
+                ref={gameSubmenuMenuRef}
+                className="vsp-adb-submenu vsp-game-submenu"
+                style={{ position: 'fixed', left: 0, top: 0, opacity: 0, pointerEvents: 'none', margin: 0 }}
+                onMouseEnter={() => {
+                  if (gameHoverTimer.current) clearTimeout(gameHoverTimer.current);
+                  setShowGameSubmenu(true);
+                }}
+                onMouseLeave={handleGameLeave}
+                data-inspector-id="gameKeyboard.settingSubmenu"
+                data-inspector-label="Game Setting hover submenu"
+                data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+              >
+                <button
+                  type="button"
+                  className="vsp-adb-submenu-item"
+                  onPointerDown={handleGameKeyPointerDown}
+                  data-inspector-id="gameKeyboard.addWasdKeyButton"
+                  data-inspector-label="Add/edit WASD joystick key mapping button"
+                  data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+                >
+                  + WASD
+                </button>
+                <button
+                  type="button"
+                  className="vsp-adb-submenu-item"
+                  onPointerDown={handleCustomKeyPointerDown}
+                  data-inspector-id="gameKeyboard.addCustomKeyButton"
+                  data-inspector-label="Add custom keyboard mapping button"
+                  data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+                >
+                  + Key
+                </button>
               </div>,
               document.body
             )}

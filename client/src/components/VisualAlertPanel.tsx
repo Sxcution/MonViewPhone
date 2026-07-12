@@ -15,17 +15,22 @@ import {
   X,
 } from 'lucide-react';
 import { useActive } from '@/context/ActiveContext';
+import { useServer } from '@/context/ServerContext';
 import {
+  DEFAULT_VISUAL_ALERT_CONFIG,
   type VisualAlertConfig,
+  type VisualAlertDetectionMode,
   type VisualAlertROI,
   type MultiROIResult,
   type RedThreshold,
+  type WeChatStatusConfig,
   loadVisualAlertConfig,
   saveVisualAlertConfig,
-  scanCanvasROIs,
+  scanCanvasVisualAlert,
   generateROIId,
   playAlertSound,
 } from '@/lib/visualAlertEngine';
+import { runAdbCommandApi } from '@/lib/serverApi';
 
 function loadBoolKey(key: string, fallback: boolean): boolean {
   try {
@@ -36,6 +41,21 @@ function loadBoolKey(key: string, fallback: boolean): boolean {
   } catch {
     return fallback;
   }
+}
+
+function getModalROIDetectionMode(
+  roi: VisualAlertROI,
+  fallbackMode: VisualAlertDetectionMode,
+): VisualAlertDetectionMode {
+  if (roi.detectionMode === 'wechat-status' || roi.detectionMode === 'red-dot') return roi.detectionMode;
+  const lower = roi.name.toLowerCase();
+  if (lower.includes('wechat') || lower.includes('we chat')) return 'wechat-status';
+  if (lower.includes('message') || lower.includes('nearby') || lower.includes('badge')) return 'red-dot';
+  return fallbackMode;
+}
+
+function getModalROIDetectionLabel(mode: VisualAlertDetectionMode): string {
+  return mode === 'wechat-status' ? 'WeChat icon' : 'Chấm đỏ';
 }
 import { useVisualAlert } from '@/hooks/useVisualAlert';
 
@@ -51,10 +71,22 @@ type VisualAlertPanelProps = {
 
 export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: VisualAlertPanelProps) {
   const { getCanvasForUdid } = useActive();
+  const { wsServer } = useServer();
 
   // Config state
   const [config, setConfig] = useState<VisualAlertConfig>(loadVisualAlertConfig);
   const [roiModalOpen, setRoiModalOpen] = useState(false);
+
+  const verifyWeChatNotification = useCallback(async (udid: string): Promise<boolean> => {
+    const command =
+      "dumpsys notification --noredact 2>/dev/null | sed -n '/Notification List:/,/Historical/p' | grep -m 1 -E 'NotificationRecord\\(.*pkg=com\\.tencent\\.mm|pkg=com\\.tencent\\.mm' || true";
+    try {
+      const result = await runAdbCommandApi(wsServer, udid, command, 'shell');
+      return /com\.tencent\.mm/i.test(result.output || '');
+    } catch {
+      return false;
+    }
+  }, [wsServer]);
 
   // Hook for scan loop
   const { scanning } = useVisualAlert({
@@ -63,6 +95,7 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
     registeredUdids,
     orderMap,
     viewerUdid,
+    verifyWeChatNotification,
   });
 
   // Persist config changes
@@ -75,7 +108,14 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
   }, []);
 
   const handleROISave = useCallback(
-    (rois: VisualAlertROI[], settings: { scanIntervalSec: number; confirmCount: number; cooldownSec: number; redThreshold: RedThreshold }) => {
+    (rois: VisualAlertROI[], settings: {
+      detectionMode: VisualAlertDetectionMode;
+      scanIntervalSec: number;
+      confirmCount: number;
+      cooldownSec: number;
+      redThreshold: RedThreshold;
+      wechatStatus: WeChatStatusConfig;
+    }) => {
       updateConfig({
         rois,
         ...settings,
@@ -142,7 +182,9 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
       {roiModalOpen && (
         <MultiROISetupModal
           currentROIs={config.rois}
+          detectionMode={config.detectionMode}
           redThreshold={config.redThreshold}
+          wechatStatus={config.wechatStatus}
           onSave={handleROISave}
           onClose={() => setRoiModalOpen(false)}
           viewerUdid={viewerUdid}
@@ -159,10 +201,19 @@ export function VisualAlertPanel({ registeredUdids, orderMap, viewerUdid }: Visu
 
 type MultiROISetupModalProps = {
   currentROIs: VisualAlertROI[];
+  detectionMode: VisualAlertDetectionMode;
   redThreshold: VisualAlertConfig['redThreshold'];
+  wechatStatus: WeChatStatusConfig;
   onSave: (
     rois: VisualAlertROI[],
-    settings: { scanIntervalSec: number; confirmCount: number; cooldownSec: number; redThreshold: RedThreshold }
+    settings: {
+      detectionMode: VisualAlertDetectionMode;
+      scanIntervalSec: number;
+      confirmCount: number;
+      cooldownSec: number;
+      redThreshold: RedThreshold;
+      wechatStatus: WeChatStatusConfig;
+    }
   ) => void;
   onClose: () => void;
   viewerUdid?: string | null;
@@ -173,7 +224,9 @@ type MultiROISetupModalProps = {
 
 function MultiROISetupModal({
   currentROIs,
+  detectionMode,
   redThreshold,
+  wechatStatus,
   onSave,
   onClose,
   viewerUdid,
@@ -188,7 +241,7 @@ function MultiROISetupModal({
   const activeCanvas = selectedUdid ? getCanvasForUdid(selectedUdid) : null;
 
   const [draftROIs, setDraftROIs] = useState<VisualAlertROI[]>(
-    currentROIs.map(r => ({ ...r })),
+    currentROIs.map(r => ({ ...r, detectionMode: getModalROIDetectionMode(r, detectionMode) })),
   );
   const [activeROIId, setActiveROIId] = useState<string | null>(
     currentROIs.length > 0 ? currentROIs[0].id : null,
@@ -202,6 +255,8 @@ function MultiROISetupModal({
   const [draftConfirmCount, setDraftConfirmCount] = useState(confirmCount);
   const [draftCooldownSec, setDraftCooldownSec] = useState(cooldownSec);
   const [draftRedThreshold, setDraftRedThreshold] = useState<RedThreshold>(redThreshold);
+  const [draftDetectionMode, setDraftDetectionMode] = useState<VisualAlertDetectionMode>(detectionMode);
+  const [draftWeChatStatus, setDraftWeChatStatus] = useState<WeChatStatusConfig>({ ...wechatStatus });
 
   // Offset position for dragging
   const [modalPos, setModalPos] = useState({ x: 0, y: 0 });
@@ -244,10 +299,10 @@ function MultiROISetupModal({
   // Canvas preview ref
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastPreviewSizeRef = useRef({ width: 392, height: 660 });
 
   // Draw device canvas snapshot to preview
   const drawPreview = useCallback(() => {
-    if (!selectedUdid || !activeCanvas) return;
     const dst = previewCanvasRef.current;
     if (!dst) return;
 
@@ -258,7 +313,11 @@ function MultiROISetupModal({
     // Use parent width as base (modal body), not container itself (which may auto-size)
     const parentW = container?.parentElement?.clientWidth ?? 500;
     const maxW = parentW - 2; // account for border
-    const aspect = activeCanvas.height / activeCanvas.width;
+    const sourceCanvas = selectedUdid && activeCanvas && activeCanvas.width && activeCanvas.height ? activeCanvas : null;
+    const fallbackSize = lastPreviewSizeRef.current;
+    const aspect = sourceCanvas
+      ? sourceCanvas.height / sourceCanvas.width
+      : fallbackSize.height / fallbackSize.width;
 
     // Cap preview height to ~48vh so the phone screen is fully visible
     const maxH = Math.round(window.innerHeight * 0.48);
@@ -272,7 +331,12 @@ function MultiROISetupModal({
 
     dst.width = previewW;
     dst.height = previewH;
-    ctx.drawImage(activeCanvas, 0, 0, previewW, previewH);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, previewW, previewH);
+    if (sourceCanvas) {
+      ctx.drawImage(sourceCanvas, 0, 0, previewW, previewH);
+      lastPreviewSizeRef.current = { width: previewW, height: previewH };
+    }
 
     // Sync container size so ROI overlay percentages align with canvas
     if (container) {
@@ -282,11 +346,10 @@ function MultiROISetupModal({
 
   // Draw preview when device selected, and refresh periodically
   useEffect(() => {
-    if (!selectedUdid || !activeCanvas) return;
     drawPreview();
     const timer = setInterval(drawPreview, 1000);
     return () => clearInterval(timer);
-  }, [selectedUdid, activeCanvas, drawPreview]);
+  }, [drawPreview]);
 
   // ROI drag state
   const dragRef = useRef<{
@@ -362,17 +425,19 @@ function MultiROISetupModal({
   // Add new ROI
   const handleAddROI = useCallback(() => {
     const idx = draftROIs.length + 1;
+    const isWeChatMode = draftDetectionMode === 'wechat-status';
     const newROI: VisualAlertROI = {
       id: generateROIId(),
-      name: `Badge ${idx}`,
-      x: 0.45,
-      y: 0.45,
-      w: 0.06,
-      h: 0.04,
+      name: isWeChatMode ? `WeChat ${idx}` : `Badge ${idx}`,
+      x: isWeChatMode ? 0.08 : 0.45,
+      y: isWeChatMode ? 0 : 0.45,
+      w: isWeChatMode ? 0.22 : 0.06,
+      h: isWeChatMode ? 0.07 : 0.04,
+      detectionMode: draftDetectionMode,
     };
     setDraftROIs(prev => [...prev, newROI]);
     setActiveROIId(newROI.id);
-  }, [draftROIs.length]);
+  }, [draftDetectionMode, draftROIs.length]);
 
   // Delete ROI
   const handleDeleteROI = useCallback((roiId: string) => {
@@ -393,10 +458,30 @@ function MultiROISetupModal({
   // Test scan inside modal (multi-ROI)
   const handleTestInModal = useCallback(() => {
     if (!selectedUdid || !activeCanvas || !draftROIs.length) return;
-    const result = scanCanvasROIs(activeCanvas, draftROIs, draftRedThreshold);
+    const result = scanCanvasVisualAlert(activeCanvas, {
+      ...DEFAULT_VISUAL_ALERT_CONFIG,
+      enabled: true,
+      detectionMode: draftDetectionMode,
+      rois: draftROIs,
+      scanIntervalSec: draftScanIntervalSec,
+      confirmCount: draftConfirmCount,
+      cooldownSec: draftCooldownSec,
+      redThreshold: draftRedThreshold,
+      wechatStatus: draftWeChatStatus,
+    });
     setTestResults(result);
     setTimeout(() => setTestResults(null), 8000);
-  }, [selectedUdid, activeCanvas, draftROIs, draftRedThreshold]);
+  }, [
+    selectedUdid,
+    activeCanvas,
+    draftROIs,
+    draftDetectionMode,
+    draftScanIntervalSec,
+    draftConfirmCount,
+    draftCooldownSec,
+    draftRedThreshold,
+    draftWeChatStatus,
+  ]);
 
   // Active ROI object
   const activeROI = draftROIs.find(r => r.id === activeROIId) ?? null;
@@ -466,16 +551,14 @@ function MultiROISetupModal({
             data-inspector-label="Visual Alert modal body"
             data-inspector-component="client/src/components/VisualAlertPanel.tsx"
           >
-            {!selectedUdid || !activeCanvas ? (
-              <div className="visualAlertPickerEmpty"
+            <>
+              <div style={{ display: 'none' }} className="visualAlertPickerEmpty"
                 data-inspector-id="visualAlert.modalEmptyState"
                 data-inspector-label="Visual Alert modal empty state"
                 data-inspector-component="client/src/components/VisualAlertPanel.tsx"
               >
                 Chọn một máy đang stream ở Grid trước
               </div>
-            ) : (
-              <>
                 {/* Canvas preview + ROI overlays */}
                 <div className="visualAlertPreviewWrap" ref={containerRef}
                   data-inspector-id="visualAlert.previewWrap"
@@ -553,6 +636,24 @@ function MultiROISetupModal({
                   data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                 >
                   <label className="visualAlertSettingItem">
+                    <span>Chế độ</span>
+                    <div className="visualAlertInputWrap">
+                      <select
+                        value={draftDetectionMode}
+                        onChange={e => {
+                          setDraftDetectionMode(e.target.value as VisualAlertDetectionMode);
+                          setTestResults(null);
+                        }}
+                        data-inspector-id="visualAlert.modalDetectionModeSelect"
+                        data-inspector-label="Visual Alert modal detection mode select"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                      >
+                        <option value="red-dot">Chấm đỏ</option>
+                        <option value="wechat-status">WeChat icon</option>
+                      </select>
+                    </div>
+                  </label>
+                  <label className="visualAlertSettingItem">
                     <span>Chu kỳ (s)</span>
                     <div className="visualAlertInputWrap">
                       <input
@@ -603,6 +704,8 @@ function MultiROISetupModal({
                       />
                     </div>
                   </label>
+                  {draftDetectionMode === 'red-dot' ? (
+                    <>
                   <label className="visualAlertSettingItem">
                     <span title="Giá trị R tối thiểu (0-255). Mặc định: 180">Màu Đỏ</span>
                     <div className="visualAlertInputWrap">
@@ -651,6 +754,128 @@ function MultiROISetupModal({
                       />
                     </div>
                   </label>
+                  <label className="visualAlertSettingItem">
+                    <span title="Số pixel đỏ tối thiểu trong ROI">Px đỏ</span>
+                    <div className="visualAlertInputWrap">
+                      <input
+                        type="number"
+                        min={1} max={10000}
+                        value={draftRedThreshold.minPixels}
+                        onChange={e =>
+                          setDraftRedThreshold(prev => ({ ...prev, minPixels: Math.max(1, Math.min(10000, Number(e.target.value) || DEFAULT_VISUAL_ALERT_CONFIG.redThreshold.minPixels)) }))
+                        }
+                        data-inspector-id="visualAlert.modalRedThresholdMinPixels"
+                        data-inspector-label="Visual Alert modal red threshold minimum pixels"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                      />
+                    </div>
+                  </label>
+                    </>
+                  ) : (
+                    <>
+                  <label className="visualAlertSettingItem">
+                    <span title="Điểm khớp template tối thiểu">Score</span>
+                    <div className="visualAlertInputWrap">
+                      <input
+                        type="number"
+                        min={0.35}
+                        max={0.95}
+                        step={0.01}
+                        value={draftWeChatStatus.minScore}
+                        onChange={e =>
+                          setDraftWeChatStatus(prev => ({
+                            ...prev,
+                            minScore: Math.max(0.35, Math.min(0.95, Number(e.target.value) || DEFAULT_VISUAL_ALERT_CONFIG.wechatStatus.minScore)),
+                          }))
+                        }
+                        data-inspector-id="visualAlert.modalWechatScore"
+                        data-inspector-label="Visual Alert modal WeChat score threshold"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                      />
+                    </div>
+                  </label>
+                  <label className="visualAlertSettingItem">
+                    <span title="Ngưỡng tương phản của icon status bar">Icon</span>
+                    <div className="visualAlertInputWrap">
+                      <input
+                        type="number"
+                        min={80}
+                        max={255}
+                        value={draftWeChatStatus.whiteThreshold}
+                        onChange={e =>
+                          setDraftWeChatStatus(prev => ({
+                            ...prev,
+                            whiteThreshold: Math.max(80, Math.min(255, Number(e.target.value) || DEFAULT_VISUAL_ALERT_CONFIG.wechatStatus.whiteThreshold)),
+                          }))
+                        }
+                        data-inspector-id="visualAlert.modalWechatWhiteThreshold"
+                        data-inspector-label="Visual Alert modal WeChat white threshold"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                      />
+                    </div>
+                  </label>
+                  <label className="visualAlertSettingItem">
+                    <span title="Số pixel icon tối thiểu trong ROI">Px icon</span>
+                    <div className="visualAlertInputWrap">
+                      <input
+                        type="number"
+                        min={1}
+                        max={10000}
+                        value={draftWeChatStatus.minWhitePixels}
+                        onChange={e =>
+                          setDraftWeChatStatus(prev => ({
+                            ...prev,
+                            minWhitePixels: Math.max(1, Math.min(10000, Number(e.target.value) || DEFAULT_VISUAL_ALERT_CONFIG.wechatStatus.minWhitePixels)),
+                          }))
+                        }
+                        data-inspector-id="visualAlert.modalWechatMinWhitePixels"
+                        data-inspector-label="Visual Alert modal WeChat minimum white pixels"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                      />
+                    </div>
+                  </label>
+                  <label className="visualAlertSettingItem visualAlertCheckSetting">
+                    <span title="Chỉ hỏi ADB sau khi ROI/template đã nghi trúng icon WeChat">ADB xác minh</span>
+                    <div className="visualAlertInputWrap visualAlertCheckWrap">
+                      <input
+                        type="checkbox"
+                        checked={draftWeChatStatus.adbVerify}
+                        onChange={e =>
+                          setDraftWeChatStatus(prev => ({
+                            ...prev,
+                            adbVerify: e.target.checked,
+                          }))
+                        }
+                        data-inspector-id="visualAlert.modalWechatAdbVerify"
+                        data-inspector-label="Visual Alert modal WeChat ADB verify checkbox"
+                        data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                      />
+                    </div>
+                  </label>
+                  {draftWeChatStatus.adbVerify && (
+                    <label className="visualAlertSettingItem">
+                      <span title="Khoảng nghỉ cache xác minh ADB">ADB (s)</span>
+                      <div className="visualAlertInputWrap">
+                        <input
+                          type="number"
+                          min={5}
+                          max={300}
+                          value={draftWeChatStatus.adbCooldownSec}
+                          onChange={e =>
+                            setDraftWeChatStatus(prev => ({
+                              ...prev,
+                              adbCooldownSec: Math.max(5, Math.min(300, Number(e.target.value) || DEFAULT_VISUAL_ALERT_CONFIG.wechatStatus.adbCooldownSec)),
+                            }))
+                          }
+                          data-inspector-id="visualAlert.modalWechatAdbCooldown"
+                          data-inspector-label="Visual Alert modal WeChat ADB cooldown"
+                          data-inspector-component="client/src/components/VisualAlertPanel.tsx"
+                        />
+                      </div>
+                    </label>
+                  )}
+                    </>
+                  )}
 
                   <div className="visualAlertSettingItem" style={{ marginLeft: 'auto', justifyContent: 'flex-end', paddingBottom: 2 }}>
                     <div className="visualAlertROIListHeader" style={{ borderBottom: 'none', paddingBottom: 0 }}>
@@ -735,11 +960,15 @@ function MultiROISetupModal({
                           data-inspector-label={`Visual Alert ROI coords label: ${roi.name}`}
                           data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                         >
-                          {roi.w.toFixed(2)}×{roi.h.toFixed(2)}
+                          {getModalROIDetectionLabel(getModalROIDetectionMode(roi, draftDetectionMode))} · {roi.w.toFixed(2)}×{roi.h.toFixed(2)}
                         </span>
                       </div>
                       <button
+                        type="button"
                         className="visualAlertROIDeleteBtn"
+                        onPointerDown={e => {
+                          e.stopPropagation();
+                        }}
                         onClick={e => {
                           e.stopPropagation();
                           setPendingDeleteROI(roi.id);
@@ -769,8 +998,12 @@ function MultiROISetupModal({
                         data-inspector-component="client/src/components/VisualAlertPanel.tsx"
                       >
                         <span>{h.roiName}:</span>
-                        <span>{h.redPixelCount} px</span>
-                        <span>{h.detected ? '✅' : '❌'}</span>
+                        <span>
+                          {h.detectionMode === 'wechat-status'
+                            ? `${Math.round((h.matchScore ?? 0) * 100)}% / ${h.foregroundPixelCount ?? h.whitePixelCount ?? h.redPixelCount}px`
+                            : `${h.redPixelCount} px`}
+                        </span>
+                        <span>{h.detected ? 'OK' : 'NO'}</span>
                       </div>
                     ))}
                   </div>
@@ -785,7 +1018,7 @@ function MultiROISetupModal({
                   <button
                     className="visualAlertModalBtn secondary"
                     onClick={handleTestInModal}
-                    disabled={!draftROIs.length}
+                    disabled={!draftROIs.length || !selectedUdid || !activeCanvas}
                     data-inspector-id="visualAlert.modalTestScanButton"
                     data-inspector-label="Visual Alert modal test scan button"
                     data-inspector-component="client/src/components/VisualAlertPanel.tsx"
@@ -805,10 +1038,12 @@ function MultiROISetupModal({
                     className="visualAlertModalBtn primary"
                     onClick={() =>
                       onSave(draftROIs, {
+                        detectionMode: draftDetectionMode,
                         scanIntervalSec: draftScanIntervalSec,
                         confirmCount: draftConfirmCount,
                         cooldownSec: draftCooldownSec,
                         redThreshold: draftRedThreshold,
+                        wechatStatus: draftWeChatStatus,
                       })
                     }
                     data-inspector-id="visualAlert.modalSaveButton"
@@ -819,13 +1054,12 @@ function MultiROISetupModal({
                   </button>
                 </div>
               </>
-            )}
           </div>
         </div>
       </div>
 
       {pendingDeleteROI && (
-        <div className="confirmOverlay" onMouseDown={() => setPendingDeleteROI(null)}
+        <div className="confirmOverlay visualAlertDeleteConfirmOverlay" onMouseDown={() => setPendingDeleteROI(null)}
           data-inspector-id="visualAlert.deleteRoiConfirmOverlay"
           data-inspector-label="Visual Alert delete ROI confirm overlay"
           data-inspector-component="client/src/components/VisualAlertPanel.tsx"
@@ -858,6 +1092,7 @@ function MultiROISetupModal({
                 onClick={() => {
                   handleDeleteROI(pendingDeleteROI);
                   setPendingDeleteROI(null);
+                  setTestResults(null);
                 }}
                 data-inspector-id="visualAlert.deleteRoiConfirmButton"
                 data-inspector-label="Visual Alert delete ROI confirm button"

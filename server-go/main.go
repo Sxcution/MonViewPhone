@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+var userProfileEnv = "%USERPROFILE%"
+
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -77,7 +79,7 @@ func ensureAdbKeys() {
 
 	if androidKeyExists {
 		// Scenario A: Copy from %USERPROFILE%\.android to Backup/adb
-		log.Println("[ADB] Found key in %USERPROFILE%\\.android. Ensuring project Backup...")
+		log.Println("[ADB] Found key in " + userProfileEnv + "\\.android. Ensuring project Backup...")
 		if err := os.MkdirAll(backupDir, 0755); err != nil {
 			log.Printf("[ADB] Failed to create backup directory: %v", err)
 			return
@@ -100,7 +102,7 @@ func ensureAdbKeys() {
 		}
 	} else if backupKeyExists {
 		// Scenario B: Restore from Backup/adb to %USERPROFILE%\.android
-		log.Println("[ADB] Key missing in %USERPROFILE%\\.android but exists in project Backup. Restoring...")
+		log.Println("[ADB] Key missing in " + userProfileEnv + "\\.android but exists in project Backup. Restoring...")
 		if err := os.MkdirAll(androidDir, 0755); err != nil {
 			log.Printf("[ADB] Failed to create .android directory: %v", err)
 			return
@@ -110,7 +112,7 @@ func ensureAdbKeys() {
 		if err := copyFile(backupKey, androidKey); err != nil {
 			log.Printf("[ADB] Failed to restore adbkey: %v", err)
 		} else {
-			log.Println("[ADB] Successfully restored adbkey to %USERPROFILE%\\.android")
+			log.Println("[ADB] Successfully restored adbkey to " + userProfileEnv + "\\.android")
 		}
 
 		// Copy pub
@@ -118,7 +120,7 @@ func ensureAdbKeys() {
 			if err := copyFile(backupPub, androidPub); err != nil {
 				log.Printf("[ADB] Failed to restore adbkey.pub: %v", err)
 			} else {
-				log.Println("[ADB] Successfully restored adbkey.pub to %USERPROFILE%\\.android")
+				log.Println("[ADB] Successfully restored adbkey.pub to " + userProfileEnv + "\\.android")
 			}
 		}
 	} else if xiaoweiKeyExists {
@@ -144,7 +146,7 @@ func ensureAdbKeys() {
 		if err := copyFile(xiaoweiKey, androidKey); err != nil {
 			log.Printf("[ADB] Failed to copy xiaowei adbkey to .android: %v", err)
 		} else {
-			log.Println("[ADB] Successfully copied xiaowei adbkey to %USERPROFILE%\\.android")
+			log.Println("[ADB] Successfully copied xiaowei adbkey to " + userProfileEnv + "\\.android")
 		}
 
 		// Copy pub to backup
@@ -159,7 +161,7 @@ func ensureAdbKeys() {
 			if err := copyFile(xiaoweiPub, androidPub); err != nil {
 				log.Printf("[ADB] Failed to copy xiaowei adbkey.pub to .android: %v", err)
 			} else {
-				log.Println("[ADB] Successfully copied xiaowei adbkey.pub to %USERPROFILE%\\.android")
+				log.Println("[ADB] Successfully copied xiaowei adbkey.pub to " + userProfileEnv + "\\.android")
 			}
 		}
 	} else {
@@ -301,6 +303,9 @@ func main() {
 				return
 			case "/api/goog/device/adb-command":
 				handleAdbCommand(w, r)
+				return
+			case "/api/goog/device/sync-clipboard-to-pc":
+				handleSyncPhoneClipboardToPC(w, r)
 				return
 			case "/api/goog/device/install-apk-binary":
 				handleInstallApkBinary(w, r)

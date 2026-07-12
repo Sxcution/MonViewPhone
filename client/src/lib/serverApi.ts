@@ -649,6 +649,23 @@ export async function runAdbCommandApi(
   return { success, output };
 }
 
+export async function syncPhoneClipboardToPcApi(
+  wsServer: string,
+  udid: string,
+): Promise<{ changed: boolean; bytes?: number }> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/sync-clipboard-to-pc`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Sync clipboard failed (status ${res.status})`);
+  }
+  return { changed: !!json.changed, bytes: json.bytes };
+}
+
 // List user profiles on a device
 export async function listUserProfiles(
   wsServer: string,
@@ -860,6 +877,10 @@ export function normalizeAdbSegment(segment: string): ParsedCommand {
     cleanSegment = cleanSegment.slice(1).trim();
   }
 
+  if (cleanSegment.toLowerCase() === 'device') {
+    return { kind: 'host-adb', original, args: ['get-serialno'] };
+  }
+
   if (!cleanSegment) {
     return { kind: 'invalid', original, error: 'Command is empty' };
   }
@@ -893,17 +914,10 @@ export function normalizeAdbSegment(segment: string): ParsedCommand {
       if (args.length === 0) {
         return { kind: 'invalid', original, error: 'Missing adb command arguments' };
       }
-      
-      const hostCmd = args[0].toLowerCase();
-      if (hostCmd === 'reboot') {
-        return { kind: 'host-adb', original, args };
-      } else {
-        return {
-          kind: 'invalid',
-          original,
-          error: 'Host adb command này chưa được hỗ trợ trong khung ADB batch. Hãy dùng chức năng riêng hoặc chỉ dùng adb shell.'
-        };
+      if (args[0].toLowerCase() === 'device') {
+        args[0] = 'get-serialno';
       }
+      return { kind: 'host-adb', original, args };
     }
   } else {
     // If not starting with adb, it's treated as shell command

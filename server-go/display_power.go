@@ -81,18 +81,12 @@ func setDisplayPower(udid string, mode string, displayIndex int) (string, string
 	// physical display without toggling Android wakefulness on ROMs that allow it.
 	out, err := runDisplayPowerHelper(udid, mode, displayIndex, false)
 	if err == nil {
-		if mode == "on" {
-			_, _ = adb.Shell(udid, "input keyevent 224 && wm dismiss-keyguard")
-		}
 		return out, "surfacecontrol-helper", nil
 	}
 	failures = append(failures, fmt.Sprintf("surfacecontrol-helper: %v", err))
 
 	retryOut, retryErr := runDisplayPowerHelper(udid, mode, displayIndex, true)
 	if retryErr == nil {
-		if mode == "on" {
-			_, _ = adb.Shell(udid, "input keyevent 224 && wm dismiss-keyguard")
-		}
 		return retryOut, "surfacecontrol-helper-repush", nil
 	}
 	failures = append(failures, fmt.Sprintf("surfacecontrol-helper-repush: %v", retryErr))

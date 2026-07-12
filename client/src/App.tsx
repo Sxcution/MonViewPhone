@@ -1142,6 +1142,19 @@ export function App() {
     } catch { }
   }, [allKnownDevices])
 
+  const [blacklistedUdids, setBlacklistedUdids] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('blacklistedUdids')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('blacklistedUdids', JSON.stringify(blacklistedUdids))
+    } catch { }
+  }, [blacklistedUdids])
+
   // Rubber band selection state
   const [rubberBand, setRubberBand] = useState<{
     startX: number; startY: number; currentX: number; currentY: number
@@ -1856,11 +1869,13 @@ export function App() {
 
   const discoveredDevices = useMemo(
     () => {
-      if (remoteDevices.length) return remoteDevices.map(d => d.udid)
-      if (androidDevices.length) return androidDevices.map(d => d.udid)
+      const filteredRemote = remoteDevices.filter(d => !blacklistedUdids.includes(d.udid))
+      const filteredAndroid = androidDevices.filter(d => !blacklistedUdids.includes(d.udid))
+      if (filteredRemote.length) return filteredRemote.map(d => d.udid)
+      if (filteredAndroid.length) return filteredAndroid.map(d => d.udid)
       return []
     },
-    [androidDevices, remoteDevices]
+    [androidDevices, remoteDevices, blacklistedUdids]
   )
   useEffect(() => {
     let active = true
@@ -1883,6 +1898,11 @@ export function App() {
                 // Guard: skip unmapped WiFi endpoints that would create rogue tiles
                 if (device.includes(':') && (!logicalUdid || logicalUdid === device)) {
                   console.warn('[devices-list] skipped unmapped wifi endpoint', device)
+                  return
+                }
+
+                // Guard: skip blacklisted devices
+                if (blacklistedUdids.includes(device) || blacklistedUdids.includes(logicalUdid)) {
                   return
                 }
 
@@ -2073,6 +2093,11 @@ export function App() {
   const removeUiDeviceEntries = useCallback((udids: string[]) => {
     const targetSet = new Set(udids.map(id => id.trim()).filter(Boolean))
     if (!targetSet.size) return
+
+    setBlacklistedUdids(prev => {
+      const next = new Set([...prev, ...Array.from(targetSet)])
+      return Array.from(next)
+    })
 
     setAllKnownDevices(prev => {
       const next = prev.filter(device => !targetSet.has(device.udid))

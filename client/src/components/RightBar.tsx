@@ -3,7 +3,7 @@ import { useActive } from '@/context/ActiveContext';
 import { AndroidKeycode } from '@/lib/keyEvent';
 import { useDirectKeyboard } from '@/hooks/useDirectKeyboard';
 import { useServer } from '@/context/ServerContext';
-import { installApk, installUploadedApk } from '@/lib/serverApi';
+import { installApk, installUploadedApk, syncPhoneClipboardToPcApi } from '@/lib/serverApi';
 import { useI18n } from '@/context/I18nContext';
 import {
   ArrowLeft,
@@ -73,6 +73,37 @@ export function RightBar({ hidden, showExpand, onExpand, hideSyncButtons }: Righ
   const kbBarRef = useRef<HTMLDivElement | null>(null);
   const { manualPaste } = useDirectKeyboard(true, kbBarRef.current);
   const apkInputRef = useRef<HTMLInputElement | null>(null);
+  const clipboardSyncErrorShownRef = useRef(false);
+
+  useEffect(() => {
+    if (!activeUdid) return;
+    let stopped = false;
+    let timer: number | null = null;
+
+    const activateClipboardSync = async () => {
+      try {
+        const result = await syncPhoneClipboardToPcApi(wsServer, activeUdid);
+        clipboardSyncErrorShownRef.current = false;
+        if (!stopped && result.changed) {
+          setInstallStatus(t('Đã tự copy clipboard device sang PC'));
+        }
+      } catch (err: any) {
+        if (!stopped && !clipboardSyncErrorShownRef.current) {
+          clipboardSyncErrorShownRef.current = true;
+          setInstallStatus(err?.message || t('Auto copy clipboard từ device thất bại'));
+        }
+      } finally {
+        if (!stopped) timer = window.setTimeout(activateClipboardSync, 15000);
+      }
+    };
+
+    timer = window.setTimeout(activateClipboardSync, 300);
+    return () => {
+      stopped = true;
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, [activeUdid, wsServer, t]);
+
   const handleApkSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';

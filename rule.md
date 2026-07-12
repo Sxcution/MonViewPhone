@@ -490,3 +490,39 @@ Property: background-color
 
 Nếu output vẫn ra các target chung như `button.generic`, `text.primary`, `section.background`, `modal.background` cho một UI cụ thể thì xem như UI đó chưa được đặt Inspector ID đầy đủ và cần bổ sung ngay.
 
+## Mon WeChat Notify Helper
+
+MonViewPhone WeChat notification badges depend on the separate Android helper APK:
+
+```text
+C:\Users\Mon\Desktop\Protect\MonWechatNotifyHelper\build\MonWechatNotifyHelper.apk
+```
+
+The archive copy is:
+
+```text
+C:\Users\Mon\Desktop\Protect\Build APK\MonWechatNotifyHelper\MonWechatNotifyHelper.apk
+```
+
+Phones must have package `com.mon.wechatnotify` installed and notification listener
+`com.mon.wechatnotify/com.mon.wechatnotify.WechatNotificationListener` enabled.
+MonViewPhone reads logcat tag `MonWechatNotify`, then shows tile badges and opens
+the detected WeChat Android user on badge click.
+
+Code naming rule for this feature:
+
+- Constants must use `MON_WECHAT_NOTIFY_HELPER_*`.
+- Polling code is `pollMonWechatNotifyHelperLogs`.
+- Badge click code is `handleMonWechatNotifyBadgeClick`.
+- Parser code lives in `client/src/lib/wechatNotifyLog.ts`.
+
+Detailed notes live in `docs/WECHAT_NOTIFY_HELPER.md`.
+
+## Work Logging Protocol (Nhật ký làm việc)
+
+1. **Mandatory Work Log File (`work_log.md`):** Whenever the AI performs coding, development, or research tasks in this project, it MUST maintain a `work_log.md` file at the root of the project.
+2. **Date Grouping:** Group all entries by date (`## YYYY-MM-DD` based on local system time). If today's block exists, append under it directly. Do not duplicate the date heading.
+3. **Timestamped Entries:** Every entry must start with a `HH:MM` timestamp (local time) in the format: `- **HH:MM**: [Description in Vietnamese/bilingual]`.
+4. **Content Requirements:** Record bug discoveries (symptom + root cause), failed attempts (what was tried, why it failed), successful solutions (what worked, why it resolved), and crucial learnings/gotchas to avoid.
+
+

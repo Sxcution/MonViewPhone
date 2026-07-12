@@ -125,8 +125,13 @@ process.on('SIGTERM', () => {
   void sessionManager.closeAll().finally(() => process.exit(0));
 });
 
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', (err: any) => {
   error('stream-node', 'Uncaught Exception:', err);
+  // Do not crash the entire server for common socket resets (ECONNRESET/EPIPE)
+  if (err && (err.code === 'ECONNRESET' || err.code === 'EPIPE' || err.message?.includes('ECONNRESET') || err.message?.includes('EPIPE'))) {
+    warn('stream-node', `Ignored socket exception to prevent server crash: ${err.message || String(err)}`);
+    return;
+  }
   process.exit(1);
 });
 process.on('unhandledRejection', (reason, promise) => {

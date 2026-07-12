@@ -30,7 +30,11 @@ function TileComponent({
     showTileInfo = true,
     isDisconnected = false,
     visualAlertActive = false,
+    visualAlertLabel = 'Thông Báo Mới',
+    visualAlertSource = 'visual',
+    visualAlertTargetUserId,
     onClearVisualAlert,
+    onVisualAlertClick,
     onRegisterReload,
     onUnregisterReload,
     onViewDevice,
@@ -45,6 +49,8 @@ function TileComponent({
     activeFilter,
     highlightFilterMatched = false,
     onOpenDeviceViewer,
+    search,
+    onSyncNovaWechat,
 }: TileProps) {
     const { t } = useI18n();
     const [accountOverlayMounted, setAccountOverlayMounted] = useState(false);
@@ -361,7 +367,7 @@ function TileComponent({
             onPointerEnter={onPointerEnter}
             onPointerLeave={onPointerLeave}
             onPointerDown={(e) => {
-                if (visualAlertActive) {
+                if (visualAlertActive && visualAlertSource !== 'wechat') {
                     onClearVisualAlert?.(udid);
                 }
             }}
@@ -475,6 +481,8 @@ function TileComponent({
                                             onOpenDeviceViewer={onOpenDeviceViewer}
                                             showAccountOverlay={showAccountOverlay}
                                             alwaysShowHeader={alwaysShowHeader}
+                                            search={search}
+                                            onSyncNovaWechat={onSyncNovaWechat}
                                         />
                                     </div>
                                 )}
@@ -486,14 +494,21 @@ function TileComponent({
                                 className="tileVisualAlertBadge" 
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    onClearVisualAlert?.(udid);
+                                    if (visualAlertSource === 'wechat') {
+                                        onVisualAlertClick?.(udid);
+                                    } else {
+                                        onClearVisualAlert?.(udid);
+                                    }
                                 }}
+                                title={visualAlertSource === 'wechat' && typeof visualAlertTargetUserId === 'number'
+                                    ? `Open WeChat user ${visualAlertTargetUserId}`
+                                    : undefined}
                                 data-inspector-id="tile.visualAlertBadge"
                                 data-inspector-label="Tile visual alert notification badge"
                                 data-inspector-component="client/src/components/tile/Tile.tsx"
                             >
                                 <Bell size={14} className="visualAlertBadgeIcon" />
-                                <span>Thông Báo Mới</span>
+                                <span>{visualAlertLabel || 'Thông Báo Mới'}</span>
                             </div>
                         ) : null}
 

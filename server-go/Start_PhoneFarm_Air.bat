@@ -4,6 +4,11 @@ color 0A
 
 cd /d "%~dp0"
 
+rem Them thu muc go/bin vao PATH de nhan dien air.exe
+if exist "%USERPROFILE%\go\bin" (
+  set "PATH=%PATH%;%USERPROFILE%\go\bin"
+)
+
 where air >nul 2>nul
 if errorlevel 1 (
   echo Khong tim thay air.exe.

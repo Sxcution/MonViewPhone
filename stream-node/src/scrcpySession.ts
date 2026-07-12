@@ -100,7 +100,7 @@ function makeOptions(query: StreamQuery, scid: string, trace: DeviceStepLogger) 
     sendCodecMeta: true,
     clipboardAutosync: true,
     powerOn: true,
-    stayAwake: false,
+    stayAwake: true,
   };
 
   if (query.encoder) init.videoEncoder = query.encoder;

@@ -3803,9 +3803,9 @@ body.alignRight .rightConfigPanel.collapsed {
 }
 
 .vsp-panel {
-  width: 260px;
-  min-width: 260px;
-  max-width: 300px;
+  width: 234px;
+  min-width: 234px;
+  max-width: 270px;
   display: flex;
   flex-direction: column;
   background: var(--vsp-bg, #1e1e1e);
@@ -3817,15 +3817,14 @@ body.alignRight .rightConfigPanel.collapsed {
 
 /* Toast notifications */
 .vsp-toast-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  width: 320px;
+  z-index: 30000;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 4px;
+  gap: 6px;
   pointer-events: none;
 }
 
@@ -3837,6 +3836,7 @@ body.alignRight .rightConfigPanel.collapsed {
   text-align: center;
   animation: vspToastIn 0.3s ease forwards;
   pointer-events: auto;
+  box-shadow: var(--md-shadow-soft);
 }
 
 .vsp-toast-ok {
@@ -3955,8 +3955,9 @@ body.alignRight .rightConfigPanel.collapsed {
 }
 
 .vsp-section-title-inline .vsp-input-inline {
-  width: 60px;
-  flex: 0 0 60px;
+  width: 42px;
+  flex: 0 0 42px;
+  text-align: center;
 }
 
 /* Clickable section titles */
@@ -8012,6 +8013,31 @@ textarea:focus,
   outline: none;
 }
 
+.visualAlertInputWrap select {
+  min-width: 104px;
+  height: 28px;
+  padding: 2px 8px;
+  color: #f8fafc;
+  font-size: 12px;
+  background: #181818;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+}
+
+.visualAlertCheckWrap {
+  justify-content: center;
+  min-width: 44px;
+  height: 28px;
+}
+
+.visualAlertInputWrap input[type="checkbox"] {
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 !important;
+  accent-color: #0d6efd;
+}
+
 /* Hide number spinners */
 .visualAlertInputWrap input[type=number]::-webkit-inner-spin-button,
 .visualAlertInputWrap input[type=number]::-webkit-outer-spin-button,
@@ -8328,6 +8354,10 @@ textarea:focus,
   background: rgba(13, 110, 253, 0.35);
 }
 
+.visualAlertDeleteConfirmOverlay {
+  z-index: 27020;
+}
+
 /* ── Toast Notifications ─────────────────────────────────────── */
 
 /* visualAlertToast : Toast hiển thị khi phát hiện chấm đỏ */
@@ -8630,6 +8660,12 @@ textarea:focus,
   transform: translateX(-50%) scale(1.05);
 }
 
+.tileVisualAlertBadge span {
+  max-width: min(170px, 42vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .visualAlertBadgeIcon {
   animation: visualAlertRing 2s infinite ease-in-out;
   transform-origin: top center;
@@ -8695,6 +8731,58 @@ textarea:focus,
   flex-direction: column !important;
   height: fit-content !important;
   position: relative !important;
+}
+
+/* Landscape-specific responsive sizing: prioritize height first, then adjust width based on aspect ratio and respect the large screen size slider */
+.viewerOverlayPanelWrap:has(#viewerPanel.is-landscape) {
+  --viewer-landscape-height: calc(min(72vh, calc(100vh - 160px)) * var(--viewer-width, 900px) / 900px);
+  width: min(calc(100vw - 48px), calc(var(--viewer-landscape-height) * var(--viewer-aspect) + 280px)) !important;
+}
+
+#viewerPanel.is-landscape {
+  --viewer-landscape-height: calc(min(72vh, calc(100vh - 160px)) * var(--viewer-width, 900px) / 900px);
+  width: min(calc(100vw - 340px), calc(var(--viewer-landscape-height) * var(--viewer-aspect))) !important;
+  max-width: calc(100vw - 340px) !important;
+}
+
+#viewerPanel.is-landscape .viewerBody.viewMode {
+  width: 100% !important;
+}
+
+#viewerPanel.is-landscape .viewerCanvasWrap {
+  width: 100% !important;
+  aspect-ratio: var(--viewer-aspect) !important;
+}
+
+#viewerPanel.is-landscape .viewerCanvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Portrait-specific responsive sizing: scale width proportionally with the slider but guard against viewport height overflows */
+.viewerOverlayPanelWrap:has(#viewerPanel.is-portrait) {
+  --viewer-portrait-width: min(calc(var(--viewer-width, 900px) * 0.8), calc(calc(100vh - 140px) * var(--viewer-aspect)), calc(100vw - 340px));
+  width: min(calc(100vw - 48px), calc(var(--viewer-portrait-width) + 240px)) !important;
+}
+
+#viewerPanel.is-portrait {
+  --viewer-portrait-width: min(calc(var(--viewer-width, 900px) * 0.8), calc(calc(100vh - 140px) * var(--viewer-aspect)), calc(100vw - 340px));
+  width: var(--viewer-portrait-width) !important;
+  max-width: calc(100vw - 340px) !important;
+}
+
+#viewerPanel.is-portrait .viewerBody.viewMode {
+  width: 100% !important;
+}
+
+#viewerPanel.is-portrait .viewerCanvasWrap {
+  width: 100% !important;
+  aspect-ratio: var(--viewer-aspect) !important;
+}
+
+#viewerPanel.is-portrait .viewerCanvas {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .viewerHeader {
@@ -10466,19 +10554,19 @@ input[type=number] {
 .tile-account-overlay .dav-input-wrapper {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.055) !important;
-  border: 1px solid var(--md-border) !important;
-  border-radius: var(--md-radius-sm, 8px) !important;
-  padding: 4px 8px;
-  width: calc(100% - 24px);
-  margin: 4px auto;
+  gap: 8px;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 2px 12px;
+  width: 100%;
+  margin: 0;
   transition: all 0.15s ease;
 }
 
 .tile-account-overlay .dav-input-wrapper:focus-within {
-  border-color: var(--md-info) !important;
-  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: transparent !important;
+  background: rgba(255, 255, 255, 0.02) !important;
   outline: none !important;
   box-shadow: none !important;
 }
@@ -10493,6 +10581,17 @@ input[type=number] {
   font-size: 12px;
   padding: 2px 0;
   width: 100%;
+}
+
+.tile-account-overlay .dav-input-prefix {
+  flex: 0 0 28px;
+  display: inline-flex;
+  justify-content: flex-start;
+  align-items: center;
+  color: var(--md-muted);
+  font-size: 11px;
+  font-weight: bold;
+  user-select: none;
 }
 
 .tile-account-overlay .dav-stats-row {
@@ -12094,3 +12193,261 @@ select:focus,
 
 
 
+
+
+/* Game keyboard WASD joystick for DeviceViewer */
+.vsp-game-btn {
+  border-color: var(--md-border);
+  background: rgba(255, 255, 255, .055);
+  color: var(--md-text);
+}
+
+.vsp-game-btn.active {
+  border-color: var(--md-info);
+  background: linear-gradient(135deg, var(--md-info), var(--md-blue));
+  color: var(--md-text);
+}
+
+.vsp-game-setting-section {
+  position: relative;
+}
+
+.vsp-game-submenu {
+  min-width: 140px;
+}
+
+.gameWasdOverlay {
+  position: absolute;
+  z-index: 10020;
+  cursor: move;
+  touch-action: none;
+  pointer-events: auto;
+  user-select: none;
+  aspect-ratio: 1 !important;
+  height: auto !important;
+  transition: opacity 0.2s ease;
+}
+
+.gameCustomKeyCircle {
+  position: absolute;
+  z-index: 10025;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid var(--md-info);
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+.gameCustomKeyCircle.is-editable {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.gameCustomKeyCircle.is-binding {
+  border-color: var(--md-warning) !important;
+  background: rgba(230, 126, 34, 0.4) !important;
+  animation: gameKeyPulse 0.8s infinite alternate ease-in-out;
+  pointer-events: auto;
+}
+
+@keyframes gameKeyPulse {
+  from {
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: 0 0 4px var(--md-warning);
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.15);
+    box-shadow: 0 0 12px var(--md-warning);
+  }
+}
+
+.gameCustomKeyLabel {
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.gameCustomKeyDeleteBtn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--md-danger);
+  color: #ffffff;
+  border: none;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.gameSaveConfigBtn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10040;
+  height: 32px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, var(--md-info), var(--md-blue));
+  color: #ffffff;
+  border: 1px solid var(--md-border-strong);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: filter 0.15s ease;
+  pointer-events: auto;
+}
+
+.gameSaveConfigBtn:hover {
+  filter: brightness(1.15);
+}
+
+.gameWasdOverlay.is-preview {
+  opacity: 0.15;
+  pointer-events: none;
+  transition: opacity 5s linear;
+}
+
+.gameWasdPad {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  border: 2px solid var(--md-info);
+  background: transparent;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.gameWasdKey {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28%;
+  height: 28%;
+  background: transparent;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.gameWasdKeyW {
+  left: 36%;
+  top: 10%;
+  border-radius: 8px 8px 0 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-bottom: none;
+}
+
+.gameWasdKeyA {
+  left: 10%;
+  top: 36%;
+  border-radius: 8px 0 0 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-right: none;
+}
+
+.gameWasdKeyS {
+  left: 36%;
+  top: 62%;
+  border-radius: 0 0 8px 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-top: none;
+}
+
+.gameWasdKeyD {
+  left: 62%;
+  top: 36%;
+  border-radius: 0 8px 8px 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-left: none;
+}
+
+.gameWasdCenter {
+  position: absolute;
+  left: 36%;
+  top: 36%;
+  width: 28%;
+  height: 28%;
+  background: transparent;
+}
+
+.gameWasdCenter::before {
+  content: "";
+  position: absolute;
+  left: 5%;
+  top: 15%;
+  width: 90%;
+  height: 70%;
+  border-radius: 999px;
+  background: #0d121a;
+  z-index: 1;
+}
+
+.gameWasdCenter::after {
+  content: "";
+  position: absolute;
+  left: 35%;
+  top: 38%;
+  width: 30%;
+  height: 24%;
+  border-radius: 999px;
+  background: #ffffff;
+  z-index: 2;
+}
+
+.gameWasdCloseBtn {
+  position: absolute;
+  right: 0px;
+  top: 0px;
+  width: 24px;
+  height: 24px;
+  border-radius: 0 10px 0 10px;
+  background: var(--md-info);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+  border: none;
+  color: #0d121a;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.gameWasdCloseBtn:hover {
+  background: var(--md-blue);
+}
+
+.gameWasdResizeHandle {
+  position: absolute;
+  right: 0px;
+  bottom: 0px;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 10;
+  border-right: 3px solid var(--md-info);
+  border-bottom: 3px solid var(--md-info);
+  border-radius: 0 0 10px 0;
+}

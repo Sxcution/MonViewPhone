@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, ShieldAlert, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings, History, Layers, ChevronDown, ChevronUp, Play } from 'lucide-react';
+import { X, Search, Plus, MoreVertical, Smartphone, Info, Calendar, Shield, ShieldAlert, Activity, Phone, Hash, Bell, MapPin, QrCode, Mail, Users, Trash2, Briefcase, Folder, Settings, History, Layers, ChevronDown, ChevronUp, Play, RefreshCw } from 'lucide-react';
 import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby';
 import { saveBackendSetting } from '@/lib/backendSettings';
 import { useServer } from '@/context/ServerContext';
@@ -42,6 +42,7 @@ type DeviceAccountOverlayProps = {
   connectSelection?: Set<string>;
   setConnectSelection?: React.Dispatch<React.SetStateAction<Set<string>>>;
   onDeviceContextMenu?: (e: React.MouseEvent, udid: string, groupIdx: number) => void;
+  onSyncNovaWechat?: (udids: string[], dataByUdid?: Record<string, DeviceAccountData>, force?: boolean) => Promise<void>;
 };
 
 const ACCOUNT_STATUS_COLORS: Record<string, string> = {
@@ -552,7 +553,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   activeFilter,
   onOpenDeviceViewer,
   showAccountOverlay = false,
-  alwaysShowHeader = false
+  alwaysShowHeader = false,
+  search,
+  onSyncNovaWechat
 }: {
   udid: string;
   order: number;
@@ -566,6 +569,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   onOpenDeviceViewer?: (udid: string) => void;
   showAccountOverlay?: boolean;
   alwaysShowHeader?: boolean;
+  search?: string;
+  onSyncNovaWechat?: (udids: string[], dataByUdid?: Record<string, DeviceAccountData>, force?: boolean) => Promise<void>;
 }) {
   const { wsServer } = useServer();
   const DAV_DEBUG_KEY = 'monviewphone:dav-debug-open-wechat';
@@ -1160,6 +1165,21 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const activeAccounts = data.platforms[activeTab] || [];
   const selectedAccountId = data.selectedAccountByPlatform[activeTab];
   let selectedAccount = activeAccounts.find(a => a.id === selectedAccountId) || activeAccounts[0];
+
+  if (search && search.trim() !== '') {
+    const q = search.toLowerCase().trim();
+    const matchedAccount = activeAccounts.find(acc => {
+      return (
+        (acc.name || '').toLowerCase().includes(q) ||
+        (acc.nickname || '').toLowerCase().includes(q) ||
+        (acc.phone || '').toLowerCase().includes(q) ||
+        (acc.email || '').toLowerCase().includes(q)
+      );
+    });
+    if (matchedAccount) {
+      selectedAccount = matchedAccount;
+    }
+  }
   const selectedAccountIsLoggedInToday = useMemo(() => {
     if (!selectedAccount) return false;
     const loginDates = Array.from(new Set(
@@ -1510,6 +1530,20 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       }
     };
     updateData(newData);
+    if (
+      activeTab === 'wechat' &&
+      onSyncNovaWechat &&
+      (
+        'status' in updates ||
+        'createdAt' in updates ||
+        'isNew' in updates ||
+        'nearbyPeopleEnabled' in updates ||
+        'nearbyPeopleDueDate' in updates ||
+        'wechatLaunchProfile' in updates
+      )
+    ) {
+      void onSyncNovaWechat([udid], { [udid]: newData }, false);
+    }
   };
 
   const handleDateSubmit = (textVal: string) => {
@@ -2585,16 +2619,10 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             {/* Tên tài khoản */}
             <div 
               className="dav-input-wrapper" 
-              style={{ marginTop: '10px' }}
               data-inspector-id="deviceAccount.accountNameDisplay"
               data-inspector-label="Account name display container"
               data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
             >
-              <span
-                style={{ color: '#888', userSelect: 'none', fontSize: '11px', fontWeight: 'bold', marginLeft: '2px', cursor: 'default', display: 'inline-flex', alignItems: 'center' }}
-              >
-                Tên
-              </span>
               <input
                 className="dav-transparent-input"
                 style={{ color: '#fff', fontWeight: 'bold' }}
@@ -2608,19 +2636,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             </div>
 
             {/* Biệt danh (Nickname) */}
-            <div className="dav-input-wrapper" style={{ marginTop: '10px' }}>
-              <span
-                className="dav-identity-toggle"
-                title={isIdentityHidden('nickname') ? 'Hiện biệt danh' : 'Ẩn biệt danh'}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  toggleIdentityHidden('nickname');
-                }}
-                style={{ color: '#888', userSelect: 'none', fontSize: '13px', fontWeight: 'bold', marginLeft: '2px', cursor: 'pointer' }}
-              >
-                @
-              </span>
+            <div className="dav-input-wrapper">
               <input
                 className="dav-transparent-input"
                 style={{ color: '#fff' }}
@@ -2640,19 +2656,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
             {/* Số điện thoại */}
             {!hidePhone && (
-              <div className="dav-input-wrapper" style={{ marginTop: '10px' }}>
-                <span
-                  className="dav-identity-toggle"
-                  title={isIdentityHidden('phone') ? 'Hiện số điện thoại' : 'Ẩn số điện thoại'}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleIdentityHidden('phone');
-                  }}
-                  style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
-                >
-                  <Phone size={12} color="#ec4899" style={{ flexShrink: 0 }} />
-                </span>
+              <div className="dav-input-wrapper">
                 <input
                   className="dav-transparent-input"
                   placeholder="Số điện thoại"
@@ -2675,19 +2679,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
 
             {/* Email */}
             {!hideEmail && (
-              <div className="dav-input-wrapper" style={{ marginTop: '10px' }}>
-                <span
-                  className="dav-identity-toggle"
-                  title={isIdentityHidden('email') ? 'Hiện email' : 'Ẩn email'}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleIdentityHidden('email');
-                  }}
-                  style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
-                >
-                  <Mail size={12} color="#9ca3af" style={{ flexShrink: 0 }} />
-                </span>
+              <div className="dav-input-wrapper">
                 <input
                   className="dav-transparent-input"
                   placeholder="Địa chỉ Email"
@@ -4218,7 +4210,8 @@ export function DeviceAccountOverlay({
   setActiveTab,
   connectSelection,
   setConnectSelection,
-  onDeviceContextMenu
+  onDeviceContextMenu,
+  onSyncNovaWechat
 }: DeviceAccountOverlayProps) {
   const { wsServer } = useServer();
   const [vault, setVault] = useState<VaultData>(() => loadDeviceAccountVault());
@@ -4295,6 +4288,7 @@ export function DeviceAccountOverlay({
   const [hideCreatedAt, setHideCreatedAt] = useState(() => localStorage.getItem('monviewphone:dav-hide-created-at') === 'true');
   const [alwaysShowHeader, setAlwaysShowHeader] = useState(() => localStorage.getItem('monviewphone:dav-always-show-header') === 'true');
   const [hideName, setHideName] = useState(() => localStorage.getItem('monviewphone:dav-hide-name') === 'true');
+  const [novaSyncing, setNovaSyncing] = useState(false);
   // Ẩn số máy (dav-order) khi Overlay Header mode
   const [headerHideOrder, setHeaderHideOrder] = useState(() => localStorage.getItem('monviewphone:dav-header-hide-order') === 'true');
   // Chế độ nền tối thiểu (chỉ nền sau nội dung) khi Overlay Header
@@ -4460,6 +4454,18 @@ export function DeviceAccountOverlay({
     setShowAddPlatformModal(false);
     setNewPlatformName('');
     setAddPlatformError('');
+  };
+
+  const handleSyncNovaWechatClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!onSyncNovaWechat || novaSyncing) return;
+    setNovaSyncing(true);
+    try {
+      await onSyncNovaWechat(Array.from(connectedUdids), undefined, true);
+    } finally {
+      setNovaSyncing(false);
+    }
   };
 
   const handleConfirmDeletePlatform = () => {
@@ -4675,29 +4681,35 @@ export function DeviceAccountOverlay({
               Quản lý tài khoản
             </span>
  
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 16 }}>
-              <span style={{ fontSize: 11, color: 'var(--md-muted)', userSelect: 'none' }}>Ẩn Tên</span>
-              <button
-                type="button"
-                className={`dav-toggle-switch ${hideName ? 'on' : ''}`}
-                style={{ width: 34, height: 18 }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const nextVal = !hideName;
-                  setHideName(nextVal);
-                  localStorage.setItem('monviewphone:dav-hide-name', String(nextVal));
-                  saveBackendSetting('monviewphone:dav-hide-name', String(nextVal));
-                  window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
-                }}
-                onDoubleClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-              >
-                <div className="dav-toggle-knob" style={{ width: 12, height: 12, top: 2, left: hideName ? 18 : 2 }} />
-              </button>
-            </div>
+            <button
+              type="button"
+              title="Sync trạng thái WeChat xuống Nova cho máy đang online"
+              onClick={handleSyncNovaWechatClick}
+              disabled={!onSyncNovaWechat || novaSyncing}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                marginLeft: 16,
+                height: 24,
+                padding: '0 9px',
+                borderRadius: 6,
+                border: '1px solid rgba(96, 165, 250, 0.45)',
+                background: novaSyncing ? 'rgba(96, 165, 250, 0.12)' : 'rgba(37, 99, 235, 0.28)',
+                color: '#dbeafe',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: !onSyncNovaWechat || novaSyncing ? 'default' : 'pointer',
+                opacity: !onSyncNovaWechat ? 0.5 : 1,
+              }}
+              onDoubleClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
+              <RefreshCw size={12} />
+              {novaSyncing ? 'Sync...' : 'Sync Nova'}
+            </button>
 
             {/* Thanh tìm kiếm thu nhỏ */}
             <input
