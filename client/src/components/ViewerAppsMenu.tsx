@@ -293,7 +293,7 @@ export function ViewerAppsMenu({
         <div
           ref={submenuRef}
           className="vsp-adb-submenu vsp-apps-submenu-panel"
-          style={{ position: 'fixed', left: 0, top: 0, opacity: 0, pointerEvents: 'none', margin: 0 }}
+          style={{ position: 'fixed', left: 0, top: 0, bottom: 'auto', opacity: 0, pointerEvents: 'none', margin: 0 }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
@@ -392,6 +392,7 @@ export function ViewerAppsMenu({
             position: 'fixed',
             left: `${submenu2Coords.left}px`,
             top: `${submenu2Coords.top}px`,
+            bottom: 'auto',
             margin: 0,
             zIndex: 10000,
           }}
