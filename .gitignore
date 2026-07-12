@@ -12,6 +12,7 @@ uploads/
 !server-go/scrcpy-server.jar
 !server-go/displaypower/bin/monview-display-power.jar
 !server-go/wallpaper/wallpaper_helper.jar
+!server-go/appmanagement/bin/monview-app-management.jar
 
 # Safe single server ignore list
 Backup/
@@ -35,3 +36,18 @@ chrome-profile/
 User Data/
 Local Storage/
 leveldb/
+
+# Large binary files - never commit
+APK/
+*.exe
+*.apk
+*.xapk
+*.zip
+Codex.Switcher*
+Working/
+__pycache__/
+*.class
+
+# Data/debug text files
+2854_*.txt
+28c4_*.txt
