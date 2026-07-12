@@ -924,3 +924,95 @@ export function normalizeAdbSegment(segment: string): ParsedCommand {
     return { kind: 'shell', original, command: cleanSegment };
   }
 }
+
+export interface AppInfo {
+  packageName: string;
+  displayName: string;
+  userId: number;
+  baseApkPath: string;
+  splitApkPaths: string[];
+  isSystem: boolean;
+  enabled: boolean;
+  icon: string; // Base64 string
+}
+
+export async function getAppsList(wsServer: string, udid: string, userId: number): Promise<AppInfo[]> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/apps/list`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, userId }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Failed to fetch app list (status ${res.status})`);
+  }
+  return json.apps || [];
+}
+
+export async function extractAppApk(
+  wsServer: string,
+  udid: string,
+  userId: number,
+  packageName: string
+): Promise<{ outputDir: string; savedPaths: string[]; count: number; packageName: string }> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/apps/extract`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, userId, packageName }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Failed to extract APK (status ${res.status})`);
+  }
+  return {
+    outputDir: json.outputDir || '',
+    savedPaths: json.savedPaths || [],
+    count: json.count || 0,
+    packageName: json.packageName || '',
+  };
+}
+
+export async function forceStopApp(wsServer: string, udid: string, userId: number, packageName: string): Promise<void> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/apps/force-stop`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, userId, packageName }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Failed to force stop (status ${res.status})`);
+  }
+}
+
+export async function clearAppCache(wsServer: string, udid: string, userId: number, packageName: string): Promise<void> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/apps/clear-cache`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, userId, packageName }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    if (json?.error === 'unsupported') {
+      throw new Error('unsupported');
+    }
+    throw new Error(json?.error || `Failed to clear cache (status ${res.status})`);
+  }
+}
+
+export async function uninstallApp(wsServer: string, udid: string, userId: number, packageName: string): Promise<void> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/apps/uninstall`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, userId, packageName }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Failed to uninstall (status ${res.status})`);
+  }
+}
+

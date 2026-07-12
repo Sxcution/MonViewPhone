@@ -15,6 +15,7 @@ import {
 } from '@/lib/serverApi';
 import type { ConnectionMode, ConnectionState } from '@/components/tile/types';
 import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Save, Trash2, Palette, Plus, Copy, ChevronRight } from 'lucide-react';
+import { ViewerAppsMenu } from './ViewerAppsMenu';
 
 type ViewerSidePanelProps = {
   udid: string;
@@ -1200,6 +1201,15 @@ export function ViewerSidePanel({
               </div>
             )}
           </div>
+
+          {/* DS ứng dụng */}
+          <ViewerAppsMenu
+            wsServer={wsServer}
+            udid={udid}
+            userId={selectedProfile}
+            profileName={profiles.find(p => p.id === selectedProfile)?.name || `User ${selectedProfile}`}
+            showToast={showToast}
+          />
 
           {/* 5. Chạy lệnh ADB - with hover submenu */}
           <div 

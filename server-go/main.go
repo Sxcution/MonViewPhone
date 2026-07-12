@@ -298,6 +298,21 @@ func main() {
 			case "/api/devices/connect":
 				handleDevicesConnect(w, r)
 				return
+			case "/api/goog/device/apps/list":
+				handleAppsList(w, r)
+				return
+			case "/api/goog/device/apps/extract":
+				handleAppsExtract(w, r)
+				return
+			case "/api/goog/device/apps/force-stop":
+				handleAppsForceStop(w, r)
+				return
+			case "/api/goog/device/apps/clear-cache":
+				handleAppsClearCache(w, r)
+				return
+			case "/api/goog/device/apps/uninstall":
+				handleAppsUninstall(w, r)
+				return
 			case "/api/goog/device/user-profiles":
 				handleUserProfiles(w, r)
 				return

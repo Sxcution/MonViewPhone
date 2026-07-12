@@ -15,7 +15,8 @@
       "automation_panel": "AutomationPanel",
       "device_account_overlay": "DeviceAccountOverlay",
       "macro_playback_panel": "MacroPlaybackPanel",
-      "notes_modal": "NotesModal"
+      "notes_modal": "NotesModal",
+      "viewer_apps_menu": "ViewerAppsMenu"
     },
     "css_classes": {
       "account_search_input": "account-search-input",
