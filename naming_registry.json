@@ -530,7 +530,8 @@
     "game_keyboard_add_wasd_key_button": "gameKeyboard.addWasdKeyButton",
     "game_keyboard_add_custom_key_button": "gameKeyboard.addCustomKeyButton",
     "game_add_key_overlay": "gameAddKeyOverlay",
-    "game_save_config_btn": "gameSaveConfigBtn"
+    "game_save_config_btn": "gameSaveConfigBtn",
+    "viewer_side_panel_toast_item": "viewerSidePanel.toastItem"
   },
   "project_assets": {
     "app_icon_png": "assets/IconMonViewPhone.png",

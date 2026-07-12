@@ -39,9 +39,14 @@
 - Test route thật với `Super_Proxy.apk`: API trả `Success` kèm `Installed after APK resource alignment/sign repair`; chỉ `user 0` có `com.scheler.superproxy`, `user 11/user 13` không có; đã uninstall app test khỏi `user 0`.
 - Log device: crash `Settings Services` là `com.google.android.settings.intelligence` lỗi provider `com.google.android.gsf.gservices`, không phải do Super Proxy install.
 
-## Ngày 13/07/2026
+## 2026-07-13
 
-- Yêu cầu: đổi shortcut `C:\Users\Mon\Desktop\run.lnk` sang chế độ dev để sửa giao diện thấy ngay, nhưng không tạo log dev quá ồn.
+- **05:30**: Thực hiện thay đổi cơ chế và vị trí hiển thị thông báo toast:
+  - Di chuyển `.vsp-toast-container` từ góc trên bên phải (`right: 12px`) ra giữa trên (`left: 50%; transform: translateX(-50%)`) trong `client/src/styles.css`.
+  - Tách logic hiển thị toast trong `client/src/components/ViewerSidePanel.tsx` thành component `ToastItem`.
+  - Thực hiện tính năng: Khi rê chuột vào thông báo (hover), toast giữ nguyên không tự ẩn. Khi chuột rời đi, đếm ngược tự động ẩn sau 2 giây.
+  - Build frontend biên dịch thành công. Đăng ký inspector ID `viewerSidePanel.toastItem` trong `naming_registry.json`.
+- **06:00**: Yêu cầu: đổi shortcut `C:\Users\Mon\Desktop\run.lnk` sang chế độ dev để sửa giao diện thấy ngay, nhưng không tạo log dev quá ồn.
 - Chọn cách tối giản: dùng launcher sẵn có `rundev.pyw`, chỉ đổi shortcut thay vì tạo shortcut/script mới.
 - Giữ `server-go-current.log`, `stream-node-current.log`, `vite-current.log` vì đây là log `current` bị ghi đè mỗi lần mở và cần cho AI debug lỗi; riêng Vite chạy với `--logLevel warn` để giảm log frontend.
 - Kiểm tra: `python -m py_compile rundev.pyw` pass; `run.lnk` hiện trỏ tới `C:\Users\Mon\Desktop\Protect\MonViewPhone\rundev.pyw`.

@@ -34,6 +34,55 @@ type ViewerSidePanelProps = {
 type AdbLogEntry = { id: number; time: string; command: string; output: string; success: boolean };
 type ToastMsg = { id: number; text: string; type: 'ok' | 'err' };
 
+interface ToastItemProps {
+  toast: ToastMsg;
+  onRemove: () => void;
+}
+
+const ToastItem: React.FC<ToastItemProps> = ({ toast, onRemove }) => {
+  const timeoutRef = useRef<any>(null);
+
+  const startTimeout = useCallback((duration: number) => {
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = window.setTimeout(() => {
+      onRemove();
+    }, duration);
+  }, [onRemove]);
+
+  useEffect(() => {
+    startTimeout(4000);
+    return () => {
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [startTimeout]);
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  const handleMouseLeave = () => {
+    startTimeout(2000);
+  };
+
+  return (
+    <div
+      className={`vsp-toast vsp-toast-${toast.type}`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {toast.text}
+    </div>
+  );
+};
+
+
 function httpBase(wsServer: string): string {
   const u = new URL(wsServer);
   u.protocol = u.protocol === 'wss:' ? 'https:' : 'http:';
@@ -113,11 +162,10 @@ export function ViewerSidePanel({
   // Toast notifications
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const toastIdRef = useRef(0);
-  const showToast = (text: string, type: 'ok' | 'err') => {
+  const showToast = useCallback((text: string, type: 'ok' | 'err') => {
     const id = ++toastIdRef.current;
     setToasts(prev => [...prev, { id, text, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
-  };
+  }, []);
 
   // APK
   const [apkStatus, setApkStatus] = useState<string | null>(null);
@@ -1280,7 +1328,11 @@ export function ViewerSidePanel({
         {toasts.length > 0 && ReactDOM.createPortal(
           <div className="vsp-toast-container">
             {toasts.map(toast => (
-              <div key={toast.id} className={`vsp-toast vsp-toast-${toast.type}`}>{toast.text}</div>
+              <ToastItem
+                key={toast.id}
+                toast={toast}
+                onRemove={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              />
             ))}
           </div>,
           document.body
