@@ -3803,9 +3803,9 @@ body.alignRight .rightConfigPanel.collapsed {
 }
 
 .vsp-panel {
-  width: 234px;
-  min-width: 234px;
-  max-width: 270px;
+  width: 280px;
+  min-width: 280px;
+  max-width: 320px;
   display: flex;
   flex-direction: column;
   background: var(--vsp-bg, #1e1e1e);
@@ -3874,7 +3874,7 @@ body.alignRight .rightConfigPanel.collapsed {
 }
 
 .vsp-header-title {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 800;
   color: #e8f2ff;
   letter-spacing: 0.3px;
@@ -3940,7 +3940,7 @@ body.alignRight .rightConfigPanel.collapsed {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 700;
   color: #ffffff;
 }
@@ -3950,7 +3950,7 @@ body.alignRight .rightConfigPanel.collapsed {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 700;
   color: #ffffff;
 }
@@ -3986,13 +3986,13 @@ body.alignRight .rightConfigPanel.collapsed {
   flex: 0 1 auto;
   min-width: 120px;
   max-width: 170px;
-  height: 32px;
+  height: 38px;
   border-radius: 8px;
   border: 1px solid #333;
   background: #181818;
   color: #fff;
   padding: 0 8px;
-  font-size: 13px;
+  font-size: 16px;
   outline: none;
 }
 
@@ -4007,19 +4007,19 @@ body.alignRight .rightConfigPanel.collapsed {
 }
 
 .vsp-label {
-  font-size: 14px;
+  font-size: 17px;
   color: #bbb;
 }
 
 .vsp-input {
   flex: 1;
-  height: 30px;
+  height: 36px;
   border-radius: 8px;
   border: 1px solid #333;
   background: #181818;
   color: #fff;
   padding: 0 8px;
-  font-size: 13px;
+  font-size: 16px;
   outline: none;
   min-width: 0;
 }
@@ -4045,13 +4045,13 @@ body.alignRight .rightConfigPanel.collapsed {
 }
 
 .vsp-btn {
-  height: 30px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 12px;
   border-radius: 8px;
   border: 1px solid #3a3a3a;
   background: #1e1e1e;
   color: #e6e6e6;
-  font-size: 13px;
+  font-size: 16px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -4685,7 +4685,7 @@ textarea.vsp-modal-input {
 }
 
 .vsp-adb-submenu-item.vsp-cmd-warn {
-  color: #ff9c9c;
+  color: #ef4444 !important;
 }
 
 .vsp-adb-submenu-item.vsp-cmd-warn:hover {
@@ -8730,7 +8730,7 @@ textarea:focus,
   align-items: stretch !important;
   height: fit-content !important;
   max-height: min(90vh, 1200px) !important;
-  gap: 10px !important;
+  gap: 0 !important;
 }
 
 #viewerPanel {
@@ -8747,13 +8747,13 @@ textarea:focus,
 /* Landscape-specific responsive sizing: prioritize height first, then adjust width based on aspect ratio and respect the large screen size slider */
 .viewerOverlayPanelWrap:has(#viewerPanel.is-landscape) {
   --viewer-landscape-height: calc(min(72vh, calc(100vh - 160px)) * var(--viewer-width, 900px) / 900px);
-  width: min(calc(100vw - 48px), calc(var(--viewer-landscape-height) * var(--viewer-aspect) + 280px)) !important;
+  width: min(calc(100vw - 48px), calc(var(--viewer-landscape-height) * var(--viewer-aspect) + 326px)) !important;
 }
 
 #viewerPanel.is-landscape {
   --viewer-landscape-height: calc(min(72vh, calc(100vh - 160px)) * var(--viewer-width, 900px) / 900px);
-  width: min(calc(100vw - 340px), calc(var(--viewer-landscape-height) * var(--viewer-aspect))) !important;
-  max-width: calc(100vw - 340px) !important;
+  width: min(calc(100vw - 386px), calc(var(--viewer-landscape-height) * var(--viewer-aspect))) !important;
+  max-width: calc(100vw - 386px) !important;
 }
 
 #viewerPanel.is-landscape .viewerBody.viewMode {
@@ -8772,14 +8772,14 @@ textarea:focus,
 
 /* Portrait-specific responsive sizing: scale width proportionally with the slider but guard against viewport height overflows */
 .viewerOverlayPanelWrap:has(#viewerPanel.is-portrait) {
-  --viewer-portrait-width: min(calc(var(--viewer-width, 900px) * 0.8), calc(calc(100vh - 140px) * var(--viewer-aspect)), calc(100vw - 340px));
-  width: min(calc(100vw - 48px), calc(var(--viewer-portrait-width) + 240px)) !important;
+  --viewer-portrait-width: min(calc(var(--viewer-width, 900px) * 0.8), calc(calc(100vh - 140px) * var(--viewer-aspect)), calc(100vw - 386px));
+  width: min(calc(100vw - 48px), calc(var(--viewer-portrait-width) + 286px)) !important;
 }
 
 #viewerPanel.is-portrait {
-  --viewer-portrait-width: min(calc(var(--viewer-width, 900px) * 0.8), calc(calc(100vh - 140px) * var(--viewer-aspect)), calc(100vw - 340px));
+  --viewer-portrait-width: min(calc(var(--viewer-width, 900px) * 0.8), calc(calc(100vh - 140px) * var(--viewer-aspect)), calc(100vw - 386px));
   width: var(--viewer-portrait-width) !important;
-  max-width: calc(100vw - 340px) !important;
+  max-width: calc(100vw - 386px) !important;
 }
 
 #viewerPanel.is-portrait .viewerBody.viewMode {
@@ -12482,7 +12482,7 @@ select:focus,
   justify-content: space-between;
   padding: 3px 8px;
   border-bottom: 1px solid var(--vsp-border, #2d2d2d);
-  background: rgba(255, 255, 255, 0.02);
+  background: transparent;
 }
 
 .vsp-apps-submenu-title {

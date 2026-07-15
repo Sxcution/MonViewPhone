@@ -23,6 +23,7 @@ APP_URL = f"{DEV_FRONTEND_URL}?{DEV_WS_QUERY}" if DEV_FRONTEND else BASE_URL
 STREAM_NODE_PORT = 11080
 STREAM_NODE_BUILD_ID = "tango-v2-race-safe-close-1"
 APP_MUTEX_NAME = r"Local\MonViewPhoneV2_Dev_SingleInstance"
+CHROME_USER_DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ROOT_DIR), "MonViewPhone", "ChromeAppProfile")
 
 instance_mutex = None
 go_process = None
@@ -327,7 +328,11 @@ def open_app(icon=None, item=None):
     chrome_paths = [r"C:\Program Files\Google\Chrome\Application\chrome.exe", r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe", "chrome"]
     for path in chrome_paths:
         try:
-            subprocess.Popen([path, f"--app={APP_URL}"], creationflags=subprocess.CREATE_NO_WINDOW)
+            os.makedirs(CHROME_USER_DATA_DIR, exist_ok=True)
+            subprocess.Popen(
+                [path, f"--user-data-dir={CHROME_USER_DATA_DIR}", "--disable-extensions", "--no-first-run", "--no-default-browser-check", f"--app={APP_URL}"],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
             return
         except Exception:
             continue

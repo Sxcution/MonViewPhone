@@ -2665,12 +2665,8 @@ export function App() {
           const stayAwakePromise = ensureStayAwakeForDevice(udid)
 
           try {
-
-            const sentViaControl = sendPhysicalScreenPowerViaControl(udid, ScreenPowerMode.OFF)
-            if (sentViaControl) {
-              await stayAwakePromise
-              return
-            }
+            // WS control: fire-and-forget bonus, không được skip REST API vì ws.send() không confirm delivery
+            sendPhysicalScreenPowerViaControl(udid, ScreenPowerMode.OFF)
 
             await stayAwakePromise
             await setDeviceDisplayPower(wsServer, udid, 'off')
@@ -2685,17 +2681,29 @@ export function App() {
 
   // ref_autoScreenPrepared : Lưu danh sách thiết bị đã được chuẩn bị tự động để tránh spam
   const autoScreenPreparedRef = useRef<Set<string>>(new Set())
+  // ref_autoScreenInFlight : Ngăn chạy song song nhiều lần cho cùng device
+  const autoScreenInFlightRef = useRef<Set<string>>(new Set())
 
   // effect_autoScreenPrepare : Tự động chạy khi thiết bị vừa online
   useEffect(() => {
-    const online = orderedRegistered.filter(id => connectedUdids.has(id))
-    for (const udid of online) {
+    // Dùng connectedUdids trực tiếp, không phụ thuộc orderedRegistered (cần Tile mount)
+    for (const udid of connectedUdids) {
       if (autoScreenPreparedRef.current.has(udid)) continue
-      autoScreenPreparedRef.current.add(udid)
-      
-      runPhysicalScreenOffWithStayAwake([udid]).catch(err => {
-        console.warn('[auto-screen-prepare] failed', udid, err)
-      })
+      if (autoScreenInFlightRef.current.has(udid)) continue
+      autoScreenInFlightRef.current.add(udid)
+
+      // Fire-and-forget async: delay 3s cho ADB ổn định, rồi tắt màn hình
+      ;(async () => {
+        await new Promise(r => setTimeout(r, 3000))
+        try {
+          await runPhysicalScreenOffWithStayAwake([udid])
+          autoScreenPreparedRef.current.add(udid)
+        } catch (err) {
+          console.warn('[auto-screen-prepare] failed, will retry next cycle', udid, err)
+        } finally {
+          autoScreenInFlightRef.current.delete(udid)
+        }
+      })()
     }
 
     // Nếu device offline thì cho phép lần sau online lại chạy lại
@@ -2705,7 +2713,7 @@ export function App() {
         stayAwakePreparedRef.current.delete(udid)
       }
     }
-  }, [orderedRegistered, connectedUdids, runPhysicalScreenOffWithStayAwake])
+  }, [connectedUdids, runPhysicalScreenOffWithStayAwake])
 
   const handleContextApkSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {

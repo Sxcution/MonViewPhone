@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { getAppsList, extractAppApk, forceStopApp, clearAppCache, uninstallApp } from '@/lib/serverApi';
+import { getAppsList, extractAppApk, forceStopApp, clearAppCache, uninstallApp, openApp } from '@/lib/serverApi';
 import type { AppInfo } from '@/lib/serverApi';
 import { Package, RefreshCw, Pin, Trash2, Play, Eraser, Download, Loader2, ChevronRight, AlertTriangle } from 'lucide-react';
 
@@ -26,6 +26,12 @@ export function ViewerAppsMenu({
   
   // Pinned apps state
   const [pinnedPackages, setPinnedPackages] = useState<Set<string>>(new Set());
+
+  // System apps hide state & search query
+  const [hideSystem, setHideSystem] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+
 
   // Submenu positioning refs
   const rowRef = useRef<HTMLDivElement>(null);
@@ -87,8 +93,16 @@ export function ViewerAppsMenu({
       const list = await getAppsList(wsServer, udid, userId);
       setApps(list);
     } catch (err: any) {
-      setError(err?.message || 'Failed to fetch application list');
-      showToast(err?.message || 'Không thể tải danh sách ứng dụng', 'err');
+      const errMsg = err?.message || 'Failed to fetch application list';
+      setError(errMsg);
+      
+      const isAdbError = errMsg.toLowerCase().includes('not found') || 
+                         errMsg.toLowerCase().includes('offline') || 
+                         errMsg.toLowerCase().includes('device');
+      
+      if (!isAdbError) {
+        showToast(errMsg, 'err');
+      }
     } finally {
       setLoading(false);
     }
@@ -128,6 +142,7 @@ export function ViewerAppsMenu({
 
   // Hover handlers for Submenu 2
   const handleAppItemEnter = (app: AppInfo, event: React.MouseEvent<HTMLDivElement>) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
     if (submenu2HoverTimer.current) clearTimeout(submenu2HoverTimer.current);
     setHoveredApp(app);
 
@@ -138,12 +153,12 @@ export function ViewerAppsMenu({
 
     if (submenu1Rect) {
       // Determine if Submenu 2 should open to the left or right of Submenu 1
-      let left = submenu1Rect.right + 4;
+      let left = submenu1Rect.right - 4;
       let alignLeft = false;
 
       // If Submenu 1 opened to the left of the sidebar, or space on right is small, open Submenu 2 to the left
       if (left + submenuWidth > window.innerWidth) {
-        left = submenu1Rect.left - submenuWidth - 4;
+        left = submenu1Rect.left - submenuWidth + 4;
         alignLeft = true;
       }
 
@@ -168,24 +183,23 @@ export function ViewerAppsMenu({
       const menuEl = submenuRef.current;
       const menuWidth = 260; // Styled width
       
-      let x = rect.right + 4;
+      let x = rect.right - 4;
       if (x + menuWidth > window.innerWidth) {
-        x = rect.left - menuWidth - 4;
+        x = rect.left - menuWidth + 4;
       }
       
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      
+      let top = rect.top - 30;
+      top = Math.max(10, top);
+      const menuHeight = menuEl.offsetHeight || 300;
+      if (top + menuHeight > window.innerHeight - 10) {
+        top = window.innerHeight - menuHeight - 10;
+      }
+      top = Math.max(10, top);
+
       menuEl.style.left = `${x}px`;
-      if (spaceBelow < 300 && spaceAbove > spaceBelow) {
-        menuEl.style.top = 'auto';
-        menuEl.style.bottom = `${window.innerHeight - rect.bottom}px`;
-        menuEl.style.maxHeight = `${rect.bottom - 12}px`;
-      } else {
-        menuEl.style.bottom = 'auto';
-        menuEl.style.top = `${rect.top}px`;
-        menuEl.style.maxHeight = `${window.innerHeight - rect.top - 12}px`;
-      }
+      menuEl.style.bottom = 'auto';
+      menuEl.style.top = `${top}px`;
+      menuEl.style.maxHeight = `${window.innerHeight - top - 12}px`;
       
       menuEl.style.opacity = '1';
       menuEl.style.pointerEvents = 'auto';
@@ -231,6 +245,20 @@ export function ViewerAppsMenu({
     }
   };
 
+  const handleOpenApp = async (app: AppInfo) => {
+    const pkg = app.packageName;
+    setActionRunning(prev => ({ ...prev, [pkg]: 'Đang mở...' }));
+    try {
+      await openApp(wsServer, udid, userId, pkg);
+      showToast(`Đã mở ứng dụng ${app.displayName}`, 'ok');
+    } catch (err: any) {
+      showToast(err?.message || 'Không thể mở ứng dụng', 'err');
+    } finally {
+      setActionRunning(prev => ({ ...prev, [pkg]: false }));
+    }
+  };
+
+
   const handleClearCache = async (app: AppInfo) => {
     const pkg = app.packageName;
     setActionRunning(prev => ({ ...prev, [pkg]: 'Xóa cache...' }));
@@ -264,16 +292,27 @@ export function ViewerAppsMenu({
     }
   };
 
-  // Sort apps: Pinned apps go first, then alphabetically
-  const sortedApps = React.useMemo(() => {
-    return [...apps].sort((a, b) => {
+  // Filter and sort apps: Pinned apps go first, then alphabetically
+  const filteredAndSortedApps = React.useMemo(() => {
+    let result = [...apps];
+    if (hideSystem) {
+      result = result.filter(app => !app.isSystem);
+    }
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(app => 
+        app.displayName.toLowerCase().includes(query) || 
+        app.packageName.toLowerCase().includes(query)
+      );
+    }
+    return result.sort((a, b) => {
       const aPinned = pinnedPackages.has(a.packageName);
       const bPinned = pinnedPackages.has(b.packageName);
       if (aPinned && !bPinned) return -1;
       if (!aPinned && bPinned) return 1;
       return a.displayName.localeCompare(b.displayName, 'vi', { sensitivity: 'base' });
     });
-  }, [apps, pinnedPackages]);
+  }, [apps, pinnedPackages, hideSystem, searchQuery]);
 
   return (
     <div
@@ -281,6 +320,7 @@ export function ViewerAppsMenu({
       ref={rowRef}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onMouseMove={handleMouseEnter}
     >
       {/* 1. Sidebar trigger row */}
       <div className="vsp-section-title vsp-clickable">
@@ -298,8 +338,51 @@ export function ViewerAppsMenu({
           onMouseLeave={handleMouseLeave}
         >
           {/* Header */}
-          <div className="vsp-apps-submenu-header">
-            <span className="vsp-apps-submenu-title">Danh sách ứng dụng</span>
+          <div className="vsp-apps-submenu-header" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', background: 'transparent' }}>
+            {/* Search input bar on the left */}
+            <input
+              type="text"
+              placeholder="Tìm ứng dụng..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                height: '22px',
+                padding: '2px 6px',
+                fontSize: '11px',
+                background: 'rgba(255, 255, 255, 0.055)',
+                border: '1px solid var(--md-border)',
+                borderRadius: '4px',
+                color: 'var(--md-text)',
+                boxSizing: 'border-box',
+              }}
+              data-inspector-id="viewerAppsMenu.searchInput"
+              data-inspector-label="Tìm kiếm ứng dụng"
+              data-inspector-component="client/src/components/ViewerAppsMenu.tsx"
+            />
+
+            {/* Middle: Ẩn System text + toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <span style={{ fontSize: '11px', color: 'var(--md-text)', fontWeight: 500, whiteSpace: 'nowrap' }}>Ẩn System</span>
+              <button
+                type="button"
+                className={`dav-toggle-switch ${hideSystem ? 'on' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setHideSystem(!hideSystem);
+                }}
+                style={{ width: '28px', height: '14px', borderRadius: '7px' }}
+                data-inspector-id="viewerAppsMenu.hideSystemToggle"
+                data-inspector-label="Ẩn ứng dụng hệ thống toggle"
+                data-inspector-component="client/src/components/ViewerAppsMenu.tsx"
+              >
+                <div className="dav-toggle-knob" style={{ width: '10px', height: '10px', top: '1px', left: hideSystem ? '15px' : '1px' }} />
+              </button>
+            </div>
+
+            {/* Right: Refresh button */}
             <button
               className="vsp-apps-refresh-btn"
               disabled={loading}
@@ -307,9 +390,10 @@ export function ViewerAppsMenu({
                 e.stopPropagation();
                 fetchApps();
               }}
+              style={{ padding: '2px', flexShrink: 0 }}
               title="Tải lại danh sách"
             >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             </button>
           </div>
 
@@ -328,13 +412,13 @@ export function ViewerAppsMenu({
               </div>
             )}
 
-            {!loading && !error && sortedApps.length === 0 && (
+            {!loading && !error && filteredAndSortedApps.length === 0 && (
               <div className="vsp-apps-state">
                 <span>Không tìm thấy ứng dụng</span>
               </div>
             )}
 
-            {!loading && !error && sortedApps.map((app) => {
+            {!loading && !error && filteredAndSortedApps.map((app) => {
               const isPinned = pinnedPackages.has(app.packageName);
               const runningState = actionRunning[app.packageName];
               const isHovered = hoveredApp?.packageName === app.packageName;
@@ -343,8 +427,13 @@ export function ViewerAppsMenu({
                 <div
                   key={app.packageName}
                   className={`vsp-apps-list-item ${isHovered ? 'hovered' : ''}`}
+                  onClick={() => handleOpenApp(app)}
                   onMouseEnter={(e) => handleAppItemEnter(app, e)}
                   onMouseLeave={handleAppItemLeave}
+                  onMouseMove={(e) => handleAppItemEnter(app, e)}
+                  data-inspector-id="viewerAppsMenu.appItemRow"
+                  data-inspector-label={`Ứng dụng: ${app.displayName}`}
+                  data-inspector-component="client/src/components/ViewerAppsMenu.tsx"
                 >
                   {/* App Icon */}
                   {app.icon ? (

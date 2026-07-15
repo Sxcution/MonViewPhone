@@ -1016,3 +1016,17 @@ export async function uninstallApp(wsServer: string, udid: string, userId: numbe
   }
 }
 
+export async function openApp(wsServer: string, udid: string, userId: number, packageName: string): Promise<void> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/apps/open`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, userId, packageName }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Failed to open app (status ${res.status})`);
+  }
+}
+
+

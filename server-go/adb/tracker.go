@@ -79,11 +79,14 @@ func (t *Tracker) pollDevices() {
 			currentDevices[id] = device
 
 			t.mu.RLock()
-			_, exists := t.devices[id]
+			previous, exists := t.devices[id]
 			t.mu.RUnlock()
 
 			if !exists {
 				log.Printf("[ADB Tracker] Device connected: %s (Status: %s)", id, status)
+			}
+			if shouldRunMonSpaceV2Autostart(exists, previous, device) {
+				runMonSpaceV2Autostart(id)
 			}
 		}
 	}

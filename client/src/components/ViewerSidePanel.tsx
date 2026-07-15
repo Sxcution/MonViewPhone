@@ -441,6 +441,7 @@ export function ViewerSidePanel({
     };
   }, [onDragMove, onDragUp]);
 
+
   // ADB submenu on hover
   const [showAdbSubmenu, setShowAdbSubmenu] = useState(false);
   const [showProfileSubmenu, setShowProfileSubmenu] = useState(false);
@@ -450,6 +451,7 @@ export function ViewerSidePanel({
   const profileHoverTimer = useRef<number | null>(null);
   const connectionHoverTimer = useRef<number | null>(null);
   const gameHoverTimer = useRef<number | null>(null);
+
 
 
 
@@ -507,24 +509,23 @@ export function ViewerSidePanel({
       const rect = adbSectionRef.current.getBoundingClientRect();
       const menuEl = adbSubmenuMenuRef.current;
       const menuWidth = 220;
-      let x = rect.right + 4;
+      let x = rect.right - 4;
       if (x + menuWidth > window.innerWidth) {
-        x = rect.left - menuWidth - 4;
+        x = rect.left - menuWidth + 4;
       }
       
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      
+      let top = rect.top - 30;
+      top = Math.max(10, top);
+      const menuHeight = menuEl.offsetHeight || 150;
+      if (top + menuHeight > window.innerHeight - 10) {
+        top = window.innerHeight - menuHeight - 10;
+      }
+      top = Math.max(10, top);
+
       menuEl.style.left = `${x}px`;
-      if (spaceBelow < 250 && spaceAbove > spaceBelow) {
-        menuEl.style.top = 'auto';
-        menuEl.style.bottom = `${window.innerHeight - rect.bottom}px`;
-        menuEl.style.maxHeight = `${rect.bottom - 12}px`;
-      } else {
-        menuEl.style.bottom = 'auto';
-        menuEl.style.top = `${rect.top}px`;
-        menuEl.style.maxHeight = `${window.innerHeight - rect.top - 12}px`;
-      }
+      menuEl.style.bottom = 'auto';
+      menuEl.style.top = `${top}px`;
+      menuEl.style.maxHeight = `${window.innerHeight - top - 12}px`;
       menuEl.style.opacity = '1';
       menuEl.style.pointerEvents = 'auto';
     }
@@ -535,15 +536,23 @@ export function ViewerSidePanel({
       const rect = profileSectionRef.current.getBoundingClientRect();
       const menuEl = profileSubmenuMenuRef.current;
       const menuWidth = 190;
-      let x = rect.right + 4;
+      let x = rect.right - 4;
       if (x + menuWidth > window.innerWidth) {
-        x = rect.left - menuWidth - 4;
+        x = rect.left - menuWidth + 4;
       }
+
+      let top = rect.top - 30;
+      top = Math.max(10, top);
+      const menuHeight = menuEl.offsetHeight || 150;
+      if (top + menuHeight > window.innerHeight - 10) {
+        top = window.innerHeight - menuHeight - 10;
+      }
+      top = Math.max(10, top);
 
       menuEl.style.left = `${x}px`;
       menuEl.style.bottom = 'auto';
-      menuEl.style.top = `${rect.top}px`;
-      menuEl.style.maxHeight = `${window.innerHeight - rect.top - 12}px`;
+      menuEl.style.top = `${top}px`;
+      menuEl.style.maxHeight = `${window.innerHeight - top - 12}px`;
       menuEl.style.opacity = '1';
       menuEl.style.pointerEvents = 'auto';
     }
@@ -554,24 +563,23 @@ export function ViewerSidePanel({
       const rect = connectionSectionRef.current.getBoundingClientRect();
       const menuEl = connectionSubmenuMenuRef.current;
       const menuWidth = 220;
-      let x = rect.right + 4;
+      let x = rect.right - 4;
       if (x + menuWidth > window.innerWidth) {
-        x = rect.left - menuWidth - 4;
+        x = rect.left - menuWidth + 4;
       }
       
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      
+      let top = rect.top - 30;
+      top = Math.max(10, top);
+      const menuHeight = menuEl.offsetHeight || 150;
+      if (top + menuHeight > window.innerHeight - 10) {
+        top = window.innerHeight - menuHeight - 10;
+      }
+      top = Math.max(10, top);
+
       menuEl.style.left = `${x}px`;
-      if (spaceBelow < 250 && spaceAbove > spaceBelow) {
-        menuEl.style.top = 'auto';
-        menuEl.style.bottom = `${window.innerHeight - rect.bottom}px`;
-        menuEl.style.maxHeight = `${rect.bottom - 12}px`;
-      } else {
-        menuEl.style.bottom = 'auto';
-        menuEl.style.top = `${rect.top}px`;
-        menuEl.style.maxHeight = `${window.innerHeight - rect.top - 12}px`;
-      }
+      menuEl.style.bottom = 'auto';
+      menuEl.style.top = `${top}px`;
+      menuEl.style.maxHeight = `${window.innerHeight - top - 12}px`;
       menuEl.style.opacity = '1';
       menuEl.style.pointerEvents = 'auto';
     }
@@ -582,14 +590,23 @@ export function ViewerSidePanel({
       const rect = gameSectionRef.current.getBoundingClientRect();
       const menuEl = gameSubmenuMenuRef.current;
       const menuWidth = 180;
-      let x = rect.right + 4;
+      let x = rect.right - 4;
       if (x + menuWidth > window.innerWidth) {
-        x = rect.left - menuWidth - 4;
+        x = rect.left - menuWidth + 4;
       }
+
+      let top = rect.top - 30;
+      top = Math.max(10, top);
+      const menuHeight = menuEl.offsetHeight || 150;
+      if (top + menuHeight > window.innerHeight - 10) {
+        top = window.innerHeight - menuHeight - 10;
+      }
+      top = Math.max(10, top);
+
       menuEl.style.left = `${x}px`;
       menuEl.style.bottom = 'auto';
-      menuEl.style.top = `${rect.top}px`;
-      menuEl.style.maxHeight = `${window.innerHeight - rect.top - 12}px`;
+      menuEl.style.top = `${top}px`;
+      menuEl.style.maxHeight = `${window.innerHeight - top - 12}px`;
       menuEl.style.opacity = '1';
       menuEl.style.pointerEvents = 'auto';
     }
@@ -1299,7 +1316,7 @@ export function ViewerSidePanel({
             style={{
               color: '#fff', 
               fontWeight: 'bold',
-              fontSize: '14px',
+              fontSize: '17px',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
@@ -1381,25 +1398,14 @@ export function ViewerSidePanel({
             </div>
           )}
 
-          {/* 3. Cài APK */}
-          <div>
-            <div 
-              className="vsp-section-title vsp-clickable" 
-              onClick={() => {
-                console.log('[VSP] APK click, ref:', apkInputRef.current);
-                apkInputRef.current?.click();
-              }}
-              data-inspector-id="viewerSidePanel.apkButton"
-              data-inspector-label="Upload and install APK button"
-              data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-            >
-              <Package size={15} /><span>{t('Cài đặt APK')}</span>
-            </div>
-            <input ref={apkInputRef} type="file" accept=".apk,.xapk,.zip" multiple
-              style={{ position: 'absolute', width: 0, height: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }}
-              onChange={handleApkSelect} />
-            {apkStatus && <div className="vsp-status" style={{ marginTop: '4px' }}>{apkStatus}</div>}
-          </div>
+          {/* DS ứng dụng */}
+          <ViewerAppsMenu
+            wsServer={wsServer}
+            udid={udid}
+            userId={selectedProfile}
+            profileName={profiles.find(p => p.id === selectedProfile)?.name || `User ${selectedProfile}`}
+            showToast={showToast}
+          />
 
           {/* 4. Nhập tệp */}
           <div>
@@ -1455,14 +1461,25 @@ export function ViewerSidePanel({
             )}
           </div>
 
-          {/* DS ứng dụng */}
-          <ViewerAppsMenu
-            wsServer={wsServer}
-            udid={udid}
-            userId={selectedProfile}
-            profileName={profiles.find(p => p.id === selectedProfile)?.name || `User ${selectedProfile}`}
-            showToast={showToast}
-          />
+          {/* 3. Cài APK */}
+          <div>
+            <div 
+              className="vsp-section-title vsp-clickable" 
+              onClick={() => {
+                console.log('[VSP] APK click, ref:', apkInputRef.current);
+                apkInputRef.current?.click();
+              }}
+              data-inspector-id="viewerSidePanel.apkButton"
+              data-inspector-label="Upload and install APK button"
+              data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+            >
+              <Package size={15} /><span>{t('Cài đặt APK')}</span>
+            </div>
+            <input ref={apkInputRef} type="file" accept=".apk,.xapk,.zip" multiple
+              style={{ position: 'absolute', width: 0, height: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }}
+              onChange={handleApkSelect} />
+            {apkStatus && <div className="vsp-status" style={{ marginTop: '4px' }}>{apkStatus}</div>}
+          </div>
 
           {/* DS Profile */}
           <div
@@ -1470,6 +1487,7 @@ export function ViewerSidePanel({
             ref={profileSectionRef}
             onMouseEnter={handleProfileEnter}
             onMouseLeave={handleProfileLeave}
+            onMouseMove={handleProfileEnter}
             data-inspector-id="viewerSidePanel.profileActions"
             data-inspector-label="Profile management sidebar row"
             data-inspector-component="client/src/components/ViewerSidePanel.tsx"
@@ -1508,8 +1526,8 @@ export function ViewerSidePanel({
                 </button>
                 <button
                   type="button"
-                  className={`vsp-adb-submenu-item vsp-cmd-warn${selectedProfile <= 0 ? ' disabled' : ''}`}
-                  aria-disabled={selectedProfile <= 0}
+                  className="vsp-adb-submenu-item vsp-cmd-warn"
+                  style={{ color: '#ef4444' }}
                   onPointerDown={handleDeleteProfilePointerDown}
                   data-inspector-id="viewerSidePanel.deleteProfileButton"
                   data-inspector-label="Delete selected Android profile"
@@ -1530,6 +1548,7 @@ export function ViewerSidePanel({
             ref={adbSectionRef}
             onMouseEnter={handleAdbEnter}
             onMouseLeave={handleAdbLeave}
+            onMouseMove={handleAdbEnter}
             data-inspector-id="viewerSidePanel.adbButton"
             data-inspector-label="Run ADB Shell command sidebar row"
             data-inspector-component="client/src/components/ViewerSidePanel.tsx"
@@ -1572,6 +1591,7 @@ export function ViewerSidePanel({
             ref={connectionSectionRef}
             onMouseEnter={handleConnectionEnter}
             onMouseLeave={handleConnectionLeave}
+            onMouseMove={handleConnectionEnter}
             data-inspector-id="viewerSidePanel.connectionSwitch"
             data-inspector-label="Device stream connection mode switch"
             data-inspector-component="client/src/components/ViewerSidePanel.tsx"
@@ -1657,6 +1677,7 @@ export function ViewerSidePanel({
             ref={gameSectionRef}
             onMouseEnter={handleGameEnter}
             onMouseLeave={handleGameLeave}
+            onMouseMove={handleGameEnter}
             data-inspector-id="gameKeyboard.settingRow"
             data-inspector-label="Game Setting sidebar row"
             data-inspector-component="client/src/components/ViewerSidePanel.tsx"

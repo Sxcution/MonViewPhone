@@ -281,6 +281,73 @@ func handleAppsForceStop(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, jsonResponse{"success": true, "output": strings.TrimSpace(out)})
 }
 
+func handleAppsOpen(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
+		return
+	}
+
+	var req appActionRequest
+	if err := readJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid JSON"})
+		return
+	}
+
+	udid := strings.TrimSpace(req.UDID)
+	packageName := strings.TrimSpace(req.PackageName)
+	if udid == "" || packageName == "" || req.UserID < 0 {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid request fields"})
+		return
+	}
+
+	if !validatePackageName(packageName) {
+		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid packageName syntax"})
+		return
+	}
+
+	// Try to resolve launch activity name using cmd package resolve-activity
+	resolveCmd := fmt.Sprintf("cmd package resolve-activity --brief --user %d %s", req.UserID, packageName)
+	resolveOut, resolveErr := adb.Shell(udid, resolveCmd)
+
+	var launchActivity string
+	if resolveErr == nil {
+		lines := strings.Split(resolveOut, "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, "/") && !strings.Contains(strings.ToLower(line), "no activity found") {
+				launchActivity = line
+				break
+			}
+		}
+	}
+
+	var out string
+	var err error
+
+	if launchActivity != "" {
+		// Launch using am start
+		startCmd := fmt.Sprintf("am start --user %d -n %s", req.UserID, launchActivity)
+		out, err = adb.Shell(udid, startCmd)
+	} else {
+		// Fallback to monkey command
+		var monkeyCmd string
+		if req.UserID == 0 {
+			monkeyCmd = fmt.Sprintf("monkey -p %s -c android.intent.category.LAUNCHER 1", packageName)
+		} else {
+			monkeyCmd = fmt.Sprintf("monkey -p %s --user %d -c android.intent.category.LAUNCHER 1", packageName, req.UserID)
+		}
+		out, err = adb.Shell(udid, monkeyCmd)
+	}
+
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": fmt.Sprintf("Failed to open app: %v, output: %s", err, out)})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, jsonResponse{"success": true, "output": strings.TrimSpace(out)})
+}
+
+
 func handleAppsClearCache(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})

@@ -307,6 +307,9 @@ func main() {
 			case "/api/goog/device/apps/force-stop":
 				handleAppsForceStop(w, r)
 				return
+			case "/api/goog/device/apps/open":
+				handleAppsOpen(w, r)
+				return
 			case "/api/goog/device/apps/clear-cache":
 				handleAppsClearCache(w, r)
 				return
