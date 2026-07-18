@@ -1,4 +1,8 @@
-  # Work Log / Nhật ký làm việc
+# Work Log / Nhật ký làm việc
+
+## 2026-07-16
+
+- **06:55**: Nghiên cứu sự cố mất config local của người dùng khi tắt/mở lại MonViewPhone. Phát hiện nguyên nhân do sự khác biệt về Chrome profile (mặc định vs ChromeAppProfile) và origin (http://localhost:11000 vs http://127.0.0.1:5173) khi chạy các launcher khác nhau (run.pyw vs rundev.pyw). Đã hướng dẫn người dùng chạy run.pyw để kích hoạt cơ chế đồng bộ hai chiều từ profile cũ lên server-go/settings.json.
 
 ## 2026-07-15
 
@@ -117,4 +121,20 @@
 - **21:28**: Theo yêu cầu của người dùng, tải về và cài đặt Apktool phiên bản mới nhất v3.0.2 tại thư mục `C:\Users\Mon\Desktop\Protect\Tool\apktool_3.0.2.jar`. Giữ nguyên phiên bản cũ `apktool_2.12.0.jar` để dự phòng tính tương thích ngược.
 - **04:05**: Khắc phục lỗi hiển thị thông báo toast khi thiết bị chưa kết nối hoặc mất kết nối ADB (lỗi 'device not found' / 'device offline'). Trong `ViewerAppsMenu.tsx` ở hàm `fetchApps`, nếu lỗi trả về chứa các từ khóa 'not found', 'offline', 'device', ứng dụng sẽ bỏ qua việc hiển thị thông báo toast lỗi để tránh làm phiền người dùng lúc thiết bị chưa sẵn sàng kết nối. Build frontend thành công.
 
+## Ngày 18/07/2026
 
+- Yêu cầu: kiểm tra read-only vì đổi trạng thái tài khoản trong MonViewPhone không làm Nova vẽ lại badge/icon WeChat.
+- Nguyên nhân: `DeviceAccountOverlay.tsx` và `Tile.tsx` vẫn có `onSyncNovaWechat`, nhưng `App.tsx` bị thiếu phần callback thực tế (`syncNovaWechatForDevices`, URI provider Nova, builder lệnh sync), nên đổi trạng thái chỉ cập nhật data mà không đẩy snapshot xuống phone.
+- Fix: khôi phục logic sync Nova trong `client/src/App.tsx`, nối callback xuống `Tile` và `DeviceAccountOverlay`; sync chỉ chạy khi được gọi bởi đổi trạng thái/tác vụ liên quan hoặc nút `Sync Nova`, không có vòng auto-sync theo `vault`.
+- Build client thành công với `npm run build`.
+- Kiểm tra `R58N22VK5RL`: crash buffer có `com.genymobile.scrcpy.CleanUp` `SIGABRT` kèm `ClassNotFoundException`, nhưng `ps` không còn tiến trình cleanup live.
+- Trace stream backend cho `R58N22VK5RL` có một lần `scrcpy server exited prematurely` rồi retry thành công; sau đó nhận video packets bình thường, không thấy lỗi framework thiếu file.
+- Profile stream của `R58N22VK5RL` đang nặng hơn các máy khác (`maxSize=1000`, `maxFps=60`, `videoBitRate=8388608`), nên lag nghiêng về cấu hình stream/backend hơn là `services.jar`.
+
+## Ngày 19/07/2026
+
+- Yêu cầu: phân biệt lỗi WhatsApp không nhận click/nhập trong MonViewPhone trên `R58N22VK5RL`; không patch tiếp `services.jar` khi chưa có bằng chứng.
+- Kết quả test: video/capture hoạt động; `adb shell input tap` và đường control SDK của MonViewPhone không mở được màn WhatsApp registration.
+- Test quyết định: official `scrcpy 3.3.4` với `--mouse=uhid --keyboard=uhid` cho phép người dùng click và nhập số điện thoại được, nên lỗi nằm ở kiểu input SDK/MonViewPhone control, không phải ROM/`FLAG_SECURE`.
+- Đã thử candidate backend `inputMode=uhid` bằng HID touchscreen và HID mouse, nhưng chưa pass absolute click từ browser; đã gỡ candidate khỏi source để không để lại nhánh fail.
+- Giữ công cụ test official tại `tools/scrcpy-v3.3.4`; log/UI dump lưu trong `logs/`. Hướng fix đúng nếu tích hợp vào MonViewPhone là làm chế độ UHID pointer-lock/relative mouse giống scrcpy, hoặc dùng official scrcpy UHID làm đường tạm.

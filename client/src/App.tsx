@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, startTransiti
 import { createPortal } from 'react-dom'
 import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
 import { saveHotkeySettingToBackend, saveBackendSetting } from '@/lib/backendSettings'
-import { loadDeviceAccountVault, getDeviceAccountDataFromVault, getDeviceAccountData, saveDeviceAccountData, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
-import { hasNearbyRelevantAccount, getNearestNearbyHours, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby'
+import { loadDeviceAccountVault, getDeviceAccountDataFromVault, getDeviceAccountData, saveDeviceAccountData, type Account, type DeviceAccountData, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
+import { getNearbyAccountState, hasNearbyRelevantAccount, getNearestNearbyHours, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby'
 import { readPageParams } from '@/lib/params'
 import { useServer } from '@/context/ServerContext'
 import { Tile } from '@/components/Tile'
@@ -136,8 +136,83 @@ const VIEWER_STREAM_CONFIG_KEY = 'viewerStreamConfig'
 const SAVED_GROUPS_BACKUP_KEY = 'savedGroupsBackupV1'
 const SAVED_GROUPS_DELETED_ALL_KEY = 'savedGroupsDeletedAllV1'
 const PREFERRED_CONNECTION_BY_UDID_KEY = 'monviewphone:preferred-connection-by-udid'
+const WECHAT_NEW_ACCOUNT_MS = 90 * 24 * 60 * 60 * 1000
+const NOVA_LAUNCHER_PACKAGE = 'com.teslacoilsw.launcher'
+const NOVA_WECHAT_STATUS_URI = 'content://com.teslacoilsw.launcher.wechatstatus/status'
+const WECHAT_PACKAGE = 'com.tencent.mm'
 
 type SavedDeviceGroup = { name: string; udids: string[]; selectedAccounts?: Record<string, string> }
+type NovaWechatStatusEntry = {
+  userId: number
+  packageName: string
+  status: string
+  nearby: boolean
+  priority: number
+}
+
+function shellQuote(value: string): string {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`
+}
+
+function getNovaWechatStatus(account: Account, now = Date.now()): string {
+  if (account.status === 'Die' || account.status === 'Risk') return account.status
+  const createdAt = typeof account.createdAt === 'number' ? account.createdAt : null
+  if (account.isNew || (createdAt && now - createdAt < WECHAT_NEW_ACCOUNT_MS)) return 'New'
+  return account.status || 'Live'
+}
+
+function getNovaWechatPriority(status: string, nearby: boolean): number {
+  if (status === 'Die') return 4
+  if (status === 'Risk') return 3
+  if (status === 'New') return 2
+  if (nearby) return 1
+  return 0
+}
+
+function buildNovaWechatStatusEntries(data: DeviceAccountData, now = Date.now()): NovaWechatStatusEntry[] {
+  const byIcon = new Map<string, NovaWechatStatusEntry>()
+  for (const account of data.platforms.wechat || []) {
+    const profile = account.wechatLaunchProfile
+    if (!profile || typeof profile.userId !== 'number') continue
+    const packageName = profile.packageName || WECHAT_PACKAGE
+    const status = getNovaWechatStatus(account, now)
+    const nearby = getNearbyAccountState(account, now) === 'eligible'
+    const entry = {
+      userId: profile.userId,
+      packageName,
+      status,
+      nearby,
+      priority: getNovaWechatPriority(status, nearby),
+    }
+    const key = `${entry.userId}:${entry.packageName}`
+    const current = byIcon.get(key)
+    if (!current || entry.priority >= current.priority) byIcon.set(key, entry)
+  }
+  return Array.from(byIcon.values()).sort((a, b) => a.userId - b.userId || a.packageName.localeCompare(b.packageName))
+}
+
+function novaWechatFingerprint(entries: NovaWechatStatusEntry[]): string {
+  return JSON.stringify(entries.map(({ userId, packageName, status, nearby }) => ({ userId, packageName, status, nearby })))
+}
+
+function buildNovaWechatSyncCommand(entries: NovaWechatStatusEntry[]): string {
+  const lines = [
+    `if ! cmd package path ${NOVA_LAUNCHER_PACKAGE} >/dev/null 2>&1; then echo NOVA_MISSING; exit 0; fi`,
+    `content delete --uri ${shellQuote(NOVA_WECHAT_STATUS_URI)}`,
+    ...entries.map(entry =>
+      [
+        `content insert --uri ${shellQuote(NOVA_WECHAT_STATUS_URI)}`,
+        `--bind userId:i:${entry.userId}`,
+        `--bind packageName:s:${shellQuote(entry.packageName)}`,
+        `--bind status:s:${shellQuote(entry.status)}`,
+        `--bind nearby:b:${entry.nearby ? 'true' : 'false'}`,
+      ].join(' ')
+    ),
+    `am force-stop ${NOVA_LAUNCHER_PACKAGE}`,
+    'input keyevent HOME',
+  ]
+  return lines.join('\n')
+}
 
 function normalizeEncoderConfig(cfg: StreamConfig): StreamConfig {
   const rawMode = cfg.encoderMode
@@ -2076,6 +2151,44 @@ export function App() {
   }, [deviceParam, gridDevices, allKnownDevices, endpointLogicalByUdid])
 
   const connectedUdids = useMemo(() => new Set(gridDevices), [gridDevices])
+  const novaWechatSyncedRef = useRef<Map<string, string>>(new Map())
+  const novaWechatPendingRef = useRef<Map<string, string>>(new Map())
+
+  const syncNovaWechatForDevices = useCallback(async (
+    targetUdids: string[],
+    dataByUdid?: Record<string, DeviceAccountData>,
+    force = false
+  ) => {
+    const uniqueUdids = Array.from(new Set(targetUdids.filter(Boolean)))
+    for (const udid of uniqueUdids) {
+      if (!connectedUdids.has(udid)) continue
+      const deviceData = dataByUdid?.[udid] || vault.devices?.[udid]
+      if (!deviceData) continue
+
+      const entries = buildNovaWechatStatusEntries(deviceData)
+      if (!entries.length && !force) continue
+      const fingerprint = novaWechatFingerprint(entries)
+      if (!force && novaWechatSyncedRef.current.get(udid) === fingerprint) continue
+      if (novaWechatPendingRef.current.get(udid) === fingerprint) continue
+
+      novaWechatPendingRef.current.set(udid, fingerprint)
+      try {
+        const res = await runAdbCommandApi(wsServer, udid, buildNovaWechatSyncCommand(entries), 'shell')
+        if (res.success) {
+          novaWechatSyncedRef.current.set(udid, fingerprint)
+        } else {
+          console.warn('[nova-wechat-sync] failed', { udid, output: res.output })
+        }
+      } catch (err) {
+        console.warn('[nova-wechat-sync] failed', udid, err)
+      } finally {
+        if (novaWechatPendingRef.current.get(udid) === fingerprint) {
+          novaWechatPendingRef.current.delete(udid)
+        }
+      }
+    }
+  }, [connectedUdids, vault, wsServer])
+
   const filteredGridDevices = useMemo(() => {
     let list = gridDevices
     if (deviceFilter !== 'all') {
@@ -3916,6 +4029,7 @@ export function App() {
                       activeFilter={davActiveFilter}
                       highlightFilterMatched={tileHighlightsMap.get(udid) ?? false}
                       onOpenDeviceViewer={openDeviceViewerFromAccountOverlay}
+                      onSyncNovaWechat={syncNovaWechatForDevices}
                     />
                   </div>
                 );
@@ -6976,6 +7090,7 @@ export function App() {
           onOpenDeviceViewer={openDeviceViewerFromAccountOverlay}
           connectSelection={connectSelection}
           setConnectSelection={setConnectSelection}
+          onSyncNovaWechat={syncNovaWechatForDevices}
           onDeviceContextMenu={(e, udid, groupIdx) => {
             e.preventDefault()
             e.stopPropagation()

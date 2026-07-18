@@ -1,0 +1,6 @@
+total 17
+drwxrwx--x 3 shell shell 3488 2026-07-19 00:09 .
+drwxr-x--x 5 root  root  3488 2026-07-16 04:15 ..
+drwxrwxrwx 3 shell shell 3488 2026-07-16 04:47 dalvik-cache
+-rw-rw-rw- 1 shell shell 3605 2026-07-12 13:51 monview-app-management.jar
+-rw-rw-rw- 1 shell shell 2968 2026-06-10 12:20 monview-display-power.jar
