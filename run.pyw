@@ -16,7 +16,7 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_URL = "http://localhost:11000/"
 BACKEND_PORT = 11000
 STREAM_NODE_PORT = 11080
-STREAM_NODE_BUILD_ID = "tango-v2-taskset-ff-1"
+STREAM_NODE_BUILD_ID = "tango-v2-uhid-control-1"
 APP_MUTEX_NAME = r"Local\MonViewPhoneV2_SingleInstance"
 
 instance_mutex = None
@@ -233,7 +233,6 @@ def start_stream_node():
     stream_node_log_file.flush()
     log_launcher(f"Starting stream-node build {STREAM_NODE_BUILD_ID}: node {dist_index}")
     env = os.environ.copy()
-    env.setdefault("MONVIEW_STREAM_START_CONCURRENCY", "5")  # Cho phép 5 scrcpy session start đồng thời (mặc định 2 quá chậm cho 15+ devices)
     stream_node_process = subprocess.Popen(["node", dist_index], cwd=stream_dir, env=env, stdout=stream_node_log_file, stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW)
 
 

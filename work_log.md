@@ -1,5 +1,13 @@
 # Work Log / Nhật ký làm việc
 
+## Ngày 26/07/2026
+
+- Yêu cầu: rà lại kết luận Gemini về stream chậm trên Note 9 A13 và gỡ workaround MonViewPhone không đúng root cause.
+- Root cause thuộc ROM: `framework.jar` N15 không khớp `boot-framework.oat/vdex/art`; ART báo `ValidateOatFile ... checksum mismatch` rồi chạy lại `dex2oat` khoảng `6-8s` cho mỗi `app_process`.
+- Bằng chứng cpuset bác bỏ workaround: ADB shell và scrcpy `app_process` trên `27f30c41a3217ece` đều ở cpuset `/`, `Cpus_allowed_list: 0-7`; `dex2oat` cũng chạy `-j8 --cpu-set=0..7`.
+- Hoàn tác có chọn lọc `taskset ff` trong stream-node dependency và ba Go helper; trả queue khởi động về batch `3`, delay `1200ms`, bỏ ép concurrency `5`. Không revert UHID hay sửa `setScreenPowerMode`.
+- Build ID đổi từ `tango-v2-taskset-ff-1` thành `tango-v2-uhid-control-1`.
+
 ## 2026-07-25
 
 - **18:25**: Phân tích bottleneck stream chậm khi 15+ devices kết nối. Phát hiện pipeline 3 tầng hàng đợi: frontend batch=3/1.2s, stream-node MAX_START_CONCURRENCY=2, server-go semaphore=12. Bottleneck chính: stream-node chỉ cho 2 scrcpy session start đồng thời → 16 device chờ ~40 giây.

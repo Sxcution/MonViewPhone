@@ -115,7 +115,7 @@ func handleAppsList(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Run the helper via app_process
 	cmd := fmt.Sprintf(
-		"CLASSPATH=%s taskset ff app_process / com.monviewphone.appmanagement.AppManagerHelper %d",
+		"CLASSPATH=%s app_process / com.monviewphone.appmanagement.AppManagerHelper %d",
 		shellQuote(remoteJar),
 		req.UserID,
 	)
