@@ -260,7 +260,7 @@ func startServerUnlocked(udid string) error {
 	}
 
 	// Start server via app_process
-	runCmd := "CLASSPATH=" + TempPath + FileName + " nohup app_process " + ArgsString + " >" + LogFilePath + " 2>&1 &"
+	runCmd := "CLASSPATH=" + TempPath + FileName + " nohup taskset ff app_process " + ArgsString + " >" + LogFilePath + " 2>&1 &"
 	log.Printf("[%s] Starting scrcpy server: %s", udid, runCmd)
 	_, err := adb.Shell(udid, runCmd)
 	if err != nil {

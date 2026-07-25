@@ -135,7 +135,7 @@ func runDisplayPowerHelper(udid string, mode string, displayIndex int, forcePush
 	}
 
 	cmd := fmt.Sprintf(
-		"CLASSPATH=%s app_process / com.monviewphone.displaypower.DisplayPower %s %d",
+		"CLASSPATH=%s taskset ff app_process / com.monviewphone.displaypower.DisplayPower %s %d",
 		shellQuote(remoteJar),
 		shellQuote(mode),
 		displayIndex,

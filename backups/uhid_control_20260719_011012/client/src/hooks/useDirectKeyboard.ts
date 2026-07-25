@@ -1,11 +1,9 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { encodeKeycodeMessage, encodeTextMessage, encodeSetClipboardMessage, encodeUhidKeyboardMessage, KeyEventAction, UhidKeyboardAction } from '@/lib/control';
+import { encodeKeycodeMessage, encodeTextMessage, encodeSetClipboardMessage, KeyEventAction } from '@/lib/control';
 import { AndroidKeycode, KeyToCodeMap } from '@/lib/keyEvent';
 import { useActive } from '@/context/ActiveContext';
 import { matchesHotkey } from '@/lib/syncTimeSettings';
 import { emitAutomationKey, emitAutomationText } from '@/lib/automation';
-import { CONTROL_MODE_EVENT } from '@/lib/controlMode';
-import { hidUsageFromCode } from '@/lib/uhidKeyboard';
 
 type GlobalWithToggle = typeof window & { __disableDirectKeyboard?: boolean };
 const PASTE_SINK_ID = '__scrcpy_paste_sink';
@@ -72,13 +70,12 @@ function getOrCreateHiddenPasteTarget(): HTMLTextAreaElement {
 }
 
 export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLElement | null) {
-  const { sendToActive, activeUdid, getActiveControlMode } = useActive();
+  const { sendToActive, activeUdid } = useActive();
 
   // buffer text (optional quick input)
   const kbBufRef = useRef('');
   const flushTimerRef = useRef<number | null>(null);
   const repeatCounterRef = useRef<Map<number, number>>(new Map());
-  const pressedUhidUsagesRef = useRef<Set<number>>(new Set());
 
   function flushText() {
     const buf = kbBufRef.current;
@@ -96,12 +93,6 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
     if (flushTimerRef.current != null) return;
     flushTimerRef.current = window.setTimeout(flushText, 35);
   }
-
-  const releaseUhidKeyboard = useCallback(() => {
-    if (!pressedUhidUsagesRef.current.size) return;
-    pressedUhidUsagesRef.current.clear();
-    sendToActive(encodeUhidKeyboardMessage(UhidKeyboardAction.RESET));
-  }, [sendToActive]);
 
   // Paste thủ công qua navigator.clipboard.readText (dùng cho nút bấm)
   const manualPaste = useCallback(async () => {
@@ -184,20 +175,6 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
 
       // Allow typing into the on-screen input/textarea
       if (allowedContainer && e.target instanceof Node && allowedContainer.contains(e.target)) {
-        return;
-      }
-
-      const activeMode = getActiveControlMode();
-      if (activeMode.keyboardMode === 'uhid') {
-        if (e.code === 'Escape' && document.pointerLockElement) return;
-        const usage = hidUsageFromCode(e.code);
-        if (usage == null) return;
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation?.();
-        if (e.repeat || pressedUhidUsagesRef.current.has(usage)) return;
-        pressedUhidUsagesRef.current.add(usage);
-        sendToActive(encodeUhidKeyboardMessage(UhidKeyboardAction.DOWN, usage));
         return;
       }
 
@@ -287,19 +264,6 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
         return;
       }
 
-      const activeMode = getActiveControlMode();
-      if (activeMode.keyboardMode === 'uhid') {
-        if (e.code === 'Escape' && document.pointerLockElement) return;
-        const usage = hidUsageFromCode(e.code);
-        if (usage == null) return;
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation?.();
-        pressedUhidUsagesRef.current.delete(usage);
-        sendToActive(encodeUhidKeyboardMessage(UhidKeyboardAction.UP, usage));
-        return;
-      }
-
       if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyA' || e.code === 'KeyD')) return;
       const isCopyPaste = (e.ctrlKey || e.metaKey) && (e.code === 'KeyC' || e.code === 'KeyV' || e.code === 'KeyX');
       if (isCopyPaste) return;
@@ -339,9 +303,6 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
 
     window.addEventListener('keydown', onKeyDown, { capture: true, passive: false });
     window.addEventListener('keyup', onKeyUp, { capture: true, passive: false });
-    window.addEventListener('blur', releaseUhidKeyboard);
-    window.addEventListener(CONTROL_MODE_EVENT, releaseUhidKeyboard);
-    document.addEventListener('pointerlockchange', releaseUhidKeyboard);
 
     // Paste handler: bắt event paste từ hidden textarea hoặc bất kỳ đâu
     const onPaste = (e: ClipboardEvent) => {
@@ -368,12 +329,9 @@ export function useDirectKeyboard(enabled: boolean, allowedContainer?: HTMLEleme
     return () => {
       window.removeEventListener('keydown', onKeyDown, { capture: true } as any);
       window.removeEventListener('keyup', onKeyUp, { capture: true } as any);
-      window.removeEventListener('blur', releaseUhidKeyboard);
-      window.removeEventListener(CONTROL_MODE_EVENT, releaseUhidKeyboard);
-      document.removeEventListener('pointerlockchange', releaseUhidKeyboard);
       window.removeEventListener('paste', onPaste, { capture: true } as any);
     };
-  }, [enabled, allowedContainer, activeUdid, sendToActive, getActiveControlMode, releaseUhidKeyboard]);
+  }, [enabled, allowedContainer, activeUdid, sendToActive]);
 
   return { queueText, flushText, manualPaste };
 }

@@ -3,7 +3,6 @@ import { useActive } from '@/context/ActiveContext';
 import type { StreamConfig } from '@/lib/config';
 import { useI18n } from '@/context/I18nContext';
 import { useServer } from '@/context/ServerContext';
-import { SDK_CONTROL_MODE } from '@/lib/controlMode';
 
 import type { StreamReloadOptions, TileProps } from './types';
 import { TileHeader } from './TileHeader';
@@ -25,7 +24,6 @@ function TileComponent({
     connectionMode = 'unknown',
     wsServer,
     streamConfig,
-    controlMode = SDK_CONTROL_MODE,
     order,
     isViewing = false,
     selected = false,
@@ -195,13 +193,10 @@ function TileComponent({
     // Register this tile into ActiveContext so other tiles can broadcast inputs to it.
     const getWs = useMemo(() => () => wsRef.current, []);
     const getCanvas = useMemo(() => () => canvasRef.current, []);
-    const controlModeRef = useRef(controlMode);
-    controlModeRef.current = controlMode;
-    const getControlMode = useMemo(() => () => controlModeRef.current, []);
     useEffect(() => {
-        registerDevice({ udid, getWs, getCanvas, getControlMode });
+        registerDevice({ udid, getWs, getCanvas });
         return () => unregisterDevice(udid);
-    }, [udid, getWs, getCanvas, getControlMode, registerDevice, unregisterDevice]);
+    }, [udid, getWs, getCanvas, registerDevice, unregisterDevice]);
 
     // ===== Streaming pipeline (WS + workers + canvas fit + touch controls) =====
     const { streamStats } = useTileStream({

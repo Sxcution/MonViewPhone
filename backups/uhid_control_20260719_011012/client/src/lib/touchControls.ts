@@ -1,4 +1,4 @@
-import { clamp, encodeKeycodeMessage, encodeScrollMessage, encodeTouchMessage, encodeUhidTouchMessage, KeyEventAction, MotionAction } from './control';
+import { clamp, encodeKeycodeMessage, encodeScrollMessage, encodeTouchMessage, KeyEventAction, MotionAction } from './control';
 import type { InputTarget } from '@/context/ActiveContext';
 import { AndroidKeycode } from './keyEvent';
 import { emitAutomationClick, emitAutomationSwipe } from './automation';
@@ -264,10 +264,7 @@ export function attachTouchControls(
     if (!isOpenTarget(tt.target)) return;
     const { x, y, w, h } = mapNormToDeviceXYWithOffset(tt.target.canvas, x01, y01, tt.dxPx, tt.dyPx);
     try {
-      const msg = tt.target.controlMode.mouseMode === 'uhid'
-        ? encodeUhidTouchMessage(action, pid, x, y, w, h, pressure)
-        : encodeTouchMessage(action, pid, x, y, w, h, pressure, buttons);
-      tt.target.ws.send(msg);
+      tt.target.ws.send(encodeTouchMessage(action, pid, x, y, w, h, pressure, buttons));
     } catch {
       // ignore
     }
@@ -367,7 +364,6 @@ export function attachTouchControls(
   function onPointerDown(e: PointerEvent) {
     // Chặn luồng thao tác và nhường lại quyền cho hệ thống Chọn (App.tsx => onClick) nếu đè Ctrl
     if (e.ctrlKey || e.metaKey) return;
-
     if (e.button === 1 || (e.buttons & 4) === 4) return;
 
     if (!canSend()) return;

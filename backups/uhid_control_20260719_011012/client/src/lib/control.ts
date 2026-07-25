@@ -6,8 +6,6 @@ export enum ControlMessageType {
   GET_CLIPBOARD = 8,
   SET_CLIPBOARD = 9,
   SET_SCREEN_POWER_MODE = 10,
-  UHID_KEYBOARD = 17,
-  UHID_TOUCH = 18,
 }
 
 export enum MotionAction {
@@ -24,12 +22,6 @@ export enum KeyEventAction {
 export enum ScreenPowerMode {
   OFF = 0,
   NORMAL = 2,
-}
-
-export enum UhidKeyboardAction {
-  DOWN = 0,
-  UP = 1,
-  RESET = 2,
 }
 
 export function clamp(n: number, min: number, max: number): number {
@@ -153,45 +145,4 @@ export function encodeSetClipboardMessage(text: string, paste: boolean = false):
   dv.setUint32(2, bytes.length, false); // big endian
   u8.set(bytes, 6);
   return u8;
-}
-
-export function encodeUhidKeyboardMessage(action: UhidKeyboardAction, usage = 0): Uint8Array {
-  const u8 = new Uint8Array(3);
-  u8[0] = ControlMessageType.UHID_KEYBOARD;
-  u8[1] = action & 0xff;
-  u8[2] = usage & 0xff;
-  return u8;
-}
-
-export function encodeUhidTouchMessage(
-  action: MotionAction,
-  pointerId: number,
-  x: number,
-  y: number,
-  screenW: number,
-  screenH: number,
-  pressure01: number | undefined,
-): Uint8Array {
-  const buf = new ArrayBuffer(24);
-  const dv = new DataView(buf);
-  let o = 0;
-  const p = clamp(pressure01 ?? 1, 0, 1);
-  const pressureU16 = Math.round(p * 0xffff) & 0xffff;
-
-  dv.setUint8(o++, ControlMessageType.UHID_TOUCH);
-  dv.setUint8(o++, action & 0xff);
-  dv.setUint32(o, 0, false);
-  o += 4;
-  dv.setUint32(o, pointerId >>> 0, false);
-  o += 4;
-  dv.setUint32(o, x >>> 0, false);
-  o += 4;
-  dv.setUint32(o, y >>> 0, false);
-  o += 4;
-  dv.setUint16(o, screenW & 0xffff, false);
-  o += 2;
-  dv.setUint16(o, screenH & 0xffff, false);
-  o += 2;
-  dv.setUint16(o, pressureU16, false);
-  return new Uint8Array(buf);
 }

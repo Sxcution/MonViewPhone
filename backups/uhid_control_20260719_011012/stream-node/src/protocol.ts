@@ -17,8 +17,6 @@ export const enum ClientControlType {
   Scroll = 3,
   SetClipboard = 9,
   SetScreenPowerMode = 10,
-  UhidKeyboard = 17,
-  UhidTouch = 18,
 }
 
 export type ServerHello = {
@@ -45,9 +43,7 @@ export type ParsedControlMessage =
   | { kind: 'touch'; action: number; pointerId: bigint; x: number; y: number; width: number; height: number; pressure: number; buttons: number }
   | { kind: 'scroll'; x: number; y: number; width: number; height: number; scrollX: number; scrollY: number; buttons: number }
   | { kind: 'clipboard'; text: string; paste: boolean }
-  | { kind: 'screenPower'; mode: number }
-  | { kind: 'uhidKeyboard'; action: number; usage: number }
-  | { kind: 'uhidTouch'; action: number; pointerId: bigint; x: number; y: number; width: number; height: number; pressure: number };
+  | { kind: 'screenPower'; mode: number };
 
 type RawWsData = Buffer | ArrayBuffer | Buffer[];
 
@@ -160,25 +156,6 @@ export function parseClientControl(data: RawWsData): ParsedControlMessage | unde
     case ClientControlType.SetScreenPowerMode: {
       if (buf.byteLength < 2) return undefined;
       return { kind: 'screenPower', mode: dv.getUint8(1) };
-    }
-    case ClientControlType.UhidKeyboard: {
-      if (buf.byteLength < 3) return undefined;
-      const action = dv.getUint8(o++);
-      const usage = dv.getUint8(o);
-      return { kind: 'uhidKeyboard', action, usage };
-    }
-    case ClientControlType.UhidTouch: {
-      if (buf.byteLength < 24) return undefined;
-      const action = dv.getUint8(o++);
-      const pointerHigh = dv.getUint32(o, false); o += 4;
-      const pointerLow = dv.getUint32(o, false); o += 4;
-      const x = dv.getUint32(o, false); o += 4;
-      const y = dv.getUint32(o, false); o += 4;
-      const width = dv.getUint16(o, false); o += 2;
-      const height = dv.getUint16(o, false); o += 2;
-      const pressure = dv.getUint16(o, false) / 0xffff;
-      const pointerId = (BigInt(pointerHigh) << 32n) | BigInt(pointerLow);
-      return { kind: 'uhidTouch', action, pointerId, x, y, width, height, pressure };
     }
     default:
       return undefined;

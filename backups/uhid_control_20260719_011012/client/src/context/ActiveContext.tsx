@@ -8,21 +8,18 @@ import React, {
   useState,
 } from 'react';
 import { encodeKeycodeMessage, KeyEventAction } from '@/lib/control';
-import { SDK_CONTROL_MODE, type ControlMode } from '@/lib/controlMode';
 
 type Getter<T> = () => T | null;
 
 type DeviceRef = {
   getWs: Getter<WebSocket>;
   getCanvas: Getter<HTMLCanvasElement>;
-  getControlMode?: () => ControlMode;
 };
 
 export type InputTarget = {
   udid: string;
   ws: WebSocket;
   canvas: HTMLCanvasElement;
-  controlMode: ControlMode;
 };
 
 function uniq(arr: string[]) {
@@ -48,7 +45,6 @@ type ActiveContextValue = {
     udid: string;
     getWs: Getter<WebSocket>;
     getCanvas: Getter<HTMLCanvasElement>;
-    getControlMode?: () => ControlMode;
   }) => void;
   unregisterDevice: (udid: string) => void;
 
@@ -67,7 +63,6 @@ type ActiveContextValue = {
 
   /** For touch controls: decide which devices should receive input from this source tile */
   getInputTargetsForSource: (sourceUdid: string) => InputTarget[];
-  getActiveControlMode: () => ControlMode;
 
   /** Sync/broadcast controls */
   syncAll: boolean;
@@ -202,12 +197,8 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
   }, [syncTargets]);
 
   const registerDevice = useCallback(
-    (args: { udid: string; getWs: Getter<WebSocket>; getCanvas: Getter<HTMLCanvasElement>; getControlMode?: () => ControlMode }) => {
-      devicesRef.current.set(args.udid, {
-        getWs: args.getWs,
-        getCanvas: args.getCanvas,
-        getControlMode: args.getControlMode,
-      });
+    (args: { udid: string; getWs: Getter<WebSocket>; getCanvas: Getter<HTMLCanvasElement> }) => {
+      devicesRef.current.set(args.udid, { getWs: args.getWs, getCanvas: args.getCanvas });
       setRegisteredUdids(Array.from(devicesRef.current.keys()));
     },
     [],
@@ -245,7 +236,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       const canvas = ref.getCanvas();
       if (!ws || ws.readyState !== WebSocket.OPEN) continue;
       if (!canvas) continue;
-      out.push({ udid, ws, canvas, controlMode: ref.getControlMode?.() ?? SDK_CONTROL_MODE });
+      out.push({ udid, ws, canvas });
     }
     return out;
   }, []);
@@ -257,7 +248,7 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       const canvas = ref.getCanvas();
       if (!ws || ws.readyState !== WebSocket.OPEN) continue;
       if (!canvas) continue;
-      out.push({ udid, ws, canvas, controlMode: ref.getControlMode?.() ?? SDK_CONTROL_MODE });
+      out.push({ udid, ws, canvas });
     }
     return out;
   }, []);
@@ -306,12 +297,6 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
     },
     [resolveTargets],
   );
-
-  const getActiveControlMode = useCallback((): ControlMode => {
-    const active = activeUdidRef.current;
-    if (!active) return SDK_CONTROL_MODE;
-    return devicesRef.current.get(active)?.getControlMode?.() ?? SDK_CONTROL_MODE;
-  }, []);
 
   const sendToActive = useCallback(
     (u8: Uint8Array): boolean => {
@@ -398,7 +383,6 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       getCanvasForUdid,
       getTargetsByUdids,
       getInputTargetsForSource,
-      getActiveControlMode,
       syncAll,
       setSyncAll,
       syncMain,
@@ -432,7 +416,6 @@ export function ActiveProvider({ children }: { children: React.ReactNode }) {
       getCanvasForUdid,
       getTargetsByUdids,
       getInputTargetsForSource,
-      getActiveControlMode,
       syncAll,
       setSyncAll,
       syncMain,

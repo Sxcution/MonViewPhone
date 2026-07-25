@@ -1,6 +1,6 @@
 import { log, warn } from './logger.js';
 
-export const STREAM_NODE_BUILD_ID = 'tango-v2-race-safe-close-1';
+export const STREAM_NODE_BUILD_ID = 'tango-v2-taskset-ff-1';
 
 function parseDeviceList(raw: string | undefined): string[] {
   if (raw == null || raw.trim() === '') return [];

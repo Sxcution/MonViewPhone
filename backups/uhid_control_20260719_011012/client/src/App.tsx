@@ -27,15 +27,6 @@ import {
   ScreenPowerMode
 } from '@/lib/control'
 import {
-  CONTROL_MODE_GLOBAL_KEY,
-  controlModePreset,
-  loadGlobalControlMode,
-  saveGlobalControlMode,
-  SDK_CONTROL_MODE,
-  UHID_CONTROL_MODE,
-  type ControlMode,
-} from '@/lib/controlMode'
-import {
   installApk,
   installUploadedApk,
   runAdbCommandApi,
@@ -617,17 +608,7 @@ export function App() {
   const [streamConfig, setStreamConfig] = useState<StreamConfig>(() => {
     return readStoredStreamConfig(STREAM_CONFIG_KEY, STREAM_CONFIG)
   })
-  const [controlModeDefault, setControlModeDefault] = useState<ControlMode>(() => loadGlobalControlMode())
   const reloadMap = useRef<Map<string, (opts?: StreamReloadOptions) => void>>(new Map())
-
-  const updateControlModeDefault = useCallback((preset: 'sdk' | 'uhid') => {
-    const next = preset === 'uhid' ? UHID_CONTROL_MODE : SDK_CONTROL_MODE
-    const saved = saveGlobalControlMode(next)
-    setControlModeDefault(saved)
-    void saveBackendSetting(CONTROL_MODE_GLOBAL_KEY, JSON.stringify(saved))
-  }, [])
-
-  const getControlModeForUdid = useCallback((_udid: string) => controlModeDefault, [controlModeDefault])
 
   const [viewerStreamConfig, setViewerStreamConfig] = useState<StreamConfig>(() => {
     const width = 1000
@@ -4034,7 +4015,6 @@ export function App() {
                       visualAlertActive={Boolean(visualTileAlerts[udid])}
                       onClearVisualAlert={clearVisualAlert}
                       streamConfig={viewerUdid === udid ? viewerStreamConfig : streamConfig}
-                      controlMode={getControlModeForUdid(udid)}
                       onRegisterReload={registerReload}
                       onUnregisterReload={unregisterReload}
                       onViewDevice={handleViewDevice}
@@ -5189,38 +5169,6 @@ export function App() {
                     />
                   </div>
                 )}
-              </div>
-            </div>
-
-            <div 
-              style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}
-              data-inspector-id="appSettings.controlModeSection"
-              data-inspector-label="Input control mode settings block"
-              data-inspector-component="client/src/App.tsx"
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1, marginRight: 16 }}>
-                    Chế độ điều khiển
-                  </div>
-                  <select
-                    className='headerLangSelect'
-                    style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', borderRadius: '6px', padding: '6px 8px', fontSize: 12, width: 220 }}
-                    value={controlModePreset(controlModeDefault)}
-                    onChange={e => updateControlModeDefault(e.target.value === 'uhid' ? 'uhid' : 'sdk')}
-                    data-inspector-id="appSettings.controlModeSelect"
-                    data-inspector-label="Input control mode selection dropdown"
-                    data-inspector-component="client/src/App.tsx"
-                  >
-                    <option value="sdk">Tiêu chuẩn — Touch SDK + Keyboard SDK</option>
-                    <option value="uhid">Tương thích UHID — Touch UHID + Keyboard UHID</option>
-                  </select>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--md-muted)', lineHeight: 1.45 }}>
-                  {controlModePreset(controlModeDefault) === 'uhid'
-                    ? 'Mô phỏng chuột và bàn phím vật lý. Dùng cho ứng dụng không nhận điều khiển thông thường.'
-                    : 'Điều khiển cảm ứng trực tiếp, phù hợp với hầu hết ứng dụng.'}
-                </div>
               </div>
             </div>
 

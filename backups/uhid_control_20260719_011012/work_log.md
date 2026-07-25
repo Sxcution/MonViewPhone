@@ -1,16 +1,5 @@
 # Work Log / Nhật ký làm việc
 
-## 2026-07-25
-
-- **18:25**: Phân tích bottleneck stream chậm khi 15+ devices kết nối. Phát hiện pipeline 3 tầng hàng đợi: frontend batch=3/1.2s, stream-node MAX_START_CONCURRENCY=2, server-go semaphore=12. Bottleneck chính: stream-node chỉ cho 2 scrcpy session start đồng thời → 16 device chờ ~40 giây.
-- **18:29**: Fix: (1) run.pyw set env MONVIEW_STREAM_START_CONCURRENCY=5 khi spawn stream-node. (2) useTileStream.ts tăng STREAM_CONNECT_BATCH_SIZE 3→5, giảm BATCH_DELAY 1200→800ms. Ước tính cải thiện: 30 devices từ ~50s xuống ~15-20s.
-- **18:30**: Phân tích sâu từ stream-node-current.log: (a) Không có scrcpy crash. (b) Samsung Note 9 tốn 6.6-8.3s/device start, gấp 20x Redmi. (c) Push JAR mỗi lần 8-32ms (không nghẽn). (d) Bug setDisplayPower trên scrcpy 3.3.4 (TypeError). (e) Device 2808133db6217ece reconnect 5 lần nhưng không gây nghẽn.
-- **18:33**: Fix bổ sung: (1) scrcpySession.ts skip pushServer nếu JAR đã có trên device (check size match) → giảm ADB contention khi 5 sessions đồng thời. (2) Fix setDisplayPower → setScreenPowerMode theo API @yume-chan/scrcpy 3.3.4.
-- **18:46**: Phát hiện nguyên nhân gốc máy Samsung Note 9 (Exynos 9810) khởi động scrcpy lâu (~7.8s): ADB shell bị ROM xếp vào `background` cpuset cgroup (chỉ chạy 2 nhân nhỏ 0-1 @ 500MHz). Đã benchmark cả 20 máy Note 9: ép nhân lớn `taskset ff` giúp thời gian start giảm từ **7.8s xuống 0.07s (70ms) - tăng tốc 100 lần**. Đã tích hợp `taskset ff` tự động vào `adb-scrcpy/client.js`, `scrcpy/server.go`, `display_power.go`, và `app_management.go`.
-- **18:57**: Kiểm tra thiết bị `2851aa1728017ece` khi mở Viewer mode. Phát hiện tiến trình `stream-node` (PID 19644) cũ chạy từ 18:35 chưa được thay thế. Đã nâng `STREAM_NODE_BUILD_ID` thành `tango-v2-taskset-ff-1`, kill tiến trình node cũ và kích hoạt `stream-node` mới chạy trực tiếp build có `taskset ff`.
-- **18:58**: Fix lỗi `scrcpy-server 3.3.4 jar not found`: Bổ sung đường dẫn tìm kiếm `SERVER_CANDIDATES` trong `scrcpySession.ts` bao gồm cả đường dẫn tuyệt đối/tương đối khi chạy từ thư mục gốc `MonViewPhone` lẫn thư mục `stream-node`. Đã rebuild `stream-node` và khởi chạy thành công.
-- **19:41**: Fix cú pháp `taskset` trong Go backend helpers (`app_management.go`, `display_power.go`, `scrcpy/server.go`): Chuyển `CLASSPATH=...` lên trước `taskset ff` để khắc phục lỗi exit 127 `taskset: exec CLASSPATH...: No such file or directory` khi mở Viewer Device. Đã biên dịch lại `server-go.exe` thành công.
-
 ## 2026-07-16
 
 - **06:55**: Nghiên cứu sự cố mất config local của người dùng khi tắt/mở lại MonViewPhone. Phát hiện nguyên nhân do sự khác biệt về Chrome profile (mặc định vs ChromeAppProfile) và origin (http://localhost:11000 vs http://127.0.0.1:5173) khi chạy các launcher khác nhau (run.pyw vs rundev.pyw). Đã hướng dẫn người dùng chạy run.pyw để kích hoạt cơ chế đồng bộ hai chiều từ profile cũ lên server-go/settings.json.
@@ -149,11 +138,3 @@
 - Test quyết định: official `scrcpy 3.3.4` với `--mouse=uhid --keyboard=uhid` cho phép người dùng click và nhập số điện thoại được, nên lỗi nằm ở kiểu input SDK/MonViewPhone control, không phải ROM/`FLAG_SECURE`.
 - Đã thử candidate backend `inputMode=uhid` bằng HID touchscreen và HID mouse, nhưng chưa pass absolute click từ browser; đã gỡ candidate khỏi source để không để lại nhánh fail.
 - Giữ công cụ test official tại `tools/scrcpy-v3.3.4`; log/UI dump lưu trong `logs/`. Hướng fix đúng nếu tích hợp vào MonViewPhone là làm chế độ UHID pointer-lock/relative mouse giống scrcpy, hoặc dùng official scrcpy UHID làm đường tạm.
-- Yêu cầu tiếp: thêm chế độ điều khiển UHID tuỳ chọn trong MonViewPhone, giữ video pipeline hiện tại và SDK là mặc định.
-- Backup trước sửa: `backups/uhid_control_20260719_011012` kèm hash các file quan trọng.
-- Fix hiện tại: thêm setting global `ControlMode { mouseMode, keyboardMode }`, UI chọn trong modal `Cài Đặt Hệ Thống`; bỏ badge `SDK/UHID` khỏi màn stream theo yêu cầu.
-- Backend `stream-node`: thêm control packet `uhidTouch` và `uhidKeyboard`, dùng `controller.uHidCreate/uHidInput/uHidDestroy` của `@yume-chan/scrcpy`; không mở `scrcpy.exe` riêng và không tạo video pipeline thứ hai.
-- Root cause lệch touch: UHID raw ban đầu map vào full panel `deviceSize=[1440,3200]`, còn video stream là logical viewport trong `physicalFrame=[0,400,1440,2800]`.
-- Fix lệch touch: `ScrcpySession` parse `dumpsys input` một lần để lấy `Viewport INTERNAL`, rồi map video 0..1 qua `physicalFrame` trước khi gửi raw 0..32767; log xác nhận trên `R58N22VK5RL`: `xOffset=0`, `yOffset=0.125`, `xScale=1`, `yScale=0.75`.
-- Dọn nhánh UHID mouse/pointer-lock cũ trong `touchControls.ts` và `useTileStream.ts`: click/swipe vẫn dùng flow SDK-like hiện có, chỉ đổi packet gửi ra thành `uhidTouch` khi mode là UHID.
-- Build pass: `npm run build` trong `client` và `stream-node`; đã restart riêng stream-node port `11080`.

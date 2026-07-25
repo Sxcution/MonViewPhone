@@ -1,6 +1,5 @@
 import type { StreamConfig } from '@/lib/config';
 import type { DeviceAccountData } from '@/lib/deviceAccountVault';
-import type { ControlMode } from '@/lib/controlMode';
 
 export type StreamReloadOptions = {
     silent?: boolean;
@@ -20,7 +19,6 @@ export type TileProps = {
     connectionMode?: ConnectionState;
     wsServer: string;
     streamConfig: StreamConfig;
-    controlMode?: ControlMode;
     streamMode?: any;
     order?: number;
     isViewing?: boolean;

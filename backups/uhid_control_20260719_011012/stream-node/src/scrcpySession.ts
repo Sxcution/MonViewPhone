@@ -2,8 +2,6 @@ import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 
 import { AdbScrcpyClient, AdbScrcpyOptionsLatest } from '@yume-chan/adb-scrcpy';
 
@@ -22,68 +20,11 @@ import {
 export type VideoPacketSink = (packet: Buffer) => void;
 
 type MaybeReadableStream = ReadableStream<Uint8Array>;
-type UhidTouchCalibration = {
-  xOffset: number;
-  yOffset: number;
-  xScale: number;
-  yScale: number;
-};
 
 const SERVER_CANDIDATES = [
   resolve(process.cwd(), 'vendor', `scrcpy-server-v${SCRCPY_VERSION}.jar`),
-  resolve(process.cwd(), 'stream-node', 'vendor', `scrcpy-server-v${SCRCPY_VERSION}.jar`),
-  resolve(process.cwd(), 'server-go', 'bin', `scrcpy-server-v${SCRCPY_VERSION}.jar`),
   resolve(process.cwd(), '..', 'server-go', 'bin', `scrcpy-server-v${SCRCPY_VERSION}.jar`),
-  resolve(process.cwd(), 'server-go', 'scrcpy-server.jar'),
-  resolve(process.cwd(), '..', 'server-go', 'scrcpy-server.jar'),
 ];
-const execFileAsync = promisify(execFile);
-
-const UHID_KEYBOARD_ID = 1;
-const UHID_TOUCH_ID = 3;
-
-const UHID_KEYBOARD_REPORT_DESC = new Uint8Array([
-  0x05, 0x01, 0x09, 0x06, 0xa1, 0x01, 0x05, 0x07,
-  0x19, 0xe0, 0x29, 0xe7, 0x15, 0x00, 0x25, 0x01,
-  0x75, 0x01, 0x95, 0x08, 0x81, 0x02, 0x75, 0x08,
-  0x95, 0x01, 0x81, 0x01, 0x05, 0x08, 0x19, 0x01,
-  0x29, 0x05, 0x75, 0x01, 0x95, 0x05, 0x91, 0x02,
-  0x75, 0x03, 0x95, 0x01, 0x91, 0x01, 0x05, 0x07,
-  0x19, 0x00, 0x29, 0x65, 0x15, 0x00, 0x25, 0x65,
-  0x75, 0x08, 0x95, 0x06, 0x81, 0x00, 0xc0,
-]);
-
-const UHID_TOUCH_REPORT_DESC = new Uint8Array([
-  0x05, 0x0d,       // Usage Page (Digitizers)
-  0x09, 0x04,       // Usage (Touch Screen)
-  0xa1, 0x01,       // Collection (Application)
-  0x09, 0x22,       // Usage (Finger)
-  0xa1, 0x02,       // Collection (Logical)
-  0x09, 0x42,       // Usage (Tip Switch)
-  0x15, 0x00, 0x25, 0x01,
-  0x75, 0x01, 0x95, 0x01,
-  0x81, 0x02,
-  0x09, 0x32,       // Usage (In Range)
-  0x81, 0x02,
-  0x75, 0x06, 0x95, 0x01,
-  0x81, 0x03,
-  0x05, 0x01,       // Usage Page (Generic Desktop)
-  0x09, 0x30,       // Usage (X)
-  0x09, 0x31,       // Usage (Y)
-  0x16, 0x00, 0x00,
-  0x26, 0xff, 0x7f,
-  0x75, 0x10, 0x95, 0x02,
-  0x81, 0x02,
-  0xc0,
-  0xc0,
-]);
-
-const UHID_KEYBOARD_ACTION_DOWN = 0;
-const UHID_KEYBOARD_ACTION_UP = 1;
-const UHID_KEYBOARD_ACTION_RESET = 2;
-const TOUCH_ACTION_DOWN = 0;
-const TOUCH_ACTION_UP = 1;
-const TOUCH_ACTION_MOVE = 2;
 
 function describeError(e: unknown): string {
   if (!e) return 'unknown error';
@@ -134,52 +75,9 @@ function randomScid() {
   return buf.toString('hex').padStart(8, '0');
 }
 
-function clampInt(n: number, min: number, max: number) {
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(min, Math.min(max, Math.trunc(n)));
-}
-
-function modifierBit(usage: number) {
-  return usage >= 0xe0 && usage <= 0xe7 ? 1 << (usage - 0xe0) : 0;
-}
-
-function parseUhidTouchCalibration(inputDump: string): UhidTouchCalibration | null {
-  const match = inputDump.match(/Viewport INTERNAL:.*?physicalFrame=\[(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\],\s*deviceSize=\[(\d+),\s*(\d+)\]/);
-  if (!match) return null;
-  const [, leftRaw, topRaw, rightRaw, bottomRaw, widthRaw, heightRaw] = match;
-  const left = Number(leftRaw);
-  const top = Number(topRaw);
-  const right = Number(rightRaw);
-  const bottom = Number(bottomRaw);
-  const width = Number(widthRaw);
-  const height = Number(heightRaw);
-  if (!width || !height || right <= left || bottom <= top) return null;
-  return {
-    xOffset: left / width,
-    yOffset: top / height,
-    xScale: (right - left) / width,
-    yScale: (bottom - top) / height,
-  };
-}
-
 async function pushServer(adb: any, trace: DeviceStepLogger) {
   const serverJar = findServerJar(trace);
   const info = await stat(serverJar);
-
-  // Skip push if JAR already on device with matching size (saves ADB contention under concurrency)
-  try {
-    const result = await adb.subprocess.spawnAndWaitLegacy(
-      `ls -l ${REMOTE_SERVER_PATH} 2>/dev/null | awk '{print $5}'`
-    );
-    const remoteSize = parseInt(String(result.stdout).trim(), 10);
-    if (remoteSize === info.size) {
-      trace.step('PUSH_JAR_SKIP', { reason: 'size match', localSize: info.size, remoteSize });
-      return;
-    }
-  } catch {
-    // ls failed → file doesn't exist, proceed with push
-  }
-
   trace.step('PUSH_JAR_BEGIN', { local: serverJar, bytes: info.size, remote: REMOTE_SERVER_PATH });
   await AdbScrcpyClient.pushServer(adb, nodeFileToWebStream(serverJar) as never, REMOTE_SERVER_PATH);
   trace.step('PUSH_JAR_OK', { remote: REMOTE_SERVER_PATH });
@@ -225,11 +123,6 @@ export class ScrcpySession {
   #firstVideoLogged = false;
   #videoPackets = 0;
   #controlPackets = 0;
-  #uHidKeyboardReady = false;
-  #uHidTouchReady = false;
-  #uHidTouchCalibration: UhidTouchCalibration | null | undefined;
-  #uHidKeyboardModifiers = 0;
-  #uHidKeyboardKeys = new Set<number>();
 
   constructor(query: StreamQuery, trace: DeviceStepLogger) {
     this.query = query;
@@ -357,148 +250,6 @@ export class ScrcpySession {
     })();
   }
 
-  async #ensureUhidKeyboard(controller: any) {
-    if (this.#uHidKeyboardReady) return true;
-    try {
-      await controller.uHidCreate({
-        id: UHID_KEYBOARD_ID,
-        vendorId: 0,
-        productId: 0,
-        name: '',
-        data: UHID_KEYBOARD_REPORT_DESC,
-      });
-      this.#uHidKeyboardReady = true;
-      this.trace.step('UHID_KEYBOARD_READY');
-      return true;
-    } catch (e) {
-      this.trace.warn('UHID_KEYBOARD_CREATE_FAILED', describeError(e));
-      return false;
-    }
-  }
-
-  async #ensureUhidTouch(controller: any) {
-    if (this.#uHidTouchReady) return true;
-    try {
-      await controller.uHidCreate({
-        id: UHID_TOUCH_ID,
-        vendorId: 0,
-        productId: 0,
-        name: 'MonViewPhone Touch',
-        data: UHID_TOUCH_REPORT_DESC,
-      });
-      this.#uHidTouchReady = true;
-      this.trace.step('UHID_TOUCH_READY');
-      return true;
-    } catch (e) {
-      this.trace.warn('UHID_TOUCH_CREATE_FAILED', describeError(e));
-      return false;
-    }
-  }
-
-  async #getUhidTouchCalibration(): Promise<UhidTouchCalibration | null> {
-    if (this.#uHidTouchCalibration !== undefined) return this.#uHidTouchCalibration;
-    try {
-      const { stdout } = await execFileAsync('adb', ['-s', this.udid, 'shell', 'dumpsys', 'input'], {
-        timeout: 2500,
-        maxBuffer: 1024 * 1024,
-      });
-      this.#uHidTouchCalibration = parseUhidTouchCalibration(String(stdout));
-      if (this.#uHidTouchCalibration) {
-        this.trace.step('UHID_TOUCH_CALIBRATION', this.#uHidTouchCalibration);
-      } else {
-        this.trace.warn('UHID_TOUCH_CALIBRATION_MISSING', 'using direct 0..1 mapping');
-      }
-    } catch (e) {
-      this.#uHidTouchCalibration = null;
-      this.trace.warn('UHID_TOUCH_CALIBRATION_FAILED', describeError(e));
-    }
-    return this.#uHidTouchCalibration;
-  }
-
-  async #sendUhidKeyboardReport(controller: any) {
-    const keys = Array.from(this.#uHidKeyboardKeys).slice(0, 6);
-    const data = new Uint8Array(8);
-    data[0] = this.#uHidKeyboardModifiers & 0xff;
-    if (this.#uHidKeyboardKeys.size > 6) {
-      data.fill(0x01, 2);
-    } else {
-      for (let i = 0; i < keys.length; i++) data[i + 2] = keys[i] & 0xff;
-    }
-    await controller.uHidInput({ id: UHID_KEYBOARD_ID, data });
-  }
-
-  async #injectUhidKeyboard(controller: any, message: Extract<ParsedControlMessage, { kind: 'uhidKeyboard' }>) {
-    if (!await this.#ensureUhidKeyboard(controller)) return;
-
-    if (message.action === UHID_KEYBOARD_ACTION_RESET) {
-      this.#uHidKeyboardModifiers = 0;
-      this.#uHidKeyboardKeys.clear();
-      await this.#sendUhidKeyboardReport(controller);
-      return;
-    }
-
-    const usage = clampInt(message.usage, 0, 0xff);
-    const bit = modifierBit(usage);
-    if (message.action === UHID_KEYBOARD_ACTION_DOWN) {
-      if (bit) this.#uHidKeyboardModifiers |= bit;
-      else if (usage) this.#uHidKeyboardKeys.add(usage);
-    } else if (message.action === UHID_KEYBOARD_ACTION_UP) {
-      if (bit) this.#uHidKeyboardModifiers &= ~bit;
-      else this.#uHidKeyboardKeys.delete(usage);
-    } else {
-      return;
-    }
-    await this.#sendUhidKeyboardReport(controller);
-  }
-
-  async #injectUhidTouch(controller: any, message: Extract<ParsedControlMessage, { kind: 'uhidTouch' }>) {
-    if (!await this.#ensureUhidTouch(controller)) return;
-    const calibration = await this.#getUhidTouchCalibration();
-    const width = Math.max(1, message.width || 1);
-    const height = Math.max(1, message.height || 1);
-    const x01 = message.x / width;
-    const y01 = message.y / height;
-    const mappedX = calibration ? calibration.xOffset + x01 * calibration.xScale : x01;
-    const mappedY = calibration ? calibration.yOffset + y01 * calibration.yScale : y01;
-    const x = clampInt(Math.round(mappedX * 0x7fff), 0, 0x7fff);
-    const y = clampInt(Math.round(mappedY * 0x7fff), 0, 0x7fff);
-    const touching = message.action === TOUCH_ACTION_DOWN || message.action === TOUCH_ACTION_MOVE;
-    const flags = touching ? 0x03 : 0x00;
-    const data = new Uint8Array([
-      flags,
-      x & 0xff,
-      (x >> 8) & 0xff,
-      y & 0xff,
-      (y >> 8) & 0xff,
-    ]);
-    await controller.uHidInput({ id: UHID_TOUCH_ID, data });
-  }
-
-  async #releaseUhidDevices() {
-    const controller = this.#client?.controller;
-    if (!controller) return;
-    try {
-      if (this.#uHidKeyboardReady) {
-        this.#uHidKeyboardModifiers = 0;
-        this.#uHidKeyboardKeys.clear();
-        await this.#sendUhidKeyboardReport(controller);
-        await controller.uHidDestroy(UHID_KEYBOARD_ID);
-        this.#uHidKeyboardReady = false;
-      }
-    } catch (e) {
-      this.trace.warn('UHID_KEYBOARD_RELEASE_FAILED', describeError(e));
-    }
-    try {
-      if (this.#uHidTouchReady) {
-        await controller.uHidInput({ id: UHID_TOUCH_ID, data: new Uint8Array(5) });
-        await controller.uHidDestroy(UHID_TOUCH_ID);
-        this.#uHidTouchReady = false;
-      }
-    } catch (e) {
-      this.trace.warn('UHID_TOUCH_RELEASE_FAILED', describeError(e));
-    }
-  }
-
   async handleControl(message: ParsedControlMessage) {
     const controller = this.#client?.controller;
     if (!controller || this.#closed) return;
@@ -545,12 +296,7 @@ export class ScrcpySession {
         });
         break;
       case 'screenPower':
-        // @yume-chan/scrcpy 3.3.4: controller writer exposes setScreenPowerMode, not setDisplayPower
-        if (typeof controller.setScreenPowerMode === 'function') {
-          await controller.setScreenPowerMode(message.mode);
-        } else if (typeof controller.setDisplayPower === 'function') {
-          await controller.setDisplayPower(message.mode);
-        }
+        await controller.setDisplayPower(message.mode);
         break;
       case 'clipboard':
         await controller.setClipboard({
@@ -558,12 +304,6 @@ export class ScrcpySession {
           paste: message.paste,
           content: message.text || '',
         });
-        break;
-      case 'uhidKeyboard':
-        await this.#injectUhidKeyboard(controller, message);
-        break;
-      case 'uhidTouch':
-        await this.#injectUhidTouch(controller, message);
         break;
     }
   }
@@ -574,7 +314,6 @@ export class ScrcpySession {
     this.trace.step('SESSION_CLOSE_BEGIN', { videoPackets: this.#videoPackets, controlPackets: this.#controlPackets });
     this.#readerAbort.abort();
 
-    try { await this.#releaseUhidDevices(); } catch {}
     try { await this.#client?.close(); } catch {}
     try { await this.#adb?.close(); } catch {}
 
