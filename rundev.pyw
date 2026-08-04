@@ -21,7 +21,7 @@ DEV_FRONTEND_URL = f"http://127.0.0.1:{DEV_FRONTEND_PORT}/"
 DEV_WS_QUERY = f"ws=ws%3A%2F%2F127.0.0.1%3A{BACKEND_PORT}%2F"
 APP_URL = f"{DEV_FRONTEND_URL}?{DEV_WS_QUERY}" if DEV_FRONTEND else BASE_URL
 STREAM_NODE_PORT = 11080
-STREAM_NODE_BUILD_ID = "tango-v2-race-safe-close-1"
+STREAM_NODE_BUILD_ID = "tango-v2-realtime-backpressure-2"
 APP_MUTEX_NAME = r"Local\MonViewPhoneV2_Dev_SingleInstance"
 CHROME_USER_DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ROOT_DIR), "MonViewPhone", "ChromeAppProfile")
 

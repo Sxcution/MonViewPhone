@@ -1,4 +1,5 @@
 import { MuxChannel, ascii4, concatBytes, int32le, utf8, int16be, int8, int32be } from './multiplexer';
+import type { MonhelperWechatEvent } from './wechatNotifyLog';
 
 export type GoogDeviceDescriptor = {
   udid: string;
@@ -48,6 +49,14 @@ export type FileStats = {
   isDir: 0 | 1;
   size: number;
   dateModified: number;
+};
+
+export type PhoneFileEntry = {
+  name: string;
+  path: string;
+  isDir: boolean;
+  size: number;
+  modifiedAt: string | number;
 };
 
 function httpBase(wsServer: string): string {
@@ -766,6 +775,130 @@ export async function pushLocalFileApi(
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json?.success) {
     throw new Error(json?.error || `Push local file failed (status ${res.status})`);
+  }
+}
+
+export function connectMonhelperWechatEvents(
+  wsServer: string,
+  udids: string[],
+  onEvent: (event: MonhelperWechatEvent) => void,
+): EventSource {
+  const url = new URL(`${httpBase(wsServer)}api/goog/wechat-notify/events`);
+  for (const udid of new Set(udids.map(value => value.trim()).filter(Boolean))) {
+    url.searchParams.append('udid', udid);
+  }
+  const source = new EventSource(url);
+  source.addEventListener('message', message => {
+    try {
+      const event = JSON.parse(String(message.data)) as MonhelperWechatEvent;
+      if (
+        !event ||
+        typeof event.udid !== 'string' ||
+        !event.udid ||
+        !Number.isInteger(event.userId) ||
+        event.userId < 0 ||
+        typeof event.id !== 'string' ||
+        !event.id
+      ) return;
+      onEvent(event);
+    } catch {
+      // Ignore malformed helper events; EventSource keeps the stream alive.
+    }
+  });
+  return source;
+}
+
+export async function pushMediaFilesBatchApi(
+  wsServer: string,
+  udid: string,
+  userId: number,
+  files: File[],
+): Promise<void> {
+  const body = new FormData();
+  for (const file of files) body.append('files', file, file.name);
+  const endpoint = `${httpBase(wsServer)}api/goog/device/push-file`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'X-UDID': udid,
+      'X-User-ID': String(userId),
+    },
+    body,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Batch image push failed (status ${res.status})`);
+  }
+}
+
+export async function pushLocalMediaFilesBatchApi(
+  wsServer: string,
+  udid: string,
+  userId: number,
+  localPaths: string[],
+): Promise<void> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/push-local-file`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, userId, localPaths }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Local batch image push failed (status ${res.status})`);
+  }
+}
+
+export async function listPhoneFilesApi(
+  wsServer: string,
+  udid: string,
+  path: string,
+): Promise<{ path: string; entries: PhoneFileEntry[] }> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/files/list`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, path }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success || typeof json?.path !== 'string' || !Array.isArray(json?.entries)) {
+    throw new Error(json?.error || `List files failed (status ${res.status})`);
+  }
+  return { path: json.path, entries: json.entries };
+}
+
+export async function exportPhoneFileApi(
+  wsServer: string,
+  udid: string,
+  path: string,
+): Promise<{ savedPath: string; fileName: string }> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/files/export`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, path }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Export file failed (status ${res.status})`);
+  }
+  return { savedPath: json.savedPath || '', fileName: json.fileName || '' };
+}
+
+export async function deletePhoneFileApi(
+  wsServer: string,
+  udid: string,
+  path: string,
+): Promise<void> {
+  const endpoint = `${httpBase(wsServer)}api/goog/device/files/delete`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ udid, path }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error || `Delete file failed (status ${res.status})`);
   }
 }
 

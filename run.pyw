@@ -16,7 +16,7 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_URL = "http://localhost:11000/"
 BACKEND_PORT = 11000
 STREAM_NODE_PORT = 11080
-STREAM_NODE_BUILD_ID = "tango-v2-uhid-control-1"
+STREAM_NODE_BUILD_ID = "tango-v2-realtime-backpressure-2"
 APP_MUTEX_NAME = r"Local\MonViewPhoneV2_SingleInstance"
 
 instance_mutex = None

@@ -1086,6 +1086,10 @@ func handlePushFile(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, jsonResponse{"success": false, "error": "Method not allowed"})
 		return
 	}
+	if strings.TrimSpace(r.Header.Get("X-User-ID")) != "" {
+		handleMultipartMediaImport(w, r)
+		return
+	}
 
 	udid := strings.TrimSpace(r.Header.Get("X-UDID"))
 	remotePath := strings.TrimSpace(r.Header.Get("X-Remote-Path"))
@@ -1650,9 +1654,11 @@ func handlePushLocalFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		UDID       string `json:"udid"`
-		LocalPath  string `json:"localPath"`
-		RemotePath string `json:"remotePath"`
+		UDID       string   `json:"udid"`
+		LocalPath  string   `json:"localPath"`
+		RemotePath string   `json:"remotePath"`
+		UserID     int      `json:"userId"`
+		LocalPaths []string `json:"localPaths"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Invalid request body: " + err.Error()})
@@ -1662,6 +1668,11 @@ func handlePushLocalFile(w http.ResponseWriter, r *http.Request) {
 	req.UDID = strings.TrimSpace(req.UDID)
 	req.LocalPath = strings.TrimSpace(req.LocalPath)
 	req.RemotePath = strings.TrimSpace(req.RemotePath)
+
+	if len(req.LocalPaths) > 0 {
+		handleLocalMediaImport(w, req.UDID, req.UserID, req.LocalPaths)
+		return
+	}
 
 	if req.UDID == "" || req.LocalPath == "" || req.RemotePath == "" {
 		writeJSON(w, http.StatusBadRequest, jsonResponse{"success": false, "error": "Missing udid, localPath, or remotePath"})

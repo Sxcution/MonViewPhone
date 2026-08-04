@@ -30,9 +30,7 @@ import {
   type AutomationKeyDetail,
   type AutomationSwipeDetail,
   type AutomationTextDetail,
-  type AutomationStep,
 } from '@/lib/automation';
-import { AndroidKeycode } from '@/lib/keyEvent';
 import {
   DEFAULT_SYNC_MACRO_SETTINGS,
   loadSyncMacroSettings,
@@ -43,6 +41,43 @@ import {
   SYNC_MACRO_SETTINGS_EVENT,
 } from '@/lib/syncMacroSettings';
 import { SyncTimeSettingsModal } from './SyncTimeSettingsModal';
+import {
+  ConfirmDeleteModal,
+  DeviceAssignModal,
+  InputModal,
+  type AutomationDeviceOption,
+  type ConfirmModalState,
+  type InputModalState,
+} from './AutomationModalOverlays';
+export type { AutomationDeviceOption } from './AutomationModalOverlays';
+import {
+  AUTOMATION_APPS,
+  DEFAULT_DELAY_MS,
+  ONLY_ONE_DEVICE_MSG,
+  SELECT_ONE_DEVICE_MSG,
+  cloneRows,
+  clampPosition,
+  formatDeviceNo,
+  formatMacroAction,
+  formatMacroDelay,
+  formatStepDetails,
+  isRunnableMacroRow,
+  loadAutomationSettings,
+  loadMacroSortMode,
+  macroRandomDelayRangeMs,
+  makeActionPatch,
+  makeId,
+  pickSeedingContent,
+  pickSeedingContents,
+  randomInt,
+  resolveMacroDelayMs,
+  rowToSteps,
+  saveAutomationSettings,
+  saveMacroSortMode,
+  sleepMs,
+  sortMacros,
+  type MacroSortMode,
+} from './automationModalUtils';
 import {
   type AutomationMacroRow,
   type SavedAutomationMacro,
@@ -56,7 +91,6 @@ import {
   saveAppActions,
   loadDeviceProfiles,
   saveDeviceProfiles,
-  loadSeedingContents,
   AUTOMATION_DATA_CHANGED_EVENT,
   MACRO_RUNNING_UDIDS_EVENT,
   MACRO_PLAYBACK_PROGRESS_EVENT,
@@ -66,37 +100,15 @@ import {
   type MacroPlaybackStopDetail,
   type MacroPlaybackReplayDetail,
 } from '@/lib/automationData';
-import { saveAutomationSettingToBackend } from '@/lib/backendSettings';
 
 /* ── types ── */
 
-export type AutomationDeviceOption = {
-  udid: string;
-  number: number;
-  manufacturer?: string;
-  model?: string;
-};
 
 export type AutomationModalRef = {
   playAppAction: (appId: AutomationAppId, actionId: string) => Promise<void>;
   playing: boolean;
 };
 
-type ConfirmModalState = {
-  title: string;
-  message: string;
-  onConfirm: () => void;
-} | null;
-
-type InputModalState = {
-  key: string;
-  title: string;
-  label?: string;
-  placeholder?: string;
-  defaultValue?: string;
-  confirmText?: string;
-  onConfirm: (value: string) => void;
-} | null;
 
 type MacroCtxMenuState = {
   macroId: string;
@@ -110,7 +122,6 @@ type RowDelayCtxMenuState = {
   y: number;
 } | null;
 
-type MacroSortMode = 'name' | 'createdAt';
 
 type AutomationModalProps = {
   open: boolean;
@@ -120,492 +131,7 @@ type AutomationModalProps = {
   onClose: () => void;
 };
 
-/* ── constants ── */
 
-const AUTOMATION_SETTINGS_KEY = 'automationSettingsV1';
-const DEFAULT_DELAY_MS = 1000;
-const ONLY_ONE_DEVICE_MSG = 'Chỉ chọn 1 thiết bị';
-const SELECT_ONE_DEVICE_MSG = 'Chọn 1 thiết bị';
-
-const AUTOMATION_APPS: Array<{ id: AutomationAppId; label: string; icon: string }> = [
-  { id: 'wechat', label: 'Wechat', icon: '/automation-icons/WechatIcon.png' },
-  { id: 'line', label: 'Line', icon: '/automation-icons/LINE_New_App_Icon_(2020-12).png' },
-  { id: 'tantan', label: 'Tantan', icon: '/automation-icons/TantanIcon.png' },
-  { id: 'setting', label: 'Setting', icon: '/automation-icons/setting.png' },
-];
-
-/* ── helpers ── */
-
-function loadAutomationSettings(): { realtimeRecording: boolean } {
-  try {
-    const v = JSON.parse(localStorage.getItem(AUTOMATION_SETTINGS_KEY) || '{}');
-    return { realtimeRecording: !!v.realtimeRecording };
-  } catch {
-    return { realtimeRecording: false };
-  }
-}
-
-function saveAutomationSettings(s: { realtimeRecording: boolean }) {
-  try {
-    const value = JSON.stringify(s);
-    localStorage.setItem(AUTOMATION_SETTINGS_KEY, value);
-    saveAutomationSettingToBackend(AUTOMATION_SETTINGS_KEY, value);
-  } catch {
-    // ignore
-  }
-}
-
-function makeId(prefix: string) {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function compareByName(a: { name: string }, b: { name: string }) {
-  return a.name.localeCompare(b.name, 'vi', { sensitivity: 'base', numeric: true });
-}
-
-function sortMacros(macros: SavedAutomationMacro[], mode: MacroSortMode) {
-  const next = [...macros];
-  if (mode === 'name') return next.sort(compareByName);
-  return next.sort((a, b) => (b.createdAt ?? b.updatedAt ?? 0) - (a.createdAt ?? a.updatedAt ?? 0));
-}
-
-function loadMacroSortMode(): MacroSortMode {
-  try {
-    return localStorage.getItem('automationMacroSortModeV1') === 'createdAt' ? 'createdAt' : 'name';
-  } catch {
-    return 'name';
-  }
-}
-
-function saveMacroSortMode(mode: MacroSortMode) {
-  try {
-    localStorage.setItem('automationMacroSortModeV1', mode);
-  } catch {
-    // ignore
-  }
-}
-
-function macroRandomDelayRangeMs(baseSec: number) {
-  const sec = Math.max(1, Math.floor(baseSec));
-  const lowRatio = sec < 10 ? 0.6 : 2 / 3;
-  const highRatio = sec < 10 ? 1.2 : 4 / 3;
-  const minMs = Math.max(0, Math.floor(sec * lowRatio) * 1000);
-  const maxMs = Math.max(minMs, Math.floor(sec * highRatio) * 1000);
-  return { minMs, maxMs };
-}
-
-function resolveMacroDelayMs(row: AutomationMacroRow) {
-  if (row.delayRandomBaseSec && row.delayRandomBaseSec > 0) {
-    const { minMs, maxMs } = macroRandomDelayRangeMs(row.delayRandomBaseSec);
-    return randomInt(minMs, maxMs);
-  }
-  return Math.max(0, Math.floor(row.delayMs || 0));
-}
-
-function formatMacroDelay(row: AutomationMacroRow) {
-  if (!row.delayRandomBaseSec) return '';
-  const { minMs, maxMs } = macroRandomDelayRangeMs(row.delayRandomBaseSec);
-  return `${Math.round(minMs / 1000)}-${Math.round(maxMs / 1000)}s`;
-}
-
-function isRunnableMacroRow(row: AutomationMacroRow) {
-  if (row.action === 'seeding') return true;
-  if (row.action === 'key') return Number.isFinite(row.keycode);
-  if (row.action === 'text') return Boolean(row.text?.length);
-  if (row.action === 'swipe') {
-    return row.x01 != null && row.y01 != null && row.endX01 != null && row.endY01 != null;
-  }
-  return row.x01 != null && row.y01 != null;
-}
-
-function rowToSteps(row: AutomationMacroRow, opts?: { seedingText?: string }): AutomationStep[] {
-  const steps: AutomationStep[] = [];
-  if (row.action === 'swipe' && row.x01 != null && row.y01 != null && row.endX01 != null && row.endY01 != null) {
-    steps.push({
-      type: 'swipe',
-      x1: row.x01,
-      y1: row.y01,
-      x2: row.endX01,
-      y2: row.endY01,
-      durationMs: row.durationMs ?? 300,
-    });
-  } else if (row.action === 'touch' && row.x01 != null && row.y01 != null) {
-    steps.push({ type: 'tap', x01: row.x01, y01: row.y01 });
-  } else if (row.action === 'seeding' && opts?.seedingText) {
-    steps.push({ type: 'text', text: opts.seedingText }, { type: 'key', keycode: AndroidKeycode.KEYCODE_ENTER });
-  } else if (row.action === 'key' && Number.isFinite(row.keycode)) {
-    steps.push({ type: 'key', keycode: Math.floor(row.keycode ?? 0) });
-  } else if (row.action === 'text' && row.text) {
-    steps.push({ type: 'text', text: row.text });
-  }
-  return steps;
-}
-
-function cloneRows(rows: AutomationMacroRow[]) {
-  return rows.map(row => ({
-    ...row,
-    targetUdids: Array.isArray(row.targetUdids) ? [...row.targetUdids] : [],
-    note: row.note ?? '',
-  }));
-}
-
-function formatDeviceNo(n: number) {
-  return String(n || 0).padStart(2, '0');
-}
-
-function clamp01Value(value: number) {
-  return Math.max(0, Math.min(1, value));
-}
-
-function formatMacroAction(action: AutomationMacroRow['action']) {
-  if (action === 'swipe') return 'Vuốt';
-  if (action === 'seeding') return 'Seeding';
-  if (action === 'key') return 'Key';
-  if (action === 'text') return 'Text';
-  return 'Touch';
-}
-
-function formatStepDetails(row: AutomationMacroRow) {
-  if (row.action === 'swipe') {
-    return `(${row.x ?? ''},${row.y ?? ''}) → (${row.endX ?? ''},${row.endY ?? ''}) ${row.durationMs ?? 0}ms`;
-  }
-  if (row.action === 'seeding') return 'Random từ ngữ chung + Enter';
-  if (row.action === 'key') return `Keycode=${row.keycode ?? ''}`;
-  if (row.action === 'text') return row.text ? `Text="${row.text}"` : 'Text=""';
-  return `X=${row.x == null ? '' : row.x}, Y=${row.y == null ? '' : row.y}`;
-}
-
-function makeActionPatch(row: AutomationMacroRow, action: AutomationMacroRow['action']): Partial<AutomationMacroRow> {
-  if (action === 'key') return { action, keycode: row.keycode ?? AndroidKeycode.KEYCODE_ENTER };
-  if (action === 'text') return { action, text: row.text ?? '' };
-  if (action !== 'swipe') return { action };
-  const width = row.width || 1;
-  const height = row.height || 1;
-  const startX01 = row.x01 ?? 0.5;
-  const startY01 = row.y01 ?? 0.5;
-  const endX01 = row.endX01 ?? startX01;
-  const endY01 = row.endY01 ?? clamp01Value(startY01 + 0.18);
-  return {
-    action,
-    x01: startX01,
-    y01: startY01,
-    x: row.x ?? Math.round(startX01 * width),
-    y: row.y ?? Math.round(startY01 * height),
-    endX01,
-    endY01,
-    endX: row.endX ?? Math.round(endX01 * width),
-    endY: row.endY ?? Math.round(endY01 * height),
-    durationMs: row.durationMs ?? 400,
-  };
-}
-
-function clampPosition(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function sleepMs(ms: number, signal?: AbortSignal) {
-  return new Promise<void>(resolve => {
-    if (signal?.aborted) {
-      resolve();
-      return;
-    }
-    const timeout = window.setTimeout(() => {
-      signal?.removeEventListener('abort', onAbort);
-      resolve();
-    }, Math.max(0, ms));
-    const onAbort = () => {
-      window.clearTimeout(timeout);
-      resolve();
-    };
-    signal?.addEventListener('abort', onAbort, { once: true });
-  });
-}
-
-function randomInt(min: number, max: number) {
-  const low = Math.min(min, max);
-  const high = Math.max(min, max);
-  return Math.floor(low + Math.random() * (high - low + 1));
-}
-
-function pickSeedingContent() {
-  const raw = loadSeedingContents();
-  const words = raw.split(/[,\s]+/).map(word => word.trim()).filter(Boolean);
-  if (!words.length) return '';
-  const count = randomInt(1, 8);
-  const out: string[] = [];
-  const used = new Set<number>();
-  while (out.length < count && used.size < words.length) {
-    const index = randomInt(0, words.length - 1);
-    if (used.has(index)) continue;
-    used.add(index);
-    out.push(words[index]);
-  }
-  return out.join(' ');
-}
-
-function pickSeedingContents(count: number) {
-  const raw = loadSeedingContents();
-  const words = raw.split(/[,\s]+/).map(word => word.trim()).filter(Boolean);
-  if (!words.length || count <= 0) return [];
-  const seen = new Set<string>();
-  return Array.from({ length: count }, () => {
-    let phrase = '';
-    for (let tries = 0; tries < 24; tries++) {
-      phrase = pickSeedingContent();
-      if (phrase && !seen.has(phrase)) break;
-    }
-    if (phrase) seen.add(phrase);
-    return phrase;
-  }).filter(Boolean);
-}
-
-function ConfirmDeleteModal({ state, onClose }: { state: ConfirmModalState; onClose: () => void }) {
-  if (!state) return null;
-  return createPortal(
-    <>
-      <div 
-        className="confirmOverlay" 
-        onMouseDown={onClose}
-        data-inspector-id="automation.confirmDeleteOverlay"
-        data-inspector-label="Automation confirm delete modal overlay"
-        data-inspector-component="client/src/components/AutomationModal.tsx"
-      >
-        <div 
-          className="confirmPanel compact" 
-          onMouseDown={e => e.stopPropagation()}
-          data-inspector-id="automation.confirmDeletePanel"
-          data-inspector-label="Automation confirm delete modal card"
-          data-inspector-component="client/src/components/AutomationModal.tsx"
-        >
-          <div className="confirmTitle">{state.title}</div>
-          <div className="confirmText" style={{ whiteSpace: 'pre-wrap' }}>
-            {state.message}
-          </div>
-          <div className="confirmActions center">
-            <button 
-              type='button' 
-              className="modalBtn" 
-              onClick={onClose}
-              data-inspector-id="automation.confirmDeleteCancelButton"
-              data-inspector-label="Cancel button in delete confirmation"
-              data-inspector-component="client/src/components/AutomationModal.tsx"
-            >
-              Huỷ
-            </button>
-            <button 
-              type='button' 
-              className="modalBtnDanger" 
-              onClick={state.onConfirm}
-              data-inspector-id="automation.confirmDeleteConfirmButton"
-              data-inspector-label="Confirm button in delete confirmation"
-              data-inspector-component="client/src/components/AutomationModal.tsx"
-            >
-              Xác Nhận
-            </button>
-          </div>
-        </div>
-      </div>
-    </>,
-    document.body,
-  );
-}
-
-function InputModalInner({ state, onClose }: { state: NonNullable<InputModalState>; onClose: () => void }) {
-  const [value, setValue] = useState(state.defaultValue ?? '');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => inputRef.current?.focus(), 60);
-    return () => clearTimeout(t);
-  }, []);
-
-  const handleSubmit = () => {
-    const v = value.trim();
-    if (!v) return;
-    state.onConfirm(v);
-  };
-
-  return createPortal(
-    <>
-      <div 
-        className="confirmOverlay" 
-        onMouseDown={onClose}
-        data-inspector-id="automation.inputModalOverlay"
-        data-inspector-label="Automation text input modal overlay"
-        data-inspector-component="client/src/components/AutomationModal.tsx"
-      >
-        <div 
-          className="confirmPanel" 
-          style={{ minWidth: 380, maxWidth: 480 }} 
-          onMouseDown={e => e.stopPropagation()}
-          data-inspector-id="automation.inputModalPanel"
-          data-inspector-label="Automation text input modal card"
-          data-inspector-component="client/src/components/AutomationModal.tsx"
-        >
-          <div className="confirmTitle">{state.title}</div>
-          <div className="confirmText">
-            {state.label ? <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>{state.label}</label> : null}
-            <input
-              ref={inputRef}
-              type='text'
-              className="modalInput"
-              placeholder={state.placeholder ?? ''}
-              value={value}
-              onChange={e => setValue(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleSubmit();
-                if (e.key === 'Escape') onClose();
-              }}
-              data-inspector-id="automation.inputModalField"
-              data-inspector-label="Text input field in modal"
-              data-inspector-component="client/src/components/AutomationModal.tsx"
-            />
-          </div>
-          <div className="confirmActions">
-            <button 
-              type='button' 
-              className="modalBtn" 
-              onClick={onClose}
-              data-inspector-id="automation.inputModalCancelButton"
-              data-inspector-label="Cancel button in text input modal"
-              data-inspector-component="client/src/components/AutomationModal.tsx"
-            >
-              Huỷ
-            </button>
-            <button
-              type='button'
-              className="modalBtnPrimary"
-              style={{
-                opacity: value.trim() ? 1 : 0.5,
-                cursor: value.trim() ? 'pointer' : 'not-allowed',
-              }}
-              disabled={!value.trim()}
-              onClick={handleSubmit}
-              data-inspector-id="automation.inputModalConfirmButton"
-              data-inspector-label="Confirm button in text input modal"
-              data-inspector-component="client/src/components/AutomationModal.tsx"
-            >
-              {state.confirmText ?? 'Xác Nhận'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </>,
-    document.body,
-  );
-}
-
-function InputModal({ state, onClose }: { state: InputModalState; onClose: () => void }) {
-  if (!state) return null;
-  return <InputModalInner key={state.key} state={state} onClose={onClose} />;
-}
-
-function DeviceAssignModal({
-  profileId,
-  devices,
-  deviceProfiles,
-  onSave,
-  onClose,
-}: {
-  profileId: string;
-  devices: AutomationDeviceOption[];
-  deviceProfiles: AutomationDeviceProfile[];
-  onSave: (udids: string[]) => void;
-  onClose: () => void;
-}) {
-  const profile = deviceProfiles.find(p => p.id === profileId);
-  if (!profile) return null;
-
-  const [checkedUdids, setCheckedUdids] = useState<string[]>(() => [...profile.udids]);
-
-  const toggleUdid = (udid: string) => {
-    setCheckedUdids(prev => {
-      if (prev.includes(udid)) {
-        return prev.filter(u => u !== udid);
-      } else {
-        return [...prev, udid];
-      }
-    });
-  };
-
-  return createPortal(
-    <div 
-      className='confirmOverlay' 
-      onMouseDown={onClose}
-      data-inspector-id="automation.deviceAssignOverlay"
-      data-inspector-label="Device assign modal overlay"
-      data-inspector-component="client/src/components/AutomationModal.tsx"
-    >
-      <div 
-        className='confirmPanel' 
-        onMouseDown={e => e.stopPropagation()} 
-        style={{ width: '400px' }}
-        data-inspector-id="automation.deviceAssignPanel"
-        data-inspector-label="Device assign modal card"
-        data-inspector-component="client/src/components/AutomationModal.tsx"
-      >
-        <div className='confirmTitle'>Gán thiết bị</div>
-        <div className='confirmText' style={{ marginBottom: 12 }}>
-          Chọn các thiết bị gán cho profile <strong>"{profile.name}"</strong>:
-        </div>
-        <div className='automationDeviceSelectList'>
-          {devices.map(device => {
-            const isChecked = checkedUdids.includes(device.udid);
-            const otherProfile = deviceProfiles.find(p => p.id !== profileId && p.udids.includes(device.udid));
-            return (
-              <label 
-                key={device.udid} 
-                className='automationDeviceSelectRow'
-                data-inspector-id="automation.deviceAssignRow"
-                data-inspector-label={`Device select row for No. ${device.number}`}
-                data-inspector-component="client/src/components/AutomationModal.tsx"
-              >
-                <input
-                  type='checkbox'
-                  checked={isChecked}
-                  onChange={() => toggleUdid(device.udid)}
-                  data-inspector-id="automation.deviceAssignCheckbox"
-                  data-inspector-label={`Device checkbox for No. ${device.number}`}
-                  data-inspector-component="client/src/components/AutomationModal.tsx"
-                />
-                <span className='automationDeviceSelectLabel'>
-                  No. {device.number} - {[device.manufacturer, device.model].filter(Boolean).join(' ') || 'Device'} ({device.udid}) {otherProfile ? `[Profile: ${otherProfile.name}]` : ''}
-                </span>
-              </label>
-            );
-          })}
-          {!devices.length ? <div style={{ padding: 12, textAlign: 'center', color: '#888' }}>Không có máy online</div> : null}
-        </div>
-        <div className='confirmActions center'>
-          <button 
-            type='button' 
-            className='modalBtn' 
-            onClick={onClose}
-            data-inspector-id="automation.deviceAssignCancelButton"
-            data-inspector-label="Cancel device assignment button"
-            data-inspector-component="client/src/components/AutomationModal.tsx"
-          >
-            Huỷ
-          </button>
-          <button
-            type='button'
-            className='modalBtnPrimary'
-            onClick={() => onSave(checkedUdids)}
-            data-inspector-id="automation.deviceAssignSaveButton"
-            data-inspector-label="Save device assignment button"
-            data-inspector-component="client/src/components/AutomationModal.tsx"
-          >
-            Lưu
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-}
 
 /* ── main component ── */
 
@@ -2550,7 +2076,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         return createPortal(
           <div 
             className='automationRowDelayCtxPanel automationContextMenuPanel contextMenuPanel dropdown-menu show'
-            style={{ position: 'fixed', left: rowDelayCtxMenu.x, top: rowDelayCtxMenu.y, zIndex: 27000, minWidth: 210 }}
+            style={{ position: 'fixed', left: rowDelayCtxMenu.x, top: rowDelayCtxMenu.y, minWidth: 210 }}
             onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
             onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
             data-inspector-id="automation.rowDelayContextMenu"
@@ -2606,7 +2132,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         return createPortal(
           <div 
             className='automationMacroCtxPanel automationContextMenuPanel contextMenuPanel dropdown-menu show'
-            style={{ position: 'fixed', left: macroCtxMenu.x, top: macroCtxMenu.y, zIndex: 27000, minWidth: 200 }}
+            style={{ position: 'fixed', left: macroCtxMenu.x, top: macroCtxMenu.y, minWidth: 200 }}
             onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
             onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
             data-inspector-id="automation.macroContextMenu"

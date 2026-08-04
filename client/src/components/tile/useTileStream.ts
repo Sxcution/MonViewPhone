@@ -44,9 +44,25 @@ const STREAM_CONNECT_BATCH_SIZE = 3;
 const STREAM_CONNECT_BATCH_DELAY_MS = 1200;
 const INITIAL_FRAME_TIMEOUT_MS = 120_000;
 const NO_PACKET_BEFORE_FIRST_FRAME_TIMEOUT_MS = 180_000;
-const NO_PACKET_AFTER_FIRST_FRAME_TIMEOUT_MS = 90_000;
 const RENDER_STALL_RESTART_DECODER_MS = 18_000;
+const RENDER_STALL_RECONNECT_AFTER_DECODER_MS = 12_000;
+const RENDER_STALL_JITTER_MS = 3_000;
 const RECONNECT_DELAY_MS = 4000;
+
+export function getRenderWatchdogAction(
+    now: number,
+    pendingRenderSince: number,
+    decoderRestartedAt: number,
+    restartAfterMs: number,
+    reconnectAfterMs: number,
+): 'restart-decoder' | 'reconnect' | null {
+    if (decoderRestartedAt) {
+        return now - decoderRestartedAt >= reconnectAfterMs ? 'reconnect' : null;
+    }
+    return pendingRenderSince && now - pendingRenderSince >= restartAfterMs
+        ? 'restart-decoder'
+        : null;
+}
 
 type StreamSessionState = 'queued' | 'connecting' | 'connected';
 
@@ -226,8 +242,9 @@ export function useTileStream(args: Args) {
         let firstFrame = false;
         let engine: TangoStreamEngine | null = null;
         let lastPacketAt = Date.now();
-        let lastBitmapAt = 0;
+        let pendingRenderSince = 0;
         let lastDecoderRestartAt = 0;
+        const renderStallJitterMs = Math.floor(Math.random() * RENDER_STALL_JITTER_MS);
         let watchdogTimer: number | null = null;
         let initialLoadTimer: number | null = null;
         let queuedConnectCancel: (() => void) | null = null;
@@ -249,6 +266,8 @@ export function useTileStream(args: Args) {
 
         async function makeStreamEngine() {
             firstFrame = false;
+            pendingRenderSince = 0;
+            lastDecoderRestartAt = 0;
             if (!isSilent()) setLoading(true);
             if (engine) {
                 try { engine.stop(); } catch {}
@@ -267,16 +286,23 @@ export function useTileStream(args: Args) {
                     setLoading(false);
                     setStatus('');
                     silentReconnectRef.current = false;
-                    lastBitmapAt = Date.now();
+                    pendingRenderSince = 0;
                     ensureCanvasSize(meta.width, meta.height);
                     fitCanvasToBody();
                     onVideoDims?.(meta.width, meta.height);
                 },
-                onFrame: () => { lastBitmapAt = Date.now(); },
+                onFrame: () => {
+                    pendingRenderSince = 0;
+                    const wasRecovering = lastDecoderRestartAt !== 0;
+                    lastDecoderRestartAt = 0;
+                    if (wasRecovering) setStatus('');
+                },
                 onError: (err: any) => { console.error('[TangoStreamEngine error]', udid, err); },
             };
 
-            engine = new TangoStreamEngine(canvas!, callbacks);
+            engine = new TangoStreamEngine(canvas!, callbacks, () => {
+                if (firstFrame && pendingRenderSince === 0) pendingRenderSince = Date.now();
+            });
             engine.start();
         }
 
@@ -345,6 +371,7 @@ export function useTileStream(args: Args) {
                 udid: streamEndpointUdid,
                 bitrate: cfg.bitrate,
                 maxFps: cfg.maxFps,
+                iFrameInterval: cfg.iFrameInterval,
                 maxSize: maxSizeFromConfig(cfg),
                 displayId: cfg.displayId ?? 0,
                 encoderName: cfg.encoderMode === 'custom' ? cfg.encoderName : undefined,
@@ -430,21 +457,30 @@ export function useTileStream(args: Args) {
 
             const now = Date.now();
             const packetAge = now - lastPacketAt;
-            const bitmapAge = lastBitmapAt ? now - lastBitmapAt : 1e9;
 
-            // Important: if packets are still arriving, do NOT close WebSocket.
-            // Closing WS tears down scrcpy and creates the random reconnect storm.
-            // Only restart the local decoder/canvas pipeline and keep control alive.
-            if (firstFrame && packetAge < 5000 && bitmapAge > RENDER_STALL_RESTART_DECODER_MS) {
-                if (now - lastDecoderRestartAt > RENDER_STALL_RESTART_DECODER_MS) {
-                    lastDecoderRestartAt = now;
-                    setStatus(tRef.current('⚠️ render Tango đang hồi…'));
-                    try { engine?.restartDecoderOnly(); } catch (e) { console.warn('[Tango] decoder-only restart failed', e); }
-                }
+            // Keep the live socket on the first recovery attempt. If no frame is
+            // presented after two default keyframe intervals, rebuild this tile only.
+            const recoveryAction = getRenderWatchdogAction(
+                now,
+                pendingRenderSince,
+                lastDecoderRestartAt,
+                RENDER_STALL_RESTART_DECODER_MS + renderStallJitterMs,
+                RENDER_STALL_RECONNECT_AFTER_DECODER_MS + renderStallJitterMs,
+            );
+            if (recoveryAction === 'reconnect') {
+                silentReconnectRef.current = true;
+                reconnectCountRef.current++;
+                setStatus(tRef.current('⚠️ render Tango kẹt - kết nối lại…'));
+                connect();
+                return;
+            }
+            if (recoveryAction === 'restart-decoder') {
+                lastDecoderRestartAt = now;
+                setStatus(tRef.current('⚠️ render Tango đang hồi…'));
+                try { engine?.restartDecoderOnly(); } catch (e) { console.warn('[Tango] decoder-only restart failed', e); }
             }
 
-            const noPacketLimit = firstFrame ? NO_PACKET_AFTER_FIRST_FRAME_TIMEOUT_MS : NO_PACKET_BEFORE_FIRST_FRAME_TIMEOUT_MS;
-            if (packetAge > noPacketLimit) {
+            if (!firstFrame && packetAge > NO_PACKET_BEFORE_FIRST_FRAME_TIMEOUT_MS) {
                 setStatus(tRef.current('⚠️ Tango stream im lặng - kết nối lại…'));
                 setLoading(true);
                 connect();

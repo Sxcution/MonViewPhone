@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
 import './styles.css';
+import './components/ViewerAppsMenu.css';
 import { ActiveProvider } from '@/context/ActiveContext';
 import { ServerProvider } from '@/context/ServerContext';
 import { readHashAction, readPageParams } from '@/lib/params';

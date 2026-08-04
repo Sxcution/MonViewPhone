@@ -36,6 +36,7 @@ export type StreamQuery = {
   maxFps: number;
   bitrate: number;
   displayId: number;
+  iFrameInterval?: number;
   encoder?: string;
 };
 
@@ -60,8 +61,10 @@ export function parseStreamQuery(url: URL): StreamQuery {
   const maxFps = clampNumber(url.searchParams.get('maxFps'), 1, 120, 24);
   const bitrate = clampNumber(url.searchParams.get('bitrate'), 64 * 1024, 128 * 1024 * 1024, 917504);
   const displayId = clampNumber(url.searchParams.get('displayId'), 0, 32, 0);
+  const iFrameIntervalRaw = url.searchParams.get('iFrameInterval')?.trim();
+  const iFrameInterval = iFrameIntervalRaw ? clampNumber(iFrameIntervalRaw, 0, 60, 5) : undefined;
   const encoder = url.searchParams.get('encoder')?.trim() || undefined;
-  return { udid, maxSize, maxFps, bitrate, displayId, encoder };
+  return { udid, maxSize, maxFps, bitrate, displayId, iFrameInterval, encoder };
 }
 
 function clampNumber(raw: string | null, min: number, max: number, fallback: number): number {

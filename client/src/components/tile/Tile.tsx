@@ -35,7 +35,9 @@ function TileComponent({
     visualAlertLabel = 'Thông Báo Mới',
     visualAlertSource = 'visual',
     visualAlertTargetUserId,
+    visualAlertTargets = [],
     onClearVisualAlert,
+    onAcknowledgeWechatAlert,
     onVisualAlertClick,
     onRegisterReload,
     onUnregisterReload,
@@ -269,8 +271,11 @@ function TileComponent({
             selectOnly(udid);
             clickDevice(udid);
             canvasRef.current?.focus?.();
+            if (visualAlertActive && visualAlertSource === 'wechat') {
+                void onAcknowledgeWechatAlert?.(udid);
+            }
         },
-        [selectOnly, clickDevice, udid],
+        [selectOnly, clickDevice, onAcknowledgeWechatAlert, udid, visualAlertActive, visualAlertSource],
     );
 
     // When user triggers any tile-specific action, keep focus on this tile.
@@ -449,6 +454,10 @@ function TileComponent({
                                 <div>FPS: {streamStats.decodedFps}/{streamStats.renderedFps}</div>
                                 {streamStats.droppedFrames > 0 && <div style={{ color: 'red' }}>Dropped: {streamStats.droppedFrames}</div>}
                                 {streamStats.decodeQueueSize > 0 && <div>Queue: {streamStats.decodeQueueSize}</div>}
+                                {streamStats.clientDecodeLatencyEstimateMs != null && <div>Decode: {streamStats.clientDecodeLatencyEstimateMs} ms</div>}
+                                {streamStats.relativeTransportBacklogEstimateMs != null && <div>Backlog: {streamStats.relativeTransportBacklogEstimateMs} ms</div>}
+                                {(streamStats.decoderRecoveryCount ?? 0) > 0 && <div>Recoveries: {streamStats.decoderRecoveryCount}</div>}
+                                {streamStats.waitingForKeyframe && <div style={{ color: 'orange' }}>Waiting: keyframe</div>}
                                 {streamStats.reconnectCount > 0 && <div>Reconnects: {streamStats.reconnectCount}</div>}
                                 {streamStats.fallbackReason && <div style={{ color: 'orange', fontSize: '9px' }}>{streamStats.fallbackReason}</div>}
                                 <div>Profile: {isViewing ? 'viewer' : 'grid'}</div>
@@ -495,25 +504,45 @@ function TileComponent({
                         )}
 
                         {visualAlertActive ? (
-                            <div 
-                                className="tileVisualAlertBadge" 
+                            <div
+                                className={`tileVisualAlertBadge${visualAlertSource === 'wechat' ? ' tileWechatAlertBadge' : ''}`}
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    if (visualAlertSource === 'wechat') {
-                                        onVisualAlertClick?.(udid);
-                                    } else {
-                                        onClearVisualAlert?.(udid);
-                                    }
+                                    if (visualAlertSource !== 'wechat') onClearVisualAlert?.(udid);
                                 }}
-                                title={visualAlertSource === 'wechat' && typeof visualAlertTargetUserId === 'number'
-                                    ? `Open WeChat user ${visualAlertTargetUserId}`
-                                    : undefined}
                                 data-inspector-id="tile.visualAlertBadge"
                                 data-inspector-label="Tile visual alert notification badge"
                                 data-inspector-component="client/src/components/tile/Tile.tsx"
                             >
                                 <Bell size={14} className="visualAlertBadgeIcon" />
-                                <span>{visualAlertLabel || 'Thông Báo Mới'}</span>
+                                {visualAlertSource === 'wechat' && visualAlertTargets.length ? (
+                                    <span>
+                                        {visualAlertTargets.map((target, index) => (
+                                            <React.Fragment key={target.userId}>
+                                                {index > 0 ? ', ' : null}
+                                                <button
+                                                    type="button"
+                                                    className="tileWechatAlertTarget"
+                                                    title={`Mở ${target.label}`}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        void onVisualAlertClick?.(udid, target.userId);
+                                                    }}
+                                                >
+                                                    {target.label}
+                                                </button>
+                                            </React.Fragment>
+                                        ))}
+                                    </span>
+                                ) : (
+                                    <span
+                                        title={visualAlertSource === 'wechat' && typeof visualAlertTargetUserId === 'number'
+                                            ? `Open WeChat user ${visualAlertTargetUserId}`
+                                            : undefined}
+                                    >
+                                        {visualAlertLabel || 'Thông Báo Mới'}
+                                    </span>
+                                )}
                             </div>
                         ) : null}
 

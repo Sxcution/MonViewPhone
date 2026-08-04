@@ -23,8 +23,6 @@ function isUserEditableElement(el: Element | null): boolean {
     el.closest('.confirmPanel') ||
     el.closest('.modalOverlay') ||
     el.closest('.modalPanel') ||
-    el.closest('.syncModalOverlay') ||
-    el.closest('.syncModalPanel') ||
     el.closest('.vsp-modal-overlay') ||
     el.closest('.vsp-modal') ||
     el.closest('.automationModalBackdrop') ||

@@ -1,0 +1,279 @@
+/* ViewerAppsMenu styles */
+
+.vsp-apps-submenu-panel {
+  width: 280px !important;
+  max-width: 280px !important;
+  min-width: 280px !important;
+  display: flex;
+  flex-direction: column;
+  background: var(--vsp-bg, #1a1a1a) !important;
+  border: 1px solid var(--vsp-border, #333) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+}
+
+.vsp-apps-submenu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--vsp-border, #2d2d2d);
+  background: transparent;
+}
+
+.vsp-apps-submenu-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--md-text, #fff);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vsp-apps-refresh-btn {
+  background: transparent;
+  border: none;
+  color: var(--md-text-soft, #aaa);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.vsp-apps-refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--md-info, #4da1ff);
+}
+
+.vsp-apps-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 380px;
+  padding: 4px 0;
+}
+
+.vsp-apps-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 16px;
+  color: var(--md-text-soft, #888);
+  font-size: 13px;
+  text-align: center;
+}
+
+.vsp-apps-error {
+  color: var(--md-danger, #ff4d4d);
+}
+
+.vsp-apps-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.vsp-apps-list-item:hover,
+.vsp-apps-list-item.hovered {
+  background: rgba(77, 161, 255, 0.12);
+}
+
+.vsp-app-item-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.vsp-app-item-icon-fallback {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+}
+
+.vsp-app-item-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.vsp-app-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--md-text, #ddd);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vsp-app-item-pkg {
+  font-size: 11px;
+  color: var(--md-text-soft, #777);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.vsp-app-item-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.vsp-app-pinned-icon {
+  color: var(--md-info, #4da1ff);
+}
+
+.vsp-app-running-text {
+  font-size: 10px;
+  background: rgba(77, 161, 255, 0.15);
+  color: var(--md-info, #4da1ff);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.vsp-app-arrow {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.vsp-apps-submenu-cap2 {
+  width: 200px !important;
+  max-width: 200px !important;
+  min-width: 200px !important;
+  background: var(--vsp-bg, #1a1a1a) !important;
+  border: 1px solid var(--vsp-border, #333) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+}
+
+.vsp-apps-cap2-header {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--vsp-border, #2d2d2d);
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vsp-apps-cap2-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--md-info, #4da1ff);
+}
+
+.vsp-apps-cap2-list {
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Modal styles */
+.vsp-apps-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(2px);
+  z-index: var(--md-layer-confirm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vsp-apps-modal-card {
+  background: var(--md-card, #1a1a1a);
+  border: 1px solid var(--md-border, #333);
+  border-radius: 8px;
+  box-shadow: var(--md-shadow-panel, 0 10px 30px rgba(0,0,0,0.6));
+  width: 440px;
+  max-width: 90%;
+  padding: 20px;
+  z-index: calc(var(--md-layer-confirm) + 1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vsp-apps-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--md-text, #fff);
+  border-bottom: 1px solid var(--md-border, #2d2d2d);
+  padding-bottom: 12px;
+}
+
+.vsp-apps-modal-alert-icon {
+  color: var(--md-danger, #ff4d4d);
+}
+
+.vsp-apps-modal-body {
+  font-size: 14px;
+  color: var(--md-text-soft, #ccc);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vsp-apps-modal-app-details {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--md-border, #222);
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vsp-apps-modal-detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.vsp-apps-modal-detail-row .label {
+  color: #777;
+}
+
+.vsp-apps-modal-detail-row .value {
+  color: #fff;
+  text-align: right;
+}
+
+.vsp-apps-modal-detail-row .value.strong {
+  font-weight: 600;
+}
+
+.vsp-apps-modal-detail-row .value.highlight {
+  color: var(--md-info, #4da1ff);
+}
+
+.vsp-apps-modal-warning-text {
+  color: #ff9c9c;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.vsp-apps-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--md-border, #2d2d2d);
+  padding-top: 16px;
+}

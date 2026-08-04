@@ -31,6 +31,8 @@ type ActivePointerState = {
   syncSettings: SyncTimeSettings;
 };
 
+const BROADCAST_MOVE_INTERVAL_MS = 1000 / 30;
+
 function makePointerIdAllocator() {
   const idToPointer = new Map<number, number>();
   const pointerToId = new Map<number, number>();
@@ -163,6 +165,7 @@ export function attachTouchControls(
   const ptr = makePointerIdAllocator();
   const active = new Map<number, ActivePointerState>();
   let raf = 0;
+  let lastBroadcastMoveAt = -Infinity;
   let lastPinchAt = 0;
   const PINCH_THROTTLE_MS = 80;
 
@@ -251,11 +254,7 @@ export function attachTouchControls(
     if (isolated) return { source: makeTouchTarget(source, true), followers: [] };
 
     const rawFollowers = targets.filter((_, index) => index !== (sourceIndex >= 0 ? sourceIndex : 0));
-    console.log('[SyncTime] settings:', settings);
-    console.log('[SyncTime] rawFollowers:', rawFollowers.map(f => f.udid));
     const shuffledRaw = settings.randomOrder ? shuffleTargets(rawFollowers) : rawFollowers;
-    console.log('[SyncTime] final queue:', shuffledRaw.map(f => f.udid));
-    
     const followers = shuffledRaw.map(target => makeTouchTarget(target, false));
     return { source: makeTouchTarget(source, true), followers };
   }
@@ -350,17 +349,27 @@ export function attachTouchControls(
 
   function scheduleMoveFlush() {
     if (raf) return;
-    raf = requestAnimationFrame(() => {
+    raf = requestAnimationFrame((now) => {
       raf = 0;
       if (!canSend()) return;
+      let broadcastDeferred = false;
+      let broadcastFlushed = false;
       for (const st of active.values()) {
         if (!st.dirty) continue;
+        const isBroadcast = st.touchTargets.length > 1;
+        if (isBroadcast && now - lastBroadcastMoveAt < BROADCAST_MOVE_INTERVAL_MS) {
+          broadcastDeferred = true;
+          continue;
+        }
         st.dirty = false;
         const { x01, y01 } = st.lastXY;
         for (const tt of st.touchTargets) {
           sendTouch(tt, MotionAction.MOVE, st.pid, x01, y01, 1, st.lastButtons);
         }
+        if (isBroadcast) broadcastFlushed = true;
       }
+      if (broadcastFlushed) lastBroadcastMoveAt = now;
+      if (broadcastDeferred) scheduleMoveFlush();
     });
   }
 
@@ -534,6 +543,7 @@ export function attachTouchControls(
   canvas.addEventListener('contextmenu', onContextMenu);
 
   return () => {
+    if (raf) cancelAnimationFrame(raf);
     canvas.removeEventListener('pointerdown', onPointerDown);
     canvas.removeEventListener('pointermove', onPointerMove);
     canvas.removeEventListener('pointerup', onPointerUpOrCancel);

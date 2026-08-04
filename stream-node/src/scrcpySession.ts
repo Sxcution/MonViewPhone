@@ -4,14 +4,16 @@ import { resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import assert from 'node:assert/strict';
+import { pathToFileURL } from 'node:url';
 
 import { AdbScrcpyClient, AdbScrcpyOptionsLatest } from '@yume-chan/adb-scrcpy';
+import { ScrcpyCodecOptions } from '@yume-chan/scrcpy';
 
 import { createAdbForSerial, listDevices } from './adb.js';
 import { DeviceStepLogger } from './runtime.js';
 import { error, log, warn } from './logger.js';
 import {
-  encodeVideoPacket,
   ParsedControlMessage,
   REMOTE_SERVER_PATH,
   SCRCPY_VERSION,
@@ -19,9 +21,16 @@ import {
   StreamQuery,
 } from './protocol.js';
 
-export type VideoPacketSink = (packet: Buffer) => void;
+export type VideoPacket = {
+  type: ServerPacketType;
+  data: Uint8Array;
+  timestamp: number;
+  keyframe: boolean;
+};
+export type VideoPacketSink = (packet: VideoPacket) => void;
 
 type MaybeReadableStream = ReadableStream<Uint8Array>;
+type DeviceAdb = Awaited<ReturnType<typeof createAdbForSerial>>;
 type UhidTouchCalibration = {
   xOffset: number;
   yOffset: number;
@@ -38,6 +47,7 @@ const SERVER_CANDIDATES = [
   resolve(process.cwd(), '..', 'server-go', 'scrcpy-server.jar'),
 ];
 const execFileAsync = promisify(execFile);
+const SERVER_IO_TIMEOUT_MS = 10_000;
 
 const UHID_KEYBOARD_ID = 1;
 const UHID_TOUCH_ID = 3;
@@ -162,27 +172,27 @@ function parseUhidTouchCalibration(inputDump: string): UhidTouchCalibration | nu
   };
 }
 
-async function pushServer(adb: any, trace: DeviceStepLogger) {
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
+async function pushServer(adb: DeviceAdb, trace: DeviceStepLogger, remoteServerPath: string) {
   const serverJar = findServerJar(trace);
   const info = await stat(serverJar);
 
-  // Skip push if JAR already on device with matching size (saves ADB contention under concurrency)
-  try {
-    const result = await adb.subprocess.spawnAndWaitLegacy(
-      `ls -l ${REMOTE_SERVER_PATH} 2>/dev/null | awk '{print $5}'`
-    );
-    const remoteSize = parseInt(String(result.stdout).trim(), 10);
-    if (remoteSize === info.size) {
-      trace.step('PUSH_JAR_SKIP', { reason: 'size match', localSize: info.size, remoteSize });
-      return;
-    }
-  } catch {
-    // ls failed → file doesn't exist, proceed with push
-  }
-
-  trace.step('PUSH_JAR_BEGIN', { local: serverJar, bytes: info.size, remote: REMOTE_SERVER_PATH });
-  await AdbScrcpyClient.pushServer(adb, nodeFileToWebStream(serverJar) as never, REMOTE_SERVER_PATH);
-  trace.step('PUSH_JAR_OK', { remote: REMOTE_SERVER_PATH });
+  trace.step('PUSH_JAR_BEGIN', { local: serverJar, bytes: info.size, remote: remoteServerPath });
+  await AdbScrcpyClient.pushServer(adb, nodeFileToWebStream(serverJar) as never, remoteServerPath);
+  trace.step('PUSH_JAR_OK', { remote: remoteServerPath });
 }
 
 function makeOptions(query: StreamQuery, scid: string, trace: DeviceStepLogger) {
@@ -201,11 +211,14 @@ function makeOptions(query: StreamQuery, scid: string, trace: DeviceStepLogger) 
     sendDeviceMeta: true,
     sendCodecMeta: true,
     clipboardAutosync: true,
-    powerOn: true,
-    stayAwake: true,
+    powerOn: false,
+    stayAwake: false,
   };
 
   if (query.encoder) init.videoEncoder = query.encoder;
+  if (query.iFrameInterval !== undefined) {
+    init.videoCodecOptions = new ScrcpyCodecOptions({ iFrameInterval: query.iFrameInterval });
+  }
   trace.step('BUILD_SCRCPY_OPTIONS', init);
   return new AdbScrcpyOptionsLatest(init as never, { version: SCRCPY_VERSION });
 }
@@ -216,8 +229,10 @@ export class ScrcpySession {
   readonly query: StreamQuery;
   readonly trace: DeviceStepLogger;
 
-  #adb: any | undefined;
+  #adb: DeviceAdb | undefined;
   #client: any | undefined;
+  #remoteServerPath: string | undefined;
+  #serverPush: Promise<void> | undefined;
   #closed = false;
   #started = false;
   #readerAbort = new AbortController();
@@ -252,6 +267,7 @@ export class ScrcpySession {
       maxSize: this.query.maxSize,
       fps: this.query.maxFps,
       bitrate: this.query.bitrate,
+      iFrameInterval: this.query.iFrameInterval ?? 'default',
       encoder: this.query.encoder ?? 'auto',
     });
 
@@ -267,15 +283,28 @@ export class ScrcpySession {
       this.trace.step('ADB_CREATE_TRANSPORT_OK');
       if (this.#closed) throw new Error('session cancelled after adb transport');
 
-      await pushServer(this.#adb, this.trace);
+      // Grid/Viewer sessions must not share a JAR that the previous scrcpy CleanUp can delete.
+      this.#remoteServerPath = REMOTE_SERVER_PATH.replace(/\.jar$/, `-${this.scid}.jar`);
+      this.#serverPush = withTimeout(
+        pushServer(this.#adb, this.trace, this.#remoteServerPath),
+        SERVER_IO_TIMEOUT_MS,
+        `scrcpy server push timed out after ${SERVER_IO_TIMEOUT_MS}ms`,
+      );
+      try {
+        await this.#serverPush;
+      } finally {
+        this.#serverPush = undefined;
+      }
       if (this.#closed) throw new Error('session cancelled after server push');
 
       const options = makeOptions(this.query, this.scid, this.trace);
-      this.trace.step('SCRCPY_START_BEGIN', { remotePath: REMOTE_SERVER_PATH });
-      this.#client = await AdbScrcpyClient.start(this.#adb, REMOTE_SERVER_PATH, options as never);
+      this.trace.step('SCRCPY_START_BEGIN', { remotePath: this.#remoteServerPath });
+      this.#client = await AdbScrcpyClient.start(this.#adb, this.#remoteServerPath, options as never);
+      this.#remoteServerPath = undefined; // The scrcpy CleanUp process owns this path now.
       this.trace.step('SCRCPY_START_OK');
       if (this.#closed) throw new Error('session cancelled after scrcpy start');
     } catch (e) {
+      await this.#removePendingServer();
       this.trace.warn('SESSION_START_FAILED', describeError(e));
       error(this.udid, `scrcpy start failed:\n${describeError(e)}`);
       throw e;
@@ -334,14 +363,15 @@ export class ScrcpySession {
               this.#firstConfigLogged = true;
               this.trace.step('FIRST_VIDEO_CONFIGURATION_PACKET', { bytes: value.data.byteLength });
             }
-            onVideoPacket(encodeVideoPacket(ServerPacketType.VideoConfiguration, value.data, 0, true));
+            onVideoPacket({ type: ServerPacketType.VideoConfiguration, data: value.data, timestamp: 0, keyframe: true });
           } else {
+            const timestamp = Number(value.pts ?? 0);
             if (!this.#firstVideoLogged) {
               this.#firstVideoLogged = true;
-              this.trace.step('FIRST_VIDEO_DATA_PACKET', { bytes: value.data.byteLength, keyframe: Boolean(value.keyframe), timestamp: Number(value.timestamp ?? 0) });
+              this.trace.step('FIRST_VIDEO_DATA_PACKET', { bytes: value.data.byteLength, keyframe: Boolean(value.keyframe), timestamp });
             }
             if (this.#videoPackets % 300 === 0) this.trace.step('VIDEO_PACKET_HEARTBEAT', { packets: this.#videoPackets });
-            onVideoPacket(encodeVideoPacket(ServerPacketType.VideoData, value.data, Number(value.timestamp ?? 0), Boolean(value.keyframe)));
+            onVideoPacket({ type: ServerPacketType.VideoData, data: value.data, timestamp, keyframe: Boolean(value.keyframe) });
           }
         }
       } catch (e) {
@@ -575,6 +605,8 @@ export class ScrcpySession {
     this.#readerAbort.abort();
 
     try { await this.#releaseUhidDevices(); } catch {}
+    try { await this.#serverPush; } catch {}
+    await this.#removePendingServer();
     try { await this.#client?.close(); } catch {}
     try { await this.#adb?.close(); } catch {}
 
@@ -582,4 +614,33 @@ export class ScrcpySession {
     this.#adb = undefined;
     this.trace.step('SESSION_CLOSE_OK');
   }
+
+  async #removePendingServer() {
+    const remoteServerPath = this.#remoteServerPath;
+    this.#remoteServerPath = undefined;
+    if (!remoteServerPath || !this.#adb) return;
+    try {
+      await withTimeout(
+        this.#adb.rm(remoteServerPath, { force: true }),
+        SERVER_IO_TIMEOUT_MS,
+        `pending scrcpy server cleanup timed out after ${SERVER_IO_TIMEOUT_MS}ms`,
+      );
+      this.trace.step('PENDING_JAR_REMOVED', { remote: remoteServerPath });
+    } catch (e) {
+      this.trace.warn('PENDING_JAR_REMOVE_FAILED', describeError(e));
+    }
+  }
+}
+
+async function selfCheck() {
+  assert.equal(await withTimeout(Promise.resolve('ok'), 100, 'unexpected timeout'), 'ok');
+  await assert.rejects(
+    withTimeout(new Promise<void>(() => undefined), 5, 'expected timeout'),
+    /expected timeout/,
+  );
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await selfCheck();
+  console.log('scrcpy session self-check passed');
 }

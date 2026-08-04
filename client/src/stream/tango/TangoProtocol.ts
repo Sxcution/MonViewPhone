@@ -19,6 +19,7 @@ export function makeTangoStreamUrl(args: {
   udid: string;
   bitrate: number;
   maxFps: number;
+  iFrameInterval?: number;
   maxSize: number;
   displayId: number;
   encoderName?: string;
@@ -27,6 +28,9 @@ export function makeTangoStreamUrl(args: {
   u.searchParams.set('udid', args.udid);
   u.searchParams.set('bitrate', String(args.bitrate));
   u.searchParams.set('maxFps', String(args.maxFps));
+  if (args.iFrameInterval != null) {
+    u.searchParams.set('iFrameInterval', String(args.iFrameInterval));
+  }
   u.searchParams.set('maxSize', String(args.maxSize));
   u.searchParams.set('displayId', String(args.displayId));
   if (args.encoderName) {
@@ -35,9 +39,10 @@ export function makeTangoStreamUrl(args: {
   return u.toString();
 }
 
-export function parseTangoPacket(data: ArrayBuffer): TangoVideoPacket | null {
-  if (data.byteLength < HEADER_SIZE) return null;
-  const dv = new DataView(data);
+export function parseTangoPacket(data: ArrayBuffer | Uint8Array): TangoVideoPacket | null {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+  if (bytes.byteLength < HEADER_SIZE) return null;
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (dv.getUint32(0, false) !== MAGIC) return null;
   const version = dv.getUint8(4);
   if (version !== 1) return null;
@@ -46,12 +51,12 @@ export function parseTangoPacket(data: ArrayBuffer): TangoVideoPacket | null {
   const flags = dv.getUint8(6);
   const timestampUs = Number(dv.getBigUint64(8, false));
   const length = dv.getUint32(16, false);
-  if (length > data.byteLength - HEADER_SIZE) return null;
+  if (length > bytes.byteLength - HEADER_SIZE) return null;
 
   return {
     type: packetType,
     keyframe: (flags & 1) !== 0,
     timestampUs,
-    payload: new Uint8Array(data, HEADER_SIZE, length),
+    payload: bytes.subarray(HEADER_SIZE, HEADER_SIZE + length),
   };
 }

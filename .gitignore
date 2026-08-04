@@ -1,6 +1,7 @@
 node_modules/
 dist/
 uploads/
+exports/
 *.tsbuildinfo
 .env
 .env.*
@@ -19,6 +20,7 @@ Backup/
 *.ldb
 *.log
 *.bak
+*.bak.*
 *.backup
 *.tmp
 *.sqlite-wal
@@ -41,12 +43,16 @@ leveldb/
 APK/
 *.exe
 *.apk
+!server-go/mediaimport/bin/Monhelper.apk
 *.xapk
 *.zip
 Codex.Switcher*
 Working/
+/backups/
+/xiaowei/
 __pycache__/
 *.class
+/server-go/$cover
 
 # Data/debug text files
 2854_*.txt

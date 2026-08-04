@@ -100,7 +100,11 @@ public class AppManagerHelper {
                 // Load and encode icon to base64 PNG
                 String base64Icon = "";
                 try {
-                    Drawable drawable = appInfo.loadIcon(pm);
+                    // Bypass vendor live icons: Samsung's calendar icon renders text and can
+                    // abort a standalone app_process before its default Typeface is initialized.
+                    Drawable drawable = appInfo.icon == 0
+                            ? null
+                            : pm.getResourcesForApplication(appInfo).getDrawable(appInfo.icon, null);
                     if (drawable != null) {
                         Bitmap bitmap;
                         if (drawable instanceof BitmapDrawable) {

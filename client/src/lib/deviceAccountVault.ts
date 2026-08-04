@@ -89,6 +89,33 @@ export interface WeChatAccount extends BaseAccount {
 // We use an intersection type for flexibility, but strictly platforms other than WeChat just use BaseAccount fields
 export type Account = BaseAccount & Partial<WeChatAccount>;
 
+export type WechatNewStatus = 'New' | 'New 1' | 'New 2';
+
+const WECHAT_NEW_ACCOUNT_MS = 30 * 24 * 60 * 60 * 1000;
+const WECHAT_NEW_1_ACCOUNT_MS = 60 * 24 * 60 * 60 * 1000;
+const WECHAT_NEW_2_ACCOUNT_MS = 90 * 24 * 60 * 60 * 1000;
+
+export function getWechatNewStatus(account: Account, now = Date.now()): WechatNewStatus | null {
+  if (typeof account.createdAt !== 'number' || !Number.isFinite(account.createdAt)) {
+    return account.isNew ? 'New' : null;
+  }
+
+  const ageMs = now - account.createdAt;
+  if (ageMs < WECHAT_NEW_ACCOUNT_MS) return 'New';
+  if (ageMs < WECHAT_NEW_1_ACCOUNT_MS) return 'New 1';
+  if (ageMs < WECHAT_NEW_2_ACCOUNT_MS) return 'New 2';
+  return null;
+}
+
+export function getNextWechatNewStatusChangeAt(account: Account, now = Date.now()): number | null {
+  if (typeof account.createdAt !== 'number' || !Number.isFinite(account.createdAt)) return null;
+  for (const ageMs of [WECHAT_NEW_ACCOUNT_MS, WECHAT_NEW_1_ACCOUNT_MS, WECHAT_NEW_2_ACCOUNT_MS]) {
+    const changeAt = account.createdAt + ageMs;
+    if (changeAt > now) return changeAt;
+  }
+  return null;
+}
+
 export interface DeviceAccountData {
   udid: string;
   displayName: string;
@@ -104,6 +131,45 @@ export interface VaultData {
 }
 
 const STORAGE_KEY = 'monviewphone:device-account-vault';
+
+export function expireDueRiskAccounts(vault: VaultData, now = Date.now()) {
+  const changedUdids: string[] = [];
+  let nextDueDate: number | null = null;
+
+  for (const [udid, device] of Object.entries(vault.devices || {})) {
+    let changed = false;
+    for (const accounts of Object.values(device.platforms || {})) {
+      for (const account of accounts) {
+        const notice = account.notice;
+        if (account.status !== 'Risk' || typeof notice?.dueDate !== 'number') continue;
+
+        if (notice.dueDate > now) {
+          nextDueDate = nextDueDate === null
+            ? notice.dueDate
+            : Math.min(nextDueDate, notice.dueDate);
+          continue;
+        }
+
+        account.status = 'Live';
+        account.history = [
+          ...(Array.isArray(account.history) ? account.history : []),
+          {
+            id: `risk_due_${account.id}_${now}`,
+            action: 'Live',
+            timestamp: now,
+          },
+        ];
+        changed = true;
+      }
+    }
+    if (changed) {
+      device.updatedAt = now;
+      changedUdids.push(udid);
+    }
+  }
+
+  return { changedUdids, nextDueDate };
+}
 
 export function loadDeviceAccountVault(): VaultData {
   try {

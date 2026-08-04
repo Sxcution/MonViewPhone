@@ -5,6 +5,10 @@ export interface StreamStats {
   renderedFps: number;
   droppedFrames: number;
   decodeQueueSize: number;
+  clientDecodeLatencyEstimateMs?: number;
+  relativeTransportBacklogEstimateMs?: number;
+  decoderRecoveryCount?: number;
+  waitingForKeyframe?: boolean;
   reconnectCount: number;
   width: number;
   height: number;

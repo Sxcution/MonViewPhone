@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Settings, ChevronUp, ChevronDown, Plus } from 'lucide-react';
 import { loadAppActions, type AutomationAppId } from '@/lib/automationData';
 import { saveAutomationSettingToBackend } from '@/lib/backendSettings';
@@ -233,10 +234,10 @@ export function AutomationPanel({
         })}
       </div>
 
-      {contextMenu && (
+      {contextMenu && createPortal(
         <div
           className='automationContextMenuPanel contextMenuPanel dropdown-menu show'
-          style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 30000 }}
+          style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y }}
           onMouseDown={e => e.stopPropagation()}
           data-inspector-id="automationPanel.contextMenu"
           data-inspector-label="Action slot context menu"
@@ -267,7 +268,8 @@ export function AutomationPanel({
           >
             <span>Gỡ khỏi panel</span>
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

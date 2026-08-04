@@ -1,85 +1,73 @@
-# Mon WeChat Notify Helper Integration
+# Monhelper
 
-This MonViewPhone feature depends on a separate Android helper APK:
-
-```text
-C:\Users\Mon\Desktop\Protect\MonWechatNotifyHelper\build\MonWechatNotifyHelper.apk
-```
-
-A copy for the APK build archive is also kept at:
+The media batch importer and the standalone-compatible WeChat notification
+listener are built into one APK:
 
 ```text
-C:\Users\Mon\Desktop\Protect\Build APK\MonWechatNotifyHelper\MonWechatNotifyHelper.apk
+server-go\mediaimport\bin\Monhelper.apk
 ```
 
-## What It Does
-
-`MonWechatNotifyHelper.apk` runs on the phone as package:
+The package and provider authority stay unchanged so existing media-import
+installs can be upgraded in place:
 
 ```text
-com.mon.wechatnotify
+package:   com.monviewphone.mediaimport
+provider:  content://com.monviewphone.mediaimport
+listener:  com.monviewphone.mediaimport/com.monviewphone.mediaimport.WechatNotificationListener
 ```
 
-It uses Android `NotificationListenerService` to detect WeChat notifications
-from:
+`..\Build APK\Monhelper\build-helper.ps1` builds and signs the APK into the
+runtime path above. The Go
+backend installs/upgrades it in user 0 and uses `install-existing` for the
+secondary users that contain WeChat.
+
+## WeChat events
+
+The listener filters `com.tencent.mm` and writes parser-compatible lines to
+logcat tag `MonWechatNotify`:
 
 ```text
-com.tencent.mm
+HELPER_V5 WECHAT_POSTED eventId=<stable-id> user=10 key=<key> title=<title> text=<text>
+HELPER_V5 WECHAT_ACTIVE eventId=<stable-id> user=10 key=<key> title=<title> text=<text>
+HELPER_V5 WECHAT_REMOVED user=10 key=<key>
 ```
 
-The helper writes detection lines to logcat with tag:
-
-```text
-MonWechatNotify
-```
-
-MonViewPhone reads those logcat lines and shows a tile badge similar to Visual
-Alert. The badge text is formatted like:
-
-```text
-Message: User 10 | Sender: message text
-```
-
-When the badge is clicked, MonViewPhone opens WeChat on the phone using the
-detected Android user:
-
-```text
-am start --user <userId> -n com.tencent.mm/com.tencent.mm.ui.LauncherUI
-```
-
-## Phone Requirement
-
-The phone must have `MonWechatNotifyHelper.apk` installed and its notification
-listener enabled. The current intended setup is:
-
-- Install helper in user 0.
-- Enable notification listener for user 0.
-- Do not install helper into clone users unless specifically testing; user 0
-  can see clone-user WeChat notifications on the tested A13 ROM.
-
-Example enable command:
+MonViewPhone opens one SSE connection to
+`/api/goog/wechat-notify/events`. The backend keeps one persistent filtered
+`adb logcat` process per requested online device, upgrades Monhelper if needed,
+then enables its listener in every Android user that contains `com.tencent.mm`.
+The parser accepts only the `HELPER_V5` marker, so an older Nova listener using
+the same tag cannot create duplicate alerts. This replaces the old browser-side
+`logcat -d` polling loop.
 
 ```powershell
-adb -s <udid> shell cmd notification allow_listener com.mon.wechatnotify/com.mon.wechatnotify.WechatNotificationListener 0
+adb -s <udid> shell cmd notification allow_listener com.monviewphone.mediaimport/com.monviewphone.mediaimport.WechatNotificationListener <userId>
 ```
 
-## MonViewPhone Code Names
+## MonViewPhone behavior
 
-Use these names to find the integration quickly:
+- WeChat alerts run independently of the Visual Alert toggle.
+- A new helper event plays the existing alert sound once. A replay with the
+  same stable ID is ignored.
+- Each tile keeps one pending item per Android profile. Multiple profiles are
+  shown together using profile names, for example `WeChat (Owner)`,
+  `WeChat1 (Space 1)`, and `WeChatWork`.
+- Each profile label is clickable. MonViewPhone opens `com.tencent.mm` for that
+  exact `userId` and clears only that item after the open command succeeds.
+- Clicking a stream title clears an item only when that exact WeChat profile is
+  the foreground activity. Opening the matching profile manually also clears it
+  when Android removes that profile's notification; other profiles stay pending.
 
-- Constants: `MON_WECHAT_NOTIFY_HELPER_*`
-- Poll function: `pollMonWechatNotifyHelperLogs`
-- Badge click function: `handleMonWechatNotifyBadgeClick`
-- Log parser file: `client/src/lib/wechatNotifyLog.ts`
-- Tile badge props:
-  - `visualAlertSource="wechat"`
-  - `visualAlertTargetUserId=<userId>`
+## Migration from Nova
 
-## Important Behavior
+The old `com.mon.wechatnotify` APK no longer exists on the current fleet. Its
+listener was folded into Nova as:
 
-- This is notification-based. If WeChat does not create an Android
-  notification, the helper will not see that message.
-- Visual Alert badges still behave normally. Only badges with
-  `source: "wechat"` open WeChat on click.
-- MonViewPhone polls helper logs in small batches to avoid overloading ADB on a
-  large device fleet.
+```text
+com.teslacoilsw.launcher/mon.space.WechatNotificationListener
+```
+
+Do not enable both WeChat listeners fleet-wide. After the Monhelper path is
+verified, disable only the Nova `mon.space` listener. Never disable Nova's own
+`com.teslacoilsw.launcher.notificationlistener.NotificationListener`, which is
+used for notification dots.

@@ -28,18 +28,19 @@ These rules exist because context menus/submenus can easily close before the int
 
 When coding any notification modal such as confirm delete, rename, create, or input, follow these rules:
 
-1. Always overlay above all other modals/panels. Notification modals must use z-index values higher than every other app layer:
-   - Automation floating layer: `z-index: 26001`
-   - Modal backdrop: `z-index: 27000`
-   - Modal overlay/card content: `z-index: 27001`
-   - Context menu on modal: `z-index: 27000`
+1. Always use the shared layer tokens instead of one-off z-index values:
+   - Automation/floating workspace: `var(--md-layer-workspace)`
+   - Parent modal: `var(--md-layer-modal)`
+   - Child modal/popover: `var(--md-layer-modal-child)`
+   - Notification/emergency confirm: `var(--md-layer-notification)`
+   - Context menu: `var(--md-layer-menu)`; a menu owned by a modal may use the child-modal layer.
 2. Use `createPortal(jsx, document.body)` to render modals outside the parent component DOM tree. Do not render modals inside containers with `transform`, `position: relative`, or `overflow: hidden`, because they can be clipped or positioned incorrectly.
 3. Do not use Bootstrap CSS classes for modal positioning (`modal`, `modal-dialog-centered`, `modal-backdrop`) because this project does not install Bootstrap CSS. Use fully controlled app styles:
    - Backdrop: `position: fixed; inset: 0;`
    - Overlay: `position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;`
    - Card: app-owned `background`, `border`, `border-radius`, and `box-shadow`
 4. Do not use native browser dialogs: no `window.prompt()`, `window.confirm()`, `alert()`, or `confirm()`. Use custom app modals such as `InputModal` or `ConfirmDeleteModal`.
-5. Any child modal opened from inside a parent modal, including settings/config modals like Sync Macro opened from Thiết Lập Macro, must render through `createPortal(..., document.body)` and use the same top overlay layer (`z-index: 27000+`) so it appears above the parent, never behind it.
+5. Any child modal opened from inside a parent modal, including settings/config modals like Sync Macro opened from Thiết Lập Macro, must render through `createPortal(..., document.body)` and use `var(--md-layer-modal-child)` so it appears above the parent, never behind it.
 
 ## UI/UX Styling Standard
 
@@ -47,7 +48,9 @@ Use the MonDashboard Home / Dashboard command-center theme as the project stylin
 
 1. Design tokens:
    - All new UI styling must use the `--md-*` tokens defined in `client/src/styles.css`.
-   - Core tokens: `--md-bg`, `--md-bg-soft`, `--md-header`, `--md-surface`, `--md-card`, `--md-panel`, `--md-border`, `--md-border-strong`, `--md-text`, `--md-muted`, `--md-info`, `--md-blue`, `--md-danger`, `--md-radius-sm`, `--md-shadow-soft`, `--md-shadow-panel`.
+   - Core tokens: `--md-bg`, `--md-bg-soft`, `--md-header`, `--md-surface`, `--md-surface-2`, `--md-card`, `--md-panel`, `--md-border`, `--md-border-strong`, `--md-text`, `--md-muted`, `--md-primary`, `--md-primary-hover`, `--md-primary-soft`, `--md-danger`, `--md-danger-hover`, `--md-danger-active`, `--md-radius-sm`, `--md-radius-md`, `--md-shadow-soft`, `--md-shadow-panel`.
+   - Semantic status tokens: `--md-success`, `--md-warning`, `--md-danger`, `--md-risk`, `--md-verify`, `--md-nearby`, and `--md-wechat`.
+   - Typography, control, spacing, and layer values must use the `--md-font-*`, `--md-control-*`, `--md-space-*`, and `--md-layer-*` scales. Do not create one-off pixel values for shared UI.
    - Compatibility tokens such as `--bg-base`, `--bg-panel`, `--border-color`, `--text-main`, and `--accent-color` must map back to the `--md-*` tokens.
 2. Surfaces:
    - Body/app background: `var(--md-bg)` with only very subtle cyan/blue radial accents.
@@ -55,22 +58,32 @@ Use the MonDashboard Home / Dashboard command-center theme as the project stylin
    - Border: `1px solid var(--md-border)`.
    - Strong/hover border: `var(--md-border-strong)`.
    - Shadow: `var(--md-shadow-soft)` for panels/cards and `var(--md-shadow-panel)` for modal/overlay surfaces.
-   - Main border-radius: `8px`.
+   - Control/menu border-radius: `var(--md-radius-sm)` (`8px`).
+   - Card/modal border-radius: `var(--md-radius-md)` (`12px`).
 3. Text:
    - Primary text: `var(--md-text)`.
    - Secondary text/labels: `var(--md-muted)` or `var(--md-text-soft)`.
-   - Accent states: cyan/blue via `var(--md-info)` and `var(--md-blue)`.
+   - Main accent: `var(--md-primary)`; legacy `--md-info` and `--md-blue` must alias back to that token.
+   - Metadata: `var(--md-font-meta)` (`11px`).
+   - Help/secondary: `var(--md-font-help)` (`12px`).
+   - Body/menu/button: `var(--md-font-body)` (`13px`).
+   - Section/field heading: `var(--md-font-section)` (`14px`).
+   - Modal/panel title: `var(--md-font-title)` (`16px`).
 4. Buttons:
-   - Base: `height: 34px; border-radius: 8px; background: rgba(255,255,255,.055); border: 1px solid var(--md-border); color: var(--md-text)`.
-   - Hover: `background: rgba(255,255,255,.09); border-color: var(--md-border-strong)`.
-   - Primary/active: `background: linear-gradient(135deg, var(--md-info), var(--md-blue))`.
+   - Base: `height: var(--md-control-height); border-radius: var(--md-radius-sm); background: var(--md-control-bg); border: 1px solid var(--md-border); color: var(--md-text)`.
+   - Compact controls may use `var(--md-control-compact)`; `var(--md-control-large)` is reserved for deliberate large quick actions.
+   - Hover: `background: var(--md-control-hover); border-color: var(--md-border-strong)`.
+   - Primary/active: `background: var(--md-primary)`; hover uses `var(--md-primary-hover)`.
    - Danger: use `var(--md-danger)`.
    - Shadow/Glow: Never use custom box-shadow, outer glows (hắc sáng), or radial-gradient overlays. All buttons must remain clean, flat, and aligned with design tokens.
 5. Inputs/selects:
-   - `background: rgba(255,255,255,.055); border: 1px solid var(--md-border); border-radius: 8px; color: var(--md-text)`.
+   - `height: var(--md-control-height); background: var(--md-control-bg); border: 1px solid var(--md-border); border-radius: var(--md-radius-sm); color: var(--md-text)`.
 6. Context menus and modals:
    - Keep all Context Menu Quality Rules and Modal Overlay Rules above unchanged.
    - Only change colors, border, radius, shadow, spacing, and hover states unless behavior changes are explicitly requested.
+   - Context menus must reuse `.uiMenuSurface`, `.uiMenuItem`, `.uiMenuDivider`, and their semantic variants. Inline styles are allowed only for clamped dynamic `top`/`left` positioning.
+7. Spacing:
+   - Shared UI spacing is limited to `var(--md-space-1)` (`4px`), `--md-space-2` (`8px`), `--md-space-3` (`12px`), `--md-space-4` (`16px`), and `--md-space-6` (`24px`).
 ## Strict UI Consistency Rules
 
 These rules are mandatory. Do not create new visual styles, colors, modal behavior, panel backgrounds, or button variants unless the user explicitly asks for a new design system.
@@ -113,8 +126,8 @@ Every new UI block must follow this hierarchy:
 - Main app/page background: `var(--md-bg)`
 - Large section container: `var(--md-card)`
 - Inner/nested section: `var(--md-surface-2)`
-- Input/select/field: `rgba(255,255,255,.055)` with `var(--md-border)`
-- Hover row: `rgba(255,255,255,.06)` or `rgba(255,255,255,.09)`
+- Input/select/field: `var(--md-control-bg)` with `var(--md-border)`
+- Hover row: `var(--md-control-hover)`
 - Border: always `1px solid var(--md-border)`
 
 Do not make one section lighter/darker than sibling sections unless it is an intentional active/selected state.
@@ -161,9 +174,9 @@ Danger buttons must use real red, not pink.
 
 Danger color:
 
-- Default: `#dc2626`
-- Hover: `#b91c1c`
-- Active: `#991b1b`
+- Default: `var(--md-danger)`
+- Hover: `var(--md-danger-hover)`
+- Active: `var(--md-danger-active)`
 
 Do not use `#e94560` for delete buttons because it looks pink in the current theme.
 
@@ -207,14 +220,13 @@ Use z-index layers consistently.
 
 Base app layers:
 
-- Normal UI: below `10000`
-- Context menu: `20000+`
-- Automation floating layer: `26001`
-- Parent modal overlay: `27000`
-- Parent modal card: `27001`
-- Child modal overlay: `28000`
-- Child modal card: `28001`
-- Emergency confirm/delete modal: `29000+`
+- Normal UI: below `var(--md-layer-menu)`
+- Context menu: `var(--md-layer-menu)`
+- Automation/floating workspace: `var(--md-layer-workspace)`
+- Parent modal: `var(--md-layer-modal)`
+- Child modal/popover: `var(--md-layer-modal-child)`
+- Notification/emergency confirm: `var(--md-layer-notification)`
+- Inspector/debug tools: `var(--md-layer-inspector)`
 
 Never render a child modal inside the DOM of a parent modal if the parent has transform, overflow, or positioning that can clip it.
 
@@ -492,29 +504,24 @@ Nếu output vẫn ra các target chung như `button.generic`, `text.primary`, `
 
 ## Mon WeChat Notify Helper
 
-MonViewPhone WeChat notification badges depend on the separate Android helper APK:
+Media batch import and the standalone-compatible WeChat notification listener
+share one APK:
 
 ```text
-C:\Users\Mon\Desktop\Protect\MonWechatNotifyHelper\build\MonWechatNotifyHelper.apk
+server-go\mediaimport\bin\Monhelper.apk
 ```
 
-The archive copy is:
+Keep package `com.monviewphone.mediaimport` and provider authority
+`content://com.monviewphone.mediaimport` for upgrade compatibility. The owner
+listener component is
+`com.monviewphone.mediaimport/com.monviewphone.mediaimport.WechatNotificationListener`.
+Do not enable it fleet-wide while Nova's
+`com.teslacoilsw.launcher/mon.space.WechatNotificationListener` is active.
+Never disable Nova's own notification-dots listener.
 
-```text
-C:\Users\Mon\Desktop\Protect\Build APK\MonWechatNotifyHelper\MonWechatNotifyHelper.apk
-```
-
-Phones must have package `com.mon.wechatnotify` installed and notification listener
-`com.mon.wechatnotify/com.mon.wechatnotify.WechatNotificationListener` enabled.
-MonViewPhone reads logcat tag `MonWechatNotify`, then shows tile badges and opens
-the detected WeChat Android user on badge click.
-
-Code naming rule for this feature:
-
-- Constants must use `MON_WECHAT_NOTIFY_HELPER_*`.
-- Polling code is `pollMonWechatNotifyHelperLogs`.
-- Badge click code is `handleMonWechatNotifyBadgeClick`.
-- Parser code lives in `client/src/lib/wechatNotifyLog.ts`.
+`client/src/lib/wechatNotifyLog.ts` parses the compatible `MonWechatNotify`
+format, but it currently has no active `App.tsx` caller. Do not restore the old
+3.5-second fleet logcat poll because it caused long-session lag.
 
 Detailed notes live in `docs/WECHAT_NOTIFY_HELPER.md`.
 

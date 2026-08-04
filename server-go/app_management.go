@@ -41,6 +41,23 @@ func validatePackageName(name string) bool {
 	return packageNameRegex.MatchString(name)
 }
 
+func shouldRepushAppHelper(output string) bool {
+	for _, line := range strings.Split(strings.ToLower(output), "\n") {
+		classMissing := strings.Contains(line, "com.monviewphone.appmanagement.appmanagerhelper") &&
+			(strings.Contains(line, "classnotfoundexception") ||
+				strings.Contains(line, "could not find or load main class") ||
+				strings.Contains(line, "didn't find class"))
+		jarMissing := strings.Contains(line, "/data/local/tmp/monview-app-management.jar") &&
+			(strings.Contains(line, "no such file or directory") ||
+				strings.Contains(line, "failed to open dex") ||
+				strings.Contains(line, "unable to open"))
+		if classMissing || jarMissing {
+			return true
+		}
+	}
+	return false
+}
+
 func findProjectRoot() string {
 	wd, err := os.Getwd()
 	if err == nil {
@@ -122,9 +139,11 @@ func handleAppsList(w http.ResponseWriter, r *http.Request) {
 
 	out, err := adb.Shell(udid, cmd)
 	if err != nil {
-		// Try pushing again just in case helper was deleted
-		if _, errPush := adb.Command("-s", udid, "push", localJar, remoteJar); errPush == nil {
-			out, err = adb.Shell(udid, cmd)
+		if shouldRepushAppHelper(out) {
+			// Push again only when app_process reports that this helper is missing.
+			if _, errPush := adb.Command("-s", udid, "push", localJar, remoteJar); errPush == nil {
+				out, err = adb.Shell(udid, cmd)
+			}
 		}
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, jsonResponse{"success": false, "error": fmt.Sprintf("Failed to run app helper: %v, output: %s", err, out)})

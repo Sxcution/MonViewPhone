@@ -1,5 +1,5 @@
 import { DeviceStepLogger } from './runtime.js';
-import { ScrcpySession } from './scrcpySession.js';
+import { ScrcpySession, type VideoPacketSink } from './scrcpySession.js';
 import type { StreamQuery } from './protocol.js';
 import { log, warn } from './logger.js';
 
@@ -18,7 +18,7 @@ export class SessionManager {
   #queue: QueueJob<unknown>[] = [];
   #activeStarts = 0;
 
-  async start(query: StreamQuery, onVideoPacket: (packet: Buffer) => void): Promise<ScrcpySession> {
+  async start(query: StreamQuery, onVideoPacket: VideoPacketSink): Promise<ScrcpySession> {
     log(query.udid, `[MANAGER] start requested. queue=${this.#queue.length}, activeStarts=${this.#activeStarts}`);
 
     await this.close(query.udid);

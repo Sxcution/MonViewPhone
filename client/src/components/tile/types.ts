@@ -31,8 +31,10 @@ export type TileProps = {
     visualAlertLabel?: string;
     visualAlertSource?: 'visual' | 'wechat';
     visualAlertTargetUserId?: number;
+    visualAlertTargets?: { userId: number; label: string }[];
     onClearVisualAlert?: (udid: string) => void;
-    onVisualAlertClick?: (udid: string) => void;
+    onAcknowledgeWechatAlert?: (udid: string) => void | Promise<void>;
+    onVisualAlertClick?: (udid: string, userId: number) => void | Promise<void>;
     onRegisterReload?: (udid: string, reload: (opts?: StreamReloadOptions) => void) => void;
     onUnregisterReload?: (udid: string) => void;
     onViewDevice?: (udid: string) => void;

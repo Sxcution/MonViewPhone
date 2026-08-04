@@ -4,8 +4,28 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { listDevices } from './adb.js';
 import { allowedDevicesLabel, isDeviceAllowed, STREAM_NODE_BUILD_ID } from './runtime.js';
 import { error, log, warn } from './logger.js';
-import { encodeHello, parseClientControl, parseStreamQuery, STREAM_NODE_PORT } from './protocol.js';
+import { encodeHello, encodeVideoPacket, HEADER_SIZE, parseClientControl, parseStreamQuery, ServerPacketType, STREAM_NODE_PORT } from './protocol.js';
 import { sessionManager } from './sessionManager.js';
+import { VideoBackpressureGate } from './videoBackpressure.js';
+
+function bytesFromEnv(name: string) {
+  const raw = process.env[name]?.trim();
+  if (!raw) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : undefined;
+}
+
+const WS_HIGH_WATER_OVERRIDE = bytesFromEnv('MONVIEW_WS_HIGH_WATER_BYTES');
+const WS_LOW_WATER_OVERRIDE = bytesFromEnv('MONVIEW_WS_LOW_WATER_BYTES');
+const CONGESTION_LOG_INTERVAL_MS = 5_000;
+
+function waterMarksForBitrate(bitrate: number) {
+  // Half a second of encoded bits, converted to bytes.
+  const derivedHigh = Math.max(64 * 1024, Math.min(512 * 1024, Math.trunc(bitrate / 16)));
+  const high = WS_HIGH_WATER_OVERRIDE !== undefined && WS_HIGH_WATER_OVERRIDE > 0 ? WS_HIGH_WATER_OVERRIDE : derivedHigh;
+  const low = Math.min(high - 1, WS_LOW_WATER_OVERRIDE ?? Math.max(16 * 1024, Math.trunc(high / 4)));
+  return { high, low };
+}
 
 const server = createServer(async (req, res) => {
   try {
@@ -69,12 +89,55 @@ wss.on('connection', async (ws, req) => {
 
     ws.send(JSON.stringify({ type: 'status', message: 'Đã nhận WS, vào hàng đợi stream Tango…' }));
 
+    const { high: highWaterBytes, low: lowWaterBytes } = waterMarksForBitrate(query.bitrate);
+    log(udid, `[WS] video backpressure highWater=${highWaterBytes} lowWater=${lowWaterBytes} bitrate=${query.bitrate} source=${WS_HIGH_WATER_OVERRIDE ? 'env' : 'bitrate'}`);
+    const backpressure = new VideoBackpressureGate(highWaterBytes, lowWaterBytes);
+    let latestConfiguration: Buffer | undefined;
+    let lastCongestionSummaryAt = 0;
+    let lastMissingConfigurationWarningAt = 0;
+    const onBinarySend = (err?: Error) => {
+      if (err) warn(udid, `[WS] send video packet failed: ${String(err)}`);
+    };
+    const sendBinary = (packet: Buffer) => {
+      ws.send(packet, { binary: true }, onBinarySend);
+    };
+
     const session = await sessionManager.start(query, (packet) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(packet, { binary: true }, (err) => {
-          if (err) warn(udid, `[WS] send video packet failed: ${String(err)}`);
-        });
+      if (ws.readyState !== WebSocket.OPEN) return;
+
+      const bufferedAmount = ws.bufferedAmount;
+      const packetBytes = HEADER_SIZE + packet.data.byteLength;
+      const wasCongested = backpressure.congested;
+      const action = backpressure.decide(packet.type, packet.keyframe, bufferedAmount, latestConfiguration !== undefined);
+      if (!wasCongested && backpressure.congested) {
+        lastCongestionSummaryAt = Date.now();
+        warn(udid, `[WS] video congestion entered bufferedAmount=${bufferedAmount} packetBytes=${packetBytes} highWater=${highWaterBytes}`);
       }
+
+      if (packet.type === ServerPacketType.VideoConfiguration) {
+        latestConfiguration = encodeVideoPacket(packet.type, packet.data, packet.timestamp, packet.keyframe);
+        if (action === 'send') sendBinary(latestConfiguration);
+        return;
+      }
+
+      if (action === 'drop-video') {
+        const now = Date.now();
+        if (packet.keyframe && bufferedAmount <= lowWaterBytes && !latestConfiguration && now - lastMissingConfigurationWarningAt >= CONGESTION_LOG_INTERVAL_MS) {
+          lastMissingConfigurationWarningAt = now;
+          warn(udid, `[WS] recovery keyframe held: no cached video configuration bufferedAmount=${bufferedAmount} droppedTotal=${backpressure.droppedFrames}`);
+        }
+        if (now - lastCongestionSummaryAt >= CONGESTION_LOG_INTERVAL_MS) {
+          lastCongestionSummaryAt = now;
+          warn(udid, `[WS] video congestion active bufferedAmount=${bufferedAmount} droppedFrames=${backpressure.droppedSinceCongestion} droppedTotal=${backpressure.droppedFrames}`);
+        }
+        return;
+      }
+
+      if (action === 'recover') {
+        log(udid, `[WS] video congestion recovered bufferedAmount=${bufferedAmount} droppedFrames=${backpressure.droppedSinceCongestion} droppedTotal=${backpressure.droppedFrames}`);
+        sendBinary(latestConfiguration!);
+      }
+      sendBinary(encodeVideoPacket(packet.type, packet.data, packet.timestamp, packet.keyframe));
     });
 
     if (ws.readyState === WebSocket.OPEN) {
@@ -98,7 +161,7 @@ wss.on('connection', async (ws, req) => {
     });
 
     ws.on('close', (code, reason) => {
-      log(udid, `[WS] closed code=${code} reason=${reason.toString()}`);
+      log(udid, `[WS] closed code=${code} reason=${reason.toString()} bufferedAmount=${ws.bufferedAmount} droppedFrames=${backpressure.droppedFrames}`);
       void sessionManager.closeIfCurrent(udid, session);
     });
 

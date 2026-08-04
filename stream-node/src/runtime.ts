@@ -1,6 +1,6 @@
 import { log, warn } from './logger.js';
 
-export const STREAM_NODE_BUILD_ID = 'tango-v2-uhid-control-1';
+export const STREAM_NODE_BUILD_ID = 'tango-v2-realtime-backpressure-2';
 
 function parseDeviceList(raw: string | undefined): string[] {
   if (raw == null || raw.trim() === '') return [];

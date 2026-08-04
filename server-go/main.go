@@ -229,6 +229,8 @@ func main() {
 	// Start ADB Tracker
 	tracker := adb.NewTracker()
 	tracker.Start()
+	monhelperNotifyHub := newMonhelperNotifyHub(tracker)
+	go monhelperNotifyHub.run()
 
 	// Wait a moment for tracker to poll devices first
 	time.Sleep(500 * time.Millisecond)
@@ -277,7 +279,7 @@ func main() {
 		// CORS headers
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-UDID, X-Filename, X-File-Size, X-Remote-Path")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-UDID, X-User-ID, X-Filename, X-File-Size, X-Remote-Path")
 		w.Header().Set("Access-Control-Expose-Headers", "Content-Disposition, Content-Length")
 		w.Header().Set("X-MonViewPhone-Backend", "server-go")
 
@@ -340,6 +342,15 @@ func main() {
 			case "/api/goog/device/pull-file":
 				handlePullFile(w, r)
 				return
+			case "/api/goog/device/files/list":
+				handlePhoneFilesList(w, r)
+				return
+			case "/api/goog/device/files/export":
+				handlePhoneFileExport(w, r)
+				return
+			case "/api/goog/device/files/delete":
+				handlePhoneFileDelete(w, r)
+				return
 			case "/api/goog/device/settings":
 				handleSettings(w, r)
 				return
@@ -351,6 +362,9 @@ func main() {
 				return
 			case "/api/goog/device/display-power":
 				handleDisplayPower(w, r)
+				return
+			case "/api/goog/wechat-notify/events":
+				monhelperNotifyHub.handleEvents(w, r)
 				return
 			case "/api/goog/pc/open-file-dialog":
 				handleOpenFileDialog(w, r)

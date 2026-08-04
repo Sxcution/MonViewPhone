@@ -483,7 +483,6 @@ export function ViewerAppsMenu({
             top: `${submenu2Coords.top}px`,
             bottom: 'auto',
             margin: 0,
-            zIndex: 10000,
           }}
           onMouseEnter={() => {
             if (hoverTimer.current) clearTimeout(hoverTimer.current);
@@ -557,14 +556,14 @@ export function ViewerAppsMenu({
 
       {/* 4. Custom Portal Uninstall Confirmation Modal */}
       {uninstallConfirmApp && ReactDOM.createPortal(
-        <div className="vsp-apps-modal-overlay">
-          <div className="vsp-apps-modal-card">
-            <div className="vsp-apps-modal-header">
+        <div className="confirmOverlay confirmOverlay--top vsp-apps-modal-overlay">
+          <div className="confirmPanel vsp-apps-modal-card">
+            <div className="confirmTitle vsp-apps-modal-header">
               <AlertTriangle size={20} className="vsp-apps-modal-alert-icon" />
               <span>Xác nhận gỡ cài đặt ứng dụng</span>
             </div>
             
-            <div className="vsp-apps-modal-body">
+            <div className="confirmText vsp-apps-modal-body">
               <p>Bạn có chắc chắn muốn gỡ cài đặt ứng dụng sau khỏi thiết bị?</p>
               <div className="vsp-apps-modal-app-details">
                 <div className="vsp-apps-modal-detail-row">
@@ -583,7 +582,7 @@ export function ViewerAppsMenu({
               <p className="vsp-apps-modal-warning-text">⚠️ Cảnh báo: Mọi dữ liệu của ứng dụng này trong hồ sơ hiện tại sẽ bị xóa sạch.</p>
             </div>
 
-            <div className="vsp-apps-modal-footer">
+            <div className="confirmActions vsp-apps-modal-footer">
               <button 
                 type="button" 
                 className="modalBtn" 

@@ -2,6 +2,9 @@ import { StreamCallbacks, StreamEngine, StreamStats } from '../StreamEngine';
 import { AccessUnitAssembler } from '../h264/AccessUnitAssembler';
 import { Canvas2DVideoFrameRenderer } from '../render/Canvas2DVideoFrameRenderer';
 
+const MAX_DECODE_QUEUE_SIZE = 8;
+const RECOVERY_DROP_LOG_INTERVAL_MS = 5000;
+
 function getCodecString(sps: Uint8Array): string {
   const profile = sps[1].toString(16).padStart(2, '0');
   const compat = sps[2].toString(16).padStart(2, '0');
@@ -36,6 +39,12 @@ export class WebCodecsH264Engine implements StreamEngine {
   private decodedFramesCount = 0;
   private renderedFramesCount = 0;
   private droppedFramesCount = 0;
+  private decoderRecoveryCount = 0;
+  private recoveryStartedAt = 0;
+  private recoveryDroppedFrames = 0;
+  private lastRecoveryDropLogAt = -Infinity;
+  private clientDecodeLatencyEstimateMs = 0;
+  private lastChunkTimestampUs = 0;
   private lastFpsCalcTime = Date.now();
   private decodedFps = 0;
   private renderedFps = 0;
@@ -55,6 +64,12 @@ export class WebCodecsH264Engine implements StreamEngine {
     this.lastSps = null;
     this.lastPps = null;
     this.activeCodec = '';
+    this.decoderRecoveryCount = 0;
+    this.recoveryStartedAt = 0;
+    this.recoveryDroppedFrames = 0;
+    this.lastRecoveryDropLogAt = -Infinity;
+    this.clientDecodeLatencyEstimateMs = 0;
+    this.lastChunkTimestampUs = 0;
 
     this.renderer = new Canvas2DVideoFrameRenderer(this.canvas);
     this.assembler = new AccessUnitAssembler((frameBytes, isKey) => {
@@ -70,37 +85,54 @@ export class WebCodecsH264Engine implements StreamEngine {
       try { this.decoder.close(); } catch {}
     }
 
-    this.decoder = new VideoDecoder({
+    const decoder = new VideoDecoder({
       output: (frame) => {
-        this.renderedFramesCount++;
-        this.width = frame.displayWidth;
-        this.height = frame.displayHeight;
-
-        if (!this.firstFrame) {
-          this.firstFrame = true;
-          this.callbacks.onFirstFrame?.({ width: this.width, height: this.height });
+        if (this.decoder !== decoder) {
+          frame.close();
+          return;
+        }
+        const renderer = this.renderer;
+        if (!renderer) {
+          frame.close();
+          return;
         }
 
-        try {
-          this.renderer?.draw(frame);
-        } catch (e) {
-          console.error('[WebCodecs Debug] Render failed:', e);
-        }
+        const timestampUs = frame.timestamp;
+        const width = frame.displayWidth;
+        const height = frame.displayHeight;
+        this.width = width;
+        this.height = height;
 
-        frame.close();
-        this.callbacks.onFrame?.();
+        renderer.draw(frame, () => {
+          if (this.decoder !== decoder || this.renderer !== renderer) return;
+          this.clientDecodeLatencyEstimateMs = Math.max(
+            0,
+            Math.round(performance.now() - timestampUs / 1000),
+          );
+          this.renderedFramesCount++;
+          if (!this.firstFrame) {
+            this.firstFrame = true;
+            this.callbacks.onFirstFrame?.({ width, height });
+          }
+          this.callbacks.onFrame?.();
+        }, (error) => {
+          if (this.decoder !== decoder || this.renderer !== renderer) return;
+          console.error('[WebCodecs Debug] Render failed:', error);
+          this.callbacks.onError?.(error);
+        });
       },
       error: (e) => {
+        if (this.decoder !== decoder) return;
         console.error('[WebCodecs Debug] Decoder error callback triggered:', e);
         this.callbacks.onError?.(e);
-        this.dropUntilKeyframe = true;
-        this.keyframeReceived = false;
-        this.recreateDecoder();
+        this.recoverDecoder('decoder-error');
       }
     });
+    this.decoder = decoder;
   }
 
   private recreateDecoder() {
+    this.renderer?.discardPending();
     try { this.decoder?.close(); } catch {}
     this.decoder = null;
     this.initDecoder();
@@ -109,8 +141,54 @@ export class WebCodecsH264Engine implements StreamEngine {
     }
   }
 
+  restartDecoderOnly(reason = 'manual'): void {
+    this.recoverDecoder(reason);
+  }
+
+  private recoverDecoder(reason: string) {
+    if (!this.isReadyState || this.dropUntilKeyframe) return;
+
+    const queueSize = this.decoder?.decodeQueueSize ?? 0;
+    this.dropUntilKeyframe = true;
+    this.keyframeReceived = false;
+    this.decoderRecoveryCount++;
+    this.recoveryStartedAt = performance.now();
+    this.lastRecoveryDropLogAt = this.recoveryStartedAt;
+    this.recoveryDroppedFrames = queueSize;
+    this.droppedFramesCount += queueSize;
+    this.logRecoveryMetrics(`recovery-start:${reason}`, queueSize);
+    this.recreateDecoder();
+  }
+
+  private dropFrame() {
+    this.droppedFramesCount++;
+    if (!this.dropUntilKeyframe) return;
+
+    this.recoveryDroppedFrames++;
+    const now = performance.now();
+    if (now - this.lastRecoveryDropLogAt >= RECOVERY_DROP_LOG_INTERVAL_MS) {
+      this.lastRecoveryDropLogAt = now;
+      this.logRecoveryMetrics('waiting-for-live-keyframe');
+    }
+  }
+
+  private logRecoveryMetrics(event: string, decodeQueueSize = this.decoder?.decodeQueueSize ?? 0) {
+    console.info('[WebCodecs realtime]', {
+      event,
+      decodeQueueSize,
+      droppedFrames: this.droppedFramesCount,
+      recoveryDroppedFrames: this.recoveryDroppedFrames,
+      decoderRecoveryCount: this.decoderRecoveryCount,
+      recoveryWaitMs: this.recoveryStartedAt
+        ? Math.round(performance.now() - this.recoveryStartedAt)
+        : 0,
+      clientDecodeLatencyEstimateMs: this.clientDecodeLatencyEstimateMs,
+    });
+  }
+
   private handleAssembledFrame(frameBytes: Uint8Array, isKey: boolean) {
     if (!this.decoder) return;
+    let completesRecovery = false;
 
     let offset = 0;
     while (offset < frameBytes.length) {
@@ -147,41 +225,43 @@ export class WebCodecsH264Engine implements StreamEngine {
 
     if (this.activeCodec === '') return;
 
+    if (this.decoder.decodeQueueSize > MAX_DECODE_QUEUE_SIZE) {
+      this.recoverDecoder('decode-queue-high-water');
+    }
+
     if (this.dropUntilKeyframe) {
       if (!isKey) {
-        this.droppedFramesCount++;
+        this.dropFrame();
         return;
       }
       this.dropUntilKeyframe = false;
       this.keyframeReceived = true;
+      completesRecovery = true;
     }
 
     if (!this.keyframeReceived) {
       if (isKey) this.keyframeReceived = true;
-      else return;
-    }
-
-    if (this.decoder.decodeQueueSize > 8 && !isKey) {
-      this.droppedFramesCount++;
-      return;
+      else {
+        this.dropFrame();
+        return;
+      }
     }
 
     try {
-      const frameCopy = frameBytes.byteOffset === 0 && frameBytes.byteLength === frameBytes.buffer.byteLength
-        ? frameBytes
-        : new Uint8Array(frameBytes);
+      const nowUs = Math.round(performance.now() * 1000);
+      this.lastChunkTimestampUs = Math.max(nowUs, this.lastChunkTimestampUs + 1);
       const chunk = new EncodedVideoChunk({
         type: isKey ? 'key' : 'delta',
-        timestamp: Date.now() * 1000,
-        data: frameCopy,
+        timestamp: this.lastChunkTimestampUs,
+        data: frameBytes,
       });
       this.decoder.decode(chunk);
       this.decodedFramesCount++;
+      if (completesRecovery) this.logRecoveryMetrics('recovery-complete');
     } catch (e: any) {
       console.error('[WebCodecs Debug] decode chunk failed:', e);
-      this.dropUntilKeyframe = true;
-      this.keyframeReceived = false;
-      this.droppedFramesCount++;
+      this.dropFrame();
+      this.recoverDecoder('decode-throw');
     }
   }
 
@@ -250,6 +330,9 @@ export class WebCodecsH264Engine implements StreamEngine {
       renderedFps: this.renderedFps,
       droppedFrames: this.droppedFramesCount,
       decodeQueueSize: this.decoder?.decodeQueueSize || 0,
+      clientDecodeLatencyEstimateMs: this.clientDecodeLatencyEstimateMs,
+      decoderRecoveryCount: this.decoderRecoveryCount,
+      waitingForKeyframe: this.dropUntilKeyframe || !this.keyframeReceived,
       reconnectCount: 0,
       width: this.width,
       height: this.height

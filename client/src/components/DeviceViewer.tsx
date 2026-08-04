@@ -36,6 +36,7 @@ type Props = {
   connectionMode?: ConnectionState;
   availableConnections?: Partial<Record<ConnectionMode, boolean>>;
   onChangeConnection?: (mode: ConnectionMode) => void;
+  onSyncNovaWechat?: (udids: string[], dataByUdid?: Record<string, DeviceAccountData>, force?: boolean) => Promise<void>;
 };
 
 type ViewerTab = 'view' | 'files' | 'apps' | 'shell';
@@ -166,7 +167,8 @@ const DeviceViewerComponent = ({
   connectSelection,
   connectionMode = 'unknown',
   availableConnections,
-  onChangeConnection
+  onChangeConnection,
+  onSyncNovaWechat,
 }: Props) => {
   const { androidDeviceMap, listDir, pullFile, pushFile } = useServer();
   const { getCanvasForUdid, getInputTargetsForSource, getTargetsByUdids, selectOnly } = useActive();
@@ -1193,6 +1195,7 @@ const DeviceViewerComponent = ({
                       setActiveTab={setTileTab as any}
                       showAccountOverlay={false}
                       alwaysShowHeader={alwaysShowHeader}
+                      onSyncNovaWechat={onSyncNovaWechat}
                     />
                   </div>
                 </div>

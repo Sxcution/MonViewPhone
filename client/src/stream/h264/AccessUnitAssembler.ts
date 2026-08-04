@@ -69,10 +69,11 @@ export class AccessUnitAssembler {
 
     for (const n of nalus) {
       if (n.type === 7) {
-        this.cachedSps = n.data;
+        // SPS/PPS are tiny; copy them so a cached view never retains a whole keyframe buffer.
+        this.cachedSps = n.data.slice();
         hasSps = true;
       } else if (n.type === 8) {
-        this.cachedPps = n.data;
+        this.cachedPps = n.data.slice();
         hasPps = true;
       } else if (n.type === 5) {
         isKey = true;

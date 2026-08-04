@@ -10,12 +10,17 @@ import {
   runAdbCommandApi,
   openPcFileDialog,
   pushLocalFileApi,
-  splitCommandBatchSmart,
-  normalizeAdbSegment,
+  pushMediaFilesBatchApi,
+  pushLocalMediaFilesBatchApi,
+  listPhoneFilesApi,
+  exportPhoneFileApi,
+  deletePhoneFileApi,
 } from '@/lib/serverApi';
+import type { PhoneFileEntry } from '@/lib/serverApi';
 import type { ConnectionMode, ConnectionState } from '@/components/tile/types';
-import { Hash, Package, Upload, Download, Terminal, X, Play, Clock, Save, Trash2, Palette, Plus, Copy, ChevronRight, Users } from 'lucide-react';
+import { Package, Upload, Download, Terminal, X, Trash2, Plus, ChevronRight, Users, Folder, FileText, ArrowUp, RefreshCw } from 'lucide-react';
 import { ViewerAppsMenu } from './ViewerAppsMenu';
+import { ViewerAdbTools } from './ViewerAdbTools';
 
 type ViewerSidePanelProps = {
   udid: string;
@@ -31,7 +36,6 @@ type ViewerSidePanelProps = {
   onShowWasdKeySetting?: () => void;
   onShowCustomKeySetting?: () => void;
 };
-type AdbLogEntry = { id: number; time: string; command: string; output: string; success: boolean };
 type ToastMsg = { id: number; text: string; type: 'ok' | 'err' };
 
 interface ToastItemProps {
@@ -91,30 +95,35 @@ function httpBase(wsServer: string): string {
   return u.toString();
 }
 
-/* Preset ADB commands - warn=true for dangerous */
-const DEFAULT_PRESETS: { label: string; cmd: string; warn?: boolean; color?: string }[] = [
-  { label: 'Bật WiFi', cmd: 'svc wifi enable' },
-  { label: 'Tắt WiFi', cmd: 'svc wifi disable' },
-  { label: 'Tăng âm lượng', cmd: 'input keyevent 24' },
-  { label: 'Giảm âm lượng', cmd: 'input keyevent 25' },
-  { label: 'Tắt tiếng', cmd: 'input keyevent 164' },
-  { label: 'Xoá cache (an toàn)', cmd: 'pm trim-caches 999999G' },
-  { label: 'Thông tin pin', cmd: 'dumpsys battery' },
-  { label: 'DS ứng dụng đã cài', cmd: 'pm list packages -3' },
-  { label: 'Khởi động lại', cmd: 'adb reboot', warn: true },
-  { label: 'Chụp màn hình', cmd: 'screencap -p /sdcard/screenshot.png' },
-  { label: '⚠ Xoá DỮ LIỆU app', cmd: 'pm clear <package>', warn: true },
-  { label: 'IP thiết bị', cmd: 'ip addr show wlan0' },
-  { label: 'DS user profiles', cmd: 'pm list users' },
-  { label: 'Bộ nhớ trống', cmd: 'df -h /sdcard' },
-];
-
-const LS_CMD_HISTORY = 'vsp_cmd_history';
-const LS_PRESET_COLORS = 'vsp_preset_colors';
-
-function loadJson<T>(key: string, def: T): T { try { return JSON.parse(localStorage.getItem(key) || '') ?? def; } catch { return def; } }
-function saveJson(key: string, v: any) { localStorage.setItem(key, JSON.stringify(v)); }
 function shellQuote(value: string): string { return `'${value.replace(/'/g, `'\\''`)}'`; }
+function formatPhoneFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes)) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KiB`;
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
+  return `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
+}
+function formatPhoneFileDate(value: string | number): string {
+  if (!value) return '—';
+  const numericValue = typeof value === 'number' && value < 1e12 ? value * 1000 : value;
+  const date = new Date(numericValue);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('vi-VN');
+}
+function phoneParentPath(path: string): string {
+  const trimmed = path.replace(/\/+$/, '');
+  return trimmed.slice(0, trimmed.lastIndexOf('/')) || '/';
+}
+function canBatchSecondaryImages(userId: number, paths: string[]): boolean {
+  if (userId <= 0 || paths.length === 0 || paths.length > 100) return false;
+  return paths.every(path => {
+    const name = path.split(/[\\/]/).pop() || '';
+    const dot = name.lastIndexOf('.');
+    if (dot <= 0) return false;
+    const stem = name.slice(0, dot);
+    const ext = name.slice(dot + 1).toLowerCase();
+    return stem.toLowerCase() !== 'qr' && ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext);
+  });
+}
 function parseCreatedUserId(output: string): number | null {
   const match = output.match(/(?:created user id|id)\s+(\d+)/i);
   return match ? Number(match[1]) : null;
@@ -160,11 +169,10 @@ export function ViewerSidePanel({
   const [deleteProfileInput, setDeleteProfileInput] = useState('');
 
   // Toast notifications
-  const [toasts, setToasts] = useState<ToastMsg[]>([]);
+  const [toast, setToast] = useState<ToastMsg | null>(null);
   const toastIdRef = useRef(0);
   const showToast = useCallback((text: string, type: 'ok' | 'err') => {
-    const id = ++toastIdRef.current;
-    setToasts(prev => [...prev, { id, text, type }]);
+    setToast({ id: ++toastIdRef.current, text, type });
   }, []);
 
   // APK
@@ -261,6 +269,33 @@ export function ViewerSidePanel({
         await Promise.all(workers);
       };
 
+      if (canBatchSecondaryImages(selectedProfile, files)) {
+        setImportStatus(`Đang đẩy batch ${files.length} ảnh...`);
+        let failed = 0;
+        let lastErrorMsg = '';
+        await runWithConcurrency(targets, 8, async targetUdid => {
+          try {
+            await pushLocalMediaFilesBatchApi(
+              wsServer,
+              targetUdid,
+              selectedProfile,
+              files,
+            );
+          } catch (err: any) {
+            failed++;
+            lastErrorMsg = err?.message || 'Lỗi';
+          }
+        });
+        if (failed === 0) {
+          setImportStatus(`✅ Đã đẩy ${files.length} ảnh lên ${targets.length} thiết bị`);
+          showToast(`✅ Batch: ${files.length} ảnh`, 'ok');
+        } else {
+          setImportStatus(`❌ Lỗi batch trên ${failed}/${targets.length} thiết bị. Lỗi: ${lastErrorMsg}`);
+          showToast(`❌ Batch: ${lastErrorMsg}`, 'err');
+        }
+        return;
+      }
+
       for (let i = 0; i < files.length; i++) {
         const localPath = files[i];
         const parts = localPath.split(/[\\/]/);
@@ -307,147 +342,160 @@ export function ViewerSidePanel({
     }
   };
 
-  // ADB Modal
-  const [showAdbModal, setShowAdbModal] = useState(false);
-  const [adbCommand, setAdbCommand] = useState('');
-  const [adbLogs, setAdbLogs] = useState<AdbLogEntry[]>([]);
-  const [adbRunning, setAdbRunning] = useState(false);
+  // File Export
+  const [showPhoneFileBrowser, setShowPhoneFileBrowser] = useState(false);
+  const [phoneFilePath, setPhoneFilePath] = useState('');
+  const [phoneFilePathInput, setPhoneFilePathInput] = useState('');
+  const [phoneFileEntries, setPhoneFileEntries] = useState<PhoneFileEntry[]>([]);
+  const [phoneFilesLoading, setPhoneFilesLoading] = useState(false);
+  const [phoneFilesError, setPhoneFilesError] = useState<string | null>(null);
+  const [phoneFileStatus, setPhoneFileStatus] = useState<{ text: string; type: 'info' | 'ok' | 'err' } | null>(null);
+  const [phoneFileContext, setPhoneFileContext] = useState<{ x: number; y: number; entry: PhoneFileEntry } | null>(null);
+  const [phoneFileDeleteTarget, setPhoneFileDeleteTarget] = useState<PhoneFileEntry | null>(null);
+  const [phoneFileAction, setPhoneFileAction] = useState<{ kind: 'export' | 'delete'; path: string } | null>(null);
+  const phoneFileRequestIdRef = useRef(0);
 
-  const textareaRef = useCallback((node: HTMLTextAreaElement | null) => {
-    if (node !== null) {
-      if (!adbCommand.includes('\n')) {
-        node.style.height = '36px';
-      } else {
-        node.style.height = '36px'; // reset to measure
-        node.style.height = `${Math.min(node.scrollHeight + 2, 120)}px`;
-      }
+  const loadPhoneFiles = useCallback(async (nextPath: string) => {
+    const targetPath = nextPath;
+    if (!targetPath.startsWith('/')) {
+      phoneFileRequestIdRef.current += 1;
+      setPhoneFilesLoading(false);
+      setPhoneFileEntries([]);
+      setPhoneFilesError('Đường dẫn trên điện thoại phải bắt đầu bằng /.');
+      return;
     }
-  }, [adbCommand]);
-  const [adbTab, setAdbTab] = useState<'preset' | 'history' | 'custom'>('preset');
-  const [cmdHistory, setCmdHistory] = useState<string[]>(() => loadJson(LS_CMD_HISTORY, []));
-  const [newCmdLabel, setNewCmdLabel] = useState('');
-  const [newCmdValue, setNewCmdValue] = useState('');
 
-  const logIdRef = useRef(0);
+    const requestId = ++phoneFileRequestIdRef.current;
+    setPhoneFilesLoading(true);
+    setPhoneFilesError(null);
+    setPhoneFileEntries([]);
+    setPhoneFileContext(null);
+    try {
+      const result = await listPhoneFilesApi(wsServer, udid, targetPath);
+      if (requestId !== phoneFileRequestIdRef.current) return;
+      setPhoneFileEntries([...result.entries].sort((a, b) => {
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        return a.name.localeCompare(b.name, 'vi');
+      }));
+      setPhoneFilePath(result.path);
+      setPhoneFilePathInput(result.path);
+    } catch (err: any) {
+      if (requestId !== phoneFileRequestIdRef.current) return;
+      setPhoneFilesError(err?.message || 'Không thể tải danh sách tệp.');
+    } finally {
+      if (requestId === phoneFileRequestIdRef.current) setPhoneFilesLoading(false);
+    }
+  }, [udid, wsServer]);
 
-  // Preset commands state
-  const LS_PRESETS = 'vsp_presets';
-  const [presets, setPresets] = useState<{ label: string; cmd: string; warn?: boolean; color?: string }[]>(() => loadJson(LS_PRESETS, DEFAULT_PRESETS));
+  const openPhoneFileBrowser = useCallback(() => {
+    if (phoneFileAction) return;
+    const initialPath = `/storage/emulated/${selectedProfile}/Download`;
+    setShowPhoneFileBrowser(true);
+    setPhoneFilePath(initialPath);
+    setPhoneFilePathInput(initialPath);
+    setPhoneFileStatus(null);
+    setPhoneFileContext(null);
+    setPhoneFileDeleteTarget(null);
+    void loadPhoneFiles(initialPath);
+  }, [loadPhoneFiles, phoneFileAction, selectedProfile]);
 
-  // Draggable position
-  const [position, setPosition] = useState(() => {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    return {
-      x: Math.max(20, Math.floor((w - 720) / 2)),
-      y: Math.max(20, Math.floor((h - 550) / 2)),
-    };
-  });
+  const closePhoneFileBrowser = useCallback(() => {
+    if (phoneFileAction) return;
+    phoneFileRequestIdRef.current += 1;
+    setShowPhoneFileBrowser(false);
+    setPhoneFileContext(null);
+    setPhoneFileDeleteTarget(null);
+  }, [phoneFileAction]);
 
-  // Preset color overrides
-  const COLOR_MIGRATION: Record<string, string> = {
-    '#fff': '#ffffff', '#ff9c9c': '#ef4444', '#9cffb8': '#22c55e', '#9cd4ff': '#3b82f6', '#ffdc9c': '#f59e0b', '#d49cff': '#a855f7', '#ff9ce0': '#ec4899'
+  const openPhoneFileContext = (event: React.MouseEvent, entry: PhoneFileEntry) => {
+    event.preventDefault();
+    if (entry.isDir || phoneFileAction) {
+      setPhoneFileContext(null);
+      return;
+    }
+    setPhoneFileContext({
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 180)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 86)),
+      entry,
+    });
   };
-  const [presetColors, setPresetColors] = useState<Record<number, string>>(() => {
-    const loaded = loadJson(LS_PRESET_COLORS, {});
-    const migrated: Record<number, string> = {};
-    for (const [k, v] of Object.entries(loaded)) {
-      migrated[Number(k)] = COLOR_MIGRATION[v as string] || v as string;
+
+  const handlePhoneFileExport = async (entry: PhoneFileEntry) => {
+    if (phoneFileAction) return;
+    setPhoneFileContext(null);
+    setPhoneFileAction({ kind: 'export', path: entry.path });
+    setPhoneFileStatus({ text: `Đang xuất: ${entry.name}`, type: 'info' });
+    try {
+      const result = await exportPhoneFileApi(wsServer, udid, entry.path);
+      const savedPath = result.savedPath || result.fileName || entry.name;
+      setPhoneFileStatus({ text: `Đã lưu: ${savedPath}`, type: 'ok' });
+      showToast(`Đã xuất tệp: ${savedPath}`, 'ok');
+    } catch (err: any) {
+      const message = err?.message || 'Xuất tệp thất bại.';
+      setPhoneFileStatus({ text: message, type: 'err' });
+      showToast(message, 'err');
+    } finally {
+      setPhoneFileAction(null);
     }
-    return migrated;
-  });
-
-  const [confirmCmd, setConfirmCmd] = useState<{ cmd: string; label: string } | null>(null);
-
-  // Context menu for presets
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; idx: number } | null>(null);
-
-  // Drag and drop for presets
-  const [draggedPresetIdx, setDraggedPresetIdx] = useState<number | null>(null);
-  const [dragOverPresetIdx, setDragOverPresetIdx] = useState<number | null>(null);
-  const [editingPreset, setEditingPreset] = useState<{ idx: number; label: string; cmd: string } | null>(null);
-
-  // ===== DRAGGABLE LOGIC =====
-  const dragRef = useRef<{
-    active: boolean;
-    startX: number;
-    startY: number;
-    originX: number;
-    originY: number;
-    panelEl?: HTMLElement | null;
-    lastX?: number;
-    lastY?: number;
-  }>({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 });
-
-  const clampPosition = (val: number, min: number, max: number) => {
-    return Math.max(min, Math.min(max, val));
   };
 
-  const onDragMove = useCallback((e: PointerEvent) => {
-    const drag = dragRef.current;
-    if (!drag.active || !drag.panelEl) return;
-    e.preventDefault();
-    const nextX = drag.originX + e.clientX - drag.startX;
-    const nextY = drag.originY + e.clientY - drag.startY;
-    const finalX = clampPosition(nextX, 0, Math.max(0, window.innerWidth - 100));
-    const finalY = clampPosition(nextY, 0, Math.max(0, window.innerHeight - 80));
-    
-    drag.panelEl.style.left = `${finalX}px`;
-    drag.panelEl.style.top = `${finalY}px`;
-    
-    drag.lastX = finalX;
-    drag.lastY = finalY;
-  }, []);
-
-  const onDragUp = useCallback(() => {
-    const drag = dragRef.current;
-    if (!drag.active) return;
-    drag.active = false;
-    document.body.classList.remove('is-dragging-modal');
-    window.removeEventListener('pointermove', onDragMove);
-    window.removeEventListener('pointerup', onDragUp);
-    
-    if (drag.lastX !== undefined && drag.lastY !== undefined) {
-      setPosition({ x: drag.lastX, y: drag.lastY });
+  const handlePhoneFileDelete = async () => {
+    const entry = phoneFileDeleteTarget;
+    if (!entry || phoneFileAction) return;
+    setPhoneFileAction({ kind: 'delete', path: entry.path });
+    setPhoneFileStatus({ text: `Đang xoá: ${entry.name}`, type: 'info' });
+    try {
+      await deletePhoneFileApi(wsServer, udid, entry.path);
+      setPhoneFileDeleteTarget(null);
+      setPhoneFileStatus({ text: `Đã xoá: ${entry.path}`, type: 'ok' });
+      showToast(`Đã xoá tệp: ${entry.name}`, 'ok');
+      await loadPhoneFiles(phoneFilePath);
+    } catch (err: any) {
+      const message = err?.message || 'Xoá tệp thất bại.';
+      setPhoneFileStatus({ text: message, type: 'err' });
+      showToast(message, 'err');
+    } finally {
+      setPhoneFileAction(null);
     }
-  }, [onDragMove]);
-
-  const startDrag = useCallback((e: React.PointerEvent<HTMLElement>) => {
-    if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest('button, input, select, textarea')) return;
-    e.preventDefault();
-    const panel = e.currentTarget.closest('.vsp-modal') as HTMLElement | null;
-    if (!panel) return;
-    
-    dragRef.current = {
-      active: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      originX: position.x,
-      originY: position.y,
-      panelEl: panel,
-      lastX: position.x,
-      lastY: position.y
-    };
-    document.body.classList.add('is-dragging-modal');
-    window.addEventListener('pointermove', onDragMove, { passive: false });
-    window.addEventListener('pointerup', onDragUp);
-  }, [onDragMove, onDragUp, position.x, position.y]);
+  };
 
   useEffect(() => {
-    return () => {
-      window.removeEventListener('pointermove', onDragMove);
-      window.removeEventListener('pointerup', onDragUp);
+    if (!phoneFileContext) return;
+    const dismiss = (event: Event) => {
+      if (!(event.target instanceof Element) || !event.target.closest('.vsp-file-context-menu')) {
+        setPhoneFileContext(null);
+      }
     };
-  }, [onDragMove, onDragUp]);
+    window.addEventListener('pointerdown', dismiss, true);
+    window.addEventListener('resize', dismiss);
+    return () => {
+      window.removeEventListener('pointerdown', dismiss, true);
+      window.removeEventListener('resize', dismiss);
+    };
+  }, [phoneFileContext]);
+
+  useEffect(() => {
+    if (!showPhoneFileBrowser) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (phoneFileAction) return;
+      if (phoneFileDeleteTarget) {
+        setPhoneFileDeleteTarget(null);
+      } else if (phoneFileContext) {
+        setPhoneFileContext(null);
+      } else {
+        closePhoneFileBrowser();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [closePhoneFileBrowser, phoneFileAction, phoneFileContext, phoneFileDeleteTarget, showPhoneFileBrowser]);
 
 
-  // ADB submenu on hover
-  const [showAdbSubmenu, setShowAdbSubmenu] = useState(false);
+
   const [showProfileSubmenu, setShowProfileSubmenu] = useState(false);
   const [showConnectionSubmenu, setShowConnectionSubmenu] = useState(false);
   const [showGameSubmenu, setShowGameSubmenu] = useState(false);
-  const adbHoverTimer = useRef<number | null>(null);
   const profileHoverTimer = useRef<number | null>(null);
   const connectionHoverTimer = useRef<number | null>(null);
   const gameHoverTimer = useRef<number | null>(null);
@@ -472,21 +520,6 @@ export function ViewerSidePanel({
     void refreshProfiles();
   }, [refreshProfiles]);
 
-  // Handle click outside to close context menu, using capture phase to catch clicks blocked by canvas
-  useEffect(() => {
-    if (!ctxMenu) return;
-    const handleClickOutside = (event: MouseEvent | PointerEvent) => {
-      if (event.button === 2) return;
-      const target = event.target as Element;
-      const isClickOnContextMenu = target.closest('.react-contexify') || target.closest('.vsp-ctx-menu') || target.closest('.context-menu');
-      if (!isClickOnContextMenu) {
-        setCtxMenu(null);
-      }
-    };
-
-    window.addEventListener('pointerdown', handleClickOutside, true);
-    return () => window.removeEventListener('pointerdown', handleClickOutside, true);
-  }, [ctxMenu]);
 
   const handleChangeOrder = () => {
     const n = parseInt(newOrder, 10);
@@ -495,8 +528,6 @@ export function ViewerSidePanel({
     setNewOrder('');
   };
 
-  const adbSectionRef = useRef<HTMLDivElement>(null);
-  const adbSubmenuMenuRef = useRef<HTMLDivElement>(null);
   const profileSectionRef = useRef<HTMLDivElement>(null);
   const profileSubmenuMenuRef = useRef<HTMLDivElement>(null);
   const connectionSectionRef = useRef<HTMLDivElement>(null);
@@ -504,32 +535,6 @@ export function ViewerSidePanel({
   const gameSectionRef = useRef<HTMLDivElement>(null);
   const gameSubmenuMenuRef = useRef<HTMLDivElement>(null);
 
-  React.useLayoutEffect(() => {
-    if (showAdbSubmenu && adbSectionRef.current && adbSubmenuMenuRef.current) {
-      const rect = adbSectionRef.current.getBoundingClientRect();
-      const menuEl = adbSubmenuMenuRef.current;
-      const menuWidth = 220;
-      let x = rect.right - 4;
-      if (x + menuWidth > window.innerWidth) {
-        x = rect.left - menuWidth + 4;
-      }
-      
-      let top = rect.top - 30;
-      top = Math.max(10, top);
-      const menuHeight = menuEl.offsetHeight || 150;
-      if (top + menuHeight > window.innerHeight - 10) {
-        top = window.innerHeight - menuHeight - 10;
-      }
-      top = Math.max(10, top);
-
-      menuEl.style.left = `${x}px`;
-      menuEl.style.bottom = 'auto';
-      menuEl.style.top = `${top}px`;
-      menuEl.style.maxHeight = `${window.innerHeight - top - 12}px`;
-      menuEl.style.opacity = '1';
-      menuEl.style.pointerEvents = 'auto';
-    }
-  }, [showAdbSubmenu]);
 
   React.useLayoutEffect(() => {
     if (showProfileSubmenu && profileSectionRef.current && profileSubmenuMenuRef.current) {
@@ -612,14 +617,6 @@ export function ViewerSidePanel({
     }
   }, [showGameSubmenu]);
 
-  const handleAdbEnter = () => {
-    if (adbHoverTimer.current) clearTimeout(adbHoverTimer.current);
-    setShowAdbSubmenu(true);
-  };
-
-  const handleAdbLeave = () => {
-    adbHoverTimer.current = window.setTimeout(() => setShowAdbSubmenu(false), 100);
-  };
 
   const handleProfileEnter = () => {
     if (profileHoverTimer.current) clearTimeout(profileHoverTimer.current);
@@ -827,7 +824,6 @@ export function ViewerSidePanel({
   };
   useEffect(() => {
     return () => {
-      if (adbHoverTimer.current) window.clearTimeout(adbHoverTimer.current);
       if (profileHoverTimer.current) window.clearTimeout(profileHoverTimer.current);
       if (connectionHoverTimer.current) window.clearTimeout(connectionHoverTimer.current);
       if (gameHoverTimer.current) window.clearTimeout(gameHoverTimer.current);
@@ -943,6 +939,33 @@ export function ViewerSidePanel({
       await Promise.all(workers);
     };
 
+    if (canBatchSecondaryImages(selectedProfile, files.map(file => file.name))) {
+      setImportStatus(`Đang đẩy batch ${files.length} ảnh...`);
+      let failed = 0;
+      let lastErrorMsg = '';
+      await runWithConcurrency(targets, 8, async targetUdid => {
+        try {
+          await pushMediaFilesBatchApi(
+            wsServer,
+            targetUdid,
+            selectedProfile,
+            files,
+          );
+        } catch (err: any) {
+          failed++;
+          lastErrorMsg = err?.message || 'Lỗi';
+        }
+      });
+      if (failed === 0) {
+        setImportStatus(`✅ Đã đẩy ${files.length} ảnh lên ${targets.length} thiết bị`);
+        showToast(`✅ Batch: ${files.length} ảnh`, 'ok');
+      } else {
+        setImportStatus(`❌ Lỗi batch trên ${failed}/${targets.length} thiết bị. Lỗi: ${lastErrorMsg}`);
+        showToast(`❌ Batch: ${lastErrorMsg}`, 'err');
+      }
+      return;
+    }
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       setImportStatus(`Đang đẩy ${file.name}... (${i + 1}/${files.length})`);
@@ -987,320 +1010,6 @@ export function ViewerSidePanel({
     }
   }, [wsServer, udid, selectedProfile, connectSelection]);
 
-  // ADB execution
-  const executeAdbCommand = useCallback(async (rawInput: string) => {
-    if (!rawInput.trim()) return;
-    setAdbRunning(true);
-    setCmdHistory(prev => {
-      const next = [rawInput, ...prev.filter(c => c !== rawInput)].slice(0, 50);
-      saveJson(LS_CMD_HISTORY, next);
-      return next;
-    });
-
-    const segments = splitCommandBatchSmart(rawInput);
-    const parsedCommands = segments.map(normalizeAdbSegment);
-
-    const targets = connectSelection && connectSelection.size > 0
-      ? Array.from(connectSelection)
-      : [udid];
-
-    interface StepLog {
-      original: string;
-      normalized: string;
-      success: boolean;
-      output: string;
-    }
-
-    const executeBatchOnDevice = async (targetUdid: string): Promise<StepLog[]> => {
-      const stepLogs: StepLog[] = [];
-      for (let stepIdx = 0; stepIdx < parsedCommands.length; stepIdx++) {
-        const parsed = parsedCommands[stepIdx];
-        if (parsed.kind === 'invalid') {
-          stepLogs.push({
-            original: parsed.original,
-            normalized: 'INVALID',
-            success: false,
-            output: parsed.error,
-          });
-          break; // Stop batch on error
-        }
-
-        let success = false;
-        let output = '';
-        try {
-          let result;
-          if (parsed.kind === 'shell') {
-            result = await runAdbCommandApi(wsServer, targetUdid, parsed.command, 'shell');
-          } else {
-            result = await runAdbCommandApi(wsServer, targetUdid, '', 'host-adb', parsed.args);
-          }
-          success = result.success;
-          output = result.output;
-        } catch (err: any) {
-          success = false;
-          output = err?.message || 'Error executing command';
-        }
-
-        stepLogs.push({
-          original: parsed.original,
-          normalized: parsed.kind === 'shell' ? `shell: ${parsed.command}` : `host-adb: ${parsed.args.join(' ')}`,
-          success,
-          output,
-        });
-
-        if (!success) {
-          break; // Stop batch on failure
-        }
-      }
-      return stepLogs;
-    };
-
-    let mainDeviceLogs: StepLog[] = [];
-
-    const runWithConcurrency = async <T,>(
-      items: T[],
-      limit: number,
-      worker: (item: T, index: number) => Promise<void>
-    ) => {
-      let nextIndex = 0;
-      const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-        while (nextIndex < items.length) {
-          const index = nextIndex++;
-          await worker(items[index], index);
-        }
-      });
-      await Promise.all(workers);
-    };
-
-    const allDevicesLogs: Record<string, StepLog[]> = {};
-    await runWithConcurrency(targets, 8, async (targetUdid) => {
-      const stepLogs = await executeBatchOnDevice(targetUdid);
-      allDevicesLogs[targetUdid] = stepLogs;
-      if (targetUdid === udid) {
-        mainDeviceLogs = stepLogs;
-      }
-    });
-
-    const extractMainErrorLine = (output: string): string => {
-      const clean = output.trim();
-      if (!clean) return 'Error';
-
-      const lines = clean.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-      if (lines.length === 0) return 'Error';
-
-      for (const line of lines) {
-        if (line.includes('** Error:') || line.includes('** Error')) {
-          return line.length > 500 ? line.slice(0, 500) + '...' : line;
-        }
-      }
-      for (const line of lines) {
-        if (line.toLowerCase().includes('error:')) {
-          return line.length > 500 ? line.slice(0, 500) + '...' : line;
-        }
-      }
-
-      const firstLine = lines[0];
-      if (firstLine.length > 500) {
-        return firstLine.slice(0, 500) + '...';
-      }
-      return firstLine;
-    };
-
-    const formatBatchLog = (stepLogs: StepLog[]): string => {
-      if (parsedCommands.length === 1) {
-        const step = stepLogs[0];
-        if (!step) return '';
-        if (step.success) {
-          const cleanOutput = step.output.trim();
-          if (cleanOutput && cleanOutput !== 'No output') {
-            return cleanOutput;
-          }
-          return '✅ Thành công';
-        } else {
-          const errorLine = extractMainErrorLine(step.output);
-          return `❌ Thất bại\n${errorLine}`;
-        }
-      }
-
-      const lastStep = stepLogs[stepLogs.length - 1];
-      const hasFailure = lastStep && !lastStep.success;
-
-      let logStr = '';
-      stepLogs.forEach((step) => {
-        if (step.success) {
-          const cleanOutput = step.output.trim();
-          if (cleanOutput && cleanOutput !== 'No output') {
-            if (logStr) logStr += '\n';
-            logStr += cleanOutput;
-          }
-        }
-      });
-
-      if (!hasFailure) {
-        const header = `✅ Thành công ${parsedCommands.length}/${parsedCommands.length} lệnh`;
-        if (logStr) {
-          return `${header}\n\n${logStr}`;
-        }
-        return header;
-      } else {
-        const failingStepIdx = stepLogs.length;
-        const failedHeader = `❌ Lỗi ở lệnh ${failingStepIdx}/${parsedCommands.length}\n${lastStep.original}`;
-        const errorLine = extractMainErrorLine(lastStep.output);
-        
-        if (logStr) {
-          return `${logStr}\n\n${failedHeader}\n\n${errorLine}`;
-        }
-        return `${failedHeader}\n\n${errorLine}`;
-      }
-    };
-
-    const id = ++logIdRef.current;
-    const time = new Date().toLocaleTimeString('vi-VN');
-    
-    let isOverallSuccess = true;
-    for (const targetUdid of targets) {
-      const deviceLogs = allDevicesLogs[targetUdid] || [];
-      const ok = deviceLogs.length === parsedCommands.length && deviceLogs.every(s => s.success);
-      if (!ok) {
-        isOverallSuccess = false;
-        break;
-      }
-    }
-
-    let formattedOutput = '';
-    if (targets.length > 1) {
-      const parts = targets.map(targetUdid => {
-        const deviceLogs = allDevicesLogs[targetUdid] || [];
-        const deviceOut = formatBatchLog(deviceLogs);
-        if (deviceOut.trim().toLowerCase() === targetUdid.toLowerCase()) {
-          return `[Device: ${targetUdid}]`;
-        }
-        return `[Device: ${targetUdid}]\n${deviceOut}`;
-      });
-      const allSingleLine = parts.every(p => !p.includes('\n'));
-      formattedOutput = parts.join(allSingleLine ? '\n' : '\n\n');
-    } else {
-      formattedOutput = formatBatchLog(mainDeviceLogs);
-    }
-
-    setAdbLogs(prev => [
-      {
-        id,
-        time,
-        command: rawInput,
-        output: formattedOutput,
-        success: isOverallSuccess,
-      },
-      ...prev,
-    ]);
-    setAdbRunning(false);
-  }, [wsServer, udid, connectSelection]);
-
-  const handleAdbSubmit = () => { if (adbCommand.trim()) { executeAdbCommand(adbCommand.trim()); setAdbCommand(''); } };
-
-  const handleSaveCustomCmd = () => {
-    if (!newCmdLabel.trim() || !newCmdValue.trim()) return;
-    const next = [...presets, { label: newCmdLabel.trim(), cmd: newCmdValue.trim() }];
-    setPresets(next); saveJson(LS_PRESETS, next);
-    setNewCmdLabel(''); setNewCmdValue('');
-    setAdbTab('preset');
-  };
-
-  // Preset context menu handlers
-  const handlePresetContextMenu = (e: React.MouseEvent, idx: number) => {
-    e.preventDefault(); e.stopPropagation();
-    setCtxMenu({ x: e.clientX, y: e.clientY, idx });
-  };
-  const startEditPreset = (idx: number) => {
-    setCtxMenu(null);
-    setEditingPreset({ idx, label: presets[idx].label, cmd: presets[idx].cmd });
-  };
-  const handleDeletePreset = (idx: number) => {
-    setCtxMenu(null);
-    setPresets(prev => {
-      const next = prev.filter((_, i) => i !== idx);
-      saveJson(LS_PRESETS, next);
-      return next;
-    });
-  };
-  const setPresetColor = (idx: number, color: string) => {
-    setCtxMenu(null);
-    setPresetColors(prev => { const next = { ...prev, [idx]: color }; saveJson(LS_PRESET_COLORS, next); return next; });
-  };
-
-  const COLORS = ['#ffffff', '#ef4444', '#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899'];
-
-  const handlePresetClick = (cmd: string, label: string, color?: string, fromSubmenu?: boolean) => {
-    if (fromSubmenu) {
-      if (cmd.includes('<')) {
-        setShowAdbSubmenu(false);
-        setShowAdbModal(true);
-        setAdbCommand(cmd);
-        return;
-      }
-      if (color === '#ef4444' || color === '#ff9c9c' || color === 'red') {
-        setShowAdbSubmenu(false);
-        setConfirmCmd({ cmd, label });
-      } else {
-        executeAdbCommand(cmd);
-      }
-    } else {
-      setAdbCommand(cmd);
-    }
-  };
-
-  const handleDragStart = (e: React.DragEvent, idx: number) => {
-    setDraggedPresetIdx(idx);
-    e.dataTransfer.setData('text/plain', '');
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e: React.DragEvent, idx: number) => {
-    e.preventDefault();
-    if (draggedPresetIdx === null || draggedPresetIdx === idx) return;
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverPresetIdx !== idx) setDragOverPresetIdx(idx);
-  };
-
-  const handleDrop = (e: React.DragEvent, idx: number) => {
-    e.preventDefault();
-    if (draggedPresetIdx === null || draggedPresetIdx === idx) {
-      setDraggedPresetIdx(null);
-      setDragOverPresetIdx(null);
-      return;
-    }
-    const from = draggedPresetIdx;
-    const to = idx;
-    
-    setPresets(prev => {
-      const next = [...prev];
-      const item = next.splice(from, 1)[0];
-      next.splice(to, 0, item);
-      saveJson(LS_PRESETS, next);
-      return next;
-    });
-    
-    setPresetColors(prev => {
-      const nextColors: Record<number, string> = {};
-      const idxArray = Array.from({ length: presets.length }, (_, i) => i);
-      const movedIdx = idxArray.splice(from, 1)[0];
-      idxArray.splice(to, 0, movedIdx);
-      
-      idxArray.forEach((oldI, newI) => {
-        if (prev[oldI]) nextColors[newI] = prev[oldI];
-      });
-      saveJson(LS_PRESET_COLORS, nextColors);
-      return nextColors;
-    });
-    
-    setDraggedPresetIdx(null);
-    setDragOverPresetIdx(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedPresetIdx(null);
-    setDragOverPresetIdx(null);
-  };
 
   return (
     <>
@@ -1342,15 +1051,13 @@ export function ViewerSidePanel({
           </button>
         </div>
         {/* Toast notifications */}
-        {toasts.length > 0 && ReactDOM.createPortal(
+        {toast && ReactDOM.createPortal(
           <div className="vsp-toast-container">
-            {toasts.map(toast => (
-              <ToastItem
-                key={toast.id}
-                toast={toast}
-                onRemove={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-              />
-            ))}
+            <ToastItem
+              key={toast.id}
+              toast={toast}
+              onRemove={() => setToast(current => current?.id === toast.id ? null : current)}
+            />
           </div>,
           document.body
         )}
@@ -1461,6 +1168,17 @@ export function ViewerSidePanel({
             )}
           </div>
 
+          <div
+            className="vsp-section-title vsp-clickable"
+            onClick={openPhoneFileBrowser}
+            title="Duyệt và xuất tệp từ điện thoại"
+            data-inspector-id="viewerSidePanel.exportFileButton"
+            data-inspector-label="Browse and export file from device button"
+            data-inspector-component="client/src/components/ViewerSidePanel.tsx"
+          >
+            <Download size={15} /><span>{t('Xuất Tệp')}</span>
+          </div>
+
           {/* 3. Cài APK */}
           <div>
             <div 
@@ -1542,48 +1260,9 @@ export function ViewerSidePanel({
             {profileActionStatus && <div className="vsp-status" style={{ marginTop: '4px' }}>{profileActionStatus}</div>}
           </div>
 
-          {/* 5. Chạy lệnh ADB - with hover submenu */}
-          <div 
-            className="vsp-adb-section" 
-            ref={adbSectionRef}
-            onMouseEnter={handleAdbEnter}
-            onMouseLeave={handleAdbLeave}
-            onMouseMove={handleAdbEnter}
-            data-inspector-id="viewerSidePanel.adbButton"
-            data-inspector-label="Run ADB Shell command sidebar row"
-            data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-          >
-            <div className="vsp-section-title vsp-clickable" onClick={() => setShowAdbModal(true)}>
-              <Terminal size={15} /><span>{t('Chạy lệnh ADB')}</span>
-            </div>
-            {showAdbSubmenu && ReactDOM.createPortal(
-              <div 
-                ref={adbSubmenuMenuRef}
-                className="vsp-adb-submenu"
-                style={{ position: 'fixed', left: 0, top: 0, opacity: 0, pointerEvents: 'none', margin: 0 }}
-                onMouseEnter={() => {
-                  if (adbHoverTimer.current) clearTimeout(adbHoverTimer.current);
-                  setShowAdbSubmenu(true);
-                }}
-                onMouseLeave={handleAdbLeave}
-                data-inspector-id="viewerSidePanel.adbHoverSubmenu"
-                data-inspector-label="ADB quick commands hover popup menu"
-                data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-              >
-                {presets.map((c, i) => (
-                  <button key={i}
-                    className={`vsp-adb-submenu-item${c.warn ? ' vsp-cmd-warn' : ''}`}
-                    style={presetColors[i] ? { color: presetColors[i] } : undefined}
-                    onClick={e => { e.stopPropagation(); handlePresetClick(c.cmd, c.label, presetColors[i], true); }}
-                    title={c.cmd}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>,
-              document.body
-            )}
-          </div>
+          {/* 5. Chạy lệnh ADB */}
+          <ViewerAdbTools udid={udid} connectSelection={connectSelection} />
+
 
           {/* 6. Kết Nối */}
           <div
@@ -1729,9 +1408,221 @@ export function ViewerSidePanel({
         </div>
       </div>
 
+      {showPhoneFileBrowser && ReactDOM.createPortal(
+        <div
+          className="vsp-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Duyệt tệp trên điện thoại"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget && !phoneFileAction) {
+              closePhoneFileBrowser();
+            }
+          }}
+        >
+          <div className="vsp-modal vsp-file-browser-modal" onMouseDown={event => event.stopPropagation()}>
+            <div className="vsp-modal-header">
+              <div className="vsp-modal-title">
+                <Download size={17} />
+                <span>Xuất Tệp</span>
+                <span className="vsp-modal-udid">{udid}</span>
+              </div>
+              <button
+                type="button"
+                className="vsp-modal-close"
+                onClick={closePhoneFileBrowser}
+                disabled={!!phoneFileAction}
+                title="Đóng"
+                aria-label="Đóng trình duyệt tệp"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form
+              className="vsp-file-browser-toolbar"
+              onSubmit={event => {
+                event.preventDefault();
+                void loadPhoneFiles(phoneFilePathInput);
+              }}
+            >
+              <button
+                type="button"
+                className="vsp-file-tool-btn"
+                onClick={() => void loadPhoneFiles(phoneParentPath(phoneFilePath))}
+                disabled={phoneFilesLoading || phoneFilePath === '/'}
+                title="Lên thư mục cha"
+                aria-label="Lên thư mục cha"
+              >
+                <ArrowUp size={15} />
+              </button>
+              <input
+                className="vsp-file-path-input"
+                value={phoneFilePathInput}
+                onChange={event => setPhoneFilePathInput(event.target.value)}
+                aria-label="Đường dẫn thư mục trên điện thoại"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                className="vsp-file-tool-btn"
+                onClick={() => void loadPhoneFiles(phoneFilePath)}
+                disabled={phoneFilesLoading}
+                title="Làm mới"
+                aria-label="Làm mới thư mục"
+              >
+                <RefreshCw size={15} className={phoneFilesLoading ? 'is-spinning' : undefined} />
+              </button>
+            </form>
+
+            <div className="vsp-file-browser-hint">
+              Nhấp thư mục để mở. Nhấp chuột phải vào tệp để xuất hoặc xoá.
+            </div>
+
+            <div className="vsp-file-list">
+              <div className="vsp-file-row vsp-file-row-head">
+                <span>Tên</span>
+                <span>Kích thước</span>
+                <span>Đã sửa</span>
+              </div>
+
+              {phoneFilesLoading && (
+                <div className="vsp-file-state">
+                  <div className="vsp-spinner-small" />
+                  <span>Đang tải thư mục...</span>
+                </div>
+              )}
+
+              {!phoneFilesLoading && phoneFilesError && (
+                <div className="vsp-file-state is-error">
+                  <span>{phoneFilesError}</span>
+                  <button type="button" className="modalBtn" onClick={() => void loadPhoneFiles(phoneFilePathInput)}>
+                    Thử lại
+                  </button>
+                </div>
+              )}
+
+              {!phoneFilesLoading && !phoneFilesError && phoneFileEntries.length === 0 && (
+                <div className="vsp-file-state">Thư mục trống.</div>
+              )}
+
+              {!phoneFilesLoading && !phoneFilesError && phoneFileEntries.map(entry => (
+                <div
+                  key={entry.path}
+                  className={`vsp-file-row${entry.isDir ? ' is-directory' : ''}${phoneFileAction?.path === entry.path ? ' is-busy' : ''}`}
+                  role={entry.isDir ? 'button' : undefined}
+                  tabIndex={entry.isDir ? 0 : -1}
+                  aria-busy={phoneFileAction?.path === entry.path}
+                  onClick={() => {
+                    if (entry.isDir) void loadPhoneFiles(entry.path);
+                  }}
+                  onKeyDown={event => {
+                    if (entry.isDir && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      void loadPhoneFiles(entry.path);
+                    }
+                  }}
+                  onContextMenu={event => openPhoneFileContext(event, entry)}
+                >
+                  <span className="vsp-file-name" title={entry.path}>
+                    {entry.isDir ? <Folder size={16} /> : <FileText size={16} />}
+                    <span>{entry.name}</span>
+                  </span>
+                  <span>{entry.isDir ? '—' : formatPhoneFileSize(entry.size)}</span>
+                  <span>{formatPhoneFileDate(entry.modifiedAt)}</span>
+                </div>
+              ))}
+            </div>
+
+            {phoneFileStatus && (
+              <div className={`vsp-file-action-status is-${phoneFileStatus.type}`}>
+                {phoneFileStatus.text}
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {phoneFileContext && ReactDOM.createPortal(
+        <div
+          className="vsp-ctx-menu vsp-file-context-menu"
+          style={{ left: phoneFileContext.x, top: phoneFileContext.y }}
+          role="menu"
+          onContextMenu={event => event.preventDefault()}
+        >
+          <button
+            type="button"
+            className="vsp-ctx-item"
+            role="menuitem"
+            disabled={!!phoneFileAction}
+            onClick={() => void handlePhoneFileExport(phoneFileContext.entry)}
+          >
+            <Download size={14} />
+            Xuất Tệp
+          </button>
+          <button
+            type="button"
+            className="vsp-ctx-item vsp-file-delete-menu-item"
+            role="menuitem"
+            disabled={!!phoneFileAction}
+            onClick={() => {
+              if (phoneFileAction) return;
+              setPhoneFileDeleteTarget(phoneFileContext.entry);
+              setPhoneFileContext(null);
+            }}
+          >
+            <Trash2 size={14} />
+            Xoá Tệp
+          </button>
+        </div>,
+        document.body
+      )}
+
+      {phoneFileDeleteTarget && ReactDOM.createPortal(
+        <div
+          className="confirmOverlay confirmOverlay--top vsp-file-confirm-overlay"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="vsp-file-delete-title"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget && !phoneFileAction) {
+              setPhoneFileDeleteTarget(null);
+            }
+          }}
+        >
+          <div className="confirmPanel" onMouseDown={event => event.stopPropagation()}>
+            <div className="confirmTitle" id="vsp-file-delete-title">Xoá Tệp</div>
+            <p className="confirmText">
+              Xoá vĩnh viễn tệp này khỏi điện thoại?
+            </p>
+            <code className="vsp-file-delete-path">{phoneFileDeleteTarget.path}</code>
+            <div className="confirmActions">
+              <button
+                type="button"
+                className="modalBtn"
+                disabled={!!phoneFileAction}
+                onClick={() => setPhoneFileDeleteTarget(null)}
+              >
+                Huỷ
+              </button>
+              <button
+                type="button"
+                className="modalBtn modalBtnDanger"
+                disabled={!!phoneFileAction}
+                onClick={() => void handlePhoneFileDelete()}
+              >
+                {phoneFileAction?.kind === 'delete' ? 'Đang xoá...' : 'Xoá Tệp'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {deleteProfileModalOpen && ReactDOM.createPortal(
         <div
-          className="confirmOverlay"
+          className="confirmOverlay confirmOverlay--top"
           style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onMouseDown={() => setDeleteProfileModalOpen(false)}
           data-inspector-id="viewerSidePanel.deleteProfileModal"
@@ -1782,261 +1673,6 @@ export function ViewerSidePanel({
         document.body
       )}
 
-      {/* ADB Command Modal */}
-      {showAdbModal && (
-        <div 
-          className="vsp-modal-overlay" 
-          style={{ background: 'transparent', backdropFilter: 'none', pointerEvents: 'none' }}
-          onClick={() => setShowAdbModal(false)}
-          data-inspector-id="viewerSidePanel.adbModalOverlay"
-          data-inspector-label="ADB command execution modal backdrop"
-          data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-        >
-          <div 
-            className="vsp-modal" 
-            style={{ left: position.x, top: position.y, position: 'fixed', pointerEvents: 'auto' }}
-            onClick={e => e.stopPropagation()}
-            data-inspector-id="viewerSidePanel.adbModal"
-            data-inspector-label="ADB command execution modal card"
-            data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-          >
-            <div className="vsp-modal-header" onPointerDown={startDrag} style={{ cursor: 'move' }}>
-              <div className="vsp-modal-title">
-                <Terminal size={18} />
-                <span>ADB Command</span>
-                <span style={{ color: '#fff', fontWeight: 400, fontSize: '13px' }}>Device:</span>
-                <span
-                  className="vsp-modal-udid"
-                  style={{ cursor: 'pointer' }}
-                  title={t('Click để copy số seri')}
-                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(udid); }}
-                >{udid}</span>
-              </div>
-              <button className="vsp-modal-close" onClick={() => setShowAdbModal(false)}><X size={16} /></button>
-            </div>
-            <div className="vsp-modal-input-row" style={{ alignItems: 'flex-start' }}>
-              <textarea
-                ref={textareaRef}
-                className="vsp-modal-input"
-                placeholder={t('Nhập lệnh ADB (VD: pm list packages -3)')}
-                value={adbCommand}
-                onChange={e => setAdbCommand(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdbSubmit(); } }}
-                autoFocus
-                data-inspector-id="viewerSidePanel.adbModalInput"
-                data-inspector-label="ADB command text field input"
-                data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-                rows={1}
-              />
-              <button
-                className="vsp-btn vsp-btn-primary"
-                onClick={handleAdbSubmit}
-                disabled={adbRunning || !adbCommand.trim()}
-                data-inspector-id="viewerSidePanel.adbModalExecuteButton"
-                data-inspector-label="Execute command button"
-                data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-              >
-                <Play size={14} />{t('Thực hiện')}
-              </button>
-              <button className={`vsp-btn ${adbTab === 'history' ? 'vsp-btn-primary' : ''}`} onClick={() => setAdbTab(adbTab === 'history' ? 'preset' : 'history')}>
-                <Clock size={13} />{t('Lịch sử')}
-              </button>
-              <button className={`vsp-btn ${adbTab === 'custom' ? 'vsp-btn-primary' : ''}`} onClick={() => setAdbTab(adbTab === 'custom' ? 'preset' : 'custom')}>
-                <Plus size={13} />{t('Thêm lệnh')}
-              </button>
-            </div>
-
-            {/* Lịch sử / Thêm lệnh - hiển thị phía trên khu vực 2 cột khi được bật */}
-            {adbTab === 'history' && (
-              <div className="vsp-modal-tab-content">
-                <div className="vsp-cmd-list">
-                  {cmdHistory.length === 0 && <div className="vsp-empty">{t('Chưa có lịch sử')}</div>}
-                  {cmdHistory.map((cmd, i) => (
-                    <button key={i} className="vsp-cmd-history-item" onClick={() => setAdbCommand(cmd)} onDoubleClick={() => executeAdbCommand(cmd)}>
-                      <Clock size={13} /><span>{cmd}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {adbTab === 'custom' && (
-              <div className="vsp-modal-tab-content">
-                <div className="vsp-cmd-custom">
-                  <div className="vsp-cmd-add-row">
-                    <input className="vsp-input" placeholder={t('Tên')} value={newCmdLabel} onChange={e => setNewCmdLabel(e.target.value)} />
-                    <input className="vsp-input vsp-input-grow" placeholder={t('Lệnh ADB')} value={newCmdValue} onChange={e => setNewCmdValue(e.target.value)} />
-                    <button className="vsp-btn vsp-btn-primary" onClick={handleSaveCustomCmd}><Save size={14} /></button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 2-column body: command list left + log right */}
-            <div className="vsp-modal-2col">
-              {/* Left column – Danh sách ADB */}
-              <div className="vsp-modal-2col-left">
-                <div className="vsp-modal-col-header">{t('Danh sách ADB')}</div>
-                <div className="vsp-modal-cmd-list">
-                  {presets.map((c, i) => (
-                    <div
-                      key={i}
-                      draggable
-                      className={`vsp-cmd-text-item${c.warn ? ' vsp-cmd-warn' : ''}${dragOverPresetIdx === i ? ' drag-over' : ''}${draggedPresetIdx === i ? ' dragging' : ''}`}
-                      style={{
-                        color: presetColors[i] || undefined,
-                        borderTop: dragOverPresetIdx === i && draggedPresetIdx !== null && draggedPresetIdx > i ? '2px solid var(--md-info)' : '2px solid transparent',
-                        borderBottom: dragOverPresetIdx === i && draggedPresetIdx !== null && draggedPresetIdx < i ? '2px solid var(--md-info)' : '2px solid transparent',
-                        opacity: draggedPresetIdx === i ? 0.4 : 1
-                      }}
-                      onClick={() => handlePresetClick(c.cmd, c.label, presetColors[i])}
-                      onContextMenu={e => handlePresetContextMenu(e, i)}
-                      onDragStart={e => handleDragStart(e, i)}
-                      onDragOver={e => handleDragOver(e, i)}
-                      onDrop={e => handleDrop(e, i)}
-                      onDragEnd={handleDragEnd}
-                      title={c.cmd}
-                    >
-                      {c.label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Right column – Nhật ký thực hiện */}
-              <div className="vsp-modal-2col-right">
-                <div className="vsp-modal-col-header">
-                  <span>{t('Nhật ký thực hiện')}</span>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
-                      className="vsp-btn" 
-                      onClick={() => {
-                        const logText = adbLogs.map(log => `[${log.time}] $ ${log.command}\n${log.output}`).join('\n\n');
-                        navigator.clipboard.writeText(logText);
-                      }}
-                      disabled={adbLogs.length === 0}
-                      data-inspector-id="viewerSidePanel.adbModalCopyLogButton"
-                      data-inspector-label="Copy ADB execution logs button"
-                      data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-                    >
-                      <Copy size={13} />{t('Copy log')}
-                    </button>
-                    <button 
-                      className="vsp-btn" 
-                      onClick={() => setAdbLogs([])}
-                      disabled={adbLogs.length === 0}
-                      data-inspector-id="viewerSidePanel.adbModalClearLogButton"
-                      data-inspector-label="Clear ADB execution logs button"
-                      data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-                    >
-                      <Trash2 size={13} />{t('Clear')}
-                    </button>
-                  </div>
-                </div>
-                <div className="vsp-modal-log" style={{ background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '12px' }}>
-                  {adbLogs.length === 0 ? (
-                    <div className="vsp-empty">{t('Chưa có lệnh nào được thực hiện')}</div>
-                  ) : (
-                    adbLogs.map(log => (
-                      <div key={log.id} style={{ fontFamily: 'monospace', fontSize: '12.5px', borderBottom: '1px solid #1c1c1c', paddingBottom: '6px', marginBottom: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                          <span style={{ color: '#666' }}>[{log.time}]</span>
-                          <span style={{ color: log.success ? '#2BD03C' : '#ff6060', fontWeight: 'bold' }}>$ {log.command}</span>
-                        </div>
-                        <pre style={{ margin: 0, paddingLeft: '8px', color: '#ccc', whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 'inherit', wordBreak: 'break-all' }}>
-                          {log.output}
-                        </pre>
-                      </div>
-                    ))
-                  )}
-
-                </div>
-                {adbRunning && <div className="vsp-modal-running"><div className="vsp-spinner-small" /><span>{t('Đang thực hiện...')}</span></div>}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Preset right-click context menu - portal to body for correct positioning */}
-      {ctxMenu && ReactDOM.createPortal(
-        <div 
-          className="vsp-ctx-menu" 
-          style={{ left: ctxMenu.x, top: ctxMenu.y }} 
-          onClick={e => e.stopPropagation()}
-          data-inspector-id="viewerSidePanel.contextMenu"
-          data-inspector-label="ADB preset commands styling/edit context menu"
-          data-inspector-component="client/src/components/ViewerSidePanel.tsx"
-        >
-          <button className="vsp-ctx-item" onClick={() => startEditPreset(ctxMenu.idx)}>
-            <Terminal size={13} />{t('Tuỳ chỉnh lệnh (Edit)')}
-          </button>
-          <button className="vsp-ctx-item" onClick={() => handleDeletePreset(ctxMenu.idx)} style={{ color: '#f87171' }}>
-            <Trash2 size={13} color="#f87171" />{t('Xoá lệnh (Delete)')}
-          </button>
-          <div className="vsp-ctx-divider" />
-          <div className="vsp-ctx-label"><Palette size={12} />{t('Màu chữ')}</div>
-          <div className="vsp-ctx-colors">
-            {COLORS.map(c => (
-              <button key={c} className="vsp-ctx-color-dot" style={{ background: c }}
-                onClick={() => setPresetColor(ctxMenu.idx, c)} />
-            ))}
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Edit preset modal */}
-      {editingPreset && (
-        <div className="vsp-modal-overlay" onClick={() => setEditingPreset(null)}>
-          <div className="vsp-modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
-            <div className="vsp-modal-header">
-              <div className="vsp-modal-title"><Terminal size={16} /><span>{t('Tuỳ chỉnh lệnh')}</span></div>
-              <button className="vsp-modal-close" onClick={() => setEditingPreset(null)}><X size={16} /></button>
-            </div>
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="vsp-label">{t('Tên lệnh')}</div>
-              <input className="vsp-input" value={editingPreset.label} onChange={e => setEditingPreset(p => p ? { ...p, label: e.target.value } : p)} />
-              <div className="vsp-label">{t('Lệnh ADB')}</div>
-              <input className="vsp-modal-input" value={editingPreset.cmd} onChange={e => setEditingPreset(p => p ? { ...p, cmd: e.target.value } : p)} />
-              <button className="vsp-btn vsp-btn-primary vsp-btn-full" onClick={() => {
-                if (editingPreset.cmd.trim()) {
-                  setPresets(prev => {
-                    const next = [...prev];
-                    next[editingPreset.idx] = {
-                      ...next[editingPreset.idx],
-                      label: editingPreset.label.trim(),
-                      cmd: editingPreset.cmd.trim(),
-                    };
-                    saveJson(LS_PRESETS, next);
-                    return next;
-                  });
-                  executeAdbCommand(editingPreset.cmd.trim());
-                }
-                setEditingPreset(null);
-              }}><Play size={14} />{t('Thực hiện')}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {confirmCmd && ReactDOM.createPortal(
-        <div className="confirmOverlay" style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="confirmPanel" style={{ width: 320, padding: 20 }}>
-            <div style={{ color: '#fff', fontSize: '15px', fontWeight: 'bold', marginBottom: '10px' }}>{t('Xác nhận lệnh rủi ro')}</div>
-            <div style={{ color: '#ccc', fontSize: '13px', marginBottom: '20px', lineHeight: 1.5 }}>
-              {t('Bạn có chắc muốn thực hiện lệnh')} <strong style={{ color: '#ef4444' }}>{confirmCmd.label}</strong> {t('không?')}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button className="modalBtn" onClick={() => setConfirmCmd(null)}>{t('Hủy')}</button>
-              <button className="modalBtnPrimary modalBtnDanger" onClick={() => {
-                executeAdbCommand(confirmCmd.cmd);
-                setConfirmCmd(null);
-              }}>{t('Thực hiện')}</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </>
   );
 }

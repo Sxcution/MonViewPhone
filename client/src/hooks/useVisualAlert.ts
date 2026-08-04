@@ -133,7 +133,7 @@ export function useVisualAlert({
 
     if (now - state.lastAlertAt >= cfg.cooldownSec * 1000) {
       state.lastAlertAt = now;
-      playAlertSound();
+      // Keep reminder notifications silent; sound already played when this alert began.
       showAlertNotification(udid, deviceNumber, hitNames, alertLabel);
     }
   }, []);

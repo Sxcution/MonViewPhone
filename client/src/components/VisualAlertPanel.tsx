@@ -1059,7 +1059,7 @@ function MultiROISetupModal({
       </div>
 
       {pendingDeleteROI && (
-        <div className="confirmOverlay visualAlertDeleteConfirmOverlay" onMouseDown={() => setPendingDeleteROI(null)}
+        <div className="confirmOverlay confirmOverlay--top visualAlertDeleteConfirmOverlay" onMouseDown={() => setPendingDeleteROI(null)}
           data-inspector-id="visualAlert.deleteRoiConfirmOverlay"
           data-inspector-label="Visual Alert delete ROI confirm overlay"
           data-inspector-component="client/src/components/VisualAlertPanel.tsx"

@@ -117,7 +117,7 @@ export const COLOR_ROLES: ThemeColorRole[] = [
   {
     key: 'right.panel.input',
     label: 'Right panel input',
-    selector: '.modalInput, .rcpSearch, .cp-search, .confirmInput',
+    selector: '.modalInput, .confirmInput',
     cssVar: '--mvp-input-bg',
     property: 'background-color'
   },
@@ -158,14 +158,14 @@ export const COLOR_ROLES: ThemeColorRole[] = [
   {
     key: 'context.menu.background',
     label: 'Context menu',
-    selector: '.contextMenuPanel, .dav-ctx-menu, .pageContextLayer, .automationContextMenuPanel, .automationMacroCtxPanel, .automationRowDelayCtxPanel, .automationMacroSortMenu, .vsp-ctx-menu',
+    selector: '.uiMenuSurface, .uiMenuSubmenu, .contextMenuPanel, .dav-ctx-menu, .pageContextMenu, .automationContextMenuPanel, .automationMacroCtxPanel, .automationRowDelayCtxPanel, .automationMacroSortMenu, .vsp-ctx-menu',
     cssVar: '--md-card',
     property: 'background-color'
   },
   {
     key: 'context.menu.item',
     label: 'Context menu item',
-    selector: '.ctxMenuItem, .automationContextMenuItem, .automationMacroSortItem, .vsp-ctx-item, .dropdown-item',
+    selector: '.uiMenuItem, .automationContextMenuItem, .automationMacroSortItem, .vsp-ctx-item, .dropdown-item',
     cssVar: '--mvp-menu-item-bg',
     property: 'background-color'
   },
@@ -213,7 +213,7 @@ export const COLOR_ROLES: ThemeColorRole[] = [
   {
     key: 'text.muted',
     label: 'Muted text',
-    selector: '.rcpToggleRow, .confirmText, .modalHint, .automationStatus, .automationProfileEmpty, .syncTimeLabel',
+    selector: '.rcpToggleRow, .confirmText, .automationStatus, .automationProfileEmpty, .syncTimeLabel',
     cssVar: '--md-muted',
     property: 'color'
   },
@@ -228,7 +228,8 @@ export const COLOR_ROLES: ThemeColorRole[] = [
   }
 ];
 
-export const STORAGE_KEY = 'monviewphone:theme-inspector-overrides:v1';
+const LEGACY_STORAGE_KEY = 'monviewphone:theme-inspector-overrides:v1';
+export const STORAGE_KEY = 'monviewphone:theme-inspector-overrides:v2';
 
 export function normalizeHexColor(value: string): string | null {
   const hex = value.trim();
@@ -247,6 +248,8 @@ export function loadThemeOverrides(): ThemeOverrideMap {
     if (raw) {
       return JSON.parse(raw);
     }
+    // v1 mixed legacy --mvp-* colors with the canonical palette. Reset once after the UI-contract migration.
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch (e) {
     console.error('Lỗi load theme overrides:', e);
   }

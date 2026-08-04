@@ -14,7 +14,7 @@ export type StreamConfig = {
   displayId: number;
   codecOptions?: string;
   encoderName?: string;
-  engine?: 'auto' | 'webcodecs' | 'legacy-tinyh264' | 'tango-scrcpy';
+  engine?: 'tango-scrcpy';
   encoderMode?: 'auto' | 'hardware' | 'software' | 'custom';
 };
 
@@ -28,3 +28,39 @@ export const STREAM_CONFIG: StreamConfig = {
   engine: 'tango-scrcpy',
   encoderMode: 'auto',
 };
+
+export function normalizeEncoderConfig(cfg: StreamConfig): StreamConfig {
+  const rawMode = cfg.encoderMode;
+  const encoderMode =
+    rawMode === 'hardware' || rawMode === 'software' || rawMode === 'custom'
+      ? rawMode
+      : 'auto';
+  return {
+    ...cfg,
+    engine: 'tango-scrcpy',
+    encoderMode,
+    encoderName: encoderMode === 'custom' ? cfg.encoderName : undefined,
+  };
+}
+
+export function readStoredStreamConfig(key: string, fallback: StreamConfig): StreamConfig {
+  try {
+    const saved = localStorage.getItem(key);
+    if (!saved) return normalizeEncoderConfig(fallback);
+    const parsed = JSON.parse(saved);
+    if (
+      parsed &&
+      typeof parsed.bitrate === 'number' &&
+      typeof parsed.maxFps === 'number' &&
+      typeof parsed.bounds?.width === 'number' &&
+      typeof parsed.bounds?.height === 'number'
+    ) {
+      return normalizeEncoderConfig({
+        ...fallback,
+        ...parsed,
+        bounds: { ...fallback.bounds, ...parsed.bounds },
+      });
+    }
+  } catch {}
+  return normalizeEncoderConfig(fallback);
+}

@@ -1,15 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
-import { saveHotkeySettingToBackend, saveBackendSetting } from '@/lib/backendSettings'
-import { loadDeviceAccountVault, getDeviceAccountDataFromVault, getDeviceAccountData, saveDeviceAccountData, type Account, type DeviceAccountData, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
+import { AppSettingsModal } from '@/components/AppSettingsModal'
+import { StreamSettingsPanel } from '@/components/StreamSettingsPanel'
+import { DeviceContextMenu } from '@/components/DeviceContextMenu'
+import { saveBackendSetting } from '@/lib/backendSettings'
+import { expireDueRiskAccounts, getNextWechatNewStatusChangeAt, getWechatNewStatus, loadDeviceAccountVault, getDeviceAccountDataFromVault, getDeviceAccountData, saveDeviceAccountData, saveDeviceAccountVaultAsync, type Account, type DeviceAccountData, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
 import { getNearbyAccountState, hasNearbyRelevantAccount, getNearestNearbyHours, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby'
+import { buildNovaWechatSyncCommand, createNovaWechatSyncQueue, type NovaWechatStatusEntry } from '@/lib/novaWechatSync'
 import { readPageParams } from '@/lib/params'
 import { useServer } from '@/context/ServerContext'
-import { Tile } from '@/components/Tile'
-import { STREAM_CONFIG, type StreamConfig } from '@/lib/config'
+import { Tile } from '@/components/tile/Tile'
+import { normalizeEncoderConfig, readStoredStreamConfig, STREAM_CONFIG, type StreamConfig } from '@/lib/config'
 import { useI18n } from '@/context/I18nContext'
 import { useDirectKeyboard } from '@/hooks/useDirectKeyboard'
+import { useWechatNotifications } from '@/hooks/useWechatNotifications'
 import { DeviceViewer } from '@/components/DeviceViewer'
 import { DeviceSelectionGrid, type DeviceSelectionGridItem } from '@/components/DeviceSelectionGrid'
 import { AutomationModal, type AutomationDeviceOption, type AutomationModalRef } from '@/components/AutomationModal'
@@ -22,9 +27,7 @@ import { useActive } from '@/context/ActiveContext'
 import { AndroidKeycode } from '@/lib/keyEvent'
 import {
   encodeKeycodeMessage,
-  encodeSetScreenPowerModeMessage,
-  KeyEventAction,
-  ScreenPowerMode
+  KeyEventAction
 } from '@/lib/control'
 import {
   CONTROL_MODE_GLOBAL_KEY,
@@ -41,6 +44,7 @@ import {
   runAdbCommandApi,
   setDeviceDisplayPower
 } from '@/lib/serverApi'
+import { buildQuickAudioShell, type QuickAudioAction } from '@/lib/quickAudio'
 import { SyncPanel } from '@/components/SyncPanel'
 import { NotesModal, type Note } from '@/components/NotesModal'
 import { SyncTimeSettingsModal } from '@/components/SyncTimeSettingsModal'
@@ -55,28 +59,15 @@ import {
 import { useTileOrder } from '@/store/useTileOrder'
 import type { ConnectionMode, ConnectionState, StreamReloadOptions } from '@/components/tile/types'
 import {
-  loadDeviceProfiles,
-  saveDeviceProfiles,
-  loadAppActions,
-  saveAppActions,
-  loadSavedMacros,
   MACRO_RUNNING_UDIDS_EVENT,
   MACRO_PLAYBACK_PROGRESS_EVENT,
   MACRO_PLAYBACK_STOP_EVENT,
   MACRO_PLAYBACK_REPLAY_EVENT,
   type MacroPlaybackProgressDetail,
   type MacroPlaybackStopDetail,
-  loadSeedingContents,
-  saveSeedingContents,
-  AUTOMATION_APPS,
-  type AutomationAppId,
-  type AutomationDeviceProfile,
-  type SavedAutomationMacro,
-  type AutomationAppAction,
 } from '@/lib/automationData'
 import {
   Bell,
-  Bot,
   Camera,
   ChevronDown,
   ChevronUp,
@@ -86,7 +77,6 @@ import {
   Pin,
   PinOff,
   Package,
-  RotateCcw,
   Settings,
   Notebook,
   Terminal,
@@ -95,10 +85,6 @@ import {
   VolumeX,
   X,
   ChevronRight,
-  Plus,
-  Pencil,
-  Trash2,
-  Users,
   Save,
   FolderOpen
 } from 'lucide-react'
@@ -110,17 +96,10 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.floor(n)))
 }
 
-const BITRATE_MIN = 524_288
-const BITRATE_MAX = 8_388_608
-const BITRATE_WARN_THRESHOLD = Math.floor(BITRATE_MAX * 0.6) // ~60%
 const TILE_WIDTH_MIN = 105
 const TILE_WIDTH_MAX = 726
 const VIEWER_WIDTH_MIN = 400
 const VIEWER_WIDTH_MAX = 900
-const STREAM_WIDTH_MIN = 100
-const STREAM_WIDTH_MAX = 726
-const VIEWER_STREAM_WIDTH = STREAM_WIDTH_MAX
-const VIEWER_STREAM_WIDTH_MAX = 1200
 const DEVICE_LIST_OFFLINE_GRACE_MS = 15_000
 
 type ConnectRequestPayload = {
@@ -145,35 +124,21 @@ const VIEWER_STREAM_CONFIG_KEY = 'viewerStreamConfig'
 const SAVED_GROUPS_BACKUP_KEY = 'savedGroupsBackupV1'
 const SAVED_GROUPS_DELETED_ALL_KEY = 'savedGroupsDeletedAllV1'
 const PREFERRED_CONNECTION_BY_UDID_KEY = 'monviewphone:preferred-connection-by-udid'
-const WECHAT_NEW_ACCOUNT_MS = 90 * 24 * 60 * 60 * 1000
-const NOVA_LAUNCHER_PACKAGE = 'com.teslacoilsw.launcher'
-const NOVA_WECHAT_STATUS_URI = 'content://com.teslacoilsw.launcher.wechatstatus/status'
 const WECHAT_PACKAGE = 'com.tencent.mm'
 
 type SavedDeviceGroup = { name: string; udids: string[]; selectedAccounts?: Record<string, string> }
-type NovaWechatStatusEntry = {
-  userId: number
-  packageName: string
-  status: string
-  nearby: boolean
-  priority: number
-}
-
-function shellQuote(value: string): string {
-  return `'${String(value).replace(/'/g, `'\\''`)}'`
-}
 
 function getNovaWechatStatus(account: Account, now = Date.now()): string {
   if (account.status === 'Die' || account.status === 'Risk') return account.status
-  const createdAt = typeof account.createdAt === 'number' ? account.createdAt : null
-  if (account.isNew || (createdAt && now - createdAt < WECHAT_NEW_ACCOUNT_MS)) return 'New'
+  const newStatus = getWechatNewStatus(account, now)
+  if (newStatus) return newStatus
   return account.status || 'Live'
 }
 
 function getNovaWechatPriority(status: string, nearby: boolean): number {
   if (status === 'Die') return 4
   if (status === 'Risk') return 3
-  if (status === 'New') return 2
+  if (status === 'New' || status === 'New 1' || status === 'New 2') return 2
   if (nearby) return 1
   return 0
 }
@@ -198,65 +163,6 @@ function buildNovaWechatStatusEntries(data: DeviceAccountData, now = Date.now())
     if (!current || entry.priority >= current.priority) byIcon.set(key, entry)
   }
   return Array.from(byIcon.values()).sort((a, b) => a.userId - b.userId || a.packageName.localeCompare(b.packageName))
-}
-
-function novaWechatFingerprint(entries: NovaWechatStatusEntry[]): string {
-  return JSON.stringify(entries.map(({ userId, packageName, status, nearby }) => ({ userId, packageName, status, nearby })))
-}
-
-function buildNovaWechatSyncCommand(entries: NovaWechatStatusEntry[]): string {
-  const lines = [
-    `if ! cmd package path ${NOVA_LAUNCHER_PACKAGE} >/dev/null 2>&1; then echo NOVA_MISSING; exit 0; fi`,
-    `content delete --uri ${shellQuote(NOVA_WECHAT_STATUS_URI)}`,
-    ...entries.map(entry =>
-      [
-        `content insert --uri ${shellQuote(NOVA_WECHAT_STATUS_URI)}`,
-        `--bind userId:i:${entry.userId}`,
-        `--bind packageName:s:${shellQuote(entry.packageName)}`,
-        `--bind status:s:${shellQuote(entry.status)}`,
-        `--bind nearby:b:${entry.nearby ? 'true' : 'false'}`,
-      ].join(' ')
-    ),
-    `am force-stop ${NOVA_LAUNCHER_PACKAGE}`,
-    'input keyevent HOME',
-  ]
-  return lines.join('\n')
-}
-
-function normalizeEncoderConfig(cfg: StreamConfig): StreamConfig {
-  const rawMode = cfg.encoderMode
-  const encoderMode =
-    rawMode === 'hardware' || rawMode === 'software' || rawMode === 'custom'
-      ? rawMode
-      : 'auto'
-  return {
-    ...cfg,
-    engine: 'tango-scrcpy',
-    encoderMode,
-    encoderName: encoderMode === 'custom' ? cfg.encoderName : undefined
-  }
-}
-
-function readStoredStreamConfig(key: string, fallback: StreamConfig): StreamConfig {
-  try {
-    const saved = localStorage.getItem(key)
-    if (!saved) return normalizeEncoderConfig(fallback)
-    const parsed = JSON.parse(saved)
-    if (
-      parsed &&
-      typeof parsed.bitrate === 'number' &&
-      typeof parsed.maxFps === 'number' &&
-      typeof parsed.bounds?.width === 'number' &&
-      typeof parsed.bounds?.height === 'number'
-    ) {
-      return normalizeEncoderConfig({
-        ...fallback,
-        ...parsed,
-        bounds: { ...fallback.bounds, ...parsed.bounds }
-      })
-    }
-  } catch {}
-  return normalizeEncoderConfig(fallback)
 }
 
 function normalizeConnectionMode(device: string, connectType: string): ConnectionState {
@@ -412,9 +318,7 @@ type QuickActionId =
   | 'screenOff'
   | 'mute'
   | 'soundOn'
-  | 'maxVolume'
   | 'syncTime'
-  | 'automation'
 
 // DEFAULT_QUICK_ACTION_ORDER : Thứ tự mặc định các phím tắt nhanh
 const DEFAULT_QUICK_ACTION_ORDER: QuickActionId[] = [
@@ -423,9 +327,7 @@ const DEFAULT_QUICK_ACTION_ORDER: QuickActionId[] = [
   'screenOff',
   'mute',
   'soundOn',
-  'maxVolume',
-  'syncTime',
-  'automation'
+  'syncTime'
 ]
 
 function loadQuickActionOrder(): QuickActionId[] {
@@ -470,22 +372,6 @@ function loadQuickActionOrder(): QuickActionId[] {
   } catch {
     return DEFAULT_QUICK_ACTION_ORDER
   }
-}
-
-function sameStreamConfig(a: StreamConfig, b: StreamConfig): boolean {
-  return (
-    a.bitrate === b.bitrate &&
-    a.maxFps === b.maxFps &&
-    a.iFrameInterval === b.iFrameInterval &&
-    a.bounds.width === b.bounds.width &&
-    a.bounds.height === b.bounds.height &&
-    a.sendFrameMeta === b.sendFrameMeta &&
-    a.displayId === b.displayId &&
-    (a.engine || 'auto') === (b.engine || 'auto') &&
-    (a.encoderMode || 'auto') === (b.encoderMode || 'auto') &&
-    (a.encoderName || '') === (b.encoderName || '') &&
-    (a.codecOptions || '') === (b.codecOptions || '')
-  )
 }
 
 function loadBoolKey(key: string, fallback: boolean): boolean {
@@ -735,139 +621,22 @@ export function App() {
   // ===== DEVICE ACCOUNT HOTKEY =====
   const [deviceAccountHotkey, setDeviceAccountHotkey] = useState(() => localStorage.getItem('monviewphone:device-account-hotkey') || 'Alt+C');
 
-  const handleDeviceAccountHotkeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const lowerKey = e.key.toLowerCase();
-    if (['control', 'alt', 'shift', 'meta'].includes(lowerKey)) {
-      return;
-    }
-
-    const parts: string[] = [];
-    if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
-    if (e.altKey) parts.push('Alt');
-    if (e.shiftKey) parts.push('Shift');
-
-    let keyName = e.key;
-    if (keyName === ' ') {
-      keyName = 'Space';
-    } else if (keyName.length === 1) {
-      keyName = keyName.toUpperCase();
-    } else {
-      keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
-    }
-    parts.push(keyName);
-
-    const newHotkey = parts.join('+');
-    setDeviceAccountHotkey(newHotkey);
-    localStorage.setItem('monviewphone:device-account-hotkey', newHotkey);
-    saveHotkeySettingToBackend('monviewphone:device-account-hotkey', newHotkey);
-  }, []);
 
   // ===== ACCOUNT MANAGER MODAL HOTKEY =====
   const [accountManagerHotkey, setAccountManagerHotkey] = useState(() => localStorage.getItem('monviewphone:account-manager-hotkey') || 'Alt+M');
 
-  const handleAccountManagerHotkeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const lowerKey = e.key.toLowerCase();
-    if (['control', 'alt', 'shift', 'meta'].includes(lowerKey)) {
-      return;
-    }
-
-    const parts: string[] = [];
-    if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
-    if (e.altKey) parts.push('Alt');
-    if (e.shiftKey) parts.push('Shift');
-
-    let keyName = e.key;
-    if (keyName === ' ') {
-      keyName = 'Space';
-    } else if (keyName.length === 1) {
-      keyName = keyName.toUpperCase();
-    } else {
-      keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
-    }
-    parts.push(keyName);
-
-    const newHotkey = parts.join('+');
-    setAccountManagerHotkey(newHotkey);
-    localStorage.setItem('monviewphone:account-manager-hotkey', newHotkey);
-    saveHotkeySettingToBackend('monviewphone:account-manager-hotkey', newHotkey);
-  }, []);
 
   // ===== OVERLAY HEADER HOTKEY =====
   // Hotkey này toggle deviceAccountOverlayOpen (bảng overlay nổi trên từng tile)
   const [overlayHeaderHotkey, setOverlayHeaderHotkey] = useState(() => localStorage.getItem('monviewphone:overlay-header-hotkey') || '');
 
-  const handleOverlayHeaderHotkeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const lowerKey = e.key.toLowerCase();
-    if (['control', 'alt', 'shift', 'meta'].includes(lowerKey)) {
-      return;
-    }
-
-    const parts: string[] = [];
-    if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
-    if (e.altKey) parts.push('Alt');
-    if (e.shiftKey) parts.push('Shift');
-
-    let keyName = e.key;
-    if (keyName === ' ') {
-      keyName = 'Space';
-    } else if (keyName.length === 1) {
-      keyName = keyName.toUpperCase();
-    } else {
-      keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
-    }
-    parts.push(keyName);
-
-    const newHotkey = parts.join('+');
-    setOverlayHeaderHotkey(newHotkey);
-    localStorage.setItem('monviewphone:overlay-header-hotkey', newHotkey);
-    saveHotkeySettingToBackend('monviewphone:overlay-header-hotkey', newHotkey);
-  }, []);
 
   // ===== INSPECTOR ID HOTKEY =====
   const [inspectorIdHotkey, setInspectorIdHotkey] = useState(() => localStorage.getItem('monviewphone:inspector-id-hotkey') || 'Ctrl+Shift+I');
 
-  const handleInspectorIdHotkeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const lowerKey = e.key.toLowerCase();
-    if (['control', 'alt', 'shift', 'meta'].includes(lowerKey)) {
-      return;
-    }
-
-    const parts: string[] = [];
-    if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
-    if (e.altKey) parts.push('Alt');
-    if (e.shiftKey) parts.push('Shift');
-
-    let keyName = e.key;
-    if (keyName === ' ') {
-      keyName = 'Space';
-    } else if (keyName.length === 1) {
-      keyName = keyName.toUpperCase();
-    } else {
-      keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
-    }
-    parts.push(keyName);
-
-    const newHotkey = parts.join('+');
-    setInspectorIdHotkey(newHotkey);
-    localStorage.setItem('monviewphone:inspector-id-hotkey', newHotkey);
-    saveHotkeySettingToBackend('monviewphone:inspector-id-hotkey', newHotkey);
-  }, []);
 
   // ===== SYNC TIME HOTKEY STATES & GLOBAL LISTENER =====
   const [syncTimeHotkey, setSyncTimeHotkey] = useState(() => localStorage.getItem('monviewphone:sync-time-hotkey') || '');
-  const [hotkeySectionOpen, setHotkeySectionOpen] = useState(false);
 
   useEffect(() => {
     const handleGlobalHotkey = (e: KeyboardEvent) => {
@@ -891,35 +660,6 @@ export function App() {
     return () => window.removeEventListener('keydown', handleGlobalHotkey, { capture: true });
   }, []);
 
-  const handleHotkeyInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const lowerKey = e.key.toLowerCase();
-    if (['control', 'alt', 'shift', 'meta'].includes(lowerKey)) {
-      return;
-    }
-
-    const parts: string[] = [];
-    if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
-    if (e.altKey) parts.push('Alt');
-    if (e.shiftKey) parts.push('Shift');
-
-    let keyName = e.key;
-    if (keyName === ' ') {
-      keyName = 'Space';
-    } else if (keyName.length === 1) {
-      keyName = keyName.toUpperCase();
-    } else {
-      keyName = keyName.charAt(0).toUpperCase() + keyName.slice(1);
-    }
-    parts.push(keyName);
-
-    const newHotkey = parts.join('+');
-    setSyncTimeHotkey(newHotkey);
-    localStorage.setItem('monviewphone:sync-time-hotkey', newHotkey);
-    saveHotkeySettingToBackend('monviewphone:sync-time-hotkey', newHotkey);
-  }, []);
 
   // ===== GRID DISPLAY FILTER STATES =====
   const [displayFilter, setDisplayFilter] = useState<'online' | 'all'>(() => {
@@ -985,10 +725,7 @@ export function App() {
     groupIdx?: number       // có nghĩa: click từ dropdown nhóm (dùng để xoá khỏi nhóm cụ thể)
     sourceGrid?: 'main' | 'group' // 'main' = grid tổng tile lớn, 'group' = grid nhỏ trong nhóm
   } | null>(null)
-  const [contextMenuOpen, setContextMenuOpen] = useState(false)
-  const [subMenuOpen, setSubMenuOpen] = useState(false)
   const [pageContextMenu, setPageContextMenu] = useState<{ x: number; y: number } | null>(null)
-  const [contextMenuInput, setContextMenuInput] = useState('')
   const [globalAdbOpen, setGlobalAdbOpen] = useState(false)
   const [automationOpen, setAutomationOpen] = useState(false)
   const [globalAdbCommand, setGlobalAdbCommand] = useState('')
@@ -1069,157 +806,7 @@ export function App() {
 
 
 
-  type CtxSubState = null | {
-    main: 'profileList' | 'setAccountList' | { appId: AutomationAppId; actionId: string };
-    nested?: { type: 'profileActions'; profileId: string; appId?: AutomationAppId; actionId?: string } | 'macroList';
-  };
-
-  type InputState = {
-    key: string;
-    title: string;
-    label?: string;
-    placeholder?: string;
-    defaultValue?: string;
-    onConfirm: (val: string) => void;
-  } | null;
-
-  const [ctxSub, setCtxSub] = useState<CtxSubState>(null);
-  const [inputState, setInputState] = useState<InputState>(null);
-  const [deviceProfiles, setDeviceProfiles] = useState<AutomationDeviceProfile[]>([]);
-  const [savedMacros, setSavedMacros] = useState<SavedAutomationMacro[]>([]);
   const automationModalRef = useRef<AutomationModalRef>(null);
-  const [appActions, setAppActions] = useState<Record<AutomationAppId, AutomationAppAction[]>>({ wechat: [], line: [], tantan: [], setting: [] });
-
-  const [seedingSectionOpen, setSeedingSectionOpen] = useState(false);
-  const [seedingContents, setSeedingContents] = useState(loadSeedingContents);
-
-  const handleSeedingContentsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setSeedingContents(val);
-    saveSeedingContents(val);
-  };
-
-  const seedingLineCount = useMemo(() => {
-    if (!seedingContents) return 0;
-    return seedingContents.split(/[,\s]+/).filter(word => word.trim()).length;
-  }, [seedingContents]);
-
-  useEffect(() => {
-    if (contextMenuTarget) {
-      setDeviceProfiles(loadDeviceProfiles());
-      setSavedMacros(loadSavedMacros());
-      setAppActions(loadAppActions());
-      setCtxSub(null);
-    }
-  }, [contextMenuTarget]);
-
-  // /* createProfileForDevices : Tạo Device Profile mới */
-  const createProfileForDevices = useCallback((name: string, targetUdids: string[]) => {
-    const newProfile: AutomationDeviceProfile = {
-      id: `profile-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name,
-      udids: [...targetUdids],
-      updatedAt: Date.now()
-    };
-    setDeviceProfiles(prev => {
-      const cleaned = prev.map(p => ({ ...p, udids: p.udids.filter(u => !targetUdids.includes(u)) }));
-      const next = [...cleaned, newProfile];
-      saveDeviceProfiles(next);
-      return next;
-    });
-  }, []);
-
-  // /* assignDevicesToProfile : Gán các thiết bị vào profile */
-  const assignDevicesToProfile = useCallback((profileId: string, targetUdids: string[]) => {
-    setDeviceProfiles(prev => {
-      const next = prev.map(p => ({
-        ...p,
-        udids: p.id === profileId
-          ? [...new Set([...p.udids, ...targetUdids])]
-          : p.udids.filter(u => !targetUdids.includes(u)),
-        updatedAt: p.id === profileId ? Date.now() : p.updatedAt,
-      }));
-      saveDeviceProfiles(next);
-      return next;
-    });
-  }, []);
-
-  // /* renameProfile : Đổi tên profile */
-  const renameProfile = useCallback((profileId: string, newName: string) => {
-    setDeviceProfiles(prev => {
-      const next = prev.map(p => p.id === profileId ? { ...p, name: newName, updatedAt: Date.now() } : p);
-      saveDeviceProfiles(next);
-      return next;
-    });
-    setAppActions(prev => {
-      const next = { ...prev };
-      for (const appId of Object.keys(next) as AutomationAppId[]) {
-        next[appId] = next[appId].map(action => ({
-          ...action,
-          bindings: action.bindings.map(b => b.profileId === profileId ? { ...b, profileName: newName } : b),
-        }));
-      }
-      saveAppActions(next);
-      return next;
-    });
-  }, []);
-
-  // /* deleteProfileImpl : Xoá profile */
-  const deleteProfileImpl = useCallback((profileId: string) => {
-    setDeviceProfiles(prev => {
-      const next = prev.filter(p => p.id !== profileId);
-      saveDeviceProfiles(next);
-      return next;
-    });
-    setAppActions(prev => {
-      const next = { ...prev };
-      for (const appId of Object.keys(next) as AutomationAppId[]) {
-        next[appId] = next[appId].map(action => ({
-          ...action,
-          bindings: action.bindings.filter(b => b.profileId !== profileId),
-        }));
-      }
-      saveAppActions(next);
-      return next;
-    });
-  }, []);
-
-  // /* assignMacroToAction : Gán macro vào hành động của profile */
-  const assignMacroToAction = useCallback((
-    appId: AutomationAppId, actionId: string, macro: SavedAutomationMacro, profile: AutomationDeviceProfile,
-  ) => {
-    setAppActions(prev => {
-      const nextActions = prev[appId].map(action => {
-        if (action.id !== actionId) return action;
-        const bindings = (action.bindings ?? []).filter(b => b.profileId !== profile.id);
-        bindings.push({
-          id: `binding-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          macroId: macro.id,
-          macroName: macro.name,
-          profileId: profile.id,
-          profileName: profile.name,
-          updatedAt: Date.now(),
-        });
-        return { ...action, bindings };
-      });
-      const next = { ...prev, [appId]: nextActions };
-      saveAppActions(next);
-      return next;
-    });
-  }, []);
-
-  // /* removeBindingImpl : Gỡ bỏ gán macro khỏi hành động */
-  const removeBindingImpl = useCallback((appId: AutomationAppId, actionId: string, profileId: string) => {
-    setAppActions(prev => {
-      const nextActions = prev[appId].map(action => {
-        if (action.id !== actionId) return action;
-        return { ...action, bindings: (action.bindings ?? []).filter(b => b.profileId !== profileId) };
-      });
-      const next = { ...prev, [appId]: nextActions };
-      saveAppActions(next);
-      return next;
-    });
-  }, []);
 
   const selectionBadgeRef = useRef<HTMLDivElement | null>(null);
 
@@ -1263,19 +850,10 @@ export function App() {
   const [notesModalOpen, setNotesModalOpen] = useState(false)
   const [activeReminderNote, setActiveReminderNote] = useState<Note | null>(null)
   const [reminderOpenNoteId, setReminderOpenNoteId] = useState<string | null>(null)
-  const [streamControlsOpen, setStreamControlsOpen] = useState(() =>
-    loadBoolKey('rightPanel.streamControlsOpen', true)
-  )
   const [quickControlsOpen, setQuickControlsOpen] = useState(() =>
     loadBoolKey('rightPanel.quickControlsOpen', true)
   )
   const [confirmState, setConfirmState] = useState<ConfirmState>(null)
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('rightPanel.streamControlsOpen', String(streamControlsOpen));
-    } catch {}
-  }, [streamControlsOpen]);
 
   useEffect(() => {
     try {
@@ -1356,33 +934,6 @@ export function App() {
       setActiveGroupIdx(null)
     }
   }, [connectSelection])
-
-  // Handle click outside to close context menu and sync sidebar state
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // 1. Ignore if right-click
-      if (event.button === 2) return;
-
-      // 2. Check if click was on a context menu element
-      const target = event.target as Element;
-      const isClickOnContextMenu =
-        target.closest('.react-contexify') ||
-        target.closest('.context-menu') ||
-        target.closest('.contextMenuPanel') ||
-        target.closest('.pageContextLayer');
-
-      // 3. If clicking outside context menu, ensure it closes
-      if (!isClickOnContextMenu && contextMenuOpen) {
-        setContextMenuOpen(false);
-        setContextMenuTarget(null);
-      }
-    };
-
-    window.addEventListener('mousedown', handleClickOutside);
-    return () => window.removeEventListener('mousedown', handleClickOutside);
-  }, [contextMenuOpen]);
-
-
 
   const [connectModalOpen, setConnectModalOpen] = useState(false)
 
@@ -2170,8 +1721,23 @@ export function App() {
   }, [deviceParam, gridDevices, allKnownDevices, endpointLogicalByUdid])
 
   const connectedUdids = useMemo(() => new Set(gridDevices), [gridDevices])
-  const novaWechatSyncedRef = useRef<Map<string, string>>(new Map())
-  const novaWechatPendingRef = useRef<Map<string, string>>(new Map())
+  const novaWechatSyncQueue = useMemo(() => createNovaWechatSyncQueue(async (
+    udid,
+    entries,
+    previous,
+    force,
+  ) => {
+    const command = buildNovaWechatSyncCommand(entries, previous, force)
+    if (!command) return true
+    try {
+      const res = await runAdbCommandApi(wsServer, udid, command, 'shell')
+      if (!res.success) console.warn('[nova-wechat-sync] failed', { udid, output: res.output })
+      return res.success
+    } catch (err) {
+      console.warn('[nova-wechat-sync] failed', udid, err)
+      return false
+    }
+  }), [wsServer])
 
   const syncNovaWechatForDevices = useCallback(async (
     targetUdids: string[],
@@ -2185,28 +1751,68 @@ export function App() {
       if (!deviceData) continue
 
       const entries = buildNovaWechatStatusEntries(deviceData)
-      if (!entries.length && !force) continue
-      const fingerprint = novaWechatFingerprint(entries)
-      if (!force && novaWechatSyncedRef.current.get(udid) === fingerprint) continue
-      if (novaWechatPendingRef.current.get(udid) === fingerprint) continue
+      await novaWechatSyncQueue(udid, entries, force)
+    }
+  }, [connectedUdids, novaWechatSyncQueue, vault])
 
-      novaWechatPendingRef.current.set(udid, fingerprint)
-      try {
-        const res = await runAdbCommandApi(wsServer, udid, buildNovaWechatSyncCommand(entries), 'shell')
-        if (res.success) {
-          novaWechatSyncedRef.current.set(udid, fingerprint)
-        } else {
-          console.warn('[nova-wechat-sync] failed', { udid, output: res.output })
-        }
-      } catch (err) {
-        console.warn('[nova-wechat-sync] failed', udid, err)
-      } finally {
-        if (novaWechatPendingRef.current.get(udid) === fingerprint) {
-          novaWechatPendingRef.current.delete(udid)
+  useEffect(() => {
+    const targetUdids = Array.from(connectedUdids)
+    if (targetUdids.length) void syncNovaWechatForDevices(targetUdids)
+
+    let timer: number | undefined
+    const scheduleNextStatusChange = () => {
+      const now = Date.now()
+      let nextChangeAt: number | null = null
+      for (const device of Object.values(vault.devices || {})) {
+        for (const account of device.platforms.wechat || []) {
+          if (!account.wechatLaunchProfile || account.status === 'Die' || account.status === 'Risk') continue
+          const changeAt = getNextWechatNewStatusChangeAt(account, now)
+          if (changeAt !== null && (nextChangeAt === null || changeAt < nextChangeAt)) nextChangeAt = changeAt
         }
       }
+      if (nextChangeAt === null) return
+
+      timer = window.setTimeout(() => {
+        void syncNovaWechatForDevices(Array.from(connectedUdids))
+        scheduleNextStatusChange()
+      }, Math.min(Math.max(0, nextChangeAt - Date.now()), 2_147_483_647))
     }
-  }, [connectedUdids, vault, wsServer])
+
+    scheduleNextStatusChange()
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [connectedUdids, syncNovaWechatForDevices, vault])
+
+  useEffect(() => {
+    let timer: number | undefined
+    const expireRiskAccounts = () => {
+      const nextVault = loadDeviceAccountVault()
+      const { changedUdids, nextDueDate } = expireDueRiskAccounts(nextVault)
+      if (changedUdids.length) {
+        void saveDeviceAccountVaultAsync(nextVault).then(ok => {
+          if (!ok) console.error('[risk-nearby] Failed to persist automatic Live status')
+        })
+        setVault(nextVault)
+        window.dispatchEvent(new Event('device-account-updated'))
+        const changedData = Object.fromEntries(
+          changedUdids.map(udid => [udid, nextVault.devices[udid]])
+        )
+        void syncNovaWechatForDevices(changedUdids, changedData, false)
+      }
+      if (nextDueDate !== null) {
+        timer = window.setTimeout(
+          expireRiskAccounts,
+          Math.min(Math.max(0, nextDueDate - Date.now()), 2_147_483_647)
+        )
+      }
+    }
+
+    expireRiskAccounts()
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [syncNovaWechatForDevices])
 
   const filteredGridDevices = useMemo(() => {
     let list = gridDevices
@@ -2342,6 +1948,12 @@ export function App() {
     return m
   }, [mergedOrder, getTileNumber])
 
+  const {
+    alertsByUdid: wechatAlertsByUdid,
+    acknowledgeFocusedWechatAlert,
+    openWechatAlert,
+  } = useWechatNotifications({ wsServer, registeredUdids, orderMap })
+
   const orderedRegistered = useMemo(() => {
     const arr = [...filteredRegistered]
 
@@ -2411,7 +2023,6 @@ export function App() {
     if (davActiveFilter !== 'default') {
       let filterMatched = false;
       const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
       if (davActiveFilter === 'one_year') {
         filterMatched = accounts.some(acc => {
@@ -2420,8 +2031,7 @@ export function App() {
         });
       } else if (davActiveFilter === 'new_month') {
         filterMatched = accounts.some(acc => {
-          if (acc.createdAt) return (Date.now() - acc.createdAt) < thirtyDaysMs;
-          return (acc as any).isNew === true;
+          return getWechatNewStatus(acc) === 'New';
         });
       } else if (davActiveFilter === 'die') {
         filterMatched = accounts.some(acc => acc.status === 'Die');
@@ -2614,10 +2224,7 @@ export function App() {
 
       // Lọc TK Mới -> trắng
       if (davActiveFilter === 'new_month') {
-        const hasNewMonth = accounts.some((acc: any) => {
-          if (!acc.createdAt) return false;
-          return Date.now() - acc.createdAt < 30 * 24 * 60 * 60 * 1000;
-        });
+        const hasNewMonth = accounts.some((acc: Account) => getWechatNewStatus(acc) === 'New');
         if (hasNewMonth) {
           map.set(udid, 'white');
           return;
@@ -2679,43 +2286,36 @@ export function App() {
     return []
   }, [activeUdid, selectedVisible])
 
-  const runQuickAdbCommands = useCallback(
-    async (commands: string[]) => {
+  const runQuickAudioAction = useCallback(
+    async (action: QuickAudioAction, label: string) => {
       const targets = quickCommandTargets()
       if (!targets.length) return
 
-      await Promise.allSettled(
+      setGlobalAdbStatus(`Đang ${label} cho ${targets.length} thiết bị...`)
+      const failures: string[] = []
+      await Promise.all(
         targets.map(async (udid) => {
-          for (const command of commands) {
-            try {
-              await runAdbCommandApi(wsServer, udid, command)
-            } catch {
-              // ignore quick action failures; server returns output in UI logs elsewhere.
-            }
+          try {
+            const result = await runAdbCommandApi(
+              wsServer,
+              udid,
+              buildQuickAudioShell(action),
+              'shell'
+            )
+            if (!result.success) failures.push(`${udid}: ${result.output}`)
+          } catch (err: any) {
+            failures.push(`${udid}: ${err?.message || err}`)
           }
         })
       )
+      if (failures.length) {
+        console.warn(`[quick-audio] ${label} failed`, failures)
+        setGlobalAdbStatus(`Lỗi ${label}: ${failures.length}/${targets.length} thiết bị`)
+      } else {
+        setGlobalAdbStatus(`Đã ${label} cho ${targets.length} thiết bị`)
+      }
     },
     [quickCommandTargets, wsServer]
-  )
-
-
-  // callback_runStayAwakeForTargets : Chạy stay awake cho danh sách thiết bị
-  const runStayAwakeForTargets = useCallback(
-    async (targets: string[]) => {
-      if (!targets.length) return
-
-      await Promise.allSettled(
-        targets.map((udid) =>
-          runAdbCommandApi(
-            wsServer,
-            udid,
-            'adb shell settings put global stay_on_while_plugged_in 7'
-          )
-        )
-      )
-    },
-    [wsServer]
   )
 
   // handleRunGroupProfiles : Chạy profiles WeChat cho nhóm máy
@@ -2751,64 +2351,41 @@ export function App() {
     }
   }, [connectedUdids, wsServer]);
 
-  const stayAwakePreparedRef = useRef<Set<string>>(new Set())
-
   const ensureStayAwakeForDevice = useCallback(
     async (udid: string) => {
-      if (stayAwakePreparedRef.current.has(udid)) return
-      try {
-        await runAdbCommandApi(
-          wsServer,
-          udid,
-          'adb shell settings put global stay_on_while_plugged_in 7'
-        )
-        stayAwakePreparedRef.current.add(udid)
-      } catch (err) {
-        console.warn('[stay-awake] failed', udid, err)
+      const result = await runAdbCommandApi(
+        wsServer,
+        udid,
+        'until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 1; done; svc power stayon true; settings put global stay_on_while_plugged_in 7; settings put system screen_off_timeout 2147483647; dumpsys power | grep -q mWakefulness=Awake || { input keyevent 224; sleep 1; }; echo "stay=$(settings get global stay_on_while_plugged_in) timeout=$(settings get system screen_off_timeout)"',
+        'shell'
+      )
+      if (!result.success) {
+        throw new Error(result.output || 'Không thể bật Stay Awake')
+      }
+      if (result.output.trim() !== 'stay=7 timeout=2147483647') {
+        throw new Error(`Stay Awake/timeout readback không đúng: ${result.output.trim() || '(trống)'}`)
       }
     },
     [wsServer]
   )
 
-  const sendPhysicalScreenPowerViaControl = useCallback(
-    (udid: string, mode: ScreenPowerMode): boolean => {
-      const resolved = getTargetsByUdids([udid])
-      const target = resolved[0]
-      if (!target?.ws || target.ws.readyState !== WebSocket.OPEN) return false
-
-      try {
-        target.ws.send(encodeSetScreenPowerModeMessage(mode))
-        return true
-      } catch (err) {
-        console.warn('[display-power] screen power ws failed', udid, err)
-        return false
-      }
-    },
-    [getTargetsByUdids]
-  )
-
-  // callback_runPhysicalScreenOffWithStayAwake : Tắt panel qua control channel trước, rồi đảm bảo Stay Awake
+  // callback_runPhysicalScreenOffWithStayAwake : Tắt panel qua ADB rồi đảm bảo Android vẫn thức
   const runPhysicalScreenOffWithStayAwake = useCallback(
     async (targets: string[]) => {
       if (!targets.length) return
 
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         targets.map(async (udid) => {
           const stayAwakePromise = ensureStayAwakeForDevice(udid)
 
-          try {
-            // WS control: fire-and-forget bonus, không được skip REST API vì ws.send() không confirm delivery
-            sendPhysicalScreenPowerViaControl(udid, ScreenPowerMode.OFF)
-
-            await stayAwakePromise
-            await setDeviceDisplayPower(wsServer, udid, 'off')
-          } catch (err) {
-            console.warn('[display-power] physical off failed', udid, err)
-          }
+          await stayAwakePromise
+          await setDeviceDisplayPower(wsServer, udid, 'off')
         })
       )
+      const failure = results.find(result => result.status === 'rejected')
+      if (failure?.status === 'rejected') throw failure.reason
     },
-    [androidDeviceMap, ensureStayAwakeForDevice, sendPhysicalScreenPowerViaControl, wsServer]
+    [ensureStayAwakeForDevice, wsServer]
   )
 
   // ref_autoScreenPrepared : Lưu danh sách thiết bị đã được chuẩn bị tự động để tránh spam
@@ -2818,8 +2395,18 @@ export function App() {
 
   // effect_autoScreenPrepare : Tự động chạy khi thiết bị vừa online
   useEffect(() => {
+    const onlineEndpoint = (udid: string) => {
+      const endpoint = getStreamEndpointUdid(udid)
+      return androidDeviceMap[endpoint]?.state === 'device' ? endpoint : null
+    }
+
     // Dùng connectedUdids trực tiếp, không phụ thuộc orderedRegistered (cần Tile mount)
     for (const udid of connectedUdids) {
+      const endpoint = onlineEndpoint(udid)
+      if (!endpoint) {
+        autoScreenPreparedRef.current.delete(udid)
+        continue
+      }
       if (autoScreenPreparedRef.current.has(udid)) continue
       if (autoScreenInFlightRef.current.has(udid)) continue
       autoScreenInFlightRef.current.add(udid)
@@ -2828,10 +2415,20 @@ export function App() {
       ;(async () => {
         await new Promise(r => setTimeout(r, 3000))
         try {
-          await runPhysicalScreenOffWithStayAwake([udid])
-          autoScreenPreparedRef.current.add(udid)
-        } catch (err) {
-          console.warn('[auto-screen-prepare] failed, will retry next cycle', udid, err)
+          // ponytail: ba lần đủ che race service đầu boot; lần reconnect kế tiếp là retry boundary.
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              await runPhysicalScreenOffWithStayAwake([endpoint])
+              autoScreenPreparedRef.current.add(udid)
+              return
+            } catch (err) {
+              if (attempt === 3) {
+                console.warn('[auto-screen-prepare] failed after retries', udid, err)
+              } else {
+                await new Promise(r => setTimeout(r, 2000))
+              }
+            }
+          }
         } finally {
           autoScreenInFlightRef.current.delete(udid)
         }
@@ -2840,12 +2437,11 @@ export function App() {
 
     // Nếu device offline thì cho phép lần sau online lại chạy lại
     for (const udid of Array.from(autoScreenPreparedRef.current)) {
-      if (!connectedUdids.has(udid)) {
+      if (!connectedUdids.has(udid) || !onlineEndpoint(udid)) {
         autoScreenPreparedRef.current.delete(udid)
-        stayAwakePreparedRef.current.delete(udid)
       }
     }
-  }, [connectedUdids, runPhysicalScreenOffWithStayAwake])
+  }, [androidDeviceMap, connectedUdids, getStreamEndpointUdid, runPhysicalScreenOffWithStayAwake])
 
   const handleContextApkSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3364,103 +2960,6 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [orderedRegistered, connectedUdids, runningMacroUdids])
 
-  const [draftConfig, setDraftConfig] = useState<StreamConfig>(STREAM_CONFIG)
-  const [draftViewerConfig, setDraftViewerConfig] = useState<StreamConfig>(viewerStreamConfig)
-
-  // Track aspect ratio so stream height follows width
-  const boundsAspectRef = useRef<number>(
-    STREAM_CONFIG.bounds.height && STREAM_CONFIG.bounds.width
-      ? STREAM_CONFIG.bounds.height / STREAM_CONFIG.bounds.width
-      : 1
-  )
-  const autoApplyTimer = useRef<number | null>(null)
-  const skipNextAutoApply = useRef(false)
-  const [bitrateWarnAccepted, setBitrateWarnAccepted] = useState(false)
-  const [bitrateConfirmVisible, setBitrateConfirmVisible] = useState(false)
-  const [bitratePending, setBitratePending] = useState<number | null>(null)
-  const [bitrateNeedsConfirm, setBitrateNeedsConfirm] = useState(false)
-  const [bitrateLastSafe, setBitrateLastSafe] = useState<number>(
-    STREAM_CONFIG.bitrate
-  )
-  const bitrateDragRef = useRef(false)
-
-  useEffect(() => {
-    setDraftConfig(streamConfig)
-    const w = streamConfig.bounds.width || 1
-    const h = streamConfig.bounds.height || 1
-    boundsAspectRef.current = h / w
-    skipNextAutoApply.current = true
-    setBitrateWarnAccepted(false)
-    setBitrateConfirmVisible(false)
-    setBitratePending(null)
-    setBitrateNeedsConfirm(false)
-    setBitrateLastSafe(streamConfig.bitrate)
-    bitrateDragRef.current = false
-  }, [streamConfig])
-
-  useEffect(() => {
-    setDraftViewerConfig(viewerStreamConfig)
-  }, [viewerStreamConfig])
-
-  const normalizeStreamConfig = (cfg: StreamConfig): StreamConfig => {
-    const bitrate = clamp(cfg.bitrate, 524288, 8_388_608)
-    const maxFps = clamp(cfg.maxFps, 1, 60)
-    const iFrameInterval = clamp(cfg.iFrameInterval, 0, 60)
-    const width = clamp(cfg.bounds?.width ?? 0, STREAM_WIDTH_MIN, STREAM_WIDTH_MAX)
-    const height = clamp(cfg.bounds?.height ?? 0, STREAM_WIDTH_MIN, 4000)
-    const displayId = Math.max(0, Math.floor(cfg.displayId ?? 0))
-    const encoderMode = cfg.encoderMode || 'auto'
-    return {
-      ...normalizeEncoderConfig({
-        bitrate,
-        maxFps,
-        iFrameInterval,
-        bounds: { width, height },
-        sendFrameMeta: Boolean(cfg.sendFrameMeta),
-        displayId,
-        codecOptions: cfg.codecOptions,
-        engine: cfg.engine,
-        encoderMode,
-        encoderName: cfg.encoderName
-      })
-    }
-  }
-
-  const normalizeViewerStreamConfig = (cfg: StreamConfig): StreamConfig => {
-    const bitrate = clamp(cfg.bitrate, 524288, 8_388_608)
-    const maxFps = clamp(cfg.maxFps, 1, 60)
-    const iFrameInterval = clamp(cfg.iFrameInterval, 0, 60)
-    const width = clamp(cfg.bounds?.width ?? 0, STREAM_WIDTH_MIN, VIEWER_STREAM_WIDTH_MAX)
-    const height = clamp(cfg.bounds?.height ?? 0, STREAM_WIDTH_MIN, 4000)
-    const displayId = Math.max(0, Math.floor(cfg.displayId ?? 0))
-    const encoderMode = cfg.encoderMode || 'auto'
-    return {
-      ...normalizeEncoderConfig({
-        bitrate,
-        maxFps,
-        iFrameInterval,
-        bounds: { width, height },
-        sendFrameMeta: Boolean(cfg.sendFrameMeta),
-        displayId,
-        codecOptions: cfg.codecOptions,
-        engine: cfg.engine,
-        encoderMode,
-        encoderName: cfg.encoderName
-      })
-    }
-  }
-
-  const isViewerConfigMode = viewerUdid !== null
-  const activeDraftConfig = isViewerConfigMode ? draftViewerConfig : draftConfig
-
-  const setActiveDraftConfig = useCallback((updater: React.SetStateAction<StreamConfig>) => {
-    if (viewerUdid) {
-      setDraftViewerConfig(updater)
-    } else {
-      setDraftConfig(updater)
-    }
-  }, [viewerUdid])
-
   const reloadAllTiles = useCallback(() => {
     reloadMap.current.forEach((fn, udid) => {
       if (viewerUdid === udid) return
@@ -3471,110 +2970,6 @@ export function App() {
       }
     })
   }, [viewerUdid])
-
-  const updateGridBoundsWidth = (widthRaw: number) => {
-    const width = clamp(widthRaw, STREAM_WIDTH_MIN, STREAM_WIDTH_MAX)
-    const height = Math.max(1, Math.round(width * boundsAspectRef.current))
-    setDraftConfig(prev => ({
-      ...prev,
-      bounds: { width, height }
-    }))
-  }
-
-  const updateViewerBoundsWidth = (widthRaw: number) => {
-    const width = clamp(widthRaw, STREAM_WIDTH_MIN, VIEWER_STREAM_WIDTH_MAX)
-    const aspect =
-      draftViewerConfig.bounds.width && draftViewerConfig.bounds.height
-        ? draftViewerConfig.bounds.height / draftViewerConfig.bounds.width
-        : boundsAspectRef.current || 1
-    const height = Math.max(1, Math.round(width * aspect))
-    setDraftViewerConfig(prev => ({
-      ...prev,
-      bounds: { width, height }
-    }))
-  }
-
-  const applyGridDraftConfig = useCallback(() => {
-    const next = normalizeStreamConfig(draftConfig)
-    setStreamConfig(prev => {
-      if (sameStreamConfig(prev, next)) return prev
-      reloadAllTiles()
-      return next
-    })
-  }, [draftConfig, reloadAllTiles])
-
-  const applyViewerDraftConfig = useCallback(() => {
-    const next = normalizeViewerStreamConfig(draftViewerConfig)
-    setViewerStreamConfig(prev => {
-      if (sameStreamConfig(prev, next)) return prev
-      return next
-    })
-  }, [draftViewerConfig])
-
-  const applyActiveDraftConfig = useCallback(() => {
-    if (viewerUdid) {
-      applyViewerDraftConfig()
-    } else {
-      applyGridDraftConfig()
-    }
-  }, [viewerUdid, applyViewerDraftConfig, applyGridDraftConfig])
-
-  const handleBitrateChange = (val: number) => {
-    const needsConfirm = val > BITRATE_WARN_THRESHOLD && !bitrateWarnAccepted
-    if (needsConfirm) {
-      setBitrateNeedsConfirm(true)
-      setBitratePending(val)
-    } else {
-      setBitrateNeedsConfirm(false)
-      setBitratePending(null)
-      setBitrateLastSafe(val)
-    }
-    setDraftConfig(prev => ({ ...prev, bitrate: val }))
-  }
-
-  const onBitratePointerDown = () => {
-    bitrateDragRef.current = true
-  }
-
-  const onBitratePointerUp = () => {
-    const needsConfirm = bitrateNeedsConfirm && !bitrateWarnAccepted
-    bitrateDragRef.current = false
-    if (needsConfirm) {
-      setBitrateConfirmVisible(true)
-    }
-  }
-
-  // Auto-apply on slider changes with debounce to avoid spamming reconnects
-  useEffect(() => {
-    if (skipNextAutoApply.current) {
-      skipNextAutoApply.current = false
-      return
-    }
-    if (
-      (bitrateNeedsConfirm && !bitrateWarnAccepted) ||
-      bitrateConfirmVisible
-    ) {
-      return
-    }
-    if (autoApplyTimer.current) window.clearTimeout(autoApplyTimer.current)
-    autoApplyTimer.current = window.setTimeout(() => {
-      applyActiveDraftConfig()
-      autoApplyTimer.current = null
-    }, 600)
-    return () => {
-      if (autoApplyTimer.current) {
-        window.clearTimeout(autoApplyTimer.current)
-        autoApplyTimer.current = null
-      }
-    }
-  }, [
-    draftConfig,
-    draftViewerConfig,
-    applyActiveDraftConfig,
-    bitrateNeedsConfirm,
-    bitrateWarnAccepted,
-    bitrateConfirmVisible
-  ])
 
   const onViewerPointerMove = useCallback((e: PointerEvent) => {
     if (!viewerDragRef.current.active) return
@@ -3724,47 +3119,20 @@ export function App() {
       mute: {
         label: 'Tắt tiếng',
         icon: <VolumeX size={15} strokeWidth={1.8} />,
-        run: () =>
-          runQuickAdbCommands(['adb shell cmd notification set_dnd none'])
+        run: () => runQuickAudioAction('mute', 'tắt tiếng')
       },
       soundOn: {
-        label: 'Mở Âm Thanh',
+        label: 'Mở âm lượng',
         icon: <Volume2 size={15} strokeWidth={1.8} />,
-        run: () =>
-          runQuickAdbCommands([
-            'adb shell cmd notification set_dnd off',
-            'adb shell cmd media_session volume --stream 3 --set 7',
-            'adb shell cmd media_session volume --stream 2 --set 7',
-            'adb shell cmd media_session volume --stream 5 --set 7',
-            'adb shell cmd media_session volume --stream 4 --set 7',
-            'adb shell cmd media_session volume --stream 1 --set 7'
-          ])
-      },
-      maxVolume: {
-        label: 'Max âm lượng',
-        icon: <Volume2 size={15} strokeWidth={1.8} />,
-        run: () =>
-          runQuickAdbCommands([
-            'adb shell cmd notification set_dnd off',
-            'adb shell cmd media_session volume --stream 1 --set 7',
-            'adb shell cmd media_session volume --stream 2 --set 15',
-            'adb shell cmd media_session volume --stream 3 --set 15',
-            'adb shell cmd media_session volume --stream 4 --set 15',
-            'adb shell cmd media_session volume --stream 5 --set 15'
-          ])
+        run: () => runQuickAudioAction('soundOn', 'mở âm lượng tối đa')
       },
       syncTime: {
         label: 'Sync Time',
         icon: <Clock3 size={15} strokeWidth={1.8} />,
         run: () => setSyncTimeModalOpen(true)
-      },
-      automation: {
-        label: t('Tự động hóa') || 'Automation',
-        icon: <Bot size={15} strokeWidth={1.8} />,
-        run: () => setAutomationOpen(true)
       }
     }),
-    [runQuickAdbCommands, runPhysicalScreenOffWithStayAwake, quickCommandTargets, getTargetsByUdids, wsServer, t]
+    [runQuickAudioAction, runPhysicalScreenOffWithStayAwake, quickCommandTargets, getTargetsByUdids, wsServer, t]
   )
 
   {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */ }
@@ -3978,8 +3346,6 @@ export function App() {
                       }
                       // Mở context menu nhóm cho tile này
                       setContextMenuTarget({ x: e.clientX, y: e.clientY, udid, sourceGrid: 'main', groupIdx: activeGroupIdx ?? undefined })
-                      setContextMenuInput(String(orderMap.get(udid) ?? 0))
-                      setContextMenuOpen(true)
                     }}
                     onDragOver={e => {
                       if (draggingTile) e.preventDefault()
@@ -4031,8 +3397,16 @@ export function App() {
                       selected={connectSelection.has(udid)}
                       showTileInfo={showTileInfo}
                       isDisconnected={!isConnected}
-                      visualAlertActive={Boolean(visualTileAlerts[udid])}
+                      visualAlertActive={Boolean(wechatAlertsByUdid[udid]?.length || visualTileAlerts[udid])}
+                      visualAlertSource={wechatAlertsByUdid[udid]?.length ? 'wechat' : 'visual'}
+                      visualAlertTargets={(wechatAlertsByUdid[udid] ?? []).map(alert => ({
+                        userId: alert.userId,
+                        label: alert.label,
+                      }))}
+                      visualAlertTargetUserId={wechatAlertsByUdid[udid]?.[0]?.userId}
                       onClearVisualAlert={clearVisualAlert}
+                      onAcknowledgeWechatAlert={acknowledgeFocusedWechatAlert}
+                      onVisualAlertClick={openWechatAlert}
                       streamConfig={viewerUdid === udid ? viewerStreamConfig : streamConfig}
                       controlMode={getControlModeForUdid(udid)}
                       onRegisterReload={registerReload}
@@ -4062,22 +3436,22 @@ export function App() {
             const w = Math.abs(rubberBand.currentX - rubberBand.startX)
             const h = Math.abs(rubberBand.currentY - rubberBand.startY)
             return (
-              <div style={{
-                position: 'fixed',
+              <div
+                className="rubberBandSelection"
+                style={{
                 left: x, top: y, width: w, height: h,
-                border: '1.5px solid #4f9eff',
-                background: 'rgba(79, 158, 255, 0.12)',
-                pointerEvents: 'none',
-                zIndex: 9000,
-                borderRadius: 3
-              }} />
+                }}
+                data-inspector-id="deviceGrid.rubberBandSelection"
+                data-inspector-label="Device grid rubber-band selection rectangle"
+                data-inspector-component="client/src/App.tsx"
+              />
             )
           })()}
         </div>
       </div>
 
       <div 
-        className={`sidebar-wrapper ${isSidebarPinned ? 'pinned' : (contextMenuOpen || !!groupContextMenu) ? 'auto-hide force-show' : 'auto-hide'}`}
+        className={`sidebar-wrapper ${isSidebarPinned ? 'pinned' : (contextMenuTarget || groupContextMenu) ? 'auto-hide force-show' : 'auto-hide'}`}
         data-inspector-id="rightSidebar.wrapper"
         data-inspector-label="Right sidebar outer wrapper"
         data-inspector-component="client/src/App.tsx"
@@ -4133,412 +3507,21 @@ export function App() {
             data-inspector-label="Right configuration panel content area"
             data-inspector-component="client/src/App.tsx"
           >
-            <div 
-              className={`rcpSection rcpDropdown rcpDropdownStatic${streamControlsOpen ? '' : ' rcpSectionCollapsed'}`}
-              data-inspector-id="rightSidebar.streamSection"
-              data-inspector-label="Stream configuration section"
-              data-inspector-component="client/src/App.tsx"
-            >
-              <div className='rcpTitleBar'>
-                <div 
-                  className='rcpTitle'
-                  data-inspector-id="rightSidebar.streamTitle"
-                  data-inspector-label="Stream configuration section title"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  {viewerUdid ? t('Stream config (viewer)') : t('Stream config')}
-                </div>
-                <div className='rcpTitleActions'>
-                  <button
-                    className='rcpMiniBtn'
-                    title={t('Reset stream config to default')}
-                    aria-label={t('Reset stream config to default')}
-                    onClick={() => {
-                      setConfirmState({
-                        title: 'Reset cấu hình?',
-                        message: 'Bạn có chắc chắn muốn khôi phục cấu hình stream về mặc định không?',
-                        danger: true,
-                        onConfirm: () => {
-                          if (viewerUdid) {
-                            const defaultViewerCfg = {
-                              ...STREAM_CONFIG,
-                              bitrate: 8_388_608,
-                              maxFps: 60,
-                              bounds: {
-                                width: 1000,
-                                height: Math.round(1000 * (boundsAspectRef.current || 16 / 9))
-                              }
-                            }
-                            setViewerStreamConfig(defaultViewerCfg)
-                            setDraftViewerConfig(defaultViewerCfg)
-                            updateWidth(205)
-                            updateViewerWidthPx(900)
-                            setShowTileInfo(false)
-                          } else {
-                            setStreamConfig(STREAM_CONFIG)
-                            setDraftConfig(STREAM_CONFIG)
-                            updateWidth(205)
-                            updateViewerWidthPx(900)
-                            setShowTileInfo(false)
-                            setBitrateWarnAccepted(false)
-                            setBitrateConfirmVisible(false)
-                            setBitratePending(null)
-                            setBitrateNeedsConfirm(false)
-                            setBitrateLastSafe(STREAM_CONFIG.bitrate)
-                            reloadAllTiles()
-                          }
-                        }
-                      });
-                    }}
-                    data-inspector-id="rightSidebar.streamResetButton"
-                    data-inspector-label="Stream config reset button"
-                    data-inspector-component="client/src/App.tsx"
-                  >
-                    <RotateCcw size={12} strokeWidth={2} />
-                    <span>Reset</span>
-                  </button>
-                  <button
-                    className='rcpIconBtn'
-                    title={streamControlsOpen ? t('Collapse stream config') : t('Expand stream config')}
-                    aria-label={streamControlsOpen ? t('Collapse stream config') : t('Expand stream config')}
-                    onClick={() => setStreamControlsOpen(prev => !prev)}
-                    data-inspector-id="rightSidebar.streamCollapseButton"
-                    data-inspector-label="Stream config collapse/expand button"
-                    data-inspector-component="client/src/App.tsx"
-                  >
-                    {streamControlsOpen ? <ChevronUp size={15} strokeWidth={2} /> : <ChevronDown size={15} strokeWidth={2} />}
-                  </button>
-                </div>
-              </div>
-              <div 
-                className='rcpToggleRow'
-                data-inspector-id="rightSidebar.showTileInfoToggle"
-                data-inspector-label="Toggle row for showing title/nav on tiles"
-                data-inspector-component="client/src/App.tsx"
-              >
-                <span>{t('Hiển thị Title / Nav')}</span>
-                <div style={{ display: 'contents' }}>
-                  <button
-                    className={`rcpToggleBtn ${showTileInfo ? 'on' : ''}`}
-                    onClick={() => setShowTileInfo(prev => !prev)}
-                  >
-                    {showTileInfo ? t('Bật') : t('Ẩn')}
-                  </button>
-                </div>
-              </div>
- 
-              <div 
-                className='rcpSliderRow'
-                data-inspector-id="rightSidebar.tileSizeRow"
-                data-inspector-label="Tile size setting row container"
-                data-inspector-component="client/src/App.tsx"
-              >
-                <div className='rcpSliderLabel'>Kích thước</div>
-                <button
-                  className='rcpStepBtn'
-                  aria-label={t('Decrease tile width')}
-                  onClick={() => updateWidth(tileDims.width - 5)}
-                  data-inspector-id="rightSidebar.tileSizeDecreaseButton"
-                  data-inspector-label="Tile size decrease button"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  –
-                </button>
-                <input
-                  type='range'
-                  min={TILE_WIDTH_MIN}
-                  max={TILE_WIDTH_MAX}
-                  value={tileDims.width}
-                  onChange={e => updateWidth(Number(e.target.value))}
-                  className='modalRange'
-                  data-inspector-id="rightSidebar.tileSizeSlider"
-                  data-inspector-label="Tile size range slider"
-                  data-inspector-component="client/src/App.tsx"
-                />
-                <button
-                  className='rcpStepBtn'
-                  aria-label={t('Increase tile width')}
-                  onClick={() => updateWidth(tileDims.width + 5)}
-                  data-inspector-id="rightSidebar.tileSizeIncreaseButton"
-                  data-inspector-label="Tile size increase button"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  +
-                </button>
-                <div className='rcpValue'>{tileDims.width}px</div>
-              </div>
-              <div 
-                className='rcpSliderRow'
-                data-inspector-id="rightSidebar.viewerSizeRow"
-                data-inspector-label="Viewer screen size setting row container"
-                data-inspector-component="client/src/App.tsx"
-              >
-                <div className='rcpSliderLabel'>Kích thước màn hình lớn</div>
-                <button
-                  className='rcpStepBtn'
-                  aria-label={t('Decrease viewer width')}
-                  onClick={() => updateViewerWidthPx(viewerWidthPx - 20)}
-                  data-inspector-id="rightSidebar.viewerSizeDecreaseButton"
-                  data-inspector-label="Viewer size decrease button"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  –
-                </button>
-                <input
-                  type='range'
-                  min={VIEWER_WIDTH_MIN}
-                  max={VIEWER_WIDTH_MAX}
-                  value={viewerWidthPx}
-                  onChange={e => updateViewerWidthPx(Number(e.target.value))}
-                  className='modalRange'
-                  data-inspector-id="rightSidebar.viewerSizeSlider"
-                  data-inspector-label="Viewer size range slider"
-                  data-inspector-component="client/src/App.tsx"
-                />
-                <button
-                  className='rcpStepBtn'
-                  aria-label={t('Increase viewer width')}
-                  onClick={() => updateViewerWidthPx(viewerWidthPx + 20)}
-                  data-inspector-id="rightSidebar.viewerSizeIncreaseButton"
-                  data-inspector-label="Viewer size increase button"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  +
-                </button>
-                <div className='rcpValue'>{viewerWidthPx}px</div>
-              </div>
-              <div 
-                className='rcpSliderRow'
-                data-inspector-id="rightSidebar.bitrateRow"
-                data-inspector-label="Bitrate setting row container"
-                data-inspector-component="client/src/App.tsx"
-              >
-                <div className='rcpSliderLabel'>Bitrate</div>
-                <button
-                  className='rcpStepBtn'
-                  aria-label={t('Decrease bitrate')}
-                  onClick={() => {
-                    const delta = -131072
-                    if (viewerUdid) {
-                      setDraftViewerConfig(prev => ({
-                        ...prev,
-                        bitrate: clamp(prev.bitrate + delta, BITRATE_MIN, BITRATE_MAX)
-                      }))
-                    } else {
-                      handleBitrateChange(
-                        clamp(draftConfig.bitrate + delta, BITRATE_MIN, BITRATE_MAX)
-                      )
-                    }
-                  }}
-                  data-inspector-id="rightSidebar.bitrateDecreaseButton"
-                  data-inspector-label="Bitrate decrease button"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  –
-                </button>
-                <input
-                  type='range'
-                  min={BITRATE_MIN}
-                  max={BITRATE_MAX}
-                  step='131072'
-                  value={
-                    viewerUdid
-                      ? draftViewerConfig.bitrate
-                      : draftConfig.bitrate
-                  }
-                  onChange={e => {
-                    const val = Number(e.target.value)
-                    if (viewerUdid) {
-                      setDraftViewerConfig(prev => ({
-                        ...prev,
-                        bitrate: val
-                      }))
-                    } else {
-                      handleBitrateChange(val)
-                    }
-                  }}
-                  onMouseDown={onBitratePointerDown}
-                  onTouchStart={onBitratePointerDown}
-                  onMouseUp={onBitratePointerUp}
-                  onTouchEnd={onBitratePointerUp}
-                  onMouseLeave={onBitratePointerUp}
-                  className='modalRange'
-                  data-inspector-id="rightSidebar.bitrateSlider"
-                  data-inspector-label="Bitrate range slider"
-                  data-inspector-component="client/src/App.tsx"
-                />
-                <button
-                  className='rcpStepBtn'
-                  aria-label={t('Increase bitrate')}
-                  onClick={() => {
-                    const delta = 131072
-                    if (viewerUdid) {
-                      setDraftViewerConfig(prev => ({
-                        ...prev,
-                        bitrate: clamp(prev.bitrate + delta, BITRATE_MIN, BITRATE_MAX)
-                      }))
-                    } else {
-                      handleBitrateChange(
-                        clamp(draftConfig.bitrate + delta, BITRATE_MIN, BITRATE_MAX)
-                      )
-                    }
-                  }}
-                  data-inspector-id="rightSidebar.bitrateIncreaseButton"
-                  data-inspector-label="Bitrate increase button"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  +
-                </button>
-                <div className='rcpValue'>
-                  {(viewerUdid
-                    ? draftViewerConfig.bitrate
-                    : draftConfig.bitrate
-                  ).toLocaleString()}
-                </div>
-              </div>
-              <div 
-                className='rcpSliderRow'
-                data-inspector-id="rightSidebar.fpsRow"
-                data-inspector-label="FPS setting row container"
-                data-inspector-component="client/src/App.tsx"
-              >
-                <div className='rcpSliderLabel'>FPS</div>
-                <button
-                  className='rcpStepBtn'
-                  aria-label={t('Decrease FPS')}
-                  onClick={() => {
-                    if (viewerUdid) {
-                      setDraftViewerConfig(prev => ({
-                        ...prev,
-                        maxFps: clamp(prev.maxFps - 1, 1, 60)
-                      }))
-                    } else {
-                      setDraftConfig(prev => ({
-                        ...prev,
-                        maxFps: clamp(prev.maxFps - 1, 1, 60)
-                      }))
-                    }
-                  }}
-                  data-inspector-id="rightSidebar.fpsDecreaseButton"
-                  data-inspector-label="FPS decrease button"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  –
-                </button>
-                <input
-                  type='range'
-                  min='1'
-                  max='60'
-                  value={
-                    viewerUdid
-                      ? draftViewerConfig.maxFps
-                      : draftConfig.maxFps
-                  }
-                  onChange={e => {
-                    const val = Number(e.target.value)
-                    if (viewerUdid) {
-                      setDraftViewerConfig(prev => ({
-                        ...prev,
-                        maxFps: val
-                      }))
-                    } else {
-                      setDraftConfig(prev => ({
-                        ...prev,
-                        maxFps: val
-                      }))
-                    }
-                  }}
-                  className='modalRange'
-                  data-inspector-id="rightSidebar.fpsSlider"
-                  data-inspector-label="FPS range slider"
-                  data-inspector-component="client/src/App.tsx"
-                />
-                <button
-                  className='rcpStepBtn'
-                  aria-label={t('Increase FPS')}
-                  onClick={() => {
-                    if (viewerUdid) {
-                      setDraftViewerConfig(prev => ({
-                        ...prev,
-                        maxFps: clamp(prev.maxFps + 1, 1, 60)
-                      }))
-                    } else {
-                      setDraftConfig(prev => ({
-                        ...prev,
-                        maxFps: clamp(prev.maxFps + 1, 1, 60)
-                      }))
-                    }
-                  }}
-                  data-inspector-id="rightSidebar.fpsIncreaseButton"
-                  data-inspector-label="FPS increase button"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  +
-                </button>
-                <div className='rcpValue'>
-                  {viewerUdid
-                    ? draftViewerConfig.maxFps
-                    : draftConfig.maxFps}{' '}
-                  fps
-                </div>
-              </div>
-
-              <div className='rcpSliderRow'>
-                <div className='rcpSliderLabel'>Độ Nét</div>
-                <button
-                  className='rcpStepBtn'
-                  aria-label={t('Decrease stream width')}
-                  onClick={() => {
-                    if (viewerUdid) {
-                      updateViewerBoundsWidth(draftViewerConfig.bounds.width - 20)
-                    } else {
-                      updateGridBoundsWidth(draftConfig.bounds.width - 20)
-                    }
-                  }}
-                >
-                  –
-                </button>
-                <input
-                  type='range'
-                  min={STREAM_WIDTH_MIN}
-                  max={viewerUdid ? VIEWER_STREAM_WIDTH_MAX : STREAM_WIDTH_MAX}
-                  value={
-                    viewerUdid
-                      ? draftViewerConfig.bounds.width
-                      : draftConfig.bounds.width
-                  }
-                  onChange={e => {
-                    const val = Number(e.target.value)
-                    if (viewerUdid) {
-                      updateViewerBoundsWidth(val)
-                    } else {
-                      updateGridBoundsWidth(val)
-                    }
-                  }}
-                  className='modalRange'
-                />
-                <button
-                  className='rcpStepBtn'
-                  aria-label={t('Increase stream width')}
-                  onClick={() => {
-                    if (viewerUdid) {
-                      updateViewerBoundsWidth(draftViewerConfig.bounds.width + 20)
-                    } else {
-                      updateGridBoundsWidth(draftConfig.bounds.width + 20)
-                    }
-                  }}
-                >
-                  +
-                </button>
-                <div className='rcpValue'>
-                  {viewerUdid
-                    ? draftViewerConfig.bounds.width
-                    : draftConfig.bounds.width}
-                  px
-                </div>
-              </div>
-
-            </div>
+            <StreamSettingsPanel
+              viewerUdid={viewerUdid}
+              streamConfig={streamConfig}
+              setStreamConfig={setStreamConfig}
+              viewerStreamConfig={viewerStreamConfig}
+              setViewerStreamConfig={setViewerStreamConfig}
+              tileWidth={tileDims.width}
+              onTileWidthChange={updateWidth}
+              viewerWidthPx={viewerWidthPx}
+              onViewerWidthChange={updateViewerWidthPx}
+              showTileInfo={showTileInfo}
+              setShowTileInfo={setShowTileInfo}
+              onReloadAll={reloadAllTiles}
+              requestConfirm={request => setConfirmState(request)}
+            />
 
             {/* visualAlertPanel : Section Visual Alert - quét chấm đỏ notification */}
             <VisualAlertPanel
@@ -4705,68 +3688,46 @@ export function App() {
                     {connectSelection.size > 0 ? ` (${connectSelection.size})` : ''}
                   </button>
 
-                  <div style={{ position: 'relative', marginLeft: 'auto' }}>
+                  <div className="rcpDisplayFilter">
                     <button
                       type="button"
-                      className="rcpAdd ghost"
+                      className="rcpAdd ghost rcpDisplayFilterButton"
                       onClick={() => setDisplayFilterOpen(p => !p)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                      data-inspector-id="rightSidebar.deviceDisplayFilterButton"
+                      data-inspector-label="Device display filter toggle"
+                      data-inspector-component="client/src/App.tsx"
                     >
                       <span>Hiển thị: {displayFilter === 'online' ? 'Online only' : 'Tất cả'}</span>
                       <ChevronDown size={14} />
                     </button>
                     {displayFilterOpen && (
                       <div
-                        className="rcpDropdown"
-                        style={{
-                          position: 'absolute',
-                          right: 0,
-                          top: '100%',
-                          marginTop: '4px',
-                          background: 'var(--md-card)',
-                          border: '1px solid var(--md-border)',
-                          borderRadius: '8px',
-                          boxShadow: 'var(--md-shadow-panel)',
-                          zIndex: 10,
-                          width: '120px',
-                          overflow: 'hidden'
-                        }}
+                        className="uiMenuSurface rcpDisplayFilterMenu"
+                        data-inspector-id="rightSidebar.deviceDisplayFilterMenu"
+                        data-inspector-label="Device display filter menu"
+                        data-inspector-component="client/src/App.tsx"
                       >
                         <div
-                          className={`rcpDropdownItem${displayFilter === 'online' ? ' active' : ''}`}
+                          className={`uiMenuItem${displayFilter === 'online' ? ' uiMenuItemActive' : ''}`}
                           onClick={() => {
                             setDisplayFilter('online');
                             setDisplayFilterOpen(false);
                           }}
-                          style={{
-                            padding: '8px 12px',
-                            fontSize: '12px',
-                            color: 'var(--md-text)',
-                            cursor: 'pointer',
-                            background: displayFilter === 'online' ? 'rgba(255,255,255,0.08)' : 'transparent',
-                            transition: 'background 0.2s'
-                          }}
-                          onMouseEnter={(e) => { if (displayFilter !== 'online') e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-                          onMouseLeave={(e) => { if (displayFilter !== 'online') e.currentTarget.style.background = 'transparent'; }}
+                          data-inspector-id="rightSidebar.deviceDisplayFilterOnline"
+                          data-inspector-label="Show online devices only"
+                          data-inspector-component="client/src/App.tsx"
                         >
                           Online only
                         </div>
                         <div
-                          className={`rcpDropdownItem${displayFilter === 'all' ? ' active' : ''}`}
+                          className={`uiMenuItem${displayFilter === 'all' ? ' uiMenuItemActive' : ''}`}
                           onClick={() => {
                             setDisplayFilter('all');
                             setDisplayFilterOpen(false);
                           }}
-                          style={{
-                            padding: '8px 12px',
-                            fontSize: '12px',
-                            color: 'var(--md-text)',
-                            cursor: 'pointer',
-                            background: displayFilter === 'all' ? 'rgba(255,255,255,0.08)' : 'transparent',
-                            transition: 'background 0.2s'
-                          }}
-                          onMouseEnter={(e) => { if (displayFilter !== 'all') e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-                          onMouseLeave={(e) => { if (displayFilter !== 'all') e.currentTarget.style.background = 'transparent'; }}
+                          data-inspector-id="rightSidebar.deviceDisplayFilterAll"
+                          data-inspector-label="Show all devices"
+                          data-inspector-component="client/src/App.tsx"
                         >
                           Tất cả
                         </div>
@@ -4807,8 +3768,6 @@ export function App() {
                         sourceGrid: 'main',
                         groupIdx: removeGroupIdx
                       })
-                      setContextMenuInput(String(orderMap.get(id) ?? 0))
-                      setContextMenuOpen(true)
                     }}
                   />
                 </div>
@@ -5004,8 +3963,6 @@ export function App() {
                                       e.preventDefault()
                                       e.stopPropagation()
                                       setContextMenuTarget({ x: e.clientX, y: e.clientY, udid: uid, groupIdx: idx, sourceGrid: 'group' })
-                                      setContextMenuInput(String(orderMap.get(uid) ?? 0))
-                                      setContextMenuOpen(true)
                                     }}
                                   >
                                     <span>{String(orderMap.get(uid) ?? 0).padStart(2, '0')}</span>
@@ -5077,6 +4034,7 @@ export function App() {
                     : undefined
                 }
                 onChangeOrder={(uid, newIdx) => setTileNumber(uid, newIdx + 1)}
+                onSyncNovaWechat={syncNovaWechatForDevices}
               />
             </div>
           </div>
@@ -5084,630 +4042,26 @@ export function App() {
       ) : null}
 
       {appSettingsVisible ? (
-        <div 
-          className='appSettingsOverlay'
-          data-inspector-id="appSettings.overlay"
-          data-inspector-label="System settings modal overlay background"
-          data-inspector-component="client/src/App.tsx"
-        >
-          <div 
-            className='confirmPanel appSettingsPanel'
-            onMouseDown={e => e.stopPropagation()}
-            data-inspector-id="appSettings.panel"
-            data-inspector-label="System settings card panel"
-            data-inspector-component="client/src/App.tsx"
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div 
-                className='confirmTitle'
-                style={{ fontSize: 22, fontWeight: 700, background: 'linear-gradient(90deg, #fff, #999)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', borderBottom: 'none', margin: 0 }}
-                data-inspector-id="appSettings.title"
-                data-inspector-label="System settings dialog title"
-                data-inspector-component="client/src/App.tsx"
-              >
-                Cài Đặt Hệ Thống
-              </div>
-              <button
-                className='appSettingsClose'
-                title={t('Close settings')}
-                aria-label={t('Close settings')}
-                onClick={() => setAppSettingsVisible(false)}
-                data-inspector-id="appSettings.closeButton"
-                data-inspector-label="System settings close button"
-                data-inspector-component="client/src/App.tsx"
-                style={{ position: 'static' }}
-              >
-                <X size={16} strokeWidth={2} />
-              </button>
-            </div>
-            <div 
-              style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}
-              data-inspector-id="appSettings.videoEncodingSection"
-              data-inspector-label="Video stream settings block"
-              data-inspector-component="client/src/App.tsx"
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {/* 1. Stream Engine Selection */}
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1, marginRight: 16 }}>Bộ giải mã video (Stream Engine)</div>
-                  <select
-                    className='headerLangSelect'
-                    style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', borderRadius: '6px', padding: '6px 8px', fontSize: 12, width: 220 }}
-                    value='tango-scrcpy'
-                    disabled
-                    title='Tango/scrcpy dùng WebCodecs H.264 trong Chrome'
-                    data-inspector-id="appSettings.streamEngineSelect"
-                    data-inspector-label="Stream engine selection dropdown"
-                    data-inspector-component="client/src/App.tsx"
-                  >
-                    <option value="tango-scrcpy">Tango/scrcpy + WebCodecs</option>
-                  </select>
-                </div>
-
-                {/* 2. Encoder Mode Selection */}
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1, marginRight: 16 }}>Bộ mã hoá thiết bị (Encoder Mode)</div>
-                  <select
-                    className='headerLangSelect'
-                    style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', borderRadius: '6px', padding: '6px 8px', fontSize: 12, width: 220 }}
-                    value={streamConfig.encoderMode || 'auto'}
-                    onChange={e => {
-                      const val = e.target.value as any;
-                      setStreamConfig(p => normalizeEncoderConfig({ ...p, encoderMode: val }));
-                      setViewerStreamConfig(p => normalizeEncoderConfig({ ...p, encoderMode: val }));
-                      localStorage.removeItem('monviewphone:device-stream-cache');
-                    }}
-                    data-inspector-id="appSettings.encoderModeSelect"
-                    data-inspector-label="Device encoder mode selection dropdown"
-                    data-inspector-component="client/src/App.tsx"
-                  >
-                    <option value="auto">Tự động (Ưu tiên Hardware)</option>
-                    <option value="hardware">Chỉ dùng Hardware (Hardware Only)</option>
-                    <option value="software">Chỉ dùng Software (Software Only)</option>
-                    <option value="custom">Tuỳ chỉnh (Custom)</option>
-                  </select>
-                </div>
-
-                {/* 3. Custom Encoder Name Input (Only visible if encoderMode is custom) */}
-                {streamConfig.encoderMode === 'custom' && (
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1, marginRight: 16 }}>Tên Encoder Tuỳ chỉnh</div>
-                    <input
-                      type="text"
-                      className="dav-form-input"
-                      style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', borderRadius: '6px', padding: '6px 8px', fontSize: 12, width: 220 }}
-                      placeholder="e.g. OMX.qcom.video.encoder.avc"
-                      value={streamConfig.encoderName || ''}
-                      onChange={e => {
-                        const val = e.target.value.trim() === '' ? undefined : e.target.value.trim();
-                        setStreamConfig(p => normalizeEncoderConfig({ ...p, encoderName: val }));
-                        setViewerStreamConfig(p => normalizeEncoderConfig({ ...p, encoderName: val }));
-                      }}
-                      data-inspector-id="appSettings.customEncoderNameInput"
-                      data-inspector-label="Custom encoder name text input field"
-                      data-inspector-component="client/src/App.tsx"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div 
-              style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}
-              data-inspector-id="appSettings.controlModeSection"
-              data-inspector-label="Input control mode settings block"
-              data-inspector-component="client/src/App.tsx"
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1, marginRight: 16 }}>
-                    Chế độ điều khiển
-                  </div>
-                  <select
-                    className='headerLangSelect'
-                    style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', borderRadius: '6px', padding: '6px 8px', fontSize: 12, width: 220 }}
-                    value={controlModePreset(controlModeDefault)}
-                    onChange={e => updateControlModeDefault(e.target.value === 'uhid' ? 'uhid' : 'sdk')}
-                    data-inspector-id="appSettings.controlModeSelect"
-                    data-inspector-label="Input control mode selection dropdown"
-                    data-inspector-component="client/src/App.tsx"
-                  >
-                    <option value="sdk">Tiêu chuẩn — Touch SDK + Keyboard SDK</option>
-                    <option value="uhid">Tương thích UHID — Touch UHID + Keyboard UHID</option>
-                  </select>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--md-muted)', lineHeight: 1.45 }}>
-                  {controlModePreset(controlModeDefault) === 'uhid'
-                    ? 'Mô phỏng chuột và bàn phím vật lý. Dùng cho ứng dụng không nhận điều khiển thông thường.'
-                    : 'Điều khiển cảm ứng trực tiếp, phù hợp với hầu hết ứng dụng.'}
-                </div>
-              </div>
-            </div>
-
-            {/* Hotkey Configuration Section */}
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}>
-              <div 
-                style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => setHotkeySectionOpen(p => !p)}
-                data-inspector-id="appSettings.hotkeyHeader"
-                data-inspector-label="Hotkey configuration header bar"
-                data-inspector-component="client/src/App.tsx"
-              >
-                <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1 }}>
-                  Hotkey
-                </div>
-                <button
-                  type="button"
-                  className='rcpIconBtn'
-                  style={{ background: 'transparent', border: 'none', color: 'var(--md-muted)', cursor: 'pointer', padding: 0 }}
-                  title={hotkeySectionOpen ? 'Thu nhỏ' : 'Mở rộng'}
-                  aria-label={hotkeySectionOpen ? 'Thu nhỏ' : 'Mở rộng'}
-                  data-inspector-id="appSettings.hotkeyToggleButton"
-                  data-inspector-label="Hotkey section expand toggle button"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  {hotkeySectionOpen ? <ChevronUp size={15} strokeWidth={2} /> : <ChevronDown size={15} strokeWidth={2} />}
-                </button>
-              </div>
-
-              {hotkeySectionOpen && (
-                <div 
-                  style={{ 
-                    marginTop: 14, 
-                    borderTop: '1px solid rgba(255,255,255,0.05)', 
-                    paddingTop: 14,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px'
-                  }}
-                  data-inspector-id="appSettings.hotkeySection"
-                  data-inspector-label="Hotkey configuration section"
-                  data-inspector-component="client/src/App.tsx"
-                >
-                  {/* Hotkey 1: Sync Time */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
-                      Bật/Tắt Sync Time (Delay):
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="text"
-                        placeholder="Nhấn tổ hợp phím..."
-                        readOnly
-                        value={syncTimeHotkey}
-                        onKeyDown={handleHotkeyInputKeyDown}
-                        style={{
-                          background: '#0a0a0a',
-                          color: 'var(--md-info)',
-                          border: '1px solid #444',
-                          borderRadius: '6px',
-                          padding: '6px 10px',
-                          fontSize: 12,
-                          width: 150,
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          fontWeight: 'bold',
-                          outline: 'none',
-                        }}
-                        data-inspector-id="appSettings.syncTimeHotkeyInput"
-                        data-inspector-label="Sync Time hotkey input"
-                        data-inspector-component="client/src/App.tsx"
-                      />
-                      {syncTimeHotkey && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSyncTimeHotkey('');
-                            localStorage.removeItem('monviewphone:sync-time-hotkey');
-                            saveHotkeySettingToBackend('monviewphone:sync-time-hotkey', '');
-                          }}
-                          style={{
-                            background: 'rgba(255,255,255,0.05)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            borderRadius: '6px',
-                            color: '#ff8080',
-                            padding: '6px 10px',
-                            fontSize: 11,
-                            cursor: 'pointer',
-                          }}
-                          data-inspector-id="appSettings.syncTimeHotkeyClearButton"
-                          data-inspector-label="Sync Time hotkey clear button"
-                          data-inspector-component="client/src/App.tsx"
-                        >
-                          Xoá
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Hotkey 2: Tile Account */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
-                      Hiện tài khoản máy (Tile):
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="text"
-                        placeholder="Nhấn tổ hợp phím..."
-                        readOnly
-                        value={deviceAccountHotkey}
-                        onKeyDown={handleDeviceAccountHotkeyInputKeyDown}
-                        style={{
-                          background: '#0a0a0a',
-                          color: 'var(--md-info)',
-                          border: '1px solid #444',
-                          borderRadius: '6px',
-                          padding: '6px 10px',
-                          fontSize: 12,
-                          width: 150,
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          fontWeight: 'bold',
-                          outline: 'none',
-                        }}
-                        data-inspector-id="appSettings.deviceAccountHotkeyInput"
-                        data-inspector-label="Device account hotkey input"
-                        data-inspector-component="client/src/App.tsx"
-                      />
-                      {deviceAccountHotkey && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDeviceAccountHotkey('');
-                            localStorage.removeItem('monviewphone:device-account-hotkey');
-                            saveHotkeySettingToBackend('monviewphone:device-account-hotkey', '');
-                          }}
-                          style={{
-                            background: 'rgba(255,255,255,0.05)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            borderRadius: '6px',
-                            color: '#ff8080',
-                            padding: '6px 10px',
-                            fontSize: 11,
-                            cursor: 'pointer',
-                          }}
-                          data-inspector-id="appSettings.deviceAccountHotkeyClearButton"
-                          data-inspector-label="Device account hotkey clear button"
-                          data-inspector-component="client/src/App.tsx"
-                        >
-                          Xoá
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Hotkey 3: Overlay Header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
-                      Overlay Header:
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        id="input_overlay_header_hotkey"
-                        type="text"
-                        placeholder="Nhấn tổ hợp phím..."
-                        readOnly
-                        value={overlayHeaderHotkey}
-                        onKeyDown={handleOverlayHeaderHotkeyInputKeyDown}
-                        style={{
-                          background: '#0a0a0a',
-                          color: 'var(--md-info)',
-                          border: '1px solid #444',
-                          borderRadius: '6px',
-                          padding: '6px 10px',
-                          fontSize: 12,
-                          width: 150,
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          fontWeight: 'bold',
-                          outline: 'none',
-                        }}
-                        data-inspector-id="appSettings.overlayHeaderHotkeyInput"
-                        data-inspector-label="Overlay header hotkey input"
-                        data-inspector-component="client/src/App.tsx"
-                      />
-                      {overlayHeaderHotkey && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOverlayHeaderHotkey('');
-                            localStorage.removeItem('monviewphone:overlay-header-hotkey');
-                            saveHotkeySettingToBackend('monviewphone:overlay-header-hotkey', '');
-                          }}
-                          style={{
-                            background: 'rgba(255,255,255,0.05)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            borderRadius: '6px',
-                            color: '#ff8080',
-                            padding: '6px 10px',
-                            fontSize: 11,
-                            cursor: 'pointer',
-                          }}
-                          data-inspector-id="appSettings.overlayHeaderHotkeyClearButton"
-                          data-inspector-label="Overlay header hotkey clear button"
-                          data-inspector-component="client/src/App.tsx"
-                        >
-                          Xoá
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Hotkey 4: Account Manager */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
-                      Bảng Quản lý tài khoản:
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="text"
-                        placeholder="Nhấn tổ hợp phím..."
-                        readOnly
-                        value={accountManagerHotkey}
-                        onKeyDown={handleAccountManagerHotkeyInputKeyDown}
-                        style={{
-                          background: '#0a0a0a',
-                          color: 'var(--md-info)',
-                          border: '1px solid #444',
-                          borderRadius: '6px',
-                          padding: '6px 10px',
-                          fontSize: 12,
-                          width: 150,
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          fontWeight: 'bold',
-                          outline: 'none',
-                        }}
-                        data-inspector-id="appSettings.accountManagerHotkeyInput"
-                        data-inspector-label="Account manager hotkey input"
-                        data-inspector-component="client/src/App.tsx"
-                      />
-                      {accountManagerHotkey && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAccountManagerHotkey('');
-                            localStorage.removeItem('monviewphone:account-manager-hotkey');
-                            saveHotkeySettingToBackend('monviewphone:account-manager-hotkey', '');
-                          }}
-                          style={{
-                            background: 'rgba(255,255,255,0.05)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            borderRadius: '6px',
-                            color: '#ff8080',
-                            padding: '6px 10px',
-                            fontSize: 11,
-                            cursor: 'pointer',
-                          }}
-                          data-inspector-id="appSettings.accountManagerHotkeyClearButton"
-                          data-inspector-label="Account manager hotkey clear button"
-                          data-inspector-component="client/src/App.tsx"
-                        >
-                          Xoá
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Hotkey 5: Inspector ID */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                    <div style={{ fontSize: 12, color: 'var(--md-muted)', flex: 1 }}>
-                      Bật/Tắt Inspector ID:
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="text"
-                        placeholder="Nhấn tổ hợp phím..."
-                        readOnly
-                        value={inspectorIdHotkey}
-                        onKeyDown={handleInspectorIdHotkeyInputKeyDown}
-                        style={{
-                          background: '#0a0a0a',
-                          color: 'var(--md-info)',
-                          border: '1px solid #444',
-                          borderRadius: '6px',
-                          padding: '6px 10px',
-                          fontSize: 12,
-                          width: 150,
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          fontWeight: 'bold',
-                          outline: 'none',
-                        }}
-                        data-inspector-id="appSettings.inspectorIdHotkeyInput"
-                        data-inspector-label="Inspector ID hotkey input"
-                        data-inspector-component="client/src/App.tsx"
-                      />
-                      {inspectorIdHotkey && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setInspectorIdHotkey('');
-                            localStorage.removeItem('monviewphone:inspector-id-hotkey');
-                            saveHotkeySettingToBackend('monviewphone:inspector-id-hotkey', '');
-                          }}
-                          style={{
-                            background: 'rgba(255,255,255,0.05)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            borderRadius: '6px',
-                            color: '#ff8080',
-                            padding: '6px 10px',
-                            fontSize: 11,
-                            cursor: 'pointer',
-                          }}
-                          data-inspector-id="appSettings.inspectorIdHotkeyClearButton"
-                          data-inspector-label="Inspector ID hotkey clear button"
-                          data-inspector-component="client/src/App.tsx"
-                        >
-                          Xoá
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Seeding Content Section */}
-            <div 
-              style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 16 }}
-              data-inspector-id="appSettings.seedingSection"
-              data-inspector-label="Seeding content configuration section"
-              data-inspector-component="client/src/App.tsx"
-            >
-              <div 
-                style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
-                onClick={() => setSeedingSectionOpen(p => !p)}
-                data-inspector-id="appSettings.seedingHeader"
-                data-inspector-label="Seeding configuration section header"
-                data-inspector-component="client/src/App.tsx"
-              >
-                <div className='rcpSliderLabel' style={{ fontSize: 14, fontWeight: 600, color: '#e0e0e0', flex: 1 }}>
-                  Nội dung Seeding
-                </div>
-                <button
-                  type="button"
-                  className='rcpIconBtn'
-                  style={{ background: 'transparent', border: 'none', color: 'var(--md-muted)', cursor: 'pointer', padding: 0 }}
-                  title={seedingSectionOpen ? 'Thu nhỏ' : 'Mở rộng'}
-                  aria-label={seedingSectionOpen ? 'Thu nhỏ' : 'Mở rộng'}
-                >
-                  {seedingSectionOpen ? <ChevronUp size={15} strokeWidth={2} /> : <ChevronDown size={15} strokeWidth={2} />}
-                </button>
-              </div>
-
-              {seedingSectionOpen && (
-                <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 14 }}>
-                  <textarea
-                    value={seedingContents}
-                    onChange={handleSeedingContentsChange}
-                    placeholder="Nhập từ ngữ seeding, mỗi câu 1 dòng..."
-                    style={{
-                      width: '100%',
-                      height: 120,
-                      background: '#0a0a0a',
-                      color: '#fff',
-                      border: '1px solid #444',
-                      borderRadius: '6px',
-                      padding: '8px 12px',
-                      fontSize: 12,
-                      fontFamily: 'monospace',
-                      outline: 'none',
-                      resize: 'vertical',
-                      boxSizing: 'border-box'
-                    }}
-                    data-inspector-id="appSettings.seedingTextarea"
-                    data-inspector-label="Seeding sentences input textarea"
-                    data-inspector-component="client/src/App.tsx"
-                  />
-                  <div style={{ fontSize: 11, color: 'var(--md-muted)', marginTop: 6, textAlign: 'right' }}>
-                    Số dòng: <strong style={{ color: 'var(--md-info)' }}>{seedingLineCount}</strong>
-                  </div>
-                </div>
-              )}
-            </div>
-
-
-            <div className='confirmBtns' style={{ marginTop: 32, justifyContent: 'flex-end', display: 'flex' }}>
-              <button
-                className='modalBtnPrimary'
-                style={{
-                  padding: '0 24px',
-                  height: 38,
-                  borderRadius: 8,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  outline: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-                onClick={() => setAppSettingsVisible(false)}
-                data-inspector-id="appSettings.confirmButton"
-                data-inspector-label="System settings save confirmation button"
-                data-inspector-component="client/src/App.tsx"
-              >
-                Xác Nhận
-              </button>
-            </div>
-          </div>
-        </div>
+        <AppSettingsModal
+          onClose={() => setAppSettingsVisible(false)}
+          streamConfig={streamConfig}
+          setStreamConfig={setStreamConfig}
+          setViewerStreamConfig={setViewerStreamConfig}
+          controlModeDefault={controlModeDefault}
+          updateControlModeDefault={updateControlModeDefault}
+          syncTimeHotkey={syncTimeHotkey}
+          setSyncTimeHotkey={setSyncTimeHotkey}
+          deviceAccountHotkey={deviceAccountHotkey}
+          setDeviceAccountHotkey={setDeviceAccountHotkey}
+          overlayHeaderHotkey={overlayHeaderHotkey}
+          setOverlayHeaderHotkey={setOverlayHeaderHotkey}
+          accountManagerHotkey={accountManagerHotkey}
+          setAccountManagerHotkey={setAccountManagerHotkey}
+          inspectorIdHotkey={inspectorIdHotkey}
+          setInspectorIdHotkey={setInspectorIdHotkey}
+        />
       ) : null}
 
-      {bitrateConfirmVisible ? (
-        <div
-          className='confirmOverlay'
-          onMouseDown={() => setBitrateConfirmVisible(false)}
-          data-inspector-id="confirm.bitrateOverlay"
-          data-inspector-label="Bitrate change confirmation overlay background"
-          data-inspector-component="client/src/App.tsx"
-        >
-          <div 
-            className='confirmPanel' 
-            onMouseDown={e => e.stopPropagation()}
-            data-inspector-id="confirm.bitratePanel"
-            data-inspector-label="Bitrate change confirmation card panel"
-            data-inspector-component="client/src/App.tsx"
-          >
-            <div 
-              className='confirmTitle'
-              data-inspector-id="confirm.bitrateTitle"
-              data-inspector-label="Bitrate change confirmation title"
-              data-inspector-component="client/src/App.tsx"
-            >
-              {t('Bitrate cao')}
-            </div>
-            <div 
-              className='confirmText'
-              data-inspector-id="confirm.bitrateText"
-              data-inspector-label="Bitrate warning message text"
-              data-inspector-component="client/src/App.tsx"
-            >
-              {t(
-                'Kéo bitrate cao trên (60%) có thể làm tăng tải và đôi lúc gây giật/đứt stream. Vẫn tiếp tục?'
-              )}
-            </div>
-            <div className='confirmActions'>
-              <button
-                className='modalBtn'
-                onClick={() => {
-                  setBitrateConfirmVisible(false)
-                  setBitratePending(null)
-                  setBitrateNeedsConfirm(false)
-                  setDraftConfig(prev => ({
-                    ...prev,
-                    bitrate: bitrateLastSafe
-                  }))
-                }}
-                data-inspector-id="confirm.bitrateCancelButton"
-                data-inspector-label="Bitrate warning cancel button"
-                data-inspector-component="client/src/App.tsx"
-              >
-                {t('Hủy')}
-              </button>
-              <button
-                className='modalBtnPrimary'
-                onClick={() => {
-                  const target = bitratePending ?? draftConfig.bitrate
-                  setBitrateWarnAccepted(true)
-                  setBitrateConfirmVisible(false)
-                  setBitrateNeedsConfirm(false)
-                  setBitratePending(null)
-                  setBitrateLastSafe(target)
-                  setDraftConfig(prev => ({ ...prev, bitrate: target }))
-                  applyGridDraftConfig()
-                }}
-                data-inspector-id="confirm.bitrateContinueButton"
-                data-inspector-label="Bitrate warning confirm/continue button"
-                data-inspector-component="client/src/App.tsx"
-              >
-                {t('Tiếp tục')}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {connectModalOpen ? (
         <div 
@@ -6044,7 +4398,7 @@ export function App() {
       {/* Modal xác nhận xoá nhóm */}
       {deleteGroupConfirm !== null && (
         <div 
-          className='confirmOverlay' 
+          className='confirmOverlay confirmOverlay--top'
           onMouseDown={() => setDeleteGroupConfirm(null)}
           data-inspector-id="savedGroups.deleteOverlay"
           data-inspector-label="Delete group confirmation overlay background"
@@ -6109,7 +4463,7 @@ export function App() {
       {/* === Context menu nhóm (right-click) === */}
       {groupContextMenu && (
         <div
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999998 }}
+          className='uiMenuLayer'
           onMouseDown={() => setGroupContextMenu(null)}
           data-inspector-id="savedGroups.contextMenuOverlay"
           data-inspector-label="Saved groups context menu overlay background"
@@ -6118,12 +4472,10 @@ export function App() {
       )}
       {groupContextMenu && (
         <div
-          className='contextMenuPanel'
+          className='uiMenuSurface groupContextMenuSurface'
           style={{
-            position: 'fixed',
             top: Math.min(groupContextMenu.y, window.innerHeight - 120),
             left: Math.min(groupContextMenu.x, window.innerWidth - 180),
-            zIndex: 999999,
           }}
           onMouseDown={e => e.stopPropagation()}
           data-inspector-id="savedGroups.contextMenu"
@@ -6131,7 +4483,7 @@ export function App() {
           data-inspector-component="client/src/App.tsx"
         >
           <button
-            className='ctxMenuItem'
+            className='uiMenuItem'
             onClick={() => {
               setRenameGroupIdx(groupContextMenu.idx)
               setRenameGroupValue(savedGroups[groupContextMenu.idx]?.name || '')
@@ -6144,7 +4496,7 @@ export function App() {
             Đổi tên nhóm
           </button>
           <button
-            className='ctxMenuItem'
+            className='uiMenuItem'
             onClick={() => {
               const idx = groupContextMenu.idx
               if (focusGroupIdx === idx) {
@@ -6165,874 +4517,22 @@ export function App() {
         </div>
       )}
       {contextMenuTarget ? (
-        <div
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999999 }}
-          onClick={() => {
-            setContextMenuTarget(null)
-            setContextMenuOpen(false)
-            setSubMenuOpen(false)
-          }}
-          onContextMenu={e => {
-            e.preventDefault()
-            setContextMenuTarget(null)
-            setContextMenuOpen(false)
-            setSubMenuOpen(false)
-          }}
-          data-inspector-id="deviceContext.menuLayer"
-          data-inspector-label="Device tile context menu overlay background"
-          data-inspector-component="client/src/App.tsx"
-        >
-          <div
-            style={{
-              position: 'absolute',
-              top: Math.min(contextMenuTarget.y, window.innerHeight - 200),
-              left: Math.min(contextMenuTarget.x, window.innerWidth - 200),
-              background: '#1a1a1a',
-              border: '1px solid #333',
-              borderRadius: '8px',
-              padding: '6px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '2px',
-              minWidth: 180,
-            }}
-            onClick={e => e.stopPropagation()}
-            onContextMenu={e => e.stopPropagation()}
-            data-inspector-id="deviceContext.menu"
-            data-inspector-label="Device tile context menu card panel"
-            data-inspector-component="client/src/App.tsx"
-          >
-            {/* Header: Device # + input số inline trong suốt */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '4px 8px 8px', borderBottom: '1px solid #2a2a2a', marginBottom: 4
-            }}>
-              <span style={{ fontSize: 12, color: '#666' }}>Device</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={contextMenuInput}
-                onChange={e => {
-                  // Chỉ cho nhập số
-                  const val = e.target.value.replace(/[^0-9]/g, '')
-                  setContextMenuInput(val)
-                }}
-                style={{
-                  width: 44,
-                  background: 'transparent',
-                  color: '#fff',
-                  border: 'none',
-                  borderBottom: '1px solid #555',
-                  outline: 'none',
-                  fontSize: 15,
-                  fontWeight: 700,
-                  padding: '0 2px',
-                  textAlign: 'center',
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    const n = Math.max(1, parseInt(contextMenuInput, 10))
-                    if (!isNaN(n)) setTileNumber(contextMenuTarget!.udid, n)
-                    setContextMenuTarget(null)
-                    setContextMenuOpen(false)
-                  }
-                }}
-                onBlur={() => {
-                  const n = Math.max(1, parseInt(contextMenuInput, 10))
-                  if (!isNaN(n)) setTileNumber(contextMenuTarget!.udid, n)
-                }}
-                data-inspector-id="deviceContext.numberInput"
-                data-inspector-label="Device tile numbering input field"
-                data-inspector-component="client/src/App.tsx"
-              />
-            </div>
-
-            {/* === Device Profile section === */}
-            <div style={{ position: 'relative' }} className='ctxAddToGroupWrap' onMouseEnter={() => setCtxSub({ main: 'profileList' })} onMouseLeave={() => setCtxSub(null)}>
-              <button
-                style={{ background: 'transparent', border: 'none', color: '#7aadff', fontSize: '13px', cursor: 'pointer', padding: '7px 8px', textAlign: 'left', width: '100%', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(122,173,255,0.1)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'transparent'
-                }}
-                data-inspector-id="deviceContext.profileSubmenu"
-                data-inspector-label="Device context menu item: Select profile submenu trigger"
-                data-inspector-component="client/src/App.tsx"
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                  <Users size={14} style={{ flexShrink: 0 }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {(() => {
-                      const clickedUdid = contextMenuTarget!.udid;
-                      const profile = deviceProfiles.find(p => p.udids.includes(clickedUdid));
-                      if (profile) return 'Chọn profile';
-                      return 'Chọn profile';
-                    })()}
-                  </span>
-                </span>
-                <span style={{ fontSize: 10, color: '#555' }}>▶</span>
-              </button>
-
-              {/* Level 2 Submenu: Profile list */}
-              {ctxSub?.main === 'profileList' && (
-                <div
-                  className='ctxSubMenu'
-                  style={{
-                    display: 'flex',
-                    position: 'absolute',
-                    top: 0,
-                    left: 'calc(100% - 4px)',
-                    background: '#1a1a1a',
-                    border: '1px solid #333',
-                    borderRadius: 8,
-                    padding: '4px',
-                    flexDirection: 'column',
-                    gap: 2,
-                    minWidth: 200,
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                    zIndex: 10
-                  }}
-                  onMouseDown={e => e.stopPropagation()}
-                  onClick={e => e.stopPropagation()}
-                >
-                  {/* Tạo Profile mới */}
-                  <button
-                    type='button'
-                    style={{
-                      background: 'transparent', border: 'none', color: '#cfcfcf',
-                      fontSize: '13px', cursor: 'pointer', padding: '6px 10px', textAlign: 'left', borderRadius: 4,
-                      display: 'none', alignItems: 'center', gap: 8, width: '100%'
-                    }}
-                    data-inspector-id="deviceContext.createProfileItem"
-                    data-inspector-label="Device context menu item: Create profile option"
-                    data-inspector-component="client/src/App.tsx"
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                    onPointerDown={e => {
-                      e.preventDefault(); e.stopPropagation();
-                      const clickedUdid = contextMenuTarget!.udid;
-                      const ctxTargets = connectSelection.size > 0 && connectSelection.has(clickedUdid)
-                        ? Array.from(connectSelection)
-                        : [clickedUdid];
-
-                      const hints = ctxTargets.map(u => {
-                        const d = androidDeviceMap[u];
-                        return d ? [d.manufacturer, d.model].filter(Boolean).join(' ') : '';
-                      }).filter(Boolean);
-
-                      setContextMenuTarget(null);
-                      setContextMenuOpen(false);
-
-                      setInputState({
-                        key: `new-profile-${Date.now()}`,
-                        title: 'Tạo Device Profile mới',
-                        label: 'Tên Profile',
-                        placeholder: 'Ví dụ: Samsung Note 9 Pixel ROM',
-                        defaultValue: hints[0] || '',
-                        onConfirm: (name) => {
-                          createProfileForDevices(name, ctxTargets);
-                          setInputState(null);
-                        },
-                      });
-                    }}
-                  >
-                    <Plus size={14} /><span>Tạo Profile mới</span>
-                  </button>
-
-                  {deviceProfiles.length > 0 && <div style={{ height: 1, background: '#2a2a2a', margin: '4px 0' }} />}
-
-                  {/* Danh sách profile */}
-                  {deviceProfiles.map(profile => {
-                    const clickedUdid = contextMenuTarget!.udid;
-                    const ctxTargets = connectSelection.size > 0 && connectSelection.has(clickedUdid)
-                      ? Array.from(connectSelection)
-                      : [clickedUdid];
-                    const isCurrentProfile = profile.udids.includes(clickedUdid);
-                    const isL3Open = false;
-
-                    return (
-                      <div
-                        key={profile.id}
-                        style={{ position: 'relative' }}
-                        onMouseEnter={() => setCtxSub({ main: 'profileList', nested: { type: 'profileActions', profileId: profile.id } })}
-                        onMouseLeave={() => setCtxSub({ main: 'profileList' })}
-                        onPointerDown={e => {
-                          e.preventDefault(); e.stopPropagation();
-                          if (isCurrentProfile) return;
-                          assignDevicesToProfile(profile.id, ctxTargets);
-                          setContextMenuTarget(null);
-                          setContextMenuOpen(false);
-                        }}
-                      >
-                        <button
-                          type='button'
-                          style={{
-                            background: 'transparent', border: 'none',
-                            color: isCurrentProfile ? '#7aadff' : '#cfcfcf',
-                            fontSize: '13px', cursor: 'pointer',
-                            padding: '6px 10px', textAlign: 'left', borderRadius: 4,
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                            width: '100%'
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                          data-inspector-id="deviceContext.profileItem"
-                          data-inspector-label={`Device context menu item: Assign to profile ${profile.name}`}
-                          data-inspector-component="client/src/App.tsx"
-                        >
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {profile.name}
-                          </span>
-                          {isCurrentProfile ? <span style={{ fontSize: 11, color: '#7aadff' }}>Đang dùng</span> : null}
-                        </button>
-
-                        {/* Level 3 Submenu: Profile actions */}
-                        {isL3Open && (
-                          <div
-                            className='ctxSubMenu'
-                            style={{
-                              display: 'flex',
-                              position: 'absolute',
-                              top: 0,
-                              left: 'calc(100% - 4px)',
-                              background: '#1a1a1a',
-                              border: '1px solid #333',
-                              borderRadius: 8,
-                              padding: '4px',
-                              flexDirection: 'column',
-                              gap: 2,
-                              minWidth: 200,
-                              boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                              zIndex: 11
-                            }}
-                            onMouseDown={e => e.stopPropagation()}
-                            onClick={e => e.stopPropagation()}
-                          >
-                            {/* Gán vào Profile này */}
-                            <button
-                              type='button'
-                              style={{
-                                background: 'transparent', border: 'none', color: isCurrentProfile ? '#555' : '#cfcfcf',
-                                fontSize: '13px', cursor: isCurrentProfile ? 'default' : 'pointer', padding: '6px 10px', textAlign: 'left', borderRadius: 4,
-                                display: 'flex', alignItems: 'center', gap: 8, width: '100%'
-                              }}
-                              disabled={isCurrentProfile}
-                              onMouseEnter={e => { if (!isCurrentProfile) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
-                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                              onPointerDown={e => {
-                                e.preventDefault(); e.stopPropagation();
-                                if (isCurrentProfile) return;
-                                assignDevicesToProfile(profile.id, ctxTargets);
-                                setContextMenuTarget(null);
-                                setContextMenuOpen(false);
-                              }}
-                            >
-                              <Users size={14} /><span>{isCurrentProfile ? 'Đang dùng Profile này' : 'Gán vào Profile này'}</span>
-                            </button>
-
-                            <div style={{ height: 1, background: '#2a2a2a', margin: '4px 0' }} />
-
-                            {/* Đổi tên Profile */}
-                            <button
-                              type='button'
-                              style={{
-                                background: 'transparent', border: 'none', color: '#cfcfcf',
-                                fontSize: '13px', cursor: 'pointer', padding: '6px 10px', textAlign: 'left', borderRadius: 4,
-                                display: 'flex', alignItems: 'center', gap: 8, width: '100%'
-                              }}
-                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
-                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                              onPointerDown={e => {
-                                e.preventDefault(); e.stopPropagation();
-                                setContextMenuTarget(null);
-                                setContextMenuOpen(false);
-                                setInputState({
-                                  key: `rename-profile-${profile.id}`,
-                                  title: 'Đổi tên Device Profile',
-                                  label: 'Tên mới',
-                                  defaultValue: profile.name,
-                                  onConfirm: (newName) => {
-                                    renameProfile(profile.id, newName);
-                                    setInputState(null);
-                                  },
-                                });
-                              }}
-                            >
-                              <Pencil size={14} /><span>Đổi tên Profile</span>
-                            </button>
-
-                            {/* Xoá Profile */}
-                            <button
-                              type='button'
-                              style={{
-                                background: 'transparent', border: 'none', color: '#ff6060',
-                                fontSize: '13px', cursor: 'pointer', padding: '6px 10px', textAlign: 'left', borderRadius: 4,
-                                display: 'flex', alignItems: 'center', gap: 8, width: '100%'
-                              }}
-                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,96,96,0.1)' }}
-                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                              onPointerDown={e => {
-                                e.preventDefault(); e.stopPropagation();
-                                setContextMenuTarget(null);
-                                setContextMenuOpen(false);
-                                const bindingCount = AUTOMATION_APPS.reduce((sum, app) =>
-                                  sum + (appActions[app.id] ?? []).reduce((s, a) => s + (a.bindings ?? []).filter(b => b.profileId === profile.id).length, 0), 0);
-                                setConfirmState({
-                                  title: 'Xoá Device Profile',
-                                  message: `Xoá Device Profile "${profile.name}" sẽ gỡ toàn bộ máy khỏi Profile và xoá ${bindingCount} macro binding đã gán cho Profile này.\n\nFile macro gốc vẫn được giữ.\n\nBạn có chắc muốn xoá không?`,
-                                  danger: true,
-                                  onConfirm: () => {
-                                    deleteProfileImpl(profile.id);
-                                  },
-                                });
-                              }}
-                            >
-                              <Trash2 size={14} /><span>Xoá Profile</span>
-                            </button>
-
-                            {/* Divider cho macro binding */}
-                            <div style={{ height: 1, background: '#2a2a2a', margin: '4px 0' }} />
-
-                            {/* Gán macro cho profile */}
-                            {AUTOMATION_APPS.map(app => {
-                              const actions = appActions[app.id] ?? [];
-                              if (!actions.length) return null;
-                              const isAppOpen = ctxSub?.nested && typeof ctxSub.nested === 'object' && ctxSub.nested.type === 'profileActions' && ctxSub.nested.profileId === profile.id && ctxSub.nested.appId === app.id;
-                              return (
-                                <div
-                                  key={`app-${app.id}`}
-                                  style={{ position: 'relative' }}
-                                  onMouseEnter={() => setCtxSub({
-                                    main: 'profileList',
-                                    nested: { type: 'profileActions', profileId: profile.id, appId: app.id }
-                                  })}
-                                  onMouseLeave={() => setCtxSub({
-                                    main: 'profileList',
-                                    nested: { type: 'profileActions', profileId: profile.id }
-                                  })}
-                                >
-                                  <button
-                                    type='button'
-                                    style={{
-                                      background: 'transparent', border: 'none', color: '#cfcfcf',
-                                      fontSize: '12px', cursor: 'pointer', padding: '5px 10px', textAlign: 'left', borderRadius: 4,
-                                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%'
-                                    }}
-                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
-                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                                  >
-                                    <span>{app.label}</span>
-                                    <span style={{ fontSize: 10, color: '#555' }}>▶</span>
-                                  </button>
-
-                                  {isAppOpen && (
-                                    <div
-                                      className='ctxSubMenu'
-                                      style={{
-                                        display: 'flex',
-                                        position: 'absolute',
-                                        top: 0,
-                                        left: 'calc(100% - 4px)',
-                                        background: '#1a1a1a',
-                                        border: '1px solid #333',
-                                        borderRadius: 8,
-                                        padding: '4px',
-                                        flexDirection: 'column',
-                                        gap: 2,
-                                        minWidth: 180,
-                                        boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                                        zIndex: 12
-                                      }}
-                                    >
-                                      {actions.map(action => {
-                                        const binding = action.bindings?.find(b => b.profileId === profile.id);
-                                        const isActionOpen = ctxSub?.nested && typeof ctxSub.nested === 'object' && ctxSub.nested.type === 'profileActions' && ctxSub.nested.profileId === profile.id && ctxSub.nested.appId === app.id && ctxSub.nested.actionId === action.id;
-                                        return (
-                                          <div
-                                            key={`act-${action.id}`}
-                                            style={{ position: 'relative' }}
-                                            onMouseEnter={() => setCtxSub({
-                                              main: 'profileList',
-                                              nested: { type: 'profileActions', profileId: profile.id, appId: app.id, actionId: action.id }
-                                            })}
-                                            onMouseLeave={() => setCtxSub({
-                                              main: 'profileList',
-                                              nested: { type: 'profileActions', profileId: profile.id, appId: app.id }
-                                            })}
-                                          >
-                                            <button
-                                              type='button'
-                                              style={{
-                                                background: 'transparent', border: 'none', color: binding ? '#7aadff' : '#cfcfcf',
-                                                fontSize: '12px', cursor: 'pointer', padding: '5px 10px', textAlign: 'left', borderRadius: 4,
-                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%'
-                                              }}
-                                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
-                                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                                            >
-                                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {action.name} {binding ? `(${binding.macroName})` : ''}
-                                              </span>
-                                              <span style={{ fontSize: 10, color: '#555' }}>▶</span>
-                                            </button>
-
-                                            {isActionOpen && (
-                                              <div
-                                                className='ctxSubMenu'
-                                                style={{
-                                                  display: 'flex',
-                                                  position: 'absolute',
-                                                  top: 0,
-                                                  left: 'calc(100% - 4px)',
-                                                  background: '#1a1a1a',
-                                                  border: '1px solid #333',
-                                                  borderRadius: 8,
-                                                  padding: '4px',
-                                                  flexDirection: 'column',
-                                                  gap: 2,
-                                                  minWidth: 200,
-                                                  maxHeight: 250,
-                                                  overflowY: 'auto',
-                                                  boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                                                  zIndex: 13
-                                                }}
-                                              >
-                                                {binding && (
-                                                  <>
-                                                    <button
-                                                      type='button'
-                                                      style={{
-                                                        background: 'transparent', border: 'none', color: '#ff6060',
-                                                        fontSize: '12px', cursor: 'pointer', padding: '5px 10px', textAlign: 'left', borderRadius: 4,
-                                                        display: 'flex', alignItems: 'center', gap: 6, width: '100%'
-                                                      }}
-                                                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,96,96,0.1)' }}
-                                                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                                                      onPointerDown={e => {
-                                                        e.preventDefault(); e.stopPropagation();
-                                                        setContextMenuTarget(null);
-                                                        setContextMenuOpen(false);
-                                                        setConfirmState({
-                                                          title: 'Xoá gán macro',
-                                                          message: `Xoá gán macro "${binding.macroName}" khỏi hành động "${action.name}" cho Device Profile "${profile.name}".\n\nFile macro gốc vẫn được giữ.\n\nBạn có chắc muốn xoá không?`,
-                                                          onConfirm: () => {
-                                                            removeBindingImpl(app.id, action.id, profile.id);
-                                                          }
-                                                        });
-                                                      }}
-                                                    >
-                                                      <Trash2 size={12} /><span>Xoá gán macro</span>
-                                                    </button>
-                                                    <div style={{ height: 1, background: '#2a2a2a', margin: '4px 0' }} />
-                                                  </>
-                                                )}
-
-                                                {savedMacros.map(macro => (
-                                                  <button
-                                                    key={macro.id}
-                                                    type='button'
-                                                    style={{
-                                                      background: 'transparent', border: 'none', color: binding?.macroId === macro.id ? '#7aadff' : '#cfcfcf',
-                                                      fontSize: '12px', cursor: binding?.macroId === macro.id ? 'default' : 'pointer', padding: '5px 10px', textAlign: 'left', borderRadius: 4,
-                                                      width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                                                    }}
-                                                    disabled={binding?.macroId === macro.id}
-                                                    onMouseEnter={e => { if (binding?.macroId !== macro.id) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
-                                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                                                    onPointerDown={e => {
-                                                      e.preventDefault(); e.stopPropagation();
-                                                      if (binding?.macroId === macro.id) return;
-                                                      assignMacroToAction(app.id, action.id, macro, profile);
-                                                      setContextMenuTarget(null);
-                                                      setContextMenuOpen(false);
-                                                    }}
-                                                  >
-                                                    {macro.name}
-                                                  </button>
-                                                ))}
-                                                {savedMacros.length === 0 && (
-                                                  <button type='button' style={{ background: 'transparent', border: 'none', color: '#555', fontSize: '12px', padding: '5px 10px', textAlign: 'left' }} disabled>
-                                                    Chưa có File Macro
-                                                  </button>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* === Thêm vào nhóm (submenu) — hiện khi có nhóm đã tạo === */}
-            {savedGroups.length > 0 && (
-              <div style={{ position: 'relative' }} className='ctxAddToGroupWrap' onMouseEnter={() => setSubMenuOpen(true)} onMouseLeave={() => setSubMenuOpen(false)}>
-                <button
-                  style={{ background: 'transparent', border: 'none', color: '#7aadff', fontSize: '13px', cursor: 'pointer', padding: '7px 8px', textAlign: 'left', width: '100%', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'rgba(122,173,255,0.1)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = 'transparent'
-                  }}
-                >
-                  <span>Thêm vào nhóm</span>
-                  <span style={{ fontSize: 10, color: '#555' }}>▶</span>
-                </button>
-                {/* Submenu nhóm */}
-                <div
-                  className='ctxSubMenu'
-                  style={{
-                    display: subMenuOpen ? 'flex' : 'none',
-                    position: 'absolute',
-                    top: 0,
-                    left: 'calc(100% - 4px)',
-                    background: '#1a1a1a',
-                    border: '1px solid #333',
-                    borderRadius: 8,
-                    padding: '4px',
-                    flexDirection: 'column',
-                    gap: 2,
-                    minWidth: 160,
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                    zIndex: 10
-                  }}
-                >
-                  {savedGroups.map((grp, gIdx) => {
-                    const alreadyIn = grp.udids.includes(contextMenuTarget.udid)
-                    return (
-                      <button
-                        key={gIdx}
-                        style={{
-                          background: 'transparent', border: 'none',
-                          color: alreadyIn ? '#555' : '#cfcfcf',
-                          fontSize: '13px', cursor: alreadyIn ? 'default' : 'pointer',
-                          padding: '6px 10px', textAlign: 'left', borderRadius: 4,
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8
-                        }}
-                        onMouseEnter={e => { if (!alreadyIn) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                        onPointerDown={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          if (alreadyIn) return
-
-                          // Lấy tất cả device đang được chọn (connectSelection)
-                          // Nếu device click chuột phải không nằm trong selection → chỉ thêm 1 device đó
-                          // Nếu device click chuột phải nằm trong selection → thêm tất cả device đang chọn
-                          const clickedUdid = contextMenuTarget!.udid
-                          const selectedUdids = connectSelection.size > 0 && connectSelection.has(clickedUdid)
-                            ? Array.from(connectSelection)
-                            : [clickedUdid]
-
-                          setSavedGroups(prev => prev.map((g, i) => {
-                            if (i !== gIdx) return g
-                            // Gộp, loại trùng
-                            const existingSet = new Set(g.udids)
-                            const toAdd = selectedUdids.filter(u => !existingSet.has(u))
-                            return { ...g, udids: [...g.udids, ...toAdd] }
-                          }))
-
-                          setContextMenuTarget(null)
-                          setContextMenuOpen(false)
-                        }}
-                      >
-                        <span>{grp.name}</span>
-                        <span style={{ fontSize: 11, color: '#555' }}>
-                          {(() => {
-                            const clickedUdid = contextMenuTarget!.udid
-                            const selectedUdids = connectSelection.size > 0 && connectSelection.has(clickedUdid)
-                              ? Array.from(connectSelection)
-                              : [clickedUdid]
-                            const existingSet = new Set(grp.udids)
-                            const countToAdd = selectedUdids.filter(u => !existingSet.has(u)).length
-                            if (alreadyIn && countToAdd === 0) return '✓ Đã có'
-                            return countToAdd > 1 ? `+${countToAdd} device` : alreadyIn ? '✓ Đã có' : `+1`
-                          })()}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* === Set WeChat Account (ONLY shown when sourceGrid === 'group') === */}
-            {contextMenuTarget.sourceGrid === 'group' && (
-              <div
-                style={{ position: 'relative' }}
-                className='ctxAddToGroupWrap'
-                onMouseEnter={() => setCtxSub({ main: 'setAccountList' })}
-                onMouseLeave={() => setCtxSub(null)}
-              >
-                <button
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#ffd700',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    padding: '7px 8px',
-                    textAlign: 'left',
-                    width: '100%',
-                    borderRadius: 4,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 6
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'rgba(255,215,0,0.1)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                    <Plus size={14} style={{ flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Set
-                    </span>
-                  </span>
-                  <span style={{ fontSize: 10, color: '#555' }}>▶</span>
-                </button>
-
-                {ctxSub?.main === 'setAccountList' && (() => {
-                  const clickedUdid = contextMenuTarget!.udid;
-                  const devData = getDeviceAccountData(clickedUdid);
-                  const accounts = devData?.platforms?.['wechat'] || [];
-                  const groupIdx = contextMenuTarget!.groupIdx;
-                  const group = groupIdx !== undefined ? savedGroups[groupIdx] : null;
-                  const groupSelectedAccounts = group?.selectedAccounts || {};
-                  const selectedId = groupSelectedAccounts[clickedUdid];
-
-                  return (
-                    <div
-                      className='ctxSubMenu'
-                      style={{
-                        display: 'flex',
-                        position: 'absolute',
-                        top: 0,
-                        left: 'calc(100% - 4px)',
-                        background: '#1a1a1a',
-                        border: '1px solid #333',
-                        borderRadius: 8,
-                        padding: '4px',
-                        flexDirection: 'column',
-                        gap: 2,
-                        minWidth: 200,
-                        boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                        zIndex: 10
-                      }}
-                      onMouseDown={e => e.stopPropagation()}
-                      onClick={e => e.stopPropagation()}
-                    >
-                      {accounts.length === 0 ? (
-                        <div style={{ padding: '6px 10px', color: '#666', fontSize: 12, fontStyle: 'italic' }}>
-                          Không có tài khoản
-                        </div>
-                      ) : (
-                        accounts.map(account => {
-                          const isCurrent = selectedId === account.id;
-                          return (
-                            <button
-                              key={account.id}
-                              type='button'
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: isCurrent ? '#ffd700' : '#cfcfcf',
-                                fontSize: '13px',
-                                cursor: 'pointer',
-                                padding: '6px 10px',
-                                textAlign: 'left',
-                                borderRadius: 4,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: 8,
-                                width: '100%'
-                              }}
-                              onMouseEnter={e => {
-                                e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.background = 'transparent';
-                              }}
-                              onPointerDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                
-                                const isDeselect = selectedId === account.id;
-
-                                if (!isDeselect) {
-                                  const today = Date.now();
-                                  const date = new Date(today);
-                                  const todayStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-                                  
-                                  const updatedPlatforms = { ...devData.platforms };
-                                  if (updatedPlatforms['wechat']) {
-                                    updatedPlatforms['wechat'] = updatedPlatforms['wechat'].map(acc => {
-                                      if (acc.id === account.id) {
-                                        const history = acc.history || [];
-                                        const alreadyLoggedInToday = history.some(
-                                          h => h.action === 'Login' && (
-                                            (() => {
-                                              const hd = new Date(h.timestamp);
-                                              const hdStr = `${hd.getFullYear()}-${String(hd.getMonth() + 1).padStart(2, '0')}-${String(hd.getDate()).padStart(2, '0')}`;
-                                              return hdStr === todayStr;
-                                            })()
-                                          )
-                                        );
-                                        if (!alreadyLoggedInToday) {
-                                          return {
-                                            ...acc,
-                                            history: [
-                                              ...history,
-                                              { id: Math.random().toString(36).substr(2, 9), action: 'Login', timestamp: today }
-                                            ]
-                                          };
-                                        }
-                                      }
-                                      return acc;
-                                    });
-                                  }
-                                  
-                                  const newData = {
-                                    ...devData,
-                                    platforms: updatedPlatforms,
-                                  };
-                                  saveDeviceAccountData(clickedUdid, newData);
-                                }
-                                
-                                // Update group selection
-                                setSavedGroups(prev => prev.map((g, i) => {
-                                  if (i !== groupIdx) return g;
-                                  const selAcc = { ...(g.selectedAccounts || {}) };
-                                  if (isDeselect) {
-                                    delete selAcc[clickedUdid];
-                                  } else {
-                                    selAcc[clickedUdid] = account.id;
-                                  }
-                                  return { ...g, selectedAccounts: selAcc };
-                                }));
-                                
-                                // Trigger state refresh in App.tsx
-                                setVault(loadDeviceAccountVault());
-                                
-                                // Dispatch event to refresh tiles and overlays
-                                window.dispatchEvent(new CustomEvent('monviewphone:dav-hide-settings-changed'));
-                                
-                                setContextMenuTarget(null);
-                                setContextMenuOpen(false);
-                              }}
-                            >
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {account.name || account.phone || account.nickname || 'Không tên'}
-                              </span>
-                              {isCurrent ? <span style={{ fontSize: 11, color: '#ffd700' }}>✓ Đang chọn</span> : null}
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-
-            {contextMenuTarget.groupIdx === undefined ? (
-              <button
-                className="ctxMenuItem ctxMenuItemDanger"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-
-                  const { udid } = contextMenuTarget!;
-                  setConfirmState({
-                    title: 'Xoá thiết bị?',
-                    message: 'Bạn có chắc chắn muốn xoá thiết bị này hoàn toàn khỏi hệ thống không?',
-                    danger: true,
-                    onConfirm: () => {
-                      removeUiDeviceEntries([udid]);
-                    }
-                  });
-
-                  setContextMenuTarget(null);
-                  setContextMenuOpen(false);
-                  setSubMenuOpen(false);
-                }}
-              >
-                <Trash2 size={14} />
-                <span>Xoá Máy</span>
-              </button>
-            ) : null}
-
-            {/* === Xoá khỏi nhóm — hiện khi click từ grid dropdown nhóm, HOẶC khi đang load nhóm và click từ grid tổng === */}
-            {contextMenuTarget.groupIdx !== undefined && (() => {
-              const grp = savedGroups[contextMenuTarget.groupIdx]
-              const isInGroup = grp?.udids.includes(contextMenuTarget.udid)
-              if (!isInGroup) return null
-              return (
-                <button
-                  className="ctxMenuItem ctxMenuItemDanger"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    const { udid, groupIdx } = contextMenuTarget!;
-                    if (groupIdx === undefined) return;
-                    const groupName = savedGroups[groupIdx]?.name || '';
-
-                    setConfirmState({
-                      title: 'Xoá khỏi nhóm?',
-                      message: `Bạn có chắc chắn muốn xoá device này khỏi nhóm "${groupName}" không?`,
-                      danger: true,
-                      onConfirm: () => {
-                        setSavedGroups(prev =>
-                          prev.map((g, i) =>
-                            i === groupIdx
-                              ? { ...g, udids: g.udids.filter(u => u !== udid) }
-                              : g
-                          )
-                        );
-
-                        if (activeGroupIdx === groupIdx || focusGroupIdx === groupIdx) {
-                          setConnectSelection(prev => {
-                            const next = new Set(prev);
-                            next.delete(udid);
-                            return next;
-                          });
-                        }
-                      }
-                    });
-
-                    setContextMenuTarget(null);
-                    setContextMenuOpen(false);
-                    setSubMenuOpen(false);
-                  }}
-                >
-                  <Trash2 size={14} />
-                  <span>Xoá khỏi nhóm <strong className="ctxMenuItemTarget">"{savedGroups[contextMenuTarget.groupIdx!]?.name}"</strong></span>
-                </button>
-              )
-            })()}
-          </div>
-        </div>
+        <DeviceContextMenu
+          target={contextMenuTarget}
+          initialOrder={orderMap.get(contextMenuTarget.udid) ?? 0}
+          selectedUdids={connectSelection}
+          setSelectedUdids={setConnectSelection}
+          androidDeviceMap={androidDeviceMap}
+          savedGroups={savedGroups}
+          setSavedGroups={setSavedGroups}
+          activeGroupIdx={activeGroupIdx}
+          focusGroupIdx={focusGroupIdx}
+          onSetTileNumber={setTileNumber}
+          onRemoveDevices={removeUiDeviceEntries}
+          requestConfirm={request => setConfirmState(request)}
+          onVaultReload={() => setVault(loadDeviceAccountVault())}
+          onClose={() => setContextMenuTarget(null)}
+        />
       ) : null}
 
       {/* === Badge tổng số device đang chọn (góc dưới trái) === */}
@@ -7054,7 +4554,7 @@ export function App() {
 
       {confirmState && (
         <div 
-          className="confirmOverlay" 
+          className="confirmOverlay confirmOverlay--top"
           onMouseDown={() => setConfirmState(null)}
           data-inspector-id="genericConfirm.overlay"
           data-inspector-label="Generic confirmation overlay background"
@@ -7110,9 +4610,6 @@ export function App() {
           </div>
         </div>
       )}
-      {inputState && (
-        <InputModalOverlay state={inputState} onClose={() => setInputState(null)} />
-      )}
       {syncTimeModalOpen ? (
         <SyncTimeSettingsModal
           settings={syncTimeSettings}
@@ -7153,8 +4650,6 @@ export function App() {
               sourceGrid: 'group',
               groupIdx
             })
-            setContextMenuInput(String(orderMap.get(udid) ?? 0))
-            setContextMenuOpen(true)
           }}
         />
       )}
@@ -7222,113 +4717,4 @@ export function App() {
       )}
     </>
   )
-}
-
-interface InputModalOverlayProps {
-  state: {
-    key: string;
-    title: string;
-    label?: string;
-    placeholder?: string;
-    defaultValue?: string;
-    onConfirm: (val: string) => void;
-  } | null;
-  onClose: () => void;
-}
-
-function InputModalOverlay({ state, onClose }: InputModalOverlayProps) {
-  if (!state) return null;
-  return <InputModalOverlayInner key={state.key} state={state} onClose={onClose} />;
-}
-
-function InputModalOverlayInner({ state, onClose }: { state: NonNullable<InputModalOverlayProps['state']>; onClose: () => void }) {
-  const [value, setValue] = useState(state.defaultValue ?? '');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => inputRef.current?.focus(), 60);
-    return () => clearTimeout(t);
-  }, []);
-
-  const handleSubmit = () => {
-    const v = value.trim();
-    if (!v) return;
-    state.onConfirm(v);
-  };
-
-  return createPortal(
-    <>
-      <div 
-        className="confirmOverlay" 
-        onMouseDown={onClose}
-        data-inspector-id="genericInput.overlay"
-        data-inspector-label="Generic input modal overlay background"
-        data-inspector-component="client/src/App.tsx"
-      >
-        <div 
-          className="confirmPanel" 
-          style={{ minWidth: 380, maxWidth: 480 }} 
-          onMouseDown={e => e.stopPropagation()}
-          data-inspector-id="genericInput.panel"
-          data-inspector-label="Generic input modal card panel"
-          data-inspector-component="client/src/App.tsx"
-        >
-          <div 
-            className="confirmTitle"
-            data-inspector-id="genericInput.title"
-            data-inspector-label="Generic input modal title"
-            data-inspector-component="client/src/App.tsx"
-          >
-            {state.title}
-          </div>
-          <div className="confirmText">
-            {state.label ? <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>{state.label}</label> : null}
-            <input
-              ref={inputRef}
-              type='text'
-              className="modalInput"
-              placeholder={state.placeholder ?? ''}
-              value={value}
-              onChange={e => setValue(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleSubmit();
-                if (e.key === 'Escape') onClose();
-              }}
-              data-inspector-id="genericInput.field"
-              data-inspector-label="Generic input text field"
-              data-inspector-component="client/src/App.tsx"
-            />
-          </div>
-          <div className="confirmActions">
-            <button 
-              type='button' 
-              className="modalBtn" 
-              onClick={onClose}
-              data-inspector-id="genericInput.cancelButton"
-              data-inspector-label="Generic input modal cancel button"
-              data-inspector-component="client/src/App.tsx"
-            >
-              Huỷ
-            </button>
-            <button
-              type='button'
-              className="modalBtnPrimary"
-              style={{
-                opacity: value.trim() ? 1 : 0.5,
-                cursor: value.trim() ? 'pointer' : 'not-allowed'
-              }}
-              disabled={!value.trim()}
-              onClick={handleSubmit}
-              data-inspector-id="genericInput.confirmButton"
-              data-inspector-label="Generic input modal confirm button"
-              data-inspector-component="client/src/App.tsx"
-            >
-              Xác Nhận
-            </button>
-          </div>
-        </div>
-      </div>
-    </>,
-    document.body
-  );
 }
