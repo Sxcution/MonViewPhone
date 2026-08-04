@@ -133,7 +133,18 @@ async function syncSettingsWithBackend(): Promise<boolean> {
   }
 }
 
+import { OverlayTestHarness } from '@/components/ui/OverlayTestHarness';
+
 async function startApp() {
+  if (typeof window !== 'undefined' && window.location.search.includes('test=overlay')) {
+    ReactDOM.createRoot(document.getElementById('root')!).render(
+      <I18nProvider>
+        <OverlayTestHarness />
+      </I18nProvider>
+    );
+    return;
+  }
+
   await syncSettingsWithBackend();
 
   // Serve static docs without mounting SPA
@@ -142,6 +153,8 @@ async function startApp() {
   } else {
     const { wsServer } = readPageParams();
     const hashAction = readHashAction();
+
+
 
     ReactDOM.createRoot(document.getElementById('root')!).render(
       <ErrorBoundary>

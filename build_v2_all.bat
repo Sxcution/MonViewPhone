@@ -17,6 +17,10 @@ if errorlevel 1 goto :error
 echo.
 echo [2/4] Building client (frontend)...
 cd /d "%~dp0client"
+for /f "tokens=*" %%a in ('git rev-parse --short HEAD 2^>nul') do set "GIT_COMMIT_SHA=%%a"
+if "%GIT_COMMIT_SHA%"=="" set "GIT_COMMIT_SHA=dev"
+set "VITE_COMMIT_SHA=%GIT_COMMIT_SHA%"
+echo [MonViewPhoneV2] Building frontend with VITE_COMMIT_SHA=%VITE_COMMIT_SHA%
 call npm install
 if errorlevel 1 goto :error
 call npm run build

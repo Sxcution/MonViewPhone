@@ -5,7 +5,7 @@ import { hasNearbyRelevantAccount } from '@/lib/deviceAccountNearby';
 import { saveBackendSetting } from '@/lib/backendSettings';
 import { useServer } from '@/context/ServerContext';
 import { runAdbCommandApi } from '@/lib/serverApi';
-import { ConfirmDialog, ContextMenuLayer, ModalLayer } from '@/components/ui';
+import { ConfirmDialog, ContextMenuLayer, ModalLayer, OverlayPortal } from '@/components/ui';
 import {
   getDeviceAccountData,
   loadDeviceAccountVault,
@@ -192,14 +192,29 @@ export function DeviceAccountOverlay({
   });
   const dragStartRef = useRef<{ x: number; y: number; panelX: number; panelY: number } | null>(null);
 
-  const handleHeaderMouseDown = (e: React.MouseEvent) => {
+  const resetDavPosition = React.useCallback(() => {
+    setDragPos(null);
+    localStorage.removeItem('monviewphone:dav-drag-pos');
+    if (floatingPanelRef.current) {
+      floatingPanelRef.current.style.left = '';
+      floatingPanelRef.current.style.top = '';
+    }
+  }, []);
+
+  const handleHeaderPointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('input') || target.closest('select')) {
+    if (target.closest('[data-no-drag="true"], button, input, select')) {
       return;
     }
+    if (e.button !== 0) return;
     e.preventDefault();
-    const panel = target.closest('.dav-floating-panel') as HTMLElement;
+    const handleEl = e.currentTarget as HTMLElement;
+    const panel = floatingPanelRef.current || handleEl.closest('.dav-floating-panel') as HTMLElement;
     if (!panel) return;
+
+    try {
+      handleEl.setPointerCapture(e.pointerId);
+    } catch {}
 
     const rect = panel.getBoundingClientRect();
     dragStartRef.current = {
@@ -212,7 +227,7 @@ export function DeviceAccountOverlay({
     let latestPos = { x: rect.left, y: rect.top };
     document.body.classList.add('is-dragging-modal');
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handlePointerMove = (moveEvent: PointerEvent) => {
       if (!dragStartRef.current) return;
       const dx = moveEvent.clientX - dragStartRef.current.x;
       const dy = moveEvent.clientY - dragStartRef.current.y;
@@ -222,25 +237,27 @@ export function DeviceAccountOverlay({
       };
       const newPos = clampDavPanelPosition(rawPos, panel);
 
-      // Update DOM directly
+      panel.style.position = 'fixed';
       panel.style.left = `${newPos.x}px`;
       panel.style.top = `${newPos.y}px`;
       latestPos = newPos;
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = (upEvent: PointerEvent) => {
       dragStartRef.current = null;
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      try {
+        handleEl.releasePointerCapture(upEvent.pointerId);
+      } catch {}
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
       document.body.classList.remove('is-dragging-modal');
 
-      // Update state and localStorage once at the end
       setDragPos(latestPos);
       localStorage.setItem('monviewphone:dav-drag-pos', JSON.stringify(latestPos));
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
   };
 
   useEffect(() => {
@@ -502,35 +519,39 @@ export function DeviceAccountOverlay({
     setActiveFilter(activeFilter === filter ? 'default' : filter);
   };
 
-  return ReactDOM.createPortal(
-    <>
+  return (
+    <OverlayPortal>
       <div 
         className={`dav-overlay ${panelOpen ? 'is-open' : 'is-hidden'}`}
+        style={{ pointerEvents: 'none', position: 'fixed', inset: 0 }}
         data-inspector-id="deviceAccount.overlay"
         data-inspector-label="Device accounts overlay backdrop"
         data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
       >
-      <div
-        ref={floatingPanelRef}
-        className="dav-floating-panel"
-        style={dragPos ? { position: 'absolute', left: `${dragPos.x}px`, top: `${dragPos.y}px`, transform: 'none' } : {}}
-        data-inspector-id="deviceAccount.panel"
-        data-inspector-label="Device accounts floating card panel"
-        data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-      >
         <div
-          className="dav-floating-header"
-          onMouseDown={handleHeaderMouseDown}
-          onDoubleClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragPos(null);
-            localStorage.removeItem('monviewphone:dav-drag-pos');
+          ref={floatingPanelRef}
+          className="dav-floating-panel"
+          style={{
+            pointerEvents: 'auto',
+            position: 'fixed',
+            ...(dragPos ? { left: `${dragPos.x}px`, top: `${dragPos.y}px`, transform: 'none' } : {})
           }}
-          data-inspector-id="deviceAccount.header"
-          data-inspector-label="Device accounts header drag area"
+          data-inspector-id="deviceAccount.panel"
+          data-inspector-label="Device accounts floating card panel"
           data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
         >
+          <div
+            className="dav-floating-header dav-drag-handle"
+            onPointerDown={handleHeaderPointerDown}
+            onDoubleClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              resetDavPosition();
+            }}
+            data-inspector-id="deviceAccount.header"
+            data-inspector-label="Device accounts header drag area"
+            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+          >
           <div className="dav-floating-title-left">
             <span 
               className="dav-floating-title"
@@ -1132,7 +1153,6 @@ export function DeviceAccountOverlay({
           </div>
         </ModalLayer>
       )}
-</>,
-    document.body
+    </OverlayPortal>
   );
 }

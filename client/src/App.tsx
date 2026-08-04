@@ -4,9 +4,7 @@ import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
 import { AppSettingsModal } from '@/components/AppSettingsModal'
 import { StreamSettingsPanel } from '@/components/StreamSettingsPanel'
 import { DeviceContextMenu } from '@/components/DeviceContextMenu'
-import { ModalLayer } from '@/components/ui/ModalLayer'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { ContextMenuLayer } from '@/components/ui/ContextMenuLayer'
+import { ModalLayer, ConfirmDialog, ContextMenuLayer, OverlayPortal } from '@/components/ui'
 import { saveBackendSetting } from '@/lib/backendSettings'
 import { expireDueRiskAccounts, getNextWechatNewStatusChangeAt, getWechatNewStatus, loadDeviceAccountVault, getDeviceAccountDataFromVault, getDeviceAccountData, saveDeviceAccountData, saveDeviceAccountVaultAsync, type Account, type DeviceAccountData, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
 import { getNearbyAccountState, hasNearbyRelevantAccount, getNearestNearbyHours, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby'
@@ -81,6 +79,7 @@ import {
   Pin,
   PinOff,
   Package,
+  RefreshCw,
   Settings,
   Notebook,
   Terminal,
@@ -3005,20 +3004,22 @@ export function App() {
     (e: React.PointerEvent) => {
       if (e.button !== 0) return
       const targetEl = e.target as HTMLElement | null
-      const isHeader = targetEl?.closest('.viewerHeader')
-      const isActions = targetEl?.closest('.viewerActions')
-      const isActionBtn = targetEl?.closest('.viewerActionBtn')
-      const isCanvasWrap = targetEl?.classList.contains('viewerCanvasWrap') || targetEl?.closest('.viewerDragHandleTop') || targetEl?.classList.contains('viewerDragHandleTop')
-      const isHandle = isHeader || (isActions && !isActionBtn) || isCanvasWrap
+      if (targetEl?.closest('[data-no-drag="true"], button, input, select')) return
+
+      const isHandle = targetEl?.closest('.viewer-drag-handle') || targetEl?.closest('.viewerHeader') || targetEl?.closest('.viewerDragHandleTop')
       if (!isHandle) return
       e.preventDefault()
+
+      const handleEl = e.currentTarget as HTMLElement
+      try {
+        handleEl.setPointerCapture(e.pointerId)
+      } catch {}
 
       let minX = -Infinity
       let maxX = Infinity
       let minY = -Infinity
       let maxY = Infinity
 
-      // Calculate dragging boundaries so the Viewer panel never spills out of the screen (12px padding)
       const wrapEl = document.querySelector('.viewerOverlayPanelWrap') as HTMLElement | null
       if (wrapEl) {
         const rect = wrapEl.getBoundingClientRect()
@@ -3051,12 +3052,32 @@ export function App() {
       viewerDragRef.current.maxY = maxY
       viewerDragRef.current.active = true
 
-      window.addEventListener('pointermove', onViewerPointerMove as any, {
-        passive: false
-      })
-      window.addEventListener('pointerup', onViewerPointerUp as any)
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        if (!viewerDragRef.current.active) return
+        const dx = moveEvent.clientX - viewerDragRef.current.startX
+        const dy = moveEvent.clientY - viewerDragRef.current.startY
+        let targetX = viewerDragRef.current.originX + dx
+        let targetY = viewerDragRef.current.originY + dy
+
+        targetX = Math.max(viewerDragRef.current.minX, Math.min(viewerDragRef.current.maxX, targetX))
+        targetY = Math.max(viewerDragRef.current.minY, Math.min(viewerDragRef.current.maxY, targetY))
+
+        setViewerOffset({ x: targetX, y: targetY })
+      }
+
+      const handlePointerUp = (upEvent: PointerEvent) => {
+        viewerDragRef.current.active = false
+        try {
+          handleEl.releasePointerCapture(upEvent.pointerId)
+        } catch {}
+        window.removeEventListener('pointermove', handlePointerMove)
+        window.removeEventListener('pointerup', handlePointerUp)
+      }
+
+      window.addEventListener('pointermove', handlePointerMove)
+      window.addEventListener('pointerup', handlePointerUp)
     },
-    [viewerOffset.x, viewerOffset.y, onViewerPointerMove, onViewerPointerUp]
+    [viewerOffset.x, viewerOffset.y]
   )
 
   const quickActions = useMemo(
@@ -3992,61 +4013,59 @@ export function App() {
       </div>
 
       {viewerUdid ? (
-        <div
-          className='viewerOverlay'
-          onMouseDown={(e) => {
-            // KHÔNG tắt viewer khi click ngoài — chỉ tắt khi bấm nút X trong DeviceViewer
-            // Cho phép click xuyên qua để tương tác grid phía sau
-            e.stopPropagation()
-          }}
-        >
+        <OverlayPortal>
           <div
-            className='viewerOverlayPanelWrap'
-            style={
-              {
-                ['--viewer-dx' as any]: `${viewerOffset.x}px`,
-                ['--viewer-dy' as any]: `${viewerOffset.y}px`,
-                ['--viewer-width' as any]: `${viewerWidthPx}px`
-              } as React.CSSProperties
-            }
-            onMouseDown={e => {
-              if (e.button === 1) {
-                e.preventDefault()
-                e.stopPropagation()
-                setViewerUdid(null)
-              } else {
-                e.stopPropagation()
-              }
-            }}
-            onPointerDown={onViewerPointerDown}
+            className='viewerOverlay'
+            style={{ pointerEvents: 'none', position: 'fixed', inset: 0 }}
           >
-            <div className='viewerOverlayPanel device-viewer-container'>
-              <DeviceViewer
-                udid={viewerUdid}
-                wsServer={wsServer}
-                onClose={() => setViewerUdid(null)}
-                connectSelection={connectSelection}
-                connectionMode={getCurrentConnectionMode(viewerUdid)}
-                availableConnections={getConnectionEndpoints(viewerUdid)}
-                onChangeConnection={(mode) => {
-                  const targets = new Set<string>([viewerUdid])
-                  connectSelection.forEach(id => targets.add(id))
-                  ensureAndSwitchConnectionForDevices(Array.from(targets), mode)
-                }}
-                currentOrder={
-                  viewerUdid
-                    ? getTileNumber(
-                      viewerUdid,
-                      mergedOrder.indexOf(viewerUdid) + 1
-                    ) - 1
-                    : undefined
+            <div
+              className='viewerOverlayPanelWrap'
+              style={
+                {
+                  ['--viewer-dx' as any]: `${viewerOffset.x}px`,
+                  ['--viewer-dy' as any]: `${viewerOffset.y}px`,
+                  ['--viewer-width' as any]: `${viewerWidthPx}px`
+                } as React.CSSProperties
+              }
+              onMouseDown={e => {
+                if (e.button === 1) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setViewerUdid(null)
+                } else {
+                  e.stopPropagation()
                 }
-                onChangeOrder={(uid, newIdx) => setTileNumber(uid, newIdx + 1)}
-                onSyncNovaWechat={syncNovaWechatForDevices}
-              />
+              }}
+              onPointerDown={onViewerPointerDown}
+            >
+              <div className='viewerOverlayPanel device-viewer-container'>
+                <DeviceViewer
+                  udid={viewerUdid}
+                  wsServer={wsServer}
+                  onClose={() => setViewerUdid(null)}
+                  connectSelection={connectSelection}
+                  connectionMode={getCurrentConnectionMode(viewerUdid)}
+                  availableConnections={getConnectionEndpoints(viewerUdid)}
+                  onChangeConnection={(mode) => {
+                    const targets = new Set<string>([viewerUdid])
+                    connectSelection.forEach(id => targets.add(id))
+                    ensureAndSwitchConnectionForDevices(Array.from(targets), mode)
+                  }}
+                  currentOrder={
+                    viewerUdid
+                      ? getTileNumber(
+                        viewerUdid,
+                        mergedOrder.indexOf(viewerUdid) + 1
+                      ) - 1
+                      : undefined
+                  }
+                  onChangeOrder={(uid, newIdx) => setTileNumber(uid, newIdx + 1)}
+                  onSyncNovaWechat={syncNovaWechatForDevices}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       ) : null}
 
       {appSettingsVisible ? (
@@ -4172,73 +4191,7 @@ export function App() {
         </div>
       ) : null}
 
-      {pageContextMenu ? (
-        <div
-          className='pageContextLayer'
-          onClick={() => setPageContextMenu(null)}
-          onContextMenu={e => {
-            e.preventDefault()
-            setPageContextMenu(null)
-          }}
-          data-inspector-id="pageContext.menuLayer"
-          data-inspector-label="Page context menu overlay background"
-          data-inspector-component="client/src/App.tsx"
-        >
-          <div
-            className='pageContextMenu'
-            style={{
-              top: Math.min(pageContextMenu.y, window.innerHeight - 150),
-              left: Math.min(pageContextMenu.x, window.innerWidth - 230)
-            }}
-            onClick={e => e.stopPropagation()}
-            onContextMenu={e => e.stopPropagation()}
-            data-inspector-id="pageContext.menu"
-            data-inspector-label="Page context menu card panel"
-            data-inspector-component="client/src/App.tsx"
-          >
-            <button
-              className='pageContextItem'
-              onClick={() => {
-                setPageContextMenu(null)
-                apkInputRef.current?.click()
-              }}
-              data-inspector-id="pageContext.installApkItem"
-              data-inspector-label="Page context menu item: Install APK"
-              data-inspector-component="client/src/App.tsx"
-            >
-              <Package size={15} strokeWidth={1.8} />
-              <span>Cài đặt APK</span>
-            </button>
-            <button
-              className='pageContextItem'
-              onClick={() => {
-                setPageContextMenu(null)
-                importInputRef.current?.click()
-              }}
-              data-inspector-id="pageContext.importFileItem"
-              data-inspector-label="Page context menu item: Import file to phone"
-              data-inspector-component="client/src/App.tsx"
-            >
-              <Upload size={15} strokeWidth={1.8} />
-              <span>Nhập tệp vào điện thoại</span>
-            </button>
-            <button
-              className='pageContextItem'
-              onClick={() => {
-                setPageContextMenu(null)
-                setGlobalAdbOpen(true)
-              }}
-              data-inspector-id="pageContext.globalAdbItem"
-              data-inspector-label="Page context menu item: Run global ADB command"
-              data-inspector-component="client/src/App.tsx"
-            >
-              <Terminal size={15} strokeWidth={1.8} />
-              <span>Chạy lệnh ADB</span>
-            </button>
-            {globalAdbStatus ? <div className='pageContextStatus'>{globalAdbStatus}</div> : null}
-          </div>
-        </div>
-      ) : null}
+
 
       {globalAdbOpen ? (
         <div 
@@ -4455,8 +4408,52 @@ export function App() {
           data-inspector-label="Page context menu item: Reset device order to default"
           data-inspector-component="client/src/App.tsx"
         >
-          🔄 Khôi phục thứ tự mặc định
+          <RefreshCw size={15} strokeWidth={1.8} />
+          <span>Khôi phục thứ tự mặc định</span>
         </button>
+        <button
+          type="button"
+          className="pageContextMenuItem"
+          onClick={() => {
+            setPageContextMenu(null)
+            apkInputRef.current?.click()
+          }}
+          data-inspector-id="pageContext.installApkItem"
+          data-inspector-label="Page context menu item: Install APK"
+          data-inspector-component="client/src/App.tsx"
+        >
+          <Package size={15} strokeWidth={1.8} />
+          <span>Cài đặt APK</span>
+        </button>
+        <button
+          type="button"
+          className="pageContextMenuItem"
+          onClick={() => {
+            setPageContextMenu(null)
+            importInputRef.current?.click()
+          }}
+          data-inspector-id="pageContext.importFileItem"
+          data-inspector-label="Page context menu item: Import file to phone"
+          data-inspector-component="client/src/App.tsx"
+        >
+          <Upload size={15} strokeWidth={1.8} />
+          <span>Nhập tệp vào điện thoại</span>
+        </button>
+        <button
+          type="button"
+          className="pageContextMenuItem"
+          onClick={() => {
+            setPageContextMenu(null)
+            setGlobalAdbOpen(true)
+          }}
+          data-inspector-id="pageContext.globalAdbItem"
+          data-inspector-label="Page context menu item: Run global ADB command"
+          data-inspector-component="client/src/App.tsx"
+        >
+          <Terminal size={15} strokeWidth={1.8} />
+          <span>Chạy lệnh ADB</span>
+        </button>
+        {globalAdbStatus ? <div className='pageContextStatus'>{globalAdbStatus}</div> : null}
       </ContextMenuLayer>
 
       {/* Group Context Menu Layer */}

@@ -349,6 +349,11 @@ def wait_ready(label, predicate, seconds, log_file):
 def main():
     if not acquire_single_instance_lock(): return
     os.chdir(ROOT_DIR)
+    try:
+        sha = subprocess.check_output("git rev-parse --short HEAD", shell=True, creationflags=subprocess.CREATE_NO_WINDOW).decode("utf-8").strip()
+    except Exception:
+        sha = "unknown"
+    log_launcher(f"Starting MonViewPhone [Commit SHA: {sha}]")
     validate_files(); start_backend(); start_stream_node()
     wait_ready("Go backend 11000", check_go_ready, 20, os.path.join(logs_dir(), "server-go-current.log"))
     wait_ready("stream-node 11080", check_stream_node_ready, 20, os.path.join(logs_dir(), "stream-node-current.log"))

@@ -971,7 +971,7 @@ const DeviceViewerComponent = ({
       data-inspector-label="Single device viewer main panel"
       data-inspector-component="client/src/components/DeviceViewer.tsx"
     >
-      <div className="viewerHeader">
+      <div className="viewerHeader viewer-drag-handle">
         <div className="viewerTitle">
           <div className="viewerTitleLine">
             {status !== 'ready' ? <span className="viewerStatus">loading...</span> : null}

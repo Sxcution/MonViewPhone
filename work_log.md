@@ -450,4 +450,23 @@
        - `ModalLayer` auto-closing transient popovers and menus.
        - Coordinate hit testing under zoom levels 100%, 125%, and 150%.
   - Verification: `npm run check:ui` PASSED, `npx playwright test` 9/9 PASSED (4.9s), `npm run build` PASSED.
-
+- **00:05**: Đã khắc phục triệt để 3 UI regressions trên `main` và kiểm thử E2E:
+  1. **App.tsx Context Menu Nền**:
+     - Xoá hoàn toàn `pageContextLayer` full-screen div với `inset: 0` backdrop.
+     - Gộp tất cả 4 item menu (`Khôi phục thứ tự mặc định`, `Cài đặt APK`, `Nhập tệp vào điện thoại`, `Chạy lệnh ADB`) vào duy nhất một `<ContextMenuLayer>`.
+     - Menu surface chỉ nhận `pointer-events: auto`, không tạo full-screen hit-blocking layer lên grid.
+  2. **DeviceAccountOverlay.tsx**:
+     - Chuyển từ `ReactDOM.createPortal(..., document.body)` sang `<OverlayPortal>`.
+     - Đổi style panel từ `position: absolute` sang `position: fixed`.
+     - Thêm `.dav-drag-handle` riêng và đánh dấu các nút điều khiển bằng `data-no-drag="true"`.
+     - Chuyển mouse drag sang pointer events (`onPointerDown`, `onPointerMove`, `onPointerUp`) dùng `setPointerCapture`/`releasePointerCapture`.
+     - Clamp theo `getBoundingClientRect()` thực tế và tự động clamp lại khi resize cửa sổ.
+  3. **Viewer**:
+     - Xoá block CSS trùng lặp `.viewerOverlay` tại dòng 10067 trong `styles.css`.
+     - Thêm `pointer-events: none` cho container `.viewerOverlay` và `pointer-events: auto` cho `.viewerOverlayPanelWrap`.
+     - Chuyển `DeviceViewer` sang `<OverlayPortal>` và thêm class `.viewer-drag-handle`.
+     - Dùng pointer capture và clamp vị trí theo `getBoundingClientRect()` thực tế.
+  4. **Commit SHA & E2E Verification**:
+     - Tự động lấy Git commit SHA (`42a481a1`) khi build trong `build_v2_all.bat` (`VITE_COMMIT_SHA`) và ghi log khi khởi chạy trong `run.pyw`.
+     - Verification: `npm run check:ui` PASSED, `npx playwright test` 9/9 PASSED (6.3s), `build_v2_all.bat` PASSED 100%.
+- **00:14**: Khắc phục nguyên nhân nền trong suốt của `.dav-floating-panel`: Sửa class selector tại dòng 10073 trong `styles.css` từ `.viewerOverlayPanelWrap` bị gán nhầm sang đúng `.dav-floating-panel` với card surface chuẩn `background: var(--md-card)` (`#18191c`), `border: 1px solid var(--md-border)` và `box-shadow: var(--md-shadow-panel)`. Đã rebuild và test PASS 9/9 E2E Playwright.
