@@ -13,34 +13,39 @@ export type PopoverPlacement =
 export interface AnchoredPopoverProps {
   isOpen: boolean;
   onClose: () => void;
-  anchorEl: HTMLElement | null;
+  anchorEl?: HTMLElement | null;
+  anchorRef?: React.RefObject<any>;
   children: React.ReactNode;
   placement?: PopoverPlacement;
   className?: string;
   style?: React.CSSProperties;
   offset?: number;
   closeOnOutsideClick?: boolean;
+  closeOnEscape?: boolean;
 }
 
 export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
   isOpen,
   onClose,
   anchorEl,
+  anchorRef,
   children,
   placement = 'bottom-start',
   className = 'anchoredPopoverPanel',
   style = {},
   offset = 4,
   closeOnOutsideClick = true,
+  closeOnEscape = true,
 }) => {
+  const targetAnchor = anchorEl || (anchorRef ? anchorRef.current : null);
   const popoverIdRef = useRef<string>(`popover-${Math.random().toString(36).substr(2, 9)}`);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: 0, top: 0 });
 
   const updatePosition = () => {
-    if (!anchorEl || !popoverRef.current) return;
+    if (!targetAnchor || !popoverRef.current) return;
 
-    const anchorRect = anchorEl.getBoundingClientRect();
+    const anchorRect = targetAnchor.getBoundingClientRect();
     const popoverRect = popoverRef.current.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -99,8 +104,7 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
         closeOnOutsideClick &&
         popoverRef.current &&
         !popoverRef.current.contains(e.target as Node) &&
-        anchorEl &&
-        !anchorEl.contains(e.target as Node)
+        (!targetAnchor || !targetAnchor.contains(e.target as Node))
       ) {
         if (OverlayManager.isTopOverlay(popoverIdRef.current)) {
           onClose();

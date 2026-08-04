@@ -69,6 +69,8 @@ class OverlayManagerService {
     return top ? top.id === id : false;
   }
 
+  private originalOverflow: string | null = null;
+
   private updateBodyScrollLock() {
     if (typeof document === 'undefined') return;
     const modalCount = this.stack.filter(
@@ -76,9 +78,13 @@ class OverlayManagerService {
     ).length;
 
     if (modalCount > 0) {
+      if (this.originalOverflow === null) {
+        this.originalOverflow = document.body.style.overflow || '';
+      }
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+    } else if (this.originalOverflow !== null) {
+      document.body.style.overflow = this.originalOverflow;
+      this.originalOverflow = null;
     }
   }
 }

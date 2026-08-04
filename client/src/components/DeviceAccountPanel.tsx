@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { Plus, Shield, ShieldAlert, Activity, Bell, MapPin, QrCode, Users, Trash2, Briefcase, Folder, History, Layers } from 'lucide-react';
+import { OverlayPortal } from '@/components/ui/OverlayPortal';
+import { ModalLayer } from '@/components/ui/ModalLayer';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ContextMenuLayer } from '@/components/ui/ContextMenuLayer';
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby';
 import { useServer } from '@/context/ServerContext';
 import { listUserProfiles, runAdbCommandApi } from '@/lib/serverApi';
@@ -562,6 +568,8 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
   const autoOpenedNearbyDropdownRef = useRef(false);
   const [dropdownCoords, setDropdownCoords] = useState<{ top: number; left: number; width: number } | null>(null);
   const headerNameDisplayRef = useRef<HTMLDivElement>(null);
+  const shieldBtnRef = useRef<HTMLSpanElement>(null);
+  const bellBtnRef = useRef<HTMLButtonElement>(null);
   const [dropdownAnchor, setDropdownAnchor] = useState<HTMLElement | null>(null);
 
   const [bellTooltip, setBellTooltip] = useState<{ x: number; y: number } | null>(null);
@@ -1843,171 +1851,165 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
             >
               {totalAccounts}
             </button>
-            {accountTitleDropdownOpen && dropdownCoords && ReactDOM.createPortal(
-              <div
-                className="dav-title-account-dropdown contextMenuPanel dav-context-layer"
-                style={{
-                  position: 'fixed',
-                  top: `${dropdownCoords.top}px`,
-                  left: `${dropdownCoords.left}px`,
-                  minWidth: `${dropdownCoords.width}px`,
-                  width: 'max-content',
-                  maxWidth: '320px',
-                  right: 'auto',
-                  marginTop: 0,
-                  maxHeight: '300px',
-                  overflowY: 'auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px',
-                  padding: '6px',
-                }}
-                onMouseDown={e => e.stopPropagation()}
-              >
-                {groupAccounts.length === 0 ? (
-                  <div className="dav-title-empty">Khong co tai khoan</div>
-                ) : (
-                  groupAccounts.map(({ udid: accUdid, account }) => {
-                    const loginDates = Array.from(new Set(
-                      (account.history || [])
-                        .filter(h => h.action === 'Login')
-                        .map(h => getLocalDateString(h.timestamp))
-                    ));
-                    const todayStr = getLocalDateString(Date.now());
-                    const isLoggedInToday = loginDates.includes(todayStr);
+            <AnchoredPopover
+              isOpen={accountTitleDropdownOpen}
+              onClose={() => setAccountTitleDropdownOpen(false)}
+              anchorRef={accountTitleDropdownRef}
+              className="dav-title-account-dropdown contextMenuPanel dav-context-layer"
+              style={{
+                minWidth: `${dropdownCoords?.width || 120}px`,
+                width: 'max-content',
+                maxWidth: '320px',
+                maxHeight: '300px',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px',
+                padding: '6px',
+              }}
+            >
+              {groupAccounts.length === 0 ? (
+                <div className="dav-title-empty">Khong co tai khoan</div>
+              ) : (
+                groupAccounts.map(({ udid: accUdid, account }) => {
+                  const loginDates = Array.from(new Set(
+                    (account.history || [])
+                      .filter(h => h.action === 'Login')
+                      .map(h => getLocalDateString(h.timestamp))
+                  ));
+                  const todayStr = getLocalDateString(Date.now());
+                  const isLoggedInToday = loginDates.includes(todayStr);
 
-                    const isScanQrEligible = activeTab === 'wechat' && (() => {
-                      const is3Months = account.createdAt ? (Date.now() - account.createdAt >= 90 * 24 * 60 * 60 * 1000) : (account as any).isOneYearOld === true;
-                      if (!is3Months) return false;
-                      const scanCount = account.scanCount || 0;
-                      if (scanCount >= 3) return false;
-                      if (account.lastScanDate) {
-                        const nextScan = account.lastScanDate + 30 * 24 * 60 * 60 * 1000;
-                        if (nextScan > Date.now()) return false;
-                      }
-                      return true;
-                    })();
+                  const isScanQrEligible = activeTab === 'wechat' && (() => {
+                    const is3Months = account.createdAt ? (Date.now() - account.createdAt >= 90 * 24 * 60 * 60 * 1000) : (account as any).isOneYearOld === true;
+                    if (!is3Months) return false;
+                    const scanCount = account.scanCount || 0;
+                    if (scanCount >= 3) return false;
+                    if (account.lastScanDate) {
+                      const nextScan = account.lastScanDate + 30 * 24 * 60 * 60 * 1000;
+                      if (nextScan > Date.now()) return false;
+                    }
+                    return true;
+                  })();
 
-                    const buildItemData = (accObj: Account) => ({
-                      accUdid,
-                      accountId: accObj.id,
-                      name: accObj.name,
-                      phone: accObj.phone,
-                      nickname: accObj.nickname,
-                      activeTab,
-                      hasWechatLaunchProfile: !!accObj.wechatLaunchProfile,
-                      wechatLaunchProfile: accObj.wechatLaunchProfile,
-                      appType: accObj.appType,
-                      selectedAccountId: selectedAccount?.id,
-                      groupAccountsLength: groupAccounts.length,
-                    });
+                  const buildItemData = (accObj: Account) => ({
+                    accUdid,
+                    accountId: accObj.id,
+                    name: accObj.name,
+                    phone: accObj.phone,
+                    nickname: accObj.nickname,
+                    activeTab,
+                    hasWechatLaunchProfile: !!accObj.wechatLaunchProfile,
+                    wechatLaunchProfile: accObj.wechatLaunchProfile,
+                    appType: accObj.appType,
+                    selectedAccountId: selectedAccount?.id,
+                    groupAccountsLength: groupAccounts.length,
+                  });
 
-                    return (
-                      <button
-                        key={account.id}
-                        type="button"
-                        className={`dav-title-account-item ${selectedAccount?.id === account.id ? 'active' : ''}`}
-                        onMouseEnter={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account })}
-                        onMouseMove={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account })}
-                        onMouseLeave={() => setAccountHoverTooltip(null)}
-                        onPointerDown={(e) => {
-                          davDebug('ITEM_POINTER_DOWN', buildItemData(account));
-                        }}
-                        onMouseDown={(e) => {
-                          davDebug('ITEM_MOUSE_DOWN', buildItemData(account));
+                  return (
+                    <button
+                      key={account.id}
+                      type="button"
+                      className={`dav-title-account-item ${selectedAccount?.id === account.id ? 'active' : ''}`}
+                      onMouseEnter={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account })}
+                      onMouseMove={(e) => setAccountHoverTooltip({ x: e.clientX, y: e.clientY, account })}
+                      onMouseLeave={() => setAccountHoverTooltip(null)}
+                      onPointerDown={(e) => {
+                        davDebug('ITEM_POINTER_DOWN', buildItemData(account));
+                      }}
+                      onMouseDown={(e) => {
+                        davDebug('ITEM_MOUSE_DOWN', buildItemData(account));
 
-                          if (e.button === 1) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onOpenDeviceViewer?.(accUdid);
-                            return;
-                          }
-
-                          if (e.button === 0) {
-                            handleDropdownAccountActivate(e, account, accUdid);
-                            return;
-                          }
-                        }}
-                        onAuxClick={(e) => {
-                          if (e.button === 1) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onOpenDeviceViewer?.(accUdid);
-                          }
-                        }}
-                        onClick={(e) => {
+                        if (e.button === 1) {
                           e.preventDefault();
                           e.stopPropagation();
-                          davDebug('ITEM_CLICK_SUPPRESSED_AFTER_MOUSE_DOWN', buildItemData(account));
-                        }}
-                        onContextMenu={(e) => {
+                          onOpenDeviceViewer?.(accUdid);
+                          return;
+                        }
+
+                        if (e.button === 0) {
+                          handleDropdownAccountActivate(e, account, accUdid);
+                          return;
+                        }
+                      }}
+                      onAuxClick={(e) => {
+                        if (e.button === 1) {
                           e.preventDefault();
                           e.stopPropagation();
-                          setAccountActionMenu({ x: e.clientX, y: e.clientY, sourceUdid: accUdid, account });
+                          onOpenDeviceViewer?.(accUdid);
+                        }
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        davDebug('ITEM_CLICK_SUPPRESSED_AFTER_MOUSE_DOWN', buildItemData(account));
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setAccountActionMenu({ x: e.clientX, y: e.clientY, sourceUdid: accUdid, account });
+                      }}
+                    >
+                      {renderAppTypeIcon(account.appType, isLoggedInToday)}
+                      <span
+                        className="dav-title-account-name"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          color: getAccountListNameColor(account),
+                          fontWeight: selectedAccount?.id === account.id ? 700 : 500,
                         }}
                       >
-                        {renderAppTypeIcon(account.appType, isLoggedInToday)}
+                        {account.name || account.phone || account.nickname || 'Không tên'}
+                        {renderUnverifiedIcon(account)}
+                        {renderAccountNoticeIcon(account)}
+                        {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
+                      </span>
+                      {isScanQrEligible && (
                         <span
-                          className="dav-title-account-name"
+                          className="dav-scan-qr-badge"
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '2px',
-                            color: getAccountListNameColor(account),
-                            fontWeight: selectedAccount?.id === account.id ? 700 : 500,
+                            justifyContent: 'center',
+                            color: 'var(--md-text)',
+                            padding: '0',
+                            marginLeft: 'auto',
+                            flexShrink: 0,
+                            marginRight: account.wechatLaunchProfile ? '4px' : '0'
                           }}
+                          data-inspector-id="deviceAccount.scanQrBadge"
+                          data-inspector-label={`Scan QR eligible badge for User ${account.name}`}
+                          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
                         >
-                          {account.name || account.phone || account.nickname || 'Không tên'}
-                          {renderUnverifiedIcon(account)}
-                          {renderAccountNoticeIcon(account)}
-                          {activeTab === 'wechat' && renderNearbyAccountIcon(account)}
+                          <QrCode size={12} />
                         </span>
-                        {isScanQrEligible && (
-                          <span
-                            className="dav-scan-qr-badge"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'var(--md-text)',
-                              padding: '0',
-                              marginLeft: 'auto',
-                              flexShrink: 0,
-                              marginRight: account.wechatLaunchProfile ? '4px' : '0'
-                            }}
-                            data-inspector-id="deviceAccount.scanQrBadge"
-                            data-inspector-label={`Scan QR eligible badge for User ${account.name}`}
-                            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-                          >
-                            <QrCode size={12} />
-                          </span>
-                        )}
-                        {account.wechatLaunchProfile && (
-                          <span
-                            style={{
-                              fontSize: '8px',
-                              background: 'color-mix(in srgb, var(--md-success) 20%, transparent)',
-                              color: 'var(--md-success)',
-                              padding: '1px 4px',
-                              borderRadius: '4px',
-                              marginLeft: isScanQrEligible ? '0' : 'auto',
-                              fontWeight: 'bold',
-                              flexShrink: 0
-                            }}
-                            data-inspector-id="deviceAccount.launchProfileBadge"
-                            data-inspector-label={`Launch profile badge for User ${account.wechatLaunchProfile.userId}`}
-                            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-                          >
-                            U{account.wechatLaunchProfile.userId}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })
-                )}
-              </div>,
-              document.body
-            )}
+                      )}
+                      {account.wechatLaunchProfile && (
+                        <span
+                          style={{
+                            fontSize: '8px',
+                            background: 'color-mix(in srgb, var(--md-success) 20%, transparent)',
+                            color: 'var(--md-success)',
+                            padding: '1px 4px',
+                            borderRadius: '4px',
+                            marginLeft: isScanQrEligible ? '0' : 'auto',
+                            fontWeight: 'bold',
+                            flexShrink: 0
+                          }}
+                          data-inspector-id="deviceAccount.launchProfileBadge"
+                          data-inspector-label={`Launch profile badge for User ${account.wechatLaunchProfile.userId}`}
+                          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+                        >
+                          U{account.wechatLaunchProfile.userId}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </AnchoredPopover>
           </div>
         </div>
 
@@ -2015,6 +2017,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           <div className="dav-header-name-wrapper">
             {showAccountOverlay && (
               <span
+                ref={shieldBtnRef}
                 title={getAccountStatusTooltip(selectedAccount)}
                 style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
               >
@@ -2053,63 +2056,60 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               {activeTab === 'wechat' && renderNearbyAccountIcon(selectedAccount)}
             </div>
 
-            {showNameStatusDropdown && (
-              <div
-                className="uiMenuSurface dav-name-status-dropdown dav-context-layer"
-                onClick={e => e.stopPropagation()}
-                data-inspector-id="deviceAccount.nameStatusMenu"
-                data-inspector-label="Account status action menu"
-                data-inspector-component="client/src/components/DeviceAccountPanel.tsx"
-              >
-                {selectedAccount.status !== 'Die' && selectedAccount.status !== 'Risk' ? (
-                  <>
-                    <button
-                      type="button"
-                      className="uiMenuItem dav-name-status-option danger"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUpdateAccount(selectedAccount.id, { status: 'Die' });
-                        setShowNameStatusDropdown(false);
-                      }}
-                      data-inspector-id="deviceAccount.setDieAction"
-                      data-inspector-label="Set account status to Die"
-                      data-inspector-component="client/src/components/DeviceAccountPanel.tsx"
-                    >
-                      Set Die
-                    </button>
-                    <button
-                      type="button"
-                      className="uiMenuItem dav-name-status-option risk"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUpdateAccount(selectedAccount.id, { status: 'Risk' });
-                        setShowNameStatusDropdown(false);
-                      }}
-                      data-inspector-id="deviceAccount.setRiskAction"
-                      data-inspector-label="Set account status to Risk"
-                      data-inspector-component="client/src/components/DeviceAccountPanel.tsx"
-                    >
-                      Set Risk
-                    </button>
-                  </>
-                ) : (
+            <AnchoredPopover
+              isOpen={showNameStatusDropdown}
+              onClose={() => setShowNameStatusDropdown(false)}
+              anchorRef={shieldBtnRef}
+              className="uiMenuSurface dav-name-status-dropdown dav-context-layer"
+            >
+              {selectedAccount.status !== 'Die' && selectedAccount.status !== 'Risk' ? (
+                <>
                   <button
                     type="button"
-                    className="uiMenuItem dav-name-status-option success"
+                    className="uiMenuItem dav-name-status-option danger"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleUpdateAccount(selectedAccount.id, { status: 'Live' });
+                      handleUpdateAccount(selectedAccount.id, { status: 'Die' });
                       setShowNameStatusDropdown(false);
                     }}
-                    data-inspector-id="deviceAccount.setLiveAction"
-                    data-inspector-label="Set account status to Live"
+                    data-inspector-id="deviceAccount.setDieAction"
+                    data-inspector-label="Set account status to Die"
                     data-inspector-component="client/src/components/DeviceAccountPanel.tsx"
                   >
-                    Set Live
+                    Set Die
                   </button>
-                )}
-              </div>
-            )}
+                  <button
+                    type="button"
+                    className="uiMenuItem dav-name-status-option risk"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUpdateAccount(selectedAccount.id, { status: 'Risk' });
+                      setShowNameStatusDropdown(false);
+                    }}
+                    data-inspector-id="deviceAccount.setRiskAction"
+                    data-inspector-label="Set account status to Risk"
+                    data-inspector-component="client/src/components/DeviceAccountPanel.tsx"
+                  >
+                    Set Risk
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="uiMenuItem dav-name-status-option success"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleUpdateAccount(selectedAccount.id, { status: 'Live' });
+                    setShowNameStatusDropdown(false);
+                  }}
+                  data-inspector-id="deviceAccount.setLiveAction"
+                  data-inspector-label="Set account status to Live"
+                  data-inspector-component="client/src/components/DeviceAccountPanel.tsx"
+                >
+                  Set Live
+                </button>
+              )}
+            </AnchoredPopover>
           </div>
         )}
 
@@ -2117,6 +2117,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           {deviceNoticeStatus !== 'none' && (
             <>
               <button
+                ref={bellBtnRef}
                 type="button"
                 data-inspector-id="deviceAccount.noticeBadge"
                 data-inspector-label="Notice warning badge"
@@ -2133,28 +2134,33 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   className={deviceNoticeStatus === 'expired' ? "dav-bell-expired animate-pulse" : ""}
                 />
               </button>
-              {bellTooltip && noticeTooltipText && noticeTooltipText.length > 0 && ReactDOM.createPortal(
-                <div
-                  className="dav-bell-tooltip-floating"
-                  style={{
-                    ...getFloatingTooltipStyle(bellTooltip.x, bellTooltip.y),
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                  }}
-                >
-                  {noticeTooltipText}
-                </div>,
-                document.body
+              {bellTooltip && noticeTooltipText && noticeTooltipText.length > 0 && (
+                <OverlayPortal>
+                  <div
+                    className="dav-bell-tooltip-floating"
+                    style={{
+                      ...getFloatingTooltipStyle(bellTooltip.x, bellTooltip.y),
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      position: 'fixed',
+                      zIndex: 'var(--md-layer-tooltip, 30500)',
+                    }}
+                  >
+                    {noticeTooltipText}
+                  </div>
+                </OverlayPortal>
               )}
             </>
           )}
           {/* dav-daily-reminder-tooltip : Tooltip nhắc nhở hàng ngày */}
           {activeDailyReminders.length > 0 && (
-            <div
-              data-inspector-id="deviceAccount.dailyReminderTooltip"
-              data-inspector-label="Daily reminder tooltip"
-              data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
+            <AnchoredPopover
+              isOpen={true}
+              onClose={() => {}}
+              anchorRef={bellBtnRef}
+              closeOnOutsideClick={false}
+              closeOnEscape={false}
               className="dav-daily-reminder-tooltip"
             >
               {activeDailyReminders.map(acc => {
@@ -2181,7 +2187,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               >
                 Đóng
               </button>
-            </div>
+            </AnchoredPopover>
           )}
           {accountHoverTooltip && (() => {
                 const acc = accountHoverTooltip.account;
@@ -2208,44 +2214,41 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   )).sort();
 
                   if (diffDays === 0) {
-                    const streakDays = countConsecutiveDays(todayStr, loginDates);
-                    line1 = `Online: Hôm nay (${formatStreakDays(streakDays)})`;
+                    const streak = countConsecutiveDays(todayStr, loginDates);
+                    line1 = `Online ngày thứ ${streak} (${formattedLastLogin})`;
                   } else if (diffDays === 1) {
-                    const streakDays = countConsecutiveDays(yesterdayStr, loginDates);
-                    line1 = `Online: Hôm qua (${formatStreakDays(streakDays)})`;
-                  } else if (diffDays >= 2 && diffDays <= 7) {
-                    line1 = `Offline: ${diffDays} ngày (Online lần cuối: ${formattedLastLogin})`;
+                    const streak = countConsecutiveDays(yesterdayStr, loginDates);
+                    line1 = `Online ngày thứ ${streak} (Gần nhất: ${formattedLastLogin})`;
                   } else {
-                    line1 = `Offline: Online lần cuối: ${formattedLastLogin}`;
+                    line1 = `Bỏ ${diffDays} ngày (Gần nhất: ${formattedLastLogin})`;
                   }
                 }
 
-                const statusTooltip = getAccountStatusTooltip(acc);
                 const details: React.ReactNode[] = [];
-                if (statusTooltip) {
+                const createdAtStr = acc.createdAt ? getRelativeTimeStr(acc.createdAt) : null;
+                if (createdAtStr) {
                   details.push(
-                    <span
-                      key="status"
-                      style={{ color: acc.status === 'Risk' ? 'var(--md-risk)' : undefined }}
-                    >
-                      {statusTooltip}
+                    <span key="created" style={{ color: 'var(--md-text)' }}>
+                      Mới tạo: {createdAtStr}
                     </span>
                   );
                 }
-                if (acc.notice) {
-                  const title = acc.notice.title || '';
-                  const isAutoRiskNotice = acc.status === 'Risk' && title === 'Account Risk';
 
+                if (acc.notice?.title) {
+                  const title = acc.notice.title;
                   if (acc.notice.dueDate) {
                     const diffMs = acc.notice.dueDate - Date.now();
-                    const isDue = diffMs <= 0;
-                    const shouldShowNotice = !isAutoRiskNotice || isDue;
-
-                    if (shouldShowNotice) {
-                      const timeStr = isDue ? 'đã đến hạn' : formatCountdown(diffMs);
+                    const days = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+                    if (acc.status === 'Risk') {
                       details.push(
                         <span key="notice" style={{ color: 'var(--md-risk)' }}>
-                          Thông báo: {title} ({timeStr})
+                          Dưỡng Hiện: Còn {days} ngày nữa đủ điều kiện Mở Hiện
+                        </span>
+                      );
+                    } else {
+                      details.push(
+                        <span key="notice" style={{ color: 'var(--md-risk)' }}>
+                          Thông báo: {title} (Còn {days} ngày)
                         </span>
                       );
                     }
@@ -2261,23 +2264,26 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 const accName = acc.name || acc.phone || acc.nickname || 'Không tên';
                 const nameColor = getAccountListNameColor(acc);
 
-                return ReactDOM.createPortal(
-                  <div
-                    className="dav-bell-tooltip-floating"
-                    style={{
-                      ...getFloatingTooltipStyle(accountHoverTooltip.x, accountHoverTooltip.y),
-                      whiteSpace: 'pre-line'
-                    }}
-                  >
-                    <div style={{ color: nameColor, fontWeight: 'bold', marginBottom: '4px' }}>
-                      {accName}
+                return (
+                  <OverlayPortal>
+                    <div
+                      className="dav-bell-tooltip-floating"
+                      style={{
+                        ...getFloatingTooltipStyle(accountHoverTooltip.x, accountHoverTooltip.y),
+                        whiteSpace: 'pre-line',
+                        position: 'fixed',
+                        zIndex: 'var(--md-layer-tooltip, 30500)',
+                      }}
+                    >
+                      <div style={{ color: nameColor, fontWeight: 'bold', marginBottom: '4px' }}>
+                        {accName}
+                      </div>
+                      <div>{line1}</div>
+                      {details.map((detail, idx) => (
+                        <div key={idx} style={{ marginTop: '2px' }}>{detail}</div>
+                      ))}
                     </div>
-                    <div>{line1}</div>
-                    {details.map((detail, idx) => (
-                      <div key={idx} style={{ marginTop: '2px' }}>{detail}</div>
-                    ))}
-                  </div>,
-                  document.body
+                  </OverlayPortal>
                 );
               })()}
               {badgeHoverTooltip && (() => {
@@ -2353,14 +2359,19 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                   );
                 });
 
-                return ReactDOM.createPortal(
-                  <div
-                    className="dav-bell-tooltip-floating"
-                    style={getFloatingTooltipStyle(badgeHoverTooltip.x, badgeHoverTooltip.y)}
-                  >
-                    {tooltipRows.length > 0 ? tooltipRows : 'Tổng số tài khoản trên điện thoại này'}
-                  </div>,
-                  document.body
+                return (
+                  <OverlayPortal>
+                    <div
+                      className="dav-bell-tooltip-floating"
+                      style={{
+                        ...getFloatingTooltipStyle(badgeHoverTooltip.x, badgeHoverTooltip.y),
+                        position: 'fixed',
+                        zIndex: 'var(--md-layer-tooltip, 30500)',
+                      }}
+                    >
+                      {tooltipRows.length > 0 ? tooltipRows : 'Tổng số tài khoản trên điện thoại này'}
+                    </div>
+                  </OverlayPortal>
                 );
               })()}
         </div>
@@ -2688,16 +2699,14 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
       )}
 
       {/* Context Menu Portal */}
-      {ctxMenu && ReactDOM.createPortal(
-        <div
-          ref={menuRef}
-          className={`dav-ctx-menu contextMenuPanel ${ctxMenu.x > window.innerWidth - 380 ? 'direction-left' : ''}`}
-          style={{ left: ctxMenu.x, top: ctxMenu.y }}
-          onClick={e => e.stopPropagation()}
-          onMouseDown={e => e.stopPropagation()}
-          onContextMenu={e => e.stopPropagation()}
-        >
-
+      <ContextMenuLayer
+        isOpen={!!ctxMenu}
+        onClose={() => setCtxMenu(null)}
+        x={ctxMenu?.x || 0}
+        y={ctxMenu?.y || 0}
+        className={`dav-ctx-menu contextMenuPanel ${ctxMenu && ctxMenu.x > window.innerWidth - 380 ? 'direction-left' : ''}`}
+      >
+        <div ref={menuRef}>
           {/* Submenu Tài Khoản */}
           <div
             className="dav-ctx-submenu-container"
@@ -3048,81 +3057,39 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           >
             <Trash2 size={16} /> Xoá tài khoản
           </button>
-        </div>,
-        document.body
-      )}
+        </div>
+      </ContextMenuLayer>
 
-      {pendingDeleteAccount && ReactDOM.createPortal(
-        <div 
-          className="confirmOverlay dav-confirm-overlay-layer"
-          onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}
-          data-inspector-id="deviceAccount.deleteConfirmOverlay"
-          data-inspector-label="Delete account confirmation modal overlay"
-          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-        >
-          <div 
-            className="confirmPanel dav-confirm-panel-layer"
-            style={{ minWidth: 380, maxWidth: 480 }}
-            onPointerDown={e => e.stopPropagation()}
-            data-inspector-id="deviceAccount.deleteConfirmModal"
-            data-inspector-label="Delete account confirmation modal card"
-            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-          >
-            <div className="confirmTitle">Xác nhận xoá tài khoản</div>
-            <div className="confirmText">
-              Bạn có chắc chắn muốn xoá tài khoản <strong>{pendingDeleteAccount.name}</strong>?
-              Hành động này sẽ xoá toàn bộ dữ liệu tài khoản và không thể hoàn tác.
-            </div>
-            <div className="confirmActions">
-              <button
-                type="button"
-                className="modalBtn"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setPendingDeleteAccount(null);
-                }}
-                data-inspector-id="deviceAccount.deleteConfirmCancelButton"
-                data-inspector-label="Delete account confirmation cancel button"
-                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-              >
-                Huỷ
-              </button>
-              <button
-                type="button"
-                className="modalBtnDanger"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleDeleteAccount(pendingDeleteAccount.id);
-                  setPendingDeleteAccount(null);
-                }}
-                data-inspector-id="deviceAccount.deleteConfirmButton"
-                data-inspector-label="Delete account confirmation confirm button"
-                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-              >
-                Xác nhận
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <ConfirmDialog
+        isOpen={!!pendingDeleteAccount}
+        title="Xác nhận xoá tài khoản"
+        message={
+          <>
+            Bạn có chắc chắn muốn xoá tài khoản <strong>{pendingDeleteAccount?.name}</strong>?
+            Hành động này sẽ xoá toàn bộ dữ liệu tài khoản và không thể hoàn tác.
+          </>
+        }
+        isDanger
+        confirmText="Xác nhận"
+        cancelText="Huỷ"
+        onConfirm={() => {
+          if (pendingDeleteAccount) {
+            handleDeleteAccount(pendingDeleteAccount.id);
+            setPendingDeleteAccount(null);
+          }
+        }}
+        onClose={() => setPendingDeleteAccount(null)}
+      />
 
-      {historyModalAccount && ReactDOM.createPortal(
-        <div
-          className="confirmOverlay dav-history-overlay"
-          data-inspector-id="deviceAccount.accountHistoryOverlay"
-          data-inspector-label="Account history modal overlay"
-          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-        >
-          <div
-            className="confirmPanel dav-history-panel"
-            onPointerDown={(e) => e.stopPropagation()}
-            data-inspector-id="deviceAccount.accountHistoryModal"
-            data-inspector-label="Account history modal card"
-            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-          >
+      <ModalLayer
+        isOpen={!!historyModalAccount}
+        onClose={() => setHistoryModalAccountId(null)}
+        level="modal"
+        overlayClassName="dav-history-overlay"
+        className="confirmPanel dav-history-panel"
+      >
+        {historyModalAccount && (
+          <>
             <div className="dav-history-title-row">
               <div className="confirmTitle dav-history-title">Lịch sử tài khoản</div>
               <div className="dav-history-account-name">
@@ -3182,81 +3149,40 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 Đóng
               </button>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </>
+        )}
+      </ModalLayer>
 
-      {pendingResetHistoryAccount && ReactDOM.createPortal(
-        <div 
-          className="confirmOverlay dav-confirm-overlay-layer"
-          onPointerDown={e => { e.preventDefault(); e.stopPropagation(); }}
-          data-inspector-id="deviceAccount.resetHistoryConfirmOverlay"
-          data-inspector-label="Reset history confirmation modal overlay"
-          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-        >
-          <div 
-            className="confirmPanel dav-confirm-panel-layer"
-            style={{ minWidth: 380, maxWidth: 480 }}
-            onPointerDown={e => e.stopPropagation()}
-            data-inspector-id="deviceAccount.resetHistoryConfirmModal"
-            data-inspector-label="Reset history confirmation modal card"
-            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-          >
-            <div className="confirmTitle">Reset lịch sử tài khoản</div>
-            <div className="confirmText">
-              Bạn có chắc chắn muốn reset toàn bộ lịch sử trạng thái của tài khoản <strong>{getAccountDisplayName(pendingResetHistoryAccount)}</strong>?
-              Hành động này sẽ xoá sạch lịch sử đã ghi và không thể hoàn tác.
-            </div>
-            <div className="confirmActions">
-              <button
-                type="button"
-                className="modalBtn"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setPendingResetHistoryAccount(null);
-                }}
-                data-inspector-id="deviceAccount.resetHistoryConfirmCancelButton"
-                data-inspector-label="Reset history confirmation cancel button"
-                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-              >
-                Huỷ
-              </button>
-              <button
-                type="button"
-                className="modalBtnDanger"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleUpdateAccount(pendingResetHistoryAccount.id, { history: [] });
-                  setPendingResetHistoryAccount(null);
-                }}
-                data-inspector-id="deviceAccount.resetHistoryConfirmButton"
-                data-inspector-label="Reset history confirmation confirm button"
-                data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-              >
-                Xác nhận
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <ConfirmDialog
+        isOpen={!!pendingResetHistoryAccount}
+        title="Reset lịch sử tài khoản"
+        message={
+          <>
+            Bạn có chắc chắn muốn reset toàn bộ lịch sử trạng thái của tài khoản <strong>{pendingResetHistoryAccount ? getAccountDisplayName(pendingResetHistoryAccount) : ''}</strong>?
+            Hành động này sẽ xoá sạch lịch sử đã ghi và không thể hoàn tác.
+          </>
+        }
+        isDanger
+        confirmText="Xác nhận"
+        cancelText="Huỷ"
+        onConfirm={() => {
+          if (pendingResetHistoryAccount) {
+            handleUpdateAccount(pendingResetHistoryAccount.id, { history: [] });
+            setPendingResetHistoryAccount(null);
+          }
+        }}
+        onClose={() => setPendingResetHistoryAccount(null)}
+      />
 
-      {/* Account Action Menu Portal */}
-      {accountActionMenu && ReactDOM.createPortal(
-        <div
-          ref={accountActionMenuRef}
-          className={`dav-ctx-menu contextMenuPanel dav-account-action-menu ${accountActionMenu.x > window.innerWidth - 380 ? 'direction-left' : ''}`}
-          style={{ left: accountActionMenu.x, top: accountActionMenu.y }}
-          onClick={e => e.stopPropagation()}
-          onMouseDown={e => e.stopPropagation()}
-          onContextMenu={e => e.stopPropagation()}
-          data-inspector-id="deviceAccount.contextMenu"
-          data-inspector-label="Device account action context menu"
-          data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-        >
+      <ContextMenuLayer
+        isOpen={!!accountActionMenu}
+        onClose={() => setAccountActionMenu(null)}
+        x={accountActionMenu?.x || 0}
+        y={accountActionMenu?.y || 0}
+        className={`dav-ctx-menu contextMenuPanel dav-account-action-menu ${accountActionMenu && accountActionMenu.x > window.innerWidth - 380 ? 'direction-left' : ''}`}
+      >
+        {accountActionMenu && (
+          <div ref={accountActionMenuRef}>
           <button
             type="button"
             className="dav-ctx-item"
@@ -3765,26 +3691,23 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
               </span>
             )}
           </button>
-        </div>,
-        document.body
-      )}
-      {/* Move Modal Portal */}
-      {moveModal && ReactDOM.createPortal(
-        <div
-          className="confirmOverlay"
-          onClick={e => e.stopPropagation()}
-          onMouseDown={e => e.stopPropagation()}
-          onPointerDown={e => e.stopPropagation()}
-        >
-          <div
-            className="confirmPanel confirmPanel--compact"
-            style={{ minWidth: '280px' }}
-            onMouseDown={e => e.stopPropagation()}
-            onPointerDown={e => e.stopPropagation()}
-            data-inspector-id="deviceAccount.moveAccountModal"
-            data-inspector-label="Move account destination dialog"
-            data-inspector-component="client/src/components/DeviceAccountOverlay.tsx"
-          >
+        </div>
+        )}
+      </ContextMenuLayer>
+      <ModalLayer
+        isOpen={!!moveModal}
+        onClose={() => {
+          setMoveModal(null);
+          setTargetOrderStr('');
+          setMoveError('');
+        }}
+        level="modal-child"
+        overlayClassName="confirmOverlay"
+        className="confirmPanel confirmPanel--compact"
+        cardStyle={{ minWidth: '280px' }}
+      >
+        {moveModal && (
+          <>
             <div className="confirmTitle" style={{ textAlign: 'center', fontSize: '14px' }}>
               Di chuyển tài khoản
             </div>
@@ -3848,25 +3771,26 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 Xác nhận
               </button>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </>
+        )}
+      </ModalLayer>
 
-      {/* Notice Edit Modal Portal */}
-      {noticeEditModal && ReactDOM.createPortal(
-        <div
-          className="confirmOverlay dav-confirm-overlay-layer"
-          onClick={e => e.stopPropagation()}
-          onMouseDown={e => e.stopPropagation()}
-          onPointerDown={e => e.stopPropagation()}
-        >
-          <div
-            className="confirmPanel confirmPanel--compact dav-confirm-panel-layer"
-            style={{ minWidth: '360px' }}
-            onMouseDown={e => e.stopPropagation()}
-            onPointerDown={e => e.stopPropagation()}
-          >
+      <ModalLayer
+        isOpen={!!noticeEditModal}
+        onClose={() => {
+          setNoticeEditModal(null);
+          setEditNoticeTitle('');
+          setEditNoticeDays('');
+          setEditNoticeTime('');
+          setNoticeError('');
+        }}
+        level="modal"
+        overlayClassName="confirmOverlay dav-confirm-overlay-layer"
+        className="confirmPanel confirmPanel--compact dav-confirm-panel-layer"
+        cardStyle={{ minWidth: '360px' }}
+      >
+        {noticeEditModal && (
+          <>
             <div className="confirmTitle" style={{ display: 'flex', alignItems: 'center', width: '100%', borderBottom: '1px solid var(--md-border)', paddingBottom: '6px', marginBottom: '8px', justifyContent: 'flex-start' }}>
               <span style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--md-text)' }}>
                 Cài đặt thông báo: <span style={{ fontWeight: 'bold', color: 'var(--md-text)' }}>{noticeEditModal.account.name || noticeEditModal.account.phone || noticeEditModal.account.nickname || 'Không tên'}</span>
@@ -3997,10 +3921,9 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 Xác nhận
               </button>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </>
+        )}
+      </ModalLayer>
     </div>
   );
 });

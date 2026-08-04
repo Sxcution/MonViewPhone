@@ -29,6 +29,7 @@ export const ModalLayer: React.FC<ModalLayerProps> = ({
   ariaLabel,
   closeOnOutsideClick = false,
   closeOnEscape = true,
+  showBackdrop = true,
 }) => {
   const modalIdRef = useRef<string>(`modal-${Math.random().toString(36).substr(2, 9)}`);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -116,7 +117,7 @@ export const ModalLayer: React.FC<ModalLayerProps> = ({
           position: 'fixed',
           inset: 0,
           zIndex: zIndexVar,
-          background: 'transparent',
+          background: showBackdrop ? 'rgba(0, 0, 0, 0.45)' : 'transparent',
           pointerEvents: 'auto',
           display: 'flex',
           alignItems: 'center',
