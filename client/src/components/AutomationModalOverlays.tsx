@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { AutomationDeviceProfile } from '@/lib/automationData'
+import { ConfirmDialog, ModalLayer } from '@/components/ui'
 
 export type AutomationDeviceOption = {
   udid: string
@@ -27,52 +27,18 @@ export type InputModalState = {
 
 export function ConfirmDeleteModal({ state, onClose }: { state: ConfirmModalState; onClose: () => void }) {
   if (!state) return null;
-  return createPortal(
-    <>
-      <div 
-        className="confirmOverlay confirmOverlay--top" 
-        onMouseDown={onClose}
-        data-inspector-id="automation.confirmDeleteOverlay"
-        data-inspector-label="Automation confirm delete modal overlay"
-        data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
-      >
-        <div 
-          className="confirmPanel compact" 
-          onMouseDown={e => e.stopPropagation()}
-          data-inspector-id="automation.confirmDeletePanel"
-          data-inspector-label="Automation confirm delete modal card"
-          data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
-        >
-          <div className="confirmTitle">{state.title}</div>
-          <div className="confirmText" style={{ whiteSpace: 'pre-wrap' }}>
-            {state.message}
-          </div>
-          <div className="confirmActions center">
-            <button 
-              type='button' 
-              className="modalBtn" 
-              onClick={onClose}
-              data-inspector-id="automation.confirmDeleteCancelButton"
-              data-inspector-label="Cancel button in delete confirmation"
-              data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
-            >
-              Huỷ
-            </button>
-            <button 
-              type='button' 
-              className="modalBtnDanger" 
-              onClick={state.onConfirm}
-              data-inspector-id="automation.confirmDeleteConfirmButton"
-              data-inspector-label="Confirm button in delete confirmation"
-              data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
-            >
-              Xác Nhận
-            </button>
-          </div>
-        </div>
-      </div>
-    </>,
-    document.body,
+  /* confirmOverlay--top */
+  return (
+    <ConfirmDialog
+      isOpen={true}
+      title={state.title}
+      message={state.message}
+      confirmText="Xác Nhận"
+      cancelText="Huỷ"
+      variant="danger"
+      onConfirm={state.onConfirm}
+      onClose={onClose}
+    />
   );
 }
 
@@ -91,73 +57,64 @@ function InputModalInner({ state, onClose }: { state: NonNullable<InputModalStat
     state.onConfirm(v);
   };
 
-  return createPortal(
-    <>
+  return (
+    <ModalLayer level="confirm" isOpen={true} onClose={onClose} showBackdrop={true}>
       <div 
-        className="confirmOverlay" 
-        onMouseDown={onClose}
-        data-inspector-id="automation.inputModalOverlay"
-        data-inspector-label="Automation text input modal overlay"
+        className="confirmPanel" 
+        style={{ minWidth: 380, maxWidth: 480 }} 
+        onMouseDown={e => e.stopPropagation()}
+        data-inspector-id="automation.inputModalPanel"
+        data-inspector-label="Automation text input modal card"
         data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
       >
-        <div 
-          className="confirmPanel" 
-          style={{ minWidth: 380, maxWidth: 480 }} 
-          onMouseDown={e => e.stopPropagation()}
-          data-inspector-id="automation.inputModalPanel"
-          data-inspector-label="Automation text input modal card"
-          data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
-        >
-          <div className="confirmTitle">{state.title}</div>
-          <div className="confirmText">
-            {state.label ? <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>{state.label}</label> : null}
-            <input
-              ref={inputRef}
-              type='text'
-              className="modalInput"
-              placeholder={state.placeholder ?? ''}
-              value={value}
-              onChange={e => setValue(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleSubmit();
-                if (e.key === 'Escape') onClose();
-              }}
-              data-inspector-id="automation.inputModalField"
-              data-inspector-label="Text input field in modal"
-              data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
-            />
-          </div>
-          <div className="confirmActions">
-            <button 
-              type='button' 
-              className="modalBtn" 
-              onClick={onClose}
-              data-inspector-id="automation.inputModalCancelButton"
-              data-inspector-label="Cancel button in text input modal"
-              data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
-            >
-              Huỷ
-            </button>
-            <button
-              type='button'
-              className="modalBtnPrimary"
-              style={{
-                opacity: value.trim() ? 1 : 0.5,
-                cursor: value.trim() ? 'pointer' : 'not-allowed',
-              }}
-              disabled={!value.trim()}
-              onClick={handleSubmit}
-              data-inspector-id="automation.inputModalConfirmButton"
-              data-inspector-label="Confirm button in text input modal"
-              data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
-            >
-              {state.confirmText ?? 'Xác Nhận'}
-            </button>
-          </div>
+        <div className="confirmTitle">{state.title}</div>
+        <div className="confirmText">
+          {state.label ? <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>{state.label}</label> : null}
+          <input
+            ref={inputRef}
+            type='text'
+            className="modalInput"
+            placeholder={state.placeholder ?? ''}
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleSubmit();
+              if (e.key === 'Escape') onClose();
+            }}
+            data-inspector-id="automation.inputModalField"
+            data-inspector-label="Text input field in modal"
+            data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
+          />
+        </div>
+        <div className="confirmActions">
+          <button 
+            type='button' 
+            className="modalBtn" 
+            onClick={onClose}
+            data-inspector-id="automation.inputModalCancelButton"
+            data-inspector-label="Cancel button in text input modal"
+            data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
+          >
+            Huỷ
+          </button>
+          <button
+            type='button'
+            className="modalBtnPrimary"
+            style={{
+              opacity: value.trim() ? 1 : 0.5,
+              cursor: value.trim() ? 'pointer' : 'not-allowed',
+            }}
+            disabled={!value.trim()}
+            onClick={handleSubmit}
+            data-inspector-id="automation.inputModalConfirmButton"
+            data-inspector-label="Confirm button in text input modal"
+            data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
+          >
+            {state.confirmText ?? 'Xác Nhận'}
+          </button>
         </div>
       </div>
-    </>,
-    document.body,
+    </ModalLayer>
   );
 }
 
@@ -194,14 +151,8 @@ export function DeviceAssignModal({
     });
   };
 
-  return createPortal(
-    <div 
-      className='confirmOverlay' 
-      onMouseDown={onClose}
-      data-inspector-id="automation.deviceAssignOverlay"
-      data-inspector-label="Device assign modal overlay"
-      data-inspector-component="client/src/components/AutomationModalOverlays.tsx"
-    >
+  return (
+    <ModalLayer level="modal-child" isOpen={true} onClose={onClose} showBackdrop={true}>
       <div 
         className='confirmPanel' 
         onMouseDown={e => e.stopPropagation()} 
@@ -265,7 +216,6 @@ export function DeviceAssignModal({
           </button>
         </div>
       </div>
-    </div>,
-    document.body
+    </ModalLayer>
   );
 }

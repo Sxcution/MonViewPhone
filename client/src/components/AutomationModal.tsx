@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
+import { AnchoredPopover } from '@/components/ui/AnchoredPopover';
+import { ContextMenuLayer } from '@/components/ui/ContextMenuLayer';
 import {
   ChevronDown,
   ChevronRight,
@@ -166,6 +168,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
   const [rowDelayCtxMenu, setRowDelayCtxMenu] = useState<RowDelayCtxMenuState>(null);
   const [macroSortMode, setMacroSortMode] = useState<MacroSortMode>(loadMacroSortMode);
   const [macroSortMenuOpen, setMacroSortMenuOpen] = useState(false);
+  const sortBtnRef = useRef<HTMLButtonElement | null>(null);
   const [currentMacroName, setCurrentMacroName] = useState('');
   const [position, setPosition] = useState({ x: 120, y: 80 });
   const [draggingRowId, setDraggingRowId] = useState<string | null>(null);
@@ -2035,16 +2038,20 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
                   <div className='automationSavedTableWrap'>
                     <table className='table table-dark table-sm automationSavedTable'>
                       <thead><tr><th className='automationSavedHeaderCell'>
-                        <button type='button' className='automationSavedHeaderBtn' onClick={() => setMacroSortMenuOpen(v => !v)} title='Sắp xếp File Macro'>
+                        <button ref={sortBtnRef} type='button' className='automationSavedHeaderBtn' onClick={() => setMacroSortMenuOpen(v => !v)} title='Sắp xếp File Macro'>
                           <span>File Macro</span>
                           <small>{macroSortMode === 'name' ? 'Name' : 'Ngày tạo'}</small>
                         </button>
-                        {macroSortMenuOpen ? (
-                          <div className='automationMacroSortMenu' onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                            <button type='button' className={`automationMacroSortItem${macroSortMode === 'name' ? ' active' : ''}`} onClick={() => updateMacroSortMode('name')}>Name</button>
-                            <button type='button' className={`automationMacroSortItem${macroSortMode === 'createdAt' ? ' active' : ''}`} onClick={() => updateMacroSortMode('createdAt')}>Ngày tạo</button>
-                          </div>
-                        ) : null}
+                        <AnchoredPopover
+                          isOpen={macroSortMenuOpen}
+                          onClose={() => setMacroSortMenuOpen(false)}
+                          anchorEl={sortBtnRef.current}
+                          placement="bottom-start"
+                          className="automationMacroSortMenu"
+                        >
+                          <button type='button' className={`automationMacroSortItem${macroSortMode === 'name' ? ' active' : ''}`} onClick={() => updateMacroSortMode('name')}>Name</button>
+                          <button type='button' className={`automationMacroSortItem${macroSortMode === 'createdAt' ? ' active' : ''}`} onClick={() => updateMacroSortMode('createdAt')}>Ngày tạo</button>
+                        </AnchoredPopover>
                       </th></tr></thead>
                       <tbody>
                         {sortedSavedMacros.map(m => (
@@ -2073,12 +2080,13 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
       {rowDelayCtxMenu ? (() => {
         const row = rows.find(r => r.id === rowDelayCtxMenu.rowId);
         if (!row) return null;
-        return createPortal(
-          <div 
+        return (
+          <ContextMenuLayer
+            isOpen={true}
+            onClose={() => setRowDelayCtxMenu(null)}
+            x={rowDelayCtxMenu.x}
+            y={rowDelayCtxMenu.y}
             className='automationRowDelayCtxPanel automationContextMenuPanel contextMenuPanel dropdown-menu show'
-            style={{ position: 'fixed', left: rowDelayCtxMenu.x, top: rowDelayCtxMenu.y, minWidth: 210 }}
-            onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
-            onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
             data-inspector-id="automation.rowDelayContextMenu"
             data-inspector-label="Automation step row delay context menu"
             data-inspector-component="client/src/components/AutomationModal.tsx"
@@ -2119,8 +2127,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
               <Trash2 size={14} /><span>Xoá step</span>
             </button>
             <div className='automationContextMenuHint'>Hiện tại: {row.delayRandomBaseSec ? formatMacroDelay(row) : `${Math.round(row.delayMs / 1000)}s cố định`}</div>
-          </div>,
-          document.body,
+          </ContextMenuLayer>
         );
       })() : null}
 
@@ -2129,12 +2136,13 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
         if (!macro) return null;
         const bindingCount = AUTOMATION_APPS.reduce((sum, app) =>
           sum + appActions[app.id].reduce((s, a) => s + (a.bindings ?? []).filter(b => b.macroId === macro.id).length, 0), 0);
-        return createPortal(
-          <div 
+        return (
+          <ContextMenuLayer
+            isOpen={true}
+            onClose={() => setMacroCtxMenu(null)}
+            x={macroCtxMenu.x}
+            y={macroCtxMenu.y}
             className='automationMacroCtxPanel automationContextMenuPanel contextMenuPanel dropdown-menu show'
-            style={{ position: 'fixed', left: macroCtxMenu.x, top: macroCtxMenu.y, minWidth: 200 }}
-            onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
-            onContextMenu={e => { e.preventDefault(); e.stopPropagation(); }}
             data-inspector-id="automation.macroContextMenu"
             data-inspector-label="Automation File Macro actions context menu"
             data-inspector-component="client/src/components/AutomationModal.tsx"
@@ -2172,8 +2180,7 @@ export const AutomationModal = forwardRef<any, AutomationModalProps>(
             >
               <Trash2 size={14} /><span>Xoá File Macro</span>
             </button>
-          </div>,
-          document.body,
+          </ContextMenuLayer>
         );
       })() : null}
 

@@ -21,6 +21,7 @@ Removed legacy layers:
 
 ## Frontend
 - `client/src/App.tsx`: Top-level grid/viewer orchestration, device lifecycle, groups, global hotkeys/actions, account-vault expiry scheduling, and composition of the extracted settings, stream, and context-menu modules.
+- [NEW] [client/src/components/ui/](file:///c:/Users/Mon/Desktop/Protect/MonViewPhone/client/src/components/ui): Core overlay architecture primitives (`OverlayPortal`, `OverlayManager`, `ModalLayer`, `ConfirmDialog`, `ContextMenuLayer`, `AnchoredPopover`, `Tooltip`). Features single `#overlay-root` portal, unified CSS layer token hierarchy (`--md-layer-*`), focus trap, Escape key stack popping, background scroll locking, and viewport edge clamping.
 - `client/src/components/AppSettingsModal.tsx`: System settings, hotkey recording, and seeding-content settings.
 - `client/src/components/StreamSettingsPanel.tsx`: Grid/viewer stream drafts, validation, auto-apply, reload controls, and bitrate confirmation.
 - `client/src/components/DeviceContextMenu.tsx`: Device/group/account right-click actions and their input dialogs.

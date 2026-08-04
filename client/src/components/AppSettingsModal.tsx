@@ -5,6 +5,7 @@ import { normalizeEncoderConfig, type StreamConfig } from '@/lib/config'
 import { controlModePreset, type ControlMode } from '@/lib/controlMode'
 import { loadSeedingContents, saveSeedingContents } from '@/lib/automationData'
 import { useI18n } from '@/context/I18nContext'
+import { ModalLayer } from '@/components/ui'
 
 type AppSettingsModalProps = {
   onClose: () => void
@@ -94,19 +95,14 @@ export function AppSettingsModal({
   ] as const
 
   return (
-  <div 
-    className='confirmOverlay appSettingsOverlay'
-    data-inspector-id="appSettings.overlay"
-    data-inspector-label="System settings modal overlay background"
-    data-inspector-component="client/src/components/AppSettingsModal.tsx"
-  >
-    <div 
-      className='confirmPanel appSettingsPanel'
-      onMouseDown={e => e.stopPropagation()}
-      data-inspector-id="appSettings.panel"
-      data-inspector-label="System settings card panel"
-      data-inspector-component="client/src/components/AppSettingsModal.tsx"
-    >
+    <ModalLayer level="modal" isOpen={true} onClose={onClose} showBackdrop={true}>
+      <div 
+        className='confirmPanel appSettingsPanel'
+        onMouseDown={e => e.stopPropagation()}
+        data-inspector-id="appSettings.panel"
+        data-inspector-label="System settings card panel"
+        data-inspector-component="client/src/components/AppSettingsModal.tsx"
+      >
       <div className='appSettingsHeader'>
         <div 
           className='confirmTitle appSettingsTitle'
@@ -355,6 +351,6 @@ export function AppSettingsModal({
         </button>
       </div>
     </div>
-  </div>
+  </ModalLayer>
   )
 }

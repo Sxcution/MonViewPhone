@@ -4,6 +4,9 @@ import { DeviceAccountOverlay } from '@/components/DeviceAccountOverlay'
 import { AppSettingsModal } from '@/components/AppSettingsModal'
 import { StreamSettingsPanel } from '@/components/StreamSettingsPanel'
 import { DeviceContextMenu } from '@/components/DeviceContextMenu'
+import { ModalLayer } from '@/components/ui/ModalLayer'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ContextMenuLayer } from '@/components/ui/ContextMenuLayer'
 import { saveBackendSetting } from '@/lib/backendSettings'
 import { expireDueRiskAccounts, getNextWechatNewStatusChangeAt, getWechatNewStatus, loadDeviceAccountVault, getDeviceAccountDataFromVault, getDeviceAccountData, saveDeviceAccountData, saveDeviceAccountVaultAsync, type Account, type DeviceAccountData, type VaultData, type PlatformType, type WeChatAccount } from '@/lib/deviceAccountVault'
 import { getNearbyAccountState, hasNearbyRelevantAccount, getNearestNearbyHours, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby'
@@ -4395,109 +4398,91 @@ export function App() {
         </div>
       )}
 
-      {/* Modal xác nhận xoá nhóm */}
+      {/* Modal xác nhận xoá nhóm confirmOverlay--top */}
       {deleteGroupConfirm !== null && (
-        <div 
-          className='confirmOverlay confirmOverlay--top'
-          onMouseDown={() => setDeleteGroupConfirm(null)}
-          data-inspector-id="savedGroups.deleteOverlay"
-          data-inspector-label="Delete group confirmation overlay background"
-          data-inspector-component="client/src/App.tsx"
-        >
-          <div 
-            className='confirmPanel compact' 
-            onMouseDown={e => e.stopPropagation()}
-            data-inspector-id="savedGroups.deletePanel"
-            data-inspector-label="Delete group confirmation card panel"
-            data-inspector-component="client/src/App.tsx"
-          >
-            <div 
-              className='confirmTitle'
-              data-inspector-id="savedGroups.deleteTitle"
-              data-inspector-label="Delete group confirmation title"
-              data-inspector-component="client/src/App.tsx"
-            >
-              Xoá nhóm
-            </div>
-            <div className='confirmText'>
-              Bạn có chắc muốn xoá nhóm{' '}
-              <strong>"{savedGroups[deleteGroupConfirm]?.name}"</strong>?
-            </div>
-            <div className='confirmActions center'>
-              <button 
-                className='modalBtn' 
-                onClick={() => setDeleteGroupConfirm(null)}
-                data-inspector-id="savedGroups.deleteCancelButton"
-                data-inspector-label="Delete group confirmation cancel button"
-                data-inspector-component="client/src/App.tsx"
-              >
-                Huỷ
-              </button>
-              <button
-                className='modalBtnDanger'
-                onClick={() => {
-                  const idx = deleteGroupConfirm
-                  setSavedGroups(prev => {
-                    const next = prev.filter((_, i) => i !== idx)
-                    if (next.length === 0) {
-                      try {
-                        localStorage.setItem(SAVED_GROUPS_DELETED_ALL_KEY, '1')
-                      } catch { }
-                    }
-                    return next
-                  })
-                  if (activeGroupIdx === idx) setActiveGroupIdx(null)
-                  if (expandedGroupIdx === idx) setExpandedGroupIdx(null)
-                  setDeleteGroupConfirm(null)
-                }}
-                data-inspector-id="savedGroups.deleteConfirmButton"
-                data-inspector-label="Delete group confirmation execution button"
-                data-inspector-component="client/src/App.tsx"
-              >
-                Xoá nhóm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* === Context menu nhóm (right-click) === */}
-      {groupContextMenu && (
-        <div
-          className='uiMenuLayer'
-          onMouseDown={() => setGroupContextMenu(null)}
-          data-inspector-id="savedGroups.contextMenuOverlay"
-          data-inspector-label="Saved groups context menu overlay background"
-          data-inspector-component="client/src/App.tsx"
+        <ConfirmDialog
+          isOpen={true}
+          onClose={() => setDeleteGroupConfirm(null)}
+          isDanger
+          title="Xoá nhóm"
+          message={
+            <>
+              Bạn có chắc muốn xoá nhóm <strong>"{savedGroups[deleteGroupConfirm]?.name}"</strong>?
+            </>
+          }
+          confirmText="Xoá nhóm"
+          cancelText="Huỷ"
+          onConfirm={() => {
+            const idx = deleteGroupConfirm
+            setSavedGroups(prev => {
+              const next = prev.filter((_, i) => i !== idx)
+              if (next.length === 0) {
+                try {
+                  localStorage.setItem(SAVED_GROUPS_DELETED_ALL_KEY, '1')
+                } catch { }
+              }
+              return next
+            })
+            if (activeGroupIdx === idx) setActiveGroupIdx(null)
+            if (expandedGroupIdx === idx) setExpandedGroupIdx(null)
+            setDeleteGroupConfirm(null)
+          }}
         />
       )}
-      {groupContextMenu && (
-        <div
-          className='uiMenuSurface groupContextMenuSurface'
-          style={{
-            top: Math.min(groupContextMenu.y, window.innerHeight - 120),
-            left: Math.min(groupContextMenu.x, window.innerWidth - 180),
+
+      {/* Page Context Menu Layer */}
+      <ContextMenuLayer
+        isOpen={!!pageContextMenu}
+        onClose={() => setPageContextMenu(null)}
+        x={pageContextMenu?.x || 0}
+        y={pageContextMenu?.y || 0}
+        className="pageContextLayer contextMenuPanel"
+      >
+        <button
+          type="button"
+          className="pageContextMenuItem"
+          onClick={() => {
+            const defaultOrderMap = new Map<string, number>()
+            registeredUdids.forEach((u, i) => setTileNumber(u, i + 1))
+            setPageContextMenu(null)
           }}
-          onMouseDown={e => e.stopPropagation()}
-          data-inspector-id="savedGroups.contextMenu"
-          data-inspector-label="Saved groups context menu panel"
+          data-inspector-id="pageContext.resetOrder"
+          data-inspector-label="Page context menu item: Reset device order to default"
           data-inspector-component="client/src/App.tsx"
         >
-          <button
-            className='uiMenuItem'
-            onClick={() => {
+          🔄 Khôi phục thứ tự mặc định
+        </button>
+      </ContextMenuLayer>
+
+      {/* Group Context Menu Layer */}
+      <ContextMenuLayer
+        isOpen={!!groupContextMenu}
+        onClose={() => setGroupContextMenu(null)}
+        x={groupContextMenu?.x || 0}
+        y={groupContextMenu?.y || 0}
+        className="groupContextMenuSurface contextMenuPanel"
+      >
+        <button
+          type="button"
+          className="groupContextMenuItem"
+          onClick={() => {
+            if (groupContextMenu) {
               setRenameGroupIdx(groupContextMenu.idx)
               setRenameGroupValue(savedGroups[groupContextMenu.idx]?.name || '')
               setGroupContextMenu(null)
-            }}
-            data-inspector-id="savedGroups.contextMenuRename"
-            data-inspector-label="Saved groups context menu item: Rename group"
-            data-inspector-component="client/src/App.tsx"
-          >
-            Đổi tên nhóm
-          </button>
-          <button
-            className='uiMenuItem'
-            onClick={() => {
+            }
+          }}
+          data-inspector-id="savedGroups.contextMenuRename"
+          data-inspector-label="Saved groups context menu item: Rename group"
+          data-inspector-component="client/src/App.tsx"
+        >
+          Đổi tên nhóm
+        </button>
+        <button
+          type="button"
+          className="groupContextMenuItem"
+          onClick={() => {
+            if (groupContextMenu) {
               const idx = groupContextMenu.idx
               if (focusGroupIdx === idx) {
                 setFocusGroupIdx(null)
@@ -4507,15 +4492,15 @@ export function App() {
                 setActiveGroupIdx(idx)
               }
               setGroupContextMenu(null)
-            }}
-            data-inspector-id="savedGroups.contextMenuFocus"
-            data-inspector-label="Saved groups context menu item: Focus group toggle"
-            data-inspector-component="client/src/App.tsx"
-          >
-            {focusGroupIdx === groupContextMenu.idx ? '👁 Hiện tất cả' : '👁 Chỉ hiện nhóm này'}
-          </button>
-        </div>
-      )}
+            }
+          }}
+          data-inspector-id="savedGroups.contextMenuFocus"
+          data-inspector-label="Saved groups context menu item: Focus group toggle"
+          data-inspector-component="client/src/App.tsx"
+        >
+          {groupContextMenu && focusGroupIdx === groupContextMenu.idx ? '👁 Hiện tất cả' : '👁 Chỉ hiện nhóm này'}
+        </button>
+      </ContextMenuLayer>
       {contextMenuTarget ? (
         <DeviceContextMenu
           target={contextMenuTarget}
@@ -4552,63 +4537,22 @@ export function App() {
         {selectedVisible.length}
       </div>
 
+      {/* confirmOverlay--top */}
       {confirmState && (
-        <div 
-          className="confirmOverlay confirmOverlay--top"
-          onMouseDown={() => setConfirmState(null)}
-          data-inspector-id="genericConfirm.overlay"
-          data-inspector-label="Generic confirmation overlay background"
-          data-inspector-component="client/src/App.tsx"
-        >
-          <div 
-            className={`confirmPanel${confirmState.danger ? ' compact' : ''}`} 
-            onMouseDown={e => e.stopPropagation()}
-            data-inspector-id="genericConfirm.panel"
-            data-inspector-label="Generic confirmation card panel"
-            data-inspector-component="client/src/App.tsx"
-          >
-            <div 
-              className="confirmTitle"
-              data-inspector-id="genericConfirm.title"
-              data-inspector-label="Generic confirmation title"
-              data-inspector-component="client/src/App.tsx"
-            >
-              {confirmState.title}
-            </div>
-            <div 
-              className="confirmText"
-              data-inspector-id="genericConfirm.text"
-              data-inspector-label="Generic confirmation message text"
-              data-inspector-component="client/src/App.tsx"
-            >
-              {confirmState.message}
-            </div>
-            <div className={`confirmActions${confirmState.danger ? ' center' : ''}`}>
-              <button 
-                className="modalBtn" 
-                onClick={() => setConfirmState(null)}
-                data-inspector-id="genericConfirm.cancelButton"
-                data-inspector-label="Generic confirmation cancel button"
-                data-inspector-component="client/src/App.tsx"
-              >
-                {confirmState.cancelText || 'Huỷ'}
-              </button>
-              <button
-                className={confirmState.danger ? 'modalBtnDanger' : 'modalBtnPrimary'}
-                onClick={() => {
-                  const fn = confirmState.onConfirm;
-                  setConfirmState(null);
-                  fn();
-                }}
-                data-inspector-id="genericConfirm.confirmButton"
-                data-inspector-label="Generic confirmation execution button"
-                data-inspector-component="client/src/App.tsx"
-              >
-                {confirmState.confirmText || 'Xác Nhận'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          isOpen={true}
+          onClose={() => setConfirmState(null)}
+          onConfirm={() => {
+            const fn = confirmState.onConfirm;
+            setConfirmState(null);
+            fn();
+          }}
+          isDanger={confirmState.danger}
+          title={confirmState.title}
+          message={confirmState.message}
+          confirmText={confirmState.confirmText || 'Xác Nhận'}
+          cancelText={confirmState.cancelText || 'Huỷ'}
+        />
       )}
       {syncTimeModalOpen ? (
         <SyncTimeSettingsModal
@@ -4662,13 +4606,7 @@ export function App() {
       )}
 
       {activeReminderNote && (
-        <div 
-          className="notesReminderOverlay"
-          onMouseDown={() => setActiveReminderNote(null)}
-          data-inspector-id="notes.reminderAlertOverlay"
-          data-inspector-label="Notes reminder overlay background alert"
-          data-inspector-component="client/src/App.tsx"
-        >
+        <ModalLayer level="confirm" isOpen={true} onClose={() => setActiveReminderNote(null)} showBackdrop={true}>
           <div 
             className="notesReminderPanel"
             onMouseDown={e => e.stopPropagation()}
@@ -4713,7 +4651,7 @@ export function App() {
               </button>
             </div>
           </div>
-        </div>
+        </ModalLayer>
       )}
     </>
   )

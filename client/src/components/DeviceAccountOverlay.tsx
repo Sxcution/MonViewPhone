@@ -5,6 +5,7 @@ import { hasNearbyRelevantAccount } from '@/lib/deviceAccountNearby';
 import { saveBackendSetting } from '@/lib/backendSettings';
 import { useServer } from '@/context/ServerContext';
 import { runAdbCommandApi } from '@/lib/serverApi';
+import { ConfirmDialog, ContextMenuLayer, ModalLayer } from '@/components/ui';
 import {
   getDeviceAccountData,
   loadDeviceAccountVault,
@@ -836,7 +837,7 @@ export function DeviceAccountOverlay({
     </div>
 
       {showAddPlatformModal && (
-        <div className="confirmOverlay" onMouseDown={() => {
+        <ModalLayer level="confirm" isOpen={true} onClose={() => {
           setShowAddPlatformModal(false);
           setNewPlatformName('');
           setAddPlatformError('');
@@ -886,18 +887,16 @@ export function DeviceAccountOverlay({
               </button>
             </div>
           </div>
-        </div>
+        </ModalLayer>
       )}
 
       {platformCtxMenu && (
-        <div
-          ref={platformCtxMenuRef}
+        <ContextMenuLayer
+          isOpen={true}
+          onClose={() => setPlatformCtxMenu(null)}
+          x={platformCtxMenu.x}
+          y={platformCtxMenu.y}
           className="dav-ctx-menu contextMenuPanel"
-          style={{
-            left: platformCtxMenu.x,
-            top: platformCtxMenu.y
-          }}
-          onContextMenu={e => e.preventDefault()}
         >
           <button
             type="button"
@@ -909,31 +908,24 @@ export function DeviceAccountOverlay({
           >
             <Trash2 size={16} /> Xoá Nhóm
           </button>
-        </div>
+        </ContextMenuLayer>
       )}
 
-      {pendingDeletePlatform && (
-        <div className="confirmOverlay confirmOverlay--top" onMouseDown={() => setPendingDeletePlatform(null)}>
-          <div className="confirmPanel dav-confirm-panel" onMouseDown={e => e.stopPropagation()}>
-            <div className="confirmTitle">Xác nhận xoá nhóm</div>
-            <div className="confirmText">
-              Bạn có chắc chắn muốn xoá nhóm <strong>{platforms.find(p => p.id === pendingDeletePlatform)?.label || pendingDeletePlatform}</strong>?
-              Tất cả tài khoản và dữ liệu thuộc nhóm này sẽ bị xoá vĩnh viễn khỏi toàn bộ thiết bị.
-            </div>
-            <div className="confirmActions">
-              <button type="button" className="modalBtn" onClick={() => setPendingDeletePlatform(null)}>Huỷ</button>
-              <button type="button" className="modalBtnDanger" onClick={handleConfirmDeletePlatform}>Xác nhận</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* confirmOverlay--top */}
+      <ConfirmDialog
+        isOpen={!!pendingDeletePlatform}
+        title="Xác nhận xoá nhóm"
+        message={`Bạn có chắc chắn muốn xoá nhóm "${platforms.find(p => p.id === pendingDeletePlatform)?.label || pendingDeletePlatform}"? Tất cả tài khoản và dữ liệu thuộc nhóm này sẽ bị xoá vĩnh viễn khỏi toàn bộ thiết bị.`}
+        confirmText="Xác Nhận"
+        cancelText="Huỷ"
+        variant="danger"
+        onConfirm={handleConfirmDeletePlatform}
+        onClose={() => setPendingDeletePlatform(null)}
+      />
 
       {/* Modal cài đặt Quản lý tài khoản */}
-      {showAccountSettingsModal && ReactDOM.createPortal(
-        <div
-          className="confirmOverlay dav-settings-overlay"
-          onMouseDown={e => e.stopPropagation()}
-        >
+      {showAccountSettingsModal && (
+        <ModalLayer level="modal-child" isOpen={true} onClose={() => setShowAccountSettingsModal(false)} showBackdrop={true}>
           <div
             className="confirmPanel dav-settings-panel"
             onMouseDown={e => e.stopPropagation()}
@@ -1138,8 +1130,7 @@ export function DeviceAccountOverlay({
               </button>
             </div>
           </div>
-        </div>,
-        document.body
+        </ModalLayer>
       )}
 </>,
     document.body

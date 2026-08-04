@@ -67,6 +67,7 @@
   --md-layer-modal-child: 28000;
   --md-layer-notification: 29000;
   --md-layer-menu: 30000;
+  --md-layer-tooltip: 30500;
   --md-layer-confirm: 31000;
   --md-layer-inspector: 32000;
 
@@ -934,6 +935,65 @@ body.sidebarCollapsed {
 
 .modalActions {
   display: flex;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+.modalPanel {
+  width: min(520px, 100%);
+  background: rgba(27, 27, 27, 0.96);
+  border: 1px solid #2a2a2a;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.modalTitle {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.modalClose {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #3a3a3a;
+  background: #202020;
+  color: #fff;
+  cursor: pointer;
+}
+
+.modalBody {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 60vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.modalLabel {
+  font-size: 13px;
+  color: #d6d6d6;
+}
+
+.modalRange {
+  width: 100%;
+}
+
+.modalActions {
+  display: flex;
   justify-content: flex-end;
   gap: 6px;
   margin-top: 8px;
@@ -944,9 +1004,6 @@ body.sidebarCollapsed {
   position: fixed;
   inset: 0;
   z-index: var(--md-layer-workspace);
-  background: rgba(0, 0, 0, 0.05);
-  display: flex;
-  align-items: center;
   justify-content: center;
   padding: 12px;
 }
@@ -4248,20 +4305,6 @@ body:not(.alignRight) .sidebar-wrapper.pinned {
   display: flex;
   flex-direction: row;
   width: 100%;
-  height: 100vh;
-  overflow: hidden;
-  background: #0e0e0e;
-}
-
-.viewerOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 900;
-  pointer-events: none;
-  /* ← backdrop KHÔNG chặn click */
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .viewerOverlayPanelWrap {
@@ -9831,6 +9874,200 @@ input[type=number] {
   color: var(--md-text);
   font-size: 12px;
   outline: none;
+/* Centered stacks layout for DeviceAccountOverlay card with prefix inside input */
+.tile-account-overlay .dav-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 2px 12px;
+  width: 100%;
+  margin: 0;
+  transition: all 0.15s ease;
+}
+
+.tile-account-overlay .dav-input-wrapper:focus-within {
+  border-color: transparent !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.tile-account-overlay .dav-transparent-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #eee;
+  text-align: center;
+  font-size: 12px;
+  padding: 2px 0;
+  width: 100%;
+}
+
+.tile-account-overlay .dav-input-prefix {
+  flex: 0 0 28px;
+  display: inline-flex;
+  justify-content: flex-start;
+  align-items: center;
+  color: var(--md-muted);
+  font-size: 11px;
+  font-weight: bold;
+  user-select: none;
+}
+
+.tile-account-overlay .dav-stats-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  padding: 8px 12px;
+  font-size: 12px;
+  user-select: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 6px;
+}
+
+.tile-account-overlay .dav-notice-centered-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.tile-account-overlay .dav-notice-centered-row:hover {
+  background: rgba(234, 179, 8, 0.05);
+}
+
+.tile-account-overlay .dav-centered-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 10px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+
+.tile-account-overlay .dav-centered-input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 10px;
+  text-align: center;
+  outline: none;
+  cursor: pointer;
+}
+
+.column-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 10;
+}
+
+.column-resizer:hover {
+  background: rgba(13, 110, 253, 0.4);
+}
+
+.macro-panel-resizer {
+  width: 4px;
+  cursor: col-resize;
+  background: #3a3a3a;
+  position: relative;
+  z-index: 10;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.macro-panel-resizer:hover {
+  background: #0d6efd;
+}
+
+.dav-header-center-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 700px;
+}
+
+.dav-stats-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  font-size: 11px;
+  width: 100%;
+}
+
+.dav-stats-row-global {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  color: var(--md-muted);
+  width: 100%;
+  gap: 2px 4px;
+}
+
+.dav-stats-label {
+  font-weight: bold;
+  margin-right: 2px;
+  color: var(--md-text-soft);
+}
+
+.dav-stats-val-total {
+  font-weight: bold;
+  color: var(--md-text);
+  margin-right: 4px;
+}
+
+.dav-stats-divider {
+  color: #333;
+  margin: 0 4px;
+}
+
+.dav-stats-btn {
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.dav-stats-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--md-text);
+}
+
+.dav-stats-btn.active {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.account-search-input {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--md-border);
+  border-radius: 8px;
+  padding: 0 12px;
+  height: 34px;
+  width: 100%;
+  max-width: 500px;
+  color: var(--md-text);
+  font-size: 12px;
+  outline: none;
   box-sizing: border-box;
 }
 
@@ -9839,7 +10076,23 @@ input[type=number] {
   box-shadow: none;
 }
 
-.dav-floating-panel {
+#fullViewerLayout {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+}
+
+.viewerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--md-layer-workspace);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewerOverlayPanelWrap {
   position: absolute;
   top: 20px;
   left: 50%;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { createPortal } from 'react-dom'
+import { ContextMenuLayer, ModalLayer } from '@/components/ui'
 import { Plus, Trash2, Users } from 'lucide-react'
 import {
   loadDeviceProfiles,
@@ -101,32 +102,15 @@ export function DeviceContextMenu({
 
   return (
     <>
-    <div
-      className="uiMenuLayer"
-      onClick={() => {
-        onClose()
-        setSubMenuOpen(false)
-      }}
-      onContextMenu={e => {
-        e.preventDefault()
-        onClose()
-        setSubMenuOpen(false)
-      }}
-      data-inspector-id="deviceContext.menuLayer"
-      data-inspector-label="Device tile context menu overlay background"
-      data-inspector-component="client/src/components/DeviceContextMenu.tsx"
-    >
-      <div
-        className={`uiMenuSurface${target.x >= window.innerWidth / 2 ? ' uiMenuSurfaceOpenLeft' : ''}`}
-        style={{
-          top: Math.min(target.y, window.innerHeight - 200),
-          left: Math.min(target.x, window.innerWidth - 200),
+      <ContextMenuLayer
+        isOpen={true}
+        x={target.x}
+        y={target.y}
+        onClose={() => {
+          onClose()
+          setSubMenuOpen(false)
         }}
-        onClick={e => e.stopPropagation()}
-        onContextMenu={e => e.stopPropagation()}
-        data-inspector-id="deviceContext.menu"
-        data-inspector-label="Device tile context menu card panel"
-        data-inspector-component="client/src/components/DeviceContextMenu.tsx"
+        className={`uiMenuSurface${target.x >= window.innerWidth / 2 ? ' uiMenuSurfaceOpenLeft' : ''}`}
       >
         {/* Header: Device # + input số inline trong suốt */}
         <div className="uiMenuHeader">
@@ -475,10 +459,9 @@ export function DeviceContextMenu({
               <Trash2 size={14} />
               <span>Xoá khỏi nhóm <strong className="uiMenuMeta uiMenuMetaDanger">"{savedGroups[target.groupIdx!]?.name}"</strong></span>
             </button>
-          )
+          );
         })()}
-      </div>
-    </div>
+      </ContextMenuLayer>
       {inputState && (
         <InputModalOverlay state={inputState} onClose={() => setInputState(null)} />
       )}
@@ -518,79 +501,68 @@ function InputModalOverlayInner({ state, onClose }: { state: NonNullable<InputMo
     state.onConfirm(v);
   };
 
-  return createPortal(
-    <>
+  return (
+    <ModalLayer isOpen={true} onClose={onClose} level="confirm">
       <div 
-        className="confirmOverlay" 
-        onMouseDown={onClose}
-        data-inspector-id="genericInput.overlay"
-        data-inspector-label="Generic input modal overlay background"
+        className="confirmPanel" 
+        style={{ minWidth: 380, maxWidth: 480 }} 
+        data-inspector-id="genericInput.panel"
+        data-inspector-label="Generic input modal card panel"
         data-inspector-component="client/src/components/DeviceContextMenu.tsx"
       >
         <div 
-          className="confirmPanel" 
-          style={{ minWidth: 380, maxWidth: 480 }} 
-          onMouseDown={e => e.stopPropagation()}
-          data-inspector-id="genericInput.panel"
-          data-inspector-label="Generic input modal card panel"
+          className="confirmTitle"
+          data-inspector-id="genericInput.title"
+          data-inspector-label="Generic input modal title"
           data-inspector-component="client/src/components/DeviceContextMenu.tsx"
         >
-          <div 
-            className="confirmTitle"
-            data-inspector-id="genericInput.title"
-            data-inspector-label="Generic input modal title"
+          {state.title}
+        </div>
+        <div className="confirmText">
+          {state.label ? <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>{state.label}</label> : null}
+          <input
+            ref={inputRef}
+            type='text'
+            className="modalInput"
+            placeholder={state.placeholder ?? ''}
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleSubmit();
+            }}
+            data-inspector-id="genericInput.field"
+            data-inspector-label="Generic input text field"
+            data-inspector-component="client/src/components/DeviceContextMenu.tsx"
+          />
+        </div>
+        <div className="confirmActions">
+          <button 
+            type='button' 
+            className="modalBtn" 
+            onClick={onClose}
+            data-inspector-id="genericInput.cancelButton"
+            data-inspector-label="Generic input modal cancel button"
             data-inspector-component="client/src/components/DeviceContextMenu.tsx"
           >
-            {state.title}
-          </div>
-          <div className="confirmText">
-            {state.label ? <label className="modalLabelSmall" style={{ display: 'block', marginBottom: 8 }}>{state.label}</label> : null}
-            <input
-              ref={inputRef}
-              type='text'
-              className="modalInput"
-              placeholder={state.placeholder ?? ''}
-              value={value}
-              onChange={e => setValue(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleSubmit();
-                if (e.key === 'Escape') onClose();
-              }}
-              data-inspector-id="genericInput.field"
-              data-inspector-label="Generic input text field"
-              data-inspector-component="client/src/components/DeviceContextMenu.tsx"
-            />
-          </div>
-          <div className="confirmActions">
-            <button 
-              type='button' 
-              className="modalBtn" 
-              onClick={onClose}
-              data-inspector-id="genericInput.cancelButton"
-              data-inspector-label="Generic input modal cancel button"
-              data-inspector-component="client/src/components/DeviceContextMenu.tsx"
-            >
-              Huỷ
-            </button>
-            <button
-              type='button'
-              className="modalBtnPrimary"
-              style={{
-                opacity: value.trim() ? 1 : 0.5,
-                cursor: value.trim() ? 'pointer' : 'not-allowed'
-              }}
-              disabled={!value.trim()}
-              onClick={handleSubmit}
-              data-inspector-id="genericInput.confirmButton"
-              data-inspector-label="Generic input modal confirm button"
-              data-inspector-component="client/src/components/DeviceContextMenu.tsx"
-            >
-              Xác Nhận
-            </button>
-          </div>
+            Huỷ
+          </button>
+          <button
+            type='button'
+            className="modalBtnPrimary"
+            style={{
+              opacity: value.trim() ? 1 : 0.5,
+              cursor: value.trim() ? 'pointer' : 'not-allowed'
+            }}
+            disabled={!value.trim()}
+            onClick={handleSubmit}
+            data-inspector-id="genericInput.confirmButton"
+            data-inspector-label="Generic input modal confirm button"
+            data-inspector-component="client/src/components/DeviceContextMenu.tsx"
+          >
+            Xác Nhận
+          </button>
         </div>
       </div>
-    </>,
-    document.body
+    </ModalLayer>
   );
 }
