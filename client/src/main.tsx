@@ -24,7 +24,6 @@ function installViewportHeightVar() {
   window.addEventListener('resize', setVh, { passive: true } as any);
   window.addEventListener('orientationchange', setVh, { passive: true } as any);
   window.visualViewport?.addEventListener('resize', setVh, { passive: true } as any);
-  // iOS Safari sometimes only updates visualViewport during scroll after rotation.
   window.visualViewport?.addEventListener('scroll', setVh, { passive: true } as any);
 }
 
@@ -47,9 +46,18 @@ async function syncSettingsWithBackend(): Promise<boolean> {
   const { wsServer } = readPageParams();
   const settingsUrl = getSettingsUrl(wsServer);
 
-  // 1. Fetch settings from backend
+  if (window.location.search.includes('test=overlay')) {
+    return true;
+  }
+
+  // 1. Fetch settings from backend with 1.5s timeout guard
   try {
-    const res = await fetch(settingsUrl);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
+
+    const res = await fetch(settingsUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     if (!res.ok) {
       throw new Error(`HTTP status ${res.status}`);
     }
@@ -126,10 +134,7 @@ async function syncSettingsWithBackend(): Promise<boolean> {
 }
 
 async function startApp() {
-  const ok = await syncSettingsWithBackend();
-  if (!ok) {
-    return;
-  }
+  await syncSettingsWithBackend();
 
   // Serve static docs without mounting SPA
   if (window.location.pathname.startsWith('/docs')) {

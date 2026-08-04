@@ -18,11 +18,12 @@ export interface OverlayPortalProps {
 }
 
 export const OverlayPortal: React.FC<OverlayPortalProps> = ({ children }) => {
-  const [container, setContainer] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setContainer(getOrCreateOverlayRoot());
-  }, []);
+  const [container] = useState<HTMLElement | null>(() => {
+    if (typeof document !== 'undefined') {
+      return getOrCreateOverlayRoot();
+    }
+    return null;
+  });
 
   if (!container) return null;
   return createPortal(children, container);

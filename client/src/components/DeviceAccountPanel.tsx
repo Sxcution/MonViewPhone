@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ContextMenuLayer } from '@/components/ui/ContextMenuLayer';
 import { AnchoredPopover } from '@/components/ui/AnchoredPopover';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { FloatingTooltip, getFloatingTooltipStyle } from '@/components/ui/FloatingTooltip';
 import { getNearbyAccountState, hasNearbyRelevantAccount, hasNearbyEligibleAccount, getNearbyAccountGroupState } from '@/lib/deviceAccountNearby';
 import { useServer } from '@/context/ServerContext';
 import { listUserProfiles, runAdbCommandApi } from '@/lib/serverApi';
@@ -160,30 +161,6 @@ const getCalendarDaysDiff = (ts1: number, ts2: number) => {
   const d2 = new Date(getLocalDateString(ts2));
   const diffTime = d2.getTime() - d1.getTime();
   return Math.round(diffTime / (1000 * 60 * 60 * 24));
-};
-
-const getFloatingTooltipStyle = (x: number, y: number) => {
-  const screenWidth = window.innerWidth;
-  let tx = '-50%';
-  let ty = 'calc(-100% - 10px)';
-
-  // Dynamic threshold to avoid overflowing the left/right screen boundaries
-  const threshold = Math.min(250, screenWidth / 2 - 20);
-  if (x < threshold) {
-    tx = '15px';
-  } else if (x > screenWidth - threshold) {
-    tx = 'calc(-100% - 15px)';
-  }
-
-  if (y < 160) {
-    ty = '15px';
-  }
-
-  return {
-    left: x,
-    top: y,
-    transform: `translate(${tx}, ${ty})`
-  };
 };
 
 const countConsecutiveDays = (startDateStr: string, allDates: string[]) => {
@@ -2135,21 +2112,15 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 />
               </button>
               {bellTooltip && noticeTooltipText && noticeTooltipText.length > 0 && (
-                <OverlayPortal>
-                  <div
-                    className="dav-bell-tooltip-floating"
-                    style={{
-                      ...getFloatingTooltipStyle(bellTooltip.x, bellTooltip.y),
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                      position: 'fixed',
-                      zIndex: 'var(--md-layer-tooltip, 30500)',
-                    }}
-                  >
-                    {noticeTooltipText}
-                  </div>
-                </OverlayPortal>
+                <FloatingTooltip
+                  isOpen={true}
+                  onClose={() => setBellTooltip(null)}
+                  x={bellTooltip.x}
+                  y={bellTooltip.y}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}
+                >
+                  {noticeTooltipText}
+                </FloatingTooltip>
               )}
             </>
           )}
@@ -2157,7 +2128,7 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
           {activeDailyReminders.length > 0 && (
             <AnchoredPopover
               isOpen={true}
-              onClose={() => {}}
+              onClose={() => activeDailyReminders.forEach(acc => dismissReminder(acc.id))}
               anchorRef={bellBtnRef}
               closeOnOutsideClick={false}
               closeOnEscape={false}
@@ -2265,25 +2236,21 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 const nameColor = getAccountListNameColor(acc);
 
                 return (
-                  <OverlayPortal>
-                    <div
-                      className="dav-bell-tooltip-floating"
-                      style={{
-                        ...getFloatingTooltipStyle(accountHoverTooltip.x, accountHoverTooltip.y),
-                        whiteSpace: 'pre-line',
-                        position: 'fixed',
-                        zIndex: 'var(--md-layer-tooltip, 30500)',
-                      }}
-                    >
-                      <div style={{ color: nameColor, fontWeight: 'bold', marginBottom: '4px' }}>
-                        {accName}
-                      </div>
-                      <div>{line1}</div>
-                      {details.map((detail, idx) => (
-                        <div key={idx} style={{ marginTop: '2px' }}>{detail}</div>
-                      ))}
+                  <FloatingTooltip
+                    isOpen={true}
+                    onClose={() => setAccountHoverTooltip(null)}
+                    x={accountHoverTooltip.x}
+                    y={accountHoverTooltip.y}
+                    style={{ whiteSpace: 'pre-line' }}
+                  >
+                    <div style={{ color: nameColor, fontWeight: 'bold', marginBottom: '4px' }}>
+                      {accName}
                     </div>
-                  </OverlayPortal>
+                    <div>{line1}</div>
+                    {details.map((detail, idx) => (
+                      <div key={idx} style={{ marginTop: '2px' }}>{detail}</div>
+                    ))}
+                  </FloatingTooltip>
                 );
               })()}
               {badgeHoverTooltip && (() => {
@@ -2360,18 +2327,14 @@ export const DeviceAccountPanel = React.memo(function DeviceAccountPanel({
                 });
 
                 return (
-                  <OverlayPortal>
-                    <div
-                      className="dav-bell-tooltip-floating"
-                      style={{
-                        ...getFloatingTooltipStyle(badgeHoverTooltip.x, badgeHoverTooltip.y),
-                        position: 'fixed',
-                        zIndex: 'var(--md-layer-tooltip, 30500)',
-                      }}
-                    >
-                      {tooltipRows.length > 0 ? tooltipRows : 'Tổng số tài khoản trên điện thoại này'}
-                    </div>
-                  </OverlayPortal>
+                  <FloatingTooltip
+                    isOpen={true}
+                    onClose={() => setBadgeHoverTooltip(null)}
+                    x={badgeHoverTooltip.x}
+                    y={badgeHoverTooltip.y}
+                  >
+                    {tooltipRows.length > 0 ? tooltipRows : 'Tổng số tài khoản trên điện thoại này'}
+                  </FloatingTooltip>
                 );
               })()}
         </div>

@@ -24,6 +24,7 @@ import { AutomationModal, type AutomationDeviceOption, type AutomationModalRef }
 import { AutomationPanel } from '@/components/AutomationPanel'
 import { VisualAlertPanel } from '@/components/VisualAlertPanel'
 import { ThemeInspector } from '@/components/ThemeInspector'
+import { OverlayTestHarness } from '@/components/ui/OverlayTestHarness'
 import { MacroPlaybackPanel } from '@/components/MacroPlaybackPanel'
 import { applyThemeOverrides, loadThemeOverrides } from '@/lib/themeInspector'
 import { useActive } from '@/context/ActiveContext'
@@ -3137,6 +3138,10 @@ export function App() {
     }),
     [runQuickAudioAction, runPhysicalScreenOffWithStayAwake, quickCommandTargets, getTargetsByUdids, wsServer, t]
   )
+
+  if (typeof window !== 'undefined' && window.location.search.includes('test=overlay')) {
+    return <OverlayTestHarness />;
+  }
 
   {/* ===== SIDEBAR DEVICE GRID — Tổng tất cả ===== */ }
   return (

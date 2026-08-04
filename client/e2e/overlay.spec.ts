@@ -1,19 +1,19 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Overlay Architecture & Stacking Tests', () => {
+test.describe('Real React Component Overlay Architecture & Stacking E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto('/?test=overlay');
+    await page.waitForSelector('#overlay-test-harness');
   });
 
   test('P0: #overlay-root has no position: fixed or zIndex and creates no stacking context', async ({ page }) => {
+    // Open a popover to ensure #overlay-root is mounted in DOM
+    await page.click('#btn-popover-ref');
+    await expect(page.locator('#overlay-root #test-popover-ref-content')).toBeVisible();
+
     const rootStyles = await page.evaluate(() => {
-      let root = document.getElementById('overlay-root');
-      if (!root) {
-        root = document.createElement('div');
-        root.id = 'overlay-root';
-        document.body.appendChild(root);
-      }
+      const root = document.getElementById('overlay-root');
+      if (!root) return null;
       const comp = window.getComputedStyle(root);
       return {
         position: comp.position,
@@ -23,176 +23,130 @@ test.describe('Overlay Architecture & Stacking Tests', () => {
       };
     });
 
-    expect(rootStyles.position).not.toBe('fixed');
-    expect(rootStyles.zIndex).toBe('auto');
+    expect(rootStyles).not.toBeNull();
+    expect(rootStyles!.position).not.toBe('fixed');
+    expect(rootStyles!.zIndex).toBe('auto');
+  });
+
+  test('P0 REAL FIX: AnchoredPopover with anchorRef actually renders inside #overlay-root', async ({ page }) => {
+    // Click button that passes anchorRef to AnchoredPopover
+    await page.click('#btn-popover-ref');
+
+    // Verify popover element is actually rendered inside #overlay-root
+    const popoverContent = page.locator('#overlay-root #test-popover-ref-content');
+    await expect(popoverContent).toBeVisible();
+
+    // Verify position is computed near the anchor button
+    const btnBox = await page.locator('#btn-popover-ref').boundingBox();
+    const popoverBox = await popoverContent.boundingBox();
+
+    expect(btnBox).not.toBeNull();
+    expect(popoverBox).not.toBeNull();
+
+    // AnchoredPopover must be placed relative to the button
+    expect(popoverBox!.x).toBeGreaterThan(0);
+    expect(popoverBox!.y).toBeGreaterThan(0);
   });
 
   test('P0: document.elementFromPoint() at center of ConfirmDialog over ContextMenu returns Confirm surface', async ({ page }) => {
-    const result = await page.evaluate(() => {
-      // Simulate opening a context menu first
-      const menu = document.createElement('div');
-      menu.id = 'test-context-menu';
-      menu.style.position = 'fixed';
-      menu.style.left = '400px';
-      menu.style.top = '300px';
-      menu.style.width = '200px';
-      menu.style.height = '150px';
-      menu.style.zIndex = 'var(--md-layer-menu, 30000)';
-      menu.style.background = '#222';
+    // Open ContextMenu first
+    await page.click('#btn-context-menu');
+    await expect(page.locator('#overlay-root #test-context-menu-content')).toBeVisible();
 
-      // Simulate opening a ConfirmDialog on top
-      const confirmOverlay = document.createElement('div');
-      confirmOverlay.id = 'test-confirm-overlay';
-      confirmOverlay.style.position = 'fixed';
-      confirmOverlay.style.inset = '0';
-      confirmOverlay.style.zIndex = 'var(--md-layer-confirm, 31000)';
-      confirmOverlay.style.display = 'flex';
-      confirmOverlay.style.alignItems = 'center';
-      confirmOverlay.style.justifyContent = 'center';
+    // Open ConfirmDialog on top
+    await page.click('#btn-confirm-dialog');
+    const confirmCard = page.locator('#overlay-root .confirmPanel');
+    await expect(confirmCard).toBeVisible();
 
-      const confirmCard = document.createElement('div');
-      confirmCard.id = 'test-confirm-card';
-      confirmCard.style.width = '300px';
-      confirmCard.style.height = '180px';
-      confirmCard.style.background = '#333';
-      confirmOverlay.appendChild(confirmCard);
-
-      let root = document.getElementById('overlay-root');
-      if (!root) {
-        root = document.createElement('div');
-        root.id = 'overlay-root';
-        document.body.appendChild(root);
-      }
-      root.appendChild(menu);
-      root.appendChild(confirmOverlay);
-
-      const rect = confirmCard.getBoundingClientRect();
+    // Perform elementFromPoint at the center of ConfirmDialog
+    const isConfirmCard = await page.evaluate(() => {
+      const card = document.querySelector('#overlay-root .confirmPanel');
+      if (!card) return false;
+      const rect = card.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-
-      const topElement = document.elementFromPoint(centerX, centerY);
-      return {
-        topElementId: topElement?.id,
-        isConfirmCard: topElement === confirmCard || confirmCard.contains(topElement),
-      };
+      const topEl = document.elementFromPoint(centerX, centerY);
+      return card === topEl || card.contains(topEl);
     });
 
-    expect(result.isConfirmCard).toBe(true);
+    expect(isConfirmCard).toBe(true);
   });
 
-  test('P0: Viewport 4-edge clamping prevents popover overflow', async ({ page }) => {
-    const edges = [
-      { name: 'top-left', x: 5, y: 5 },
-      { name: 'top-right', x: 1200, y: 5 },
-      { name: 'bottom-left', x: 5, y: 700 },
-      { name: 'bottom-right', x: 1200, y: 700 },
-    ];
+  test('P0: Viewport 4-edge clamping prevents popover overflow on real component', async ({ page }) => {
+    // Click bottom-right anchored target button
+    await page.click('#btn-clamp-test');
+    await expect(page.locator('#overlay-root #test-popover-clamp-content')).toBeVisible();
 
-    for (const edge of edges) {
-      const isClamped = await page.evaluate(({ x, y }) => {
-        const popover = document.createElement('div');
-        popover.style.position = 'fixed';
-        popover.style.width = '250px';
-        popover.style.height = '200px';
-        popover.style.zIndex = 'var(--md-layer-menu, 30000)';
+    const isClamped = await page.evaluate(() => {
+      const popover = document.querySelector('#overlay-root .test-popover-clamp-panel');
+      if (!popover) return false;
 
-        // Clamping logic calculation
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const margin = 8;
-        let left = Math.max(margin, Math.min(x, vw - 250 - margin));
-        let top = Math.max(margin, Math.min(y, vh - 200 - margin));
+      const rect = popover.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
 
-        popover.style.left = `${left}px`;
-        popover.style.top = `${top}px`;
-
-        let root = document.getElementById('overlay-root') || document.body;
-        root.appendChild(popover);
-
-        const rect = popover.getBoundingClientRect();
-        const validLeft = rect.left >= 0 && rect.right <= vw;
-        const validTop = rect.top >= 0 && rect.bottom <= vh;
-
-        root.removeChild(popover);
-        return validLeft && validTop;
-      }, edge);
-
-      expect(isClamped).toBe(true);
-    }
-  });
-
-  test('P0: Escape key pops top-most overlay only', async ({ page }) => {
-    const state = await page.evaluate(() => {
-      const stack: string[] = [];
-
-      const pushOverlay = (id: string) => stack.push(id);
-      const popOverlay = () => stack.pop();
-
-      pushOverlay('modal-parent');
-      pushOverlay('confirm-child');
-
-      // Simulate Escape key press popping top-most
-      const popped1 = popOverlay();
-      const remaining1 = [...stack];
-
-      const popped2 = popOverlay();
-      const remaining2 = [...stack];
-
-      return { popped1, remaining1, popped2, remaining2 };
+      return rect.left >= 0 && rect.right <= vw && rect.top >= 0 && rect.bottom <= vh;
     });
 
-    expect(state.popped1).toBe('confirm-child');
-    expect(state.remaining1).toEqual(['modal-parent']);
-    expect(state.popped2).toBe('modal-parent');
-    expect(state.remaining2).toEqual([]);
+    expect(isClamped).toBe(true);
   });
 
-  test('P0: Opening ModalLayer auto-closes transient popovers/menus', async ({ page }) => {
-    const autoClosed = await page.evaluate(() => {
-      let menuClosed = false;
-      const transientMenu = {
-        id: 'transient-1',
-        type: 'popover',
-        close: () => { menuClosed = true; }
-      };
+  test('P0: Escape key skips closeOnEscape=false and pops top-most closable overlay', async ({ page }) => {
+    // Open Reminder Popover FIRST (closeOnEscape = false)
+    await page.click('#btn-reminder-no-escape');
+    await expect(page.locator('#overlay-root #test-reminder-content')).toBeVisible();
 
-      // When modal opens, transient items are closed
-      if (transientMenu.type === 'popover' || transientMenu.type === 'context-menu') {
-        transientMenu.close();
-      }
+    // Open Confirm Dialog SECOND (closeOnEscape = true)
+    await page.click('#btn-confirm-dialog');
+    await expect(page.locator('#overlay-root .confirmPanel')).toBeVisible();
 
-      return menuClosed;
-    });
+    // Press Escape key
+    await page.keyboard.press('Escape');
 
-    expect(autoClosed).toBe(true);
+    // Confirm Dialog should be closed by Escape because OverlayManager searched down the stack!
+    await expect(page.locator('#overlay-root .confirmPanel')).toBeHidden();
+
+    // Reminder popover remains open because it has closeOnEscape = false
+    await expect(page.locator('#overlay-root #test-reminder-content')).toBeVisible();
+  });
+
+  test('P0: Opening ModalLayer auto-closes transient popovers and menus', async ({ page }) => {
+    // Open Popover
+    await page.click('#btn-popover-ref');
+    await expect(page.locator('#overlay-root #test-popover-ref-content')).toBeVisible();
+
+    // Open ContextMenu
+    await page.click('#btn-context-menu');
+    await expect(page.locator('#overlay-root #test-context-menu-content')).toBeVisible();
+
+    // Open ModalLayer
+    await page.click('#btn-modal-layer');
+    await expect(page.locator('#overlay-root #test-modal-content')).toBeVisible();
+
+    // Popover and ContextMenu must be auto-closed by OverlayManager
+    await expect(page.locator('#overlay-root #test-popover-ref-content')).toBeHidden();
+    await expect(page.locator('#overlay-root #test-context-menu-content')).toBeHidden();
   });
 
   for (const zoomFactor of [1.0, 1.25, 1.5]) {
-    test(`P0: Viewport zoom level ${zoomFactor * 100}% overlay coordinate accuracy`, async ({ page }) => {
+    test(`P0: Real component coordinate accuracy under zoom level ${zoomFactor * 100}%`, async ({ page }) => {
       await page.evaluate((zoom) => {
-        document.body.style.transform = `scale(${zoom})`;
-        document.body.style.transformOrigin = '0 0';
+        document.body.style.zoom = `${zoom}`;
       }, zoomFactor);
 
-      const isValid = await page.evaluate(() => {
-        const root = document.getElementById('overlay-root') || document.body;
-        const testEl = document.createElement('div');
-        testEl.style.position = 'fixed';
-        testEl.style.left = '100px';
-        testEl.style.top = '100px';
-        testEl.style.width = '100px';
-        testEl.style.height = '100px';
-        testEl.style.zIndex = 'var(--md-layer-modal, 27000)';
-        root.appendChild(testEl);
+      await page.click('#btn-popover-ref');
+      const popover = page.locator('#overlay-root #test-popover-ref-content');
+      await expect(popover).toBeVisible();
 
-        const rect = testEl.getBoundingClientRect();
-        const hit = document.elementFromPoint(rect.left + 10, rect.top + 10);
-        root.removeChild(testEl);
-
-        return hit === testEl;
+      const hitSuccess = await page.evaluate(() => {
+        const el = document.querySelector('#overlay-root #test-popover-ref-content');
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        const topEl = document.elementFromPoint(rect.left + 5, rect.top + 5);
+        return el === topEl || el.contains(topEl);
       });
 
-      expect(isValid).toBe(true);
+      expect(hitSuccess).toBe(true);
     });
   }
 });

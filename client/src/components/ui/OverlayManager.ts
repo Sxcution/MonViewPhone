@@ -21,11 +21,14 @@ class OverlayManagerService {
 
   private handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
-      const top = this.getTopOverlay();
-      if (top && top.closeOnEscape !== false) {
-        e.preventDefault();
-        e.stopPropagation();
-        top.onClose();
+      for (let i = this.stack.length - 1; i >= 0; i--) {
+        const item = this.stack[i];
+        if (item.closeOnEscape !== false) {
+          e.preventDefault();
+          e.stopPropagation();
+          item.onClose();
+          break;
+        }
       }
     }
   };

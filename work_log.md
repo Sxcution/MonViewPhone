@@ -428,11 +428,26 @@
 - Verification độc lập cuối PASS `32/32`, FAIL `0`: mọi máy online đều đúng `versionCode=263008000`, đủ `4` APK active có SHA-256 khớp nguồn, installed cho user `0`, và resolve được `com.whatsapp/.Main`.
 - Cảnh báo runtime: `eubqcykrhm8dw8hy` ghi hai crash JNI lúc `01:32:36–01:32:37`, `UnsatisfiedLinkError` tại `AbortHooks.init()` ngay sau update cùng version; app tự phục hồi, hai process WhatsApp chạy ổn hơn `11` phút và không có crash lặp lại sau `01:32:38`. Không rollback, clear data hoặc cài lại ngoài phạm vi yêu cầu.
 - **17:19**: Thực hiện build lại toàn bộ hệ thống MonViewPhone theo yêu cầu người dùng (`client` frontend Vite, `server-go` Go backend, `stream-node`). Tất cả đều kết thúc thành công với mã 0 (`dist/` mới và `server-go.exe` đã được tạo).
-- **18:30**: Complete all 5 P0 requirements for Overlay Refactor:
-  1. Fix `OverlayPortal.tsx`: Removed `position: fixed`, `top: 0`, `left: 0`, `width: 100vw`, `height: 0`, and `zIndex` from `#overlay-root`, ensuring `#overlay-root` creates NO CSS stacking context whatsoever.
-  2. Refactor `DeviceAccountPanel.tsx`: Converted all 11 direct `createPortal` / inline popups (`accountTitleDropdownOpen`, `showNameStatusDropdown`, `bellTooltip`, `dav-daily-reminder-tooltip`, `accountHoverTooltip`, `badgeHoverTooltip`, `ctxMenu`, `pendingDeleteAccount`, `historyModalAccount`, `pendingResetHistoryAccount`, `accountActionMenu`, `moveModal`, `noticeEditModal`) to official portal primitives (`AnchoredPopover`, `ContextMenuLayer`, `ConfirmDialog`, `ModalLayer`, `Tooltip`, `OverlayPortal`). Removed CSS `:has()` workaround elevating tile z-index from `styles.css`.
-  3. Fix `ModalLayer.tsx` & `OverlayManager.ts`: Added backdrop rendering with `rgba(0, 0, 0, 0.45)` when `showBackdrop=true` and `transparent` when `false`. Cached `document.body.style.overflow` prior to lock and restored exact original value when modal stack empties.
-  4. Repo Audit: Audited all `createPortal` calls and confirmed zero un-wrappered direct `createPortal` or inline popups remain inside tile/viewer components.
-  5. Playwright Runtime E2E Suite: Created `client/e2e/overlay.spec.ts` and `client/playwright.config.ts`. Verified 8/8 tests pass (`document.elementFromPoint()` at center of `ConfirmDialog` over `ContextMenu` returns `ConfirmDialog` surface; 4-edge viewport clamping; `Escape` key top-most popping; auto-closing transient popovers; viewport zoom 100%, 125%, 150%).
-  - Verification: `npm run check:ui` PASSED, `npx playwright test` 8/8 PASSED, `npm run build` PASSED.
+- **19:20**: Resolved all overlay review findings and verified with real React component E2E test suite:
+  1. Fixed P0 bug in `AnchoredPopover.tsx`:
+     - Changed `if (!isOpen || !anchorEl) return null;` to check `targetAnchor` (`anchorEl ?? anchorRef?.current ?? null`).
+     - Fixed `ResizeObserver`, `useEffect`, and `useLayoutEffect` dependency arrays to observe `targetAnchor` instead of `anchorEl`.
+     - Passed `closeOnEscape` prop down to `OverlayManager.register({ closeOnEscape })` instead of hardcoding `closeOnEscape: true`.
+     - Directly updated DOM element `style.left` and `style.top` in `updatePosition()` to prevent 1-frame position lag.
+  2. Fixed `OverlayPortal.tsx`:
+     - Initialized `container` synchronously in `useState(() => getOrCreateOverlayRoot())` so `createPortal` mounts on frame 1 without delaying 1 frame in `useEffect`.
+  3. Created `FloatingTooltip.tsx`:
+     - Added `FloatingTooltip` component registering mouse-following floating tooltips (`bellTooltip`, `accountHoverTooltip`, `badgeHoverTooltip`) with `OverlayManager` (type `'tooltip'`, level `30500`, `closeOnEscape: true`), automatically closing on modal open.
+  4. Fixed `OverlayManager.ts`:
+     - Updated `handleKeyDown` to search top-to-bottom for the top-most closable overlay (`closeOnEscape !== false`), ensuring non-closable overlays (like Daily Reminder) do not swallow `Escape` key events.
+  5. Built Real React Component E2E Test Suite (`client/src/components/ui/OverlayTestHarness.tsx` & `client/e2e/overlay.spec.ts`):
+     - Created React test harness mounting real `AnchoredPopover`, `ContextMenuLayer`, `ConfirmDialog`, `ModalLayer`, `FloatingTooltip` components.
+     - Playwright E2E suite tests real React DOM elements:
+       - `AnchoredPopover` using `anchorRef` renders in `#overlay-root` and positions correctly below target button.
+       - `document.elementFromPoint()` at center of `ConfirmDialog` over `ContextMenu` returns `ConfirmDialog` surface.
+       - Viewport 4-edge clamping on real popovers.
+       - `Escape` key skipping `closeOnEscape=false` popover and popping top-most closable overlay.
+       - `ModalLayer` auto-closing transient popovers and menus.
+       - Coordinate hit testing under zoom levels 100%, 125%, and 150%.
+  - Verification: `npm run check:ui` PASSED, `npx playwright test` 9/9 PASSED (4.9s), `npm run build` PASSED.
 

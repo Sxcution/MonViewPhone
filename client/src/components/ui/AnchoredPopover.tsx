@@ -37,10 +37,10 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
   closeOnOutsideClick = true,
   closeOnEscape = true,
 }) => {
-  const targetAnchor = anchorEl || (anchorRef ? anchorRef.current : null);
+  const targetAnchor = anchorEl ?? anchorRef?.current ?? null;
   const popoverIdRef = useRef<string>(`popover-${Math.random().toString(36).substr(2, 9)}`);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ left: 0, top: 0 });
+  const [pos, setPos] = useState({ left: -9999, top: -9999 });
 
   const updatePosition = () => {
     if (!targetAnchor || !popoverRef.current) return;
@@ -84,7 +84,17 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
       left = Math.max(margin, vw - popoverRect.width - margin);
     }
     if (left < margin) left = margin;
+
+    // Vertical clamping
+    if (top + popoverRect.height > vh - margin) {
+      top = Math.max(margin, vh - popoverRect.height - margin);
+    }
     if (top < margin) top = margin;
+
+    if (popoverRef.current) {
+      popoverRef.current.style.left = `${left}px`;
+      popoverRef.current.style.top = `${top}px`;
+    }
 
     setPos({ left, top });
   };
@@ -96,7 +106,7 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
       id: popoverIdRef.current,
       type: 'popover',
       onClose,
-      closeOnEscape: true,
+      closeOnEscape,
     });
 
     const handlePointerDown = (e: PointerEvent | MouseEvent) => {
@@ -121,9 +131,9 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
     window.addEventListener('resize', handleScrollOrResize, true);
 
     let ro: ResizeObserver | null = null;
-    if (anchorEl && typeof ResizeObserver !== 'undefined') {
+    if (targetAnchor && typeof ResizeObserver !== 'undefined') {
       ro = new ResizeObserver(() => updatePosition());
-      ro.observe(anchorEl);
+      ro.observe(targetAnchor);
     }
 
     return () => {
@@ -133,15 +143,15 @@ export const AnchoredPopover: React.FC<AnchoredPopoverProps> = ({
       window.removeEventListener('resize', handleScrollOrResize, true);
       if (ro) ro.disconnect();
     };
-  }, [isOpen, anchorEl, onClose, closeOnOutsideClick]);
+  }, [isOpen, targetAnchor, onClose, closeOnOutsideClick, closeOnEscape]);
 
   useLayoutEffect(() => {
     if (isOpen) {
       updatePosition();
     }
-  }, [isOpen, anchorEl, placement]);
+  }, [isOpen, targetAnchor, placement]);
 
-  if (!isOpen || !anchorEl) return null;
+  if (!isOpen || !targetAnchor) return null;
 
   return (
     <OverlayPortal>
